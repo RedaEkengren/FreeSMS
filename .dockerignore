@@ -1,0 +1,7 @@
+.git
+.github
+.env
+*.md
+!README.md
+/attachments/
+*.sql.gz
