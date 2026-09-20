@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: redasms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-redasms}
+      POSTGRES_DB: redasms
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      # pg_isready reports that the server accepts connections. The application
+      # waits for this rather than racing the first migration against a
+      # database that is still starting.
+      test: ["CMD-SHELL", "pg_isready -U redasms -d redasms"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://redasms:${POSTGRES_PASSWORD:-redasms}@db:5432/redasms?sslmode=disable
+      HTTP_ADDR: ":8080"
+      BASE_URL: ${BASE_URL:-http://localhost:8080}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env (openssl rand -base64 32)}
+      ATTACHMENTS_DIR: /var/lib/redasms/attachments
+      DEFAULT_LOCALE: ${DEFAULT_LOCALE:-en}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      RELEASE: ${RELEASE:-dev}
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+    volumes:
+      - attachments:/var/lib/redasms/attachments
+    healthcheck:
+      # The binary is the only thing in the image, so the check runs it rather
+      # than reaching for curl or wget, which are not there.
+      test: ["CMD", "/redasms", "-healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  attachments:

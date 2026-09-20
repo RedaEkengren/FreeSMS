@@ -11,8 +11,8 @@ and no annual contract.
 
 ## Status
 
-Early. The repository is being set up; there is nothing to run yet. Progress is
-tracked in [issues](https://github.com/RedaEkengren/RedaSMS/issues), grouped
+Early. The service starts, applies its schema and answers a health check;
+there is no domain functionality yet. Progress is tracked in [issues](https://github.com/RedaEkengren/RedaSMS/issues), grouped
 into four milestones:
 
 | Milestone | What it covers |
@@ -47,10 +47,30 @@ RedaSMS is built around three decisions that follow from that:
 
 ## Running it
 
-Not yet possible. This section is filled in by
-[#2](https://github.com/RedaEkengren/RedaSMS/issues/2), which adds the Go
-skeleton, and will describe `docker compose up` and nothing more complicated
-than that.
+Docker and nothing else.
+
+```sh
+cp .env.example .env
+sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -base64 32)|" .env
+docker compose up
+```
+
+That starts Postgres, applies the migrations and serves on
+<http://localhost:8080>. Check it:
+
+```sh
+curl http://localhost:8080/healthz
+# {"status":"healthy","release":"dev","database":"up"}
+```
+
+The health endpoint reaches the database rather than reporting that the
+process is alive, so a green check means the service can actually do its job.
+
+To work on the code without installing Go locally:
+
+```sh
+docker run --rm -v "$PWD":/src -w /src golang:1.27-alpine go test ./...
+```
 
 ## Hosting and cost
 

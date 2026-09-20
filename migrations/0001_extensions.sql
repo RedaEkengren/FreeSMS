@@ -1,0 +1,11 @@
+-- Extensions the schema relies on.
+--
+-- gen_random_uuid() is built into PostgreSQL 13 and later, so pgcrypto is not
+-- needed for identifiers.
+--
+-- citext gives case-insensitive comparison without lower() on every query and
+-- every index. It is here for email addresses: a person who registers as
+-- Anna@example.com and signs in as anna@example.com is the same person, and
+-- the database is the right place for that to be true rather than every
+-- caller remembering to normalise.
+CREATE EXTENSION IF NOT EXISTS citext;
