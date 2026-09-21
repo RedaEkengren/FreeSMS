@@ -115,17 +115,23 @@ WHERE id = '77777777-7777-7777-7777-777777777779';
 
 -- A normal line, a fractional one, and a warranty replacement at zero that
 -- still appears on the order.
+-- approved_at and estimated_unit_price_minor are set because these lines were
+-- quoted and agreed. Leaving them NULL would show every demonstration line as
+-- "added after approval", which is true of the data and false about the shop.
 INSERT INTO work_order_lines
-  (id, shop_id, work_order_id, position, kind, description, quantity, unit_price_minor, vat_rate_bp, cost_bearer)
+  (id, shop_id, work_order_id, position, kind, description, quantity, unit_price_minor,
+   estimated_unit_price_minor, vat_rate_bp, cost_bearer, approved_at)
 VALUES
   ('cccccccc-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
-   '77777777-7777-7777-7777-777777777777', 1, 'labour', 'Replace front brake pads and discs', 2.5, 89500, 2500, 'customer'),
+   '77777777-7777-7777-7777-777777777777', 1, 'labour', 'Replace front brake pads and discs', 2.5, 89500, 89500, 2500, 'customer', now()),
   ('cccccccc-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111',
-   '77777777-7777-7777-7777-777777777777', 2, 'part', 'Brake pad set, front', 1, 74900, 2500, 'customer'),
+   -- Quoted at 699, charged at 749: the supplier put the price up between the
+   -- estimate and the work. Both are kept, and the board shows the difference.
+   '77777777-7777-7777-7777-777777777777', 2, 'part', 'Brake pad set, front', 1, 74900, 69900, 2500, 'customer', now()),
   ('cccccccc-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111',
-   '77777777-7777-7777-7777-777777777777', 3, 'part', 'Brake caliper, left front (warranty)', 1, 0, 2500, 'supplier'),
+   '77777777-7777-7777-7777-777777777777', 3, 'part', 'Brake caliper, left front (warranty)', 1, 0, 0, 2500, 'supplier', now()),
   ('cccccccc-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111',
-   '77777777-7777-7777-7777-777777777778', 1, 'part', 'Engine oil 5W-30', 4.5, 12900, 2500, 'customer')
+   '77777777-7777-7777-7777-777777777778', 1, 'part', 'Engine oil 5W-30', 4.5, 12900, 12900, 2500, 'customer', now())
 ON CONFLICT (id) DO NOTHING;
 
 COMMIT;

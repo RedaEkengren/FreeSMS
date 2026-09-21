@@ -99,6 +99,7 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		Session: session,
 		Job:     job,
 		Lines:   lines,
+		Next:    workshop.NextStates(workshop.State(job.State)),
 	})
 }
 

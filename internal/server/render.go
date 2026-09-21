@@ -23,6 +23,7 @@ type pageData struct {
 	Job   workshop.Job
 	Lines []workshop.Line
 	Board []workshop.BoardEntry
+	Next  []workshop.State
 	Form  intakeForm
 
 	// Setup only.

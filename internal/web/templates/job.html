@@ -14,6 +14,18 @@
   {{if .Job.OdometerKm}}<dt>Odometer</dt><dd>{{.Job.OdometerKm}} km</dd>{{end}}
 </dl>
 
+{{if .Next}}
+<h2>Move it along</h2>
+<div class="actions">
+  {{range .Next}}
+  <form method="post" action="/jobs/{{$.Job.ID}}/state" style="margin:0">
+    <input type="hidden" name="state" value="{{.}}">
+    <button type="submit" class="secondary">{{.}}</button>
+  </form>
+  {{end}}
+</div>
+{{end}}
+
 <h2>Lines</h2>
 {{if not .Lines}}
   <p class="empty">Nothing on this order yet.</p>
@@ -23,12 +35,54 @@
   <li>
     <div class="row">
       <span>{{.Description}}</span>
-      <span class="tag">{{.Quantity}}</span>
+      <span>{{.Quantity}} &times; {{.Price}}</span>
     </div>
-    {{if ne .CostBearer "customer"}}<span class="tag warranty">warranty: {{.CostBearer}}</span>{{end}}
+    <div>
+      {{if not .Approved}}<span class="tag warranty">added after approval</span>{{end}}
+      {{if ne .CostBearer "customer"}}<span class="tag warranty">warranty: {{.CostBearer}}</span>{{end}}
+      {{if .PriceChanged}}<span class="tag warranty">quoted {{.EstimatedPrice}}</span>{{end}}
+    </div>
   </li>
   {{end}}
 </ul>
+{{end}}
+
+{{if .Session.Scope.Role.SeesCustomerPersonalData}}
+<h2>Add a line</h2>
+<form method="post" action="/jobs/{{.Job.ID}}/lines">
+  <label>
+    <span>What</span>
+    <input name="description" required>
+  </label>
+  <div class="pair">
+    <label>
+      <span>Quantity</span>
+      <input name="quantity" value="1" inputmode="decimal">
+    </label>
+    <label>
+      <span>Unit price</span>
+      <input name="unit_price" value="0" inputmode="decimal">
+    </label>
+  </div>
+  <label>
+    <span>Kind</span>
+    <select name="kind">
+      <option value="labour">Labour</option>
+      <option value="part">Part</option>
+      <option value="sublet">Sublet</option>
+      <option value="fee">Fee</option>
+    </select>
+  </label>
+  <label>
+    <span>Who pays</span>
+    <select name="cost_bearer">
+      <option value="customer">The customer</option>
+      <option value="supplier">Supplier warranty</option>
+      <option value="shop">The workshop</option>
+    </select>
+  </label>
+  <button type="submit">Add the line</button>
+</form>
 {{end}}
 
 <p style="margin-top:2rem"><a href="/">Back</a></p>

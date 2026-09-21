@@ -49,13 +49,49 @@ type Job struct {
 
 // Line is one line of a work order.
 type Line struct {
-	Position    int
-	Kind        string
-	Description string
-	Quantity    float64
-	CostBearer  string
-	ApprovedAt  *time.Time
+	Position       int
+	Kind           string
+	Description    string
+	Quantity       float64
+	CostBearer     string
+	ApprovedAt     *time.Time
+	UnitPriceMinor int64
+	EstimatedMinor *int64
 }
+
+// Approved reports whether the customer agreed to this line.
+//
+// A line added after approval is not hidden and is not quietly included: it
+// shows as unapproved, which is the only honest thing to put in front of
+// somebody being asked to pay for it.
+func (l Line) Approved() bool { return l.ApprovedAt != nil }
+
+// PriceChanged reports whether the line is being charged at something other
+// than what was quoted.
+func (l Line) PriceChanged() bool {
+	return l.EstimatedMinor != nil && *l.EstimatedMinor != l.UnitPriceMinor
+}
+
+// Money renders minor units as a decimal string. Formatting per locale is the
+// i18n work; this at least does not lie about the amount.
+func Money(minor int64) string {
+	sign := ""
+	if minor < 0 {
+		sign, minor = "-", -minor
+	}
+	return fmt.Sprintf("%s%d.%02d", sign, minor/100, minor%100)
+}
+
+// EstimatedPrice renders the quoted price, for a line whose price has moved.
+func (l Line) EstimatedPrice() string {
+	if l.EstimatedMinor == nil {
+		return ""
+	}
+	return Money(*l.EstimatedMinor)
+}
+
+// Price renders what is being charged.
+func (l Line) Price() string { return Money(l.UnitPriceMinor) }
 
 const jobColumns = `
 	w.id, w.number, w.state, coalesce(w.complaint, ''),
@@ -126,7 +162,8 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 		job = j
 
 		rows, err := tx.Query(ctx, `
-			SELECT position, kind, description, quantity, cost_bearer, approved_at
+			SELECT position, kind, description, quantity, cost_bearer, approved_at,
+			       unit_price_minor, estimated_unit_price_minor
 			FROM work_order_lines WHERE work_order_id = $1 ORDER BY position`, id)
 		if err != nil {
 			return fmt.Errorf("read lines: %w", err)
@@ -134,7 +171,8 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 		defer rows.Close()
 		for rows.Next() {
 			var l Line
-			if err := rows.Scan(&l.Position, &l.Kind, &l.Description, &l.Quantity, &l.CostBearer, &l.ApprovedAt); err != nil {
+			if err := rows.Scan(&l.Position, &l.Kind, &l.Description, &l.Quantity,
+				&l.CostBearer, &l.ApprovedAt, &l.UnitPriceMinor, &l.EstimatedMinor); err != nil {
 				return fmt.Errorf("scan line: %w", err)
 			}
 			lines = append(lines, l)
@@ -175,11 +213,17 @@ func ClockIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 			return ErrNotFound
 		}
 
-		// Moving to a job implies work has started on it.
-		_, err = tx.Exec(ctx,
-			`UPDATE work_orders SET state = 'in_progress', updated_at = now()
-			 WHERE id = $1 AND state IN ('approved', 'awaiting_parts')`, jobID)
-		return err
+		// Moving to a job implies work has started on it -- but through the
+		// state machine, not a bare UPDATE. A second place deciding what is
+		// legal is how a system ends up with two answers.
+		var state State
+		if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1`, jobID).Scan(&state); err != nil {
+			return fmt.Errorf("read state: %w", err)
+		}
+		if state == StateApproved || state == StateAwaitingParts {
+			return setStateTx(ctx, tx, jobID, StateInProgress)
+		}
+		return nil
 	})
 }
 
