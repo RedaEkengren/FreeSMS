@@ -114,6 +114,27 @@ func CanTransition(from, to State) bool {
 // NextStates lists where an order can go from here.
 func NextStates(from State) []State { return transitions[from] }
 
+// AvailableStates is NextStates minus the moves that would be refused anyway.
+//
+// Offering a button that always fails is worse than not offering it: the
+// person taps it, reads a refusal, and learns that the interface does not know
+// what it is doing. The rule is the same one SetState enforces, applied in one
+// place so the two cannot drift.
+func AvailableStates(from State, hasWork bool) []State {
+	next := transitions[from]
+	if !hasWork {
+		return next
+	}
+	out := make([]State, 0, len(next))
+	for _, s := range next {
+		if s == StateCancelled {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
 // SetState moves an order, or explains why it cannot move.
 //
 // Everything that changes a state goes through here. The clock does too: it

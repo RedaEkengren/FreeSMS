@@ -47,6 +47,10 @@ type Job struct {
 	// Set when this technician has a running clock on the job.
 	ClockRunning   bool
 	ClockStartedAt *time.Time
+
+	// True when anything has been clocked or priced on the order. Cancelling
+	// such an order is refused, so the button is not offered.
+	HasWork bool
 }
 
 // Line is one line of a work order.
@@ -130,7 +134,9 @@ const jobColumns = `
 	  WHERE o.vehicle_id = v.id ORDER BY o.read_at DESC LIMIT 1) AS odometer_km,
 	(SELECT t.started_at FROM time_entries t
 	  WHERE t.work_order_id = w.id AND t.user_id = $1 AND t.ended_at IS NULL
-	  LIMIT 1) AS clock_started_at`
+	  LIMIT 1) AS clock_started_at,
+	(EXISTS (SELECT 1 FROM time_entries t2      WHERE t2.work_order_id = w.id)
+	      OR EXISTS (SELECT 1 FROM work_order_lines l WHERE l.work_order_id = w.id)) AS has_work`
 
 const jobFrom = `
 	FROM work_orders w
@@ -142,7 +148,7 @@ func scanJob(row pgx.Row) (Job, error) {
 	var j Job
 	err := row.Scan(&j.ID, &j.Number, &j.State, &j.Complaint,
 		&j.Registration, &j.Make, &j.Model, &j.ModelYear,
-		&j.OpenedAt, &j.PromisedAt, &j.OdometerKm, &j.ClockStartedAt)
+		&j.OpenedAt, &j.PromisedAt, &j.OdometerKm, &j.ClockStartedAt, &j.HasWork)
 	j.ClockRunning = j.ClockStartedAt != nil
 	return j, err
 }

@@ -134,7 +134,16 @@ func Login(ctx context.Context, pool *pgxpool.Pool, shopID, email, password, use
 		return "", Session{}, err
 	}
 
-	recordAttempt(ctx, pool, shopID, email, ok)
+	if err := recordAttempt(ctx, pool, shopID, email, ok); err != nil {
+		// Deliberately not best effort.
+		//
+		// Throttling counts rows in this table. A system that cannot write
+		// them has no brute-force protection at all, and swallowing the error
+		// means nobody finds out until the guessing has already happened. It
+		// was swallowed once, and the throttle was silently off for as long as
+		// the writes were failing.
+		return "", Session{}, fmt.Errorf("record login attempt: %w", err)
+	}
 	if !ok {
 		return "", Session{}, ErrInvalidCredentials
 	}
@@ -153,10 +162,8 @@ var dummyHash = func() string {
 
 // recordAttempt writes the attempt in a transaction of its own, so that it
 // survives the failure it is recording.
-func recordAttempt(ctx context.Context, pool *pgxpool.Pool, shopID, email string, ok bool) {
-	// Best effort: failing to write the audit row must not turn a wrong
-	// password into a server error. The caller's answer does not depend on it.
-	_ = database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+func recordAttempt(ctx context.Context, pool *pgxpool.Pool, shopID, email string, ok bool) error {
+	return database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx,
 			`INSERT INTO login_attempts (shop_id, email, succeeded) VALUES ($1, $2, $3)`,
 			shopID, email, ok)

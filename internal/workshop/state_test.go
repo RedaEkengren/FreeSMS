@@ -71,3 +71,28 @@ func contains(haystack, needle string) bool {
 		return false
 	})()
 }
+
+// A button that always fails teaches the person tapping it that the interface
+// does not know what it is doing.
+func TestCancelIsNotOfferedOnAnOrderWithWork(t *testing.T) {
+	withWork := AvailableStates(StateDraft, true)
+	for _, s := range withWork {
+		if s == StateCancelled {
+			t.Error("cancelled is offered on an order that has work on it, and would be refused")
+		}
+	}
+	if len(withWork) == 0 {
+		t.Error("an order with work has nowhere to go at all")
+	}
+
+	empty := AvailableStates(StateDraft, false)
+	var sawCancel bool
+	for _, s := range empty {
+		if s == StateCancelled {
+			sawCancel = true
+		}
+	}
+	if !sawCancel {
+		t.Error("cancelled is not offered on an empty draft, where it is the right action")
+	}
+}

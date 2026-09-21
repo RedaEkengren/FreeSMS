@@ -7,6 +7,7 @@ package testsupport
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -36,6 +37,18 @@ func FreshPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
 	url := os.Getenv(EnvDatabaseURL)
+
+	// This wipes the schema, so it must never be pointed at a database a
+	// running instance is using. Doing so destroys that instance's data and,
+	// worse, silently poisons its connection pool: pgx caches type OIDs per
+	// connection, and recreating the schema gives citext a new one. Every
+	// query touching a citext column then fails with "cache lookup failed for
+	// type N", which reads as corruption. docker-compose.yml creates
+	// redasms_test for exactly this.
+	if strings.HasSuffix(url, "/redasms?sslmode=disable") || strings.HasSuffix(url, "/redasms") {
+		t.Fatalf("%s points at the development database; use redasms_test", EnvDatabaseURL)
+	}
+
 	if url == "" {
 		if os.Getenv("CI") != "" {
 			t.Fatalf("%s is not set, but this is CI: the integration tests would "+

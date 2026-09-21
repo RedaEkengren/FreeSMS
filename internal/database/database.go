@@ -31,6 +31,15 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	// hours clocked across a daylight saving change.
 	cfg.ConnConfig.RuntimeParams["timezone"] = "UTC"
 
+	// Recycle connections rather than keeping them for the life of the
+	// process. pgx caches type OIDs per connection, so a connection that was
+	// open when a type was recreated -- by a restore, or by a migration that
+	// drops and recreates an extension -- keeps the stale OID and fails every
+	// query touching that type with "cache lookup failed for type N". An hour
+	// bounds how long such a connection can stay poisoned.
+	cfg.MaxConnLifetime = time.Hour
+	cfg.MaxConnIdleTime = 15 * time.Minute
+
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("create pool: %w", err)

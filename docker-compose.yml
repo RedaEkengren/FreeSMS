@@ -7,6 +7,10 @@ services:
       POSTGRES_DB: redasms
     volumes:
       - db-data:/var/lib/postgresql/data
+      # Creates redasms_test alongside redasms. The integration tests wipe the
+      # schema of whatever they are pointed at, so they must not be pointed at
+      # the database a running instance is using.
+      - ./deploy/init-test-database.sql:/docker-entrypoint-initdb.d/10-test-database.sql:ro
     ports:
       # Bound to loopback, and on 5433 because a developer machine often
       # already has something on 5432. Without this the integration tests

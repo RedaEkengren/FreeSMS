@@ -19,7 +19,7 @@ import (
 // wiped. CI supplies one; locally:
 //
 //	docker compose up -d db
-//	REDASMS_TEST_DATABASE_URL=postgres://redasms:redasms@127.0.0.1:55432/redasms?sslmode=disable go test ./internal/database/
+//	REDASMS_TEST_DATABASE_URL=postgres://redasms:redasms@127.0.0.1:55432/redasms_test?sslmode=disable go test ./internal/database/
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	pool := testsupport.FreshPool(t)

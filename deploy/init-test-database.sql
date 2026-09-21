@@ -1,0 +1,18 @@
+-- A separate database for the integration tests.
+--
+-- They begin by dropping and recreating the public schema, and pointing them
+-- at the database a running instance is using destroys its data -- which is
+-- annoying -- and silently poisons that instance's connection pool, which is
+-- worse.
+--
+-- pgx caches type OIDs per connection. Recreating the schema gives citext a
+-- new OID, and every pooled connection that was open at the time keeps the
+-- old one. Queries touching a citext column then fail with
+--
+--     cache lookup failed for type 16394
+--
+-- which reads as database corruption and is really two processes sharing a
+-- database they should not. A morning was spent on it.
+--
+-- Run automatically by the Postgres image on first initialisation.
+CREATE DATABASE redasms_test OWNER redasms;
