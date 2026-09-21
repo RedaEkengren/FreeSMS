@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/RedaEkengren/RedaSMS/internal/access"
 	"github.com/RedaEkengren/RedaSMS/internal/auth"
 	"github.com/RedaEkengren/RedaSMS/internal/workshop"
 )
@@ -94,6 +95,15 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	requests, err := workshop.PartRequestsFor(r.Context(), s.pool, session.Scope, id)
+	if err != nil {
+		s.log.Error("read part requests", "error", err)
+	}
+	findings, err := workshop.FindingsFor(r.Context(), s.pool, session.Scope, id)
+	if err != nil {
+		s.log.Error("read findings", "error", err)
+	}
+
 	// Only the front desk sees documents; a technician has no use for them
 	// and they carry the customer's name.
 	var invoices []workshop.Invoice
@@ -109,9 +119,11 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		Session:  session,
 		Job:      job,
 		Lines:    lines,
-		Next:     workshop.AvailableStates(workshop.State(job.State), job.HasWork),
+		Next:     stateChoices(session.Scope.Role, workshop.State(job.State), job.HasWork),
 		Totals:   workshop.TotalsFor(lines),
 		Invoices: invoices,
+		Requests: requests,
+		Findings: findings,
 	})
 }
 
@@ -150,4 +162,16 @@ func (s *Server) handleClock(in bool) http.HandlerFunc {
 		}
 		s.renderPartial(w, r, "job", "clock", pageData{Session: session, Job: job})
 	}
+}
+
+// stateChoices offers each role only the moves that are theirs.
+//
+// A technician seeing "invoiced" would be reading somebody else's job, and a
+// button they cannot press is a button that teaches them to ignore the row it
+// sits in.
+func stateChoices(role access.Role, from workshop.State, hasWork bool) []workshop.State {
+	if role.SeesCustomerPersonalData() {
+		return workshop.AvailableStates(from, hasWork)
+	}
+	return workshop.TechnicianStates(from, hasWork)
 }

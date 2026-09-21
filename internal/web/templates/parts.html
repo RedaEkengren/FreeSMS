@@ -1,0 +1,22 @@
+{{define "content"}}
+<h1>Waiting for parts</h1>
+{{if not .Requests}}
+  <p class="empty">Nothing outstanding.</p>
+{{else}}
+  {{range .Requests}}
+  <div class="card">
+    <div class="row">
+      <a class="plate" href="/jobs/{{.WorkOrderID}}">{{if .Registration}}{{.Registration}}{{else}}no plate{{end}}</a>
+    </div>
+    <div class="vehicle">{{.Make}} {{.Model}}</div>
+    <div class="complaint">{{.Description}}</div>
+    <div class="waiting">Asked for by {{.RequestedBy}}</div>
+    <form method="post" action="/parts/arrived" style="margin-top:0.75rem">
+      <input type="hidden" name="request_id" value="{{.ID}}">
+      <button type="submit">It has arrived</button>
+    </form>
+  </div>
+  {{end}}
+{{end}}
+<p style="margin-top:1.5rem"><a href="/">Back</a></p>
+{{end}}

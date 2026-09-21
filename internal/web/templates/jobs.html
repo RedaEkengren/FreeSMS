@@ -8,10 +8,13 @@
     <div class="row">
       <span class="plate">{{if .Registration}}{{.Registration}}{{else}}no plate{{end}}</span>
       {{if .ClockRunning}}<span class="tag running">running</span>
+      {{else if .AssignedToMe}}<span class="tag running">mine</span>
       {{else}}<span class="tag">{{.State}}</span>{{end}}
     </div>
     <div class="vehicle">{{.Make}} {{.Model}}{{if .ModelYear}} {{.ModelYear}}{{end}}</div>
     {{if .Complaint}}<div class="complaint">{{.Complaint}}</div>{{end}}
+    {{if gt .OpenRequests 0}}<div class="waiting">Waiting for {{.OpenRequests}} part{{if ne .OpenRequests 1}}s{{end}}</div>{{end}}
+    {{if and .AssignedTo (not .AssignedToMe)}}<div class="waiting">{{.AssignedTo}} is on it</div>{{end}}
   </a>
   {{end}}
 {{end}}

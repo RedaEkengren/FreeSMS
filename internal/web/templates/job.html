@@ -12,6 +12,7 @@
 <dl>
   <dt>State</dt><dd>{{.Job.State}}</dd>
   {{if .Job.OdometerKm}}<dt>Odometer</dt><dd>{{.Job.OdometerKm}} km</dd>{{end}}
+  {{if .Job.AssignedTo}}<dt>On it</dt><dd>{{.Job.AssignedTo}}</dd>{{end}}
 </dl>
 
 {{if .Next}}
@@ -24,6 +25,44 @@
   </form>
   {{end}}
 </div>
+{{end}}
+
+{{if .Requests}}
+<h2>Parts</h2>
+<ul class="lines">
+  {{range .Requests}}
+  <li>
+    <div class="row">
+      <span>{{.Description}}</span>
+      {{if .Open}}<span class="tag warranty">waiting</span>
+      {{else if .ArrivedAt}}<span class="tag">arrived</span>
+      {{else}}<span class="tag">cancelled</span>{{end}}
+    </div>
+    <div class="waiting">Asked for by {{.RequestedBy}}</div>
+  </li>
+  {{end}}
+</ul>
+{{end}}
+
+{{if .Findings}}
+<h2>Noticed under the car</h2>
+<ul class="lines">
+  {{range .Findings}}
+  <li>
+    <div class="row">
+      <span>{{.Note}}</span>
+      {{if not .Handled}}<span class="tag warranty">needs pricing</span>{{end}}
+    </div>
+    <div class="waiting">{{.ReportedBy}}</div>
+    {{if and (not .Handled) $.Session.Scope.Role.SeesCustomerPersonalData}}
+    <form method="post" action="/jobs/{{$.Job.ID}}/findings/handled" style="margin-top:0.5rem">
+      <input type="hidden" name="finding_id" value="{{.ID}}">
+      <button type="submit" class="secondary">Dealt with</button>
+    </form>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
 {{end}}
 
 <h2>Lines</h2>
@@ -81,6 +120,24 @@
   <dt>Net</dt><dd>{{fmt .Totals.NetMinor}}</dd>
   <dt class="grand">Total</dt><dd class="grand">{{fmt .Totals.GrossMinor}}</dd>
 </dl>
+{{end}}
+
+{{if not .Session.Scope.Role.SeesCustomerPersonalData}}
+<h2>Hand it on</h2>
+<form method="post" action="/jobs/{{.Job.ID}}/parts">
+  <label>
+    <span>I need a part to carry on</span>
+    <input name="description" placeholder="Track rod end, left front">
+  </label>
+  <button type="submit" class="secondary">Ask the parts desk</button>
+</form>
+<form method="post" action="/jobs/{{.Job.ID}}/findings" style="margin-top:1rem">
+  <label>
+    <span>Something else needs doing</span>
+    <input name="note" placeholder="Other track rod end is going too">
+  </label>
+  <button type="submit" class="secondary">Tell the front desk</button>
+</form>
 {{end}}
 
 {{if .Session.Scope.Role.SeesCustomerPersonalData}}

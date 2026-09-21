@@ -51,6 +51,15 @@ type Job struct {
 	// True when anything has been clocked or priced on the order. Cancelling
 	// such an order is refused, so the button is not offered.
 	HasWork bool
+
+	// Who the job belongs to today, and whether that is the caller. Not a
+	// lock: whoever else has clocked time on it is just as real.
+	AssignedTo   string
+	AssignedToMe bool
+
+	// Counts the front desk and the technician both need at a glance.
+	OpenRequests int
+	OpenFindings int
 }
 
 // Line is one line of a work order.
@@ -136,7 +145,15 @@ const jobColumns = `
 	  WHERE t.work_order_id = w.id AND t.user_id = $1 AND t.ended_at IS NULL
 	  LIMIT 1) AS clock_started_at,
 	(EXISTS (SELECT 1 FROM time_entries t2      WHERE t2.work_order_id = w.id)
-	      OR EXISTS (SELECT 1 FROM work_order_lines l WHERE l.work_order_id = w.id)) AS has_work`
+	      OR EXISTS (SELECT 1 FROM work_order_lines l WHERE l.work_order_id = w.id)) AS has_work,
+	coalesce((SELECT p.display_name FROM users au
+	           JOIN people p ON p.id = au.person_id
+	          WHERE au.id = w.assigned_to), '') AS assigned_to,
+	(w.assigned_to = $1) IS TRUE AS assigned_to_me,
+	(SELECT count(*) FROM part_requests pr
+	  WHERE pr.work_order_id = w.id AND pr.arrived_at IS NULL AND pr.cancelled_at IS NULL) AS open_requests,
+	(SELECT count(*) FROM findings f
+	  WHERE f.work_order_id = w.id AND f.handled_at IS NULL) AS open_findings`
 
 const jobFrom = `
 	FROM work_orders w
@@ -148,7 +165,8 @@ func scanJob(row pgx.Row) (Job, error) {
 	var j Job
 	err := row.Scan(&j.ID, &j.Number, &j.State, &j.Complaint,
 		&j.Registration, &j.Make, &j.Model, &j.ModelYear,
-		&j.OpenedAt, &j.PromisedAt, &j.OdometerKm, &j.ClockStartedAt, &j.HasWork)
+		&j.OpenedAt, &j.PromisedAt, &j.OdometerKm, &j.ClockStartedAt, &j.HasWork,
+		&j.AssignedTo, &j.AssignedToMe, &j.OpenRequests, &j.OpenFindings)
 	j.ClockRunning = j.ClockStartedAt != nil
 	return j, err
 }
@@ -159,7 +177,11 @@ func OpenJobs(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Jo
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT`+jobColumns+jobFrom+`
 			WHERE w.state NOT IN ('closed', 'cancelled')
-			ORDER BY w.promised_at NULLS LAST, w.opened_at`, scope.UserID)
+			-- Mine first. "What am I doing today" is the question a
+			-- technician opens this screen to answer, and a list of every job
+			-- in the shop does not answer it.
+			ORDER BY (w.assigned_to = $1) IS NOT TRUE,
+			         w.promised_at NULLS LAST, w.opened_at`, scope.UserID)
 		if err != nil {
 			return fmt.Errorf("list jobs: %w", err)
 		}
@@ -240,6 +262,15 @@ func ClockIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 			`UPDATE time_entries SET ended_at = now() WHERE user_id = $1 AND ended_at IS NULL`,
 			scope.UserID); err != nil {
 			return fmt.Errorf("stop running clock: %w", err)
+		}
+
+		// Picking a job up is what assigns it, when nobody has it. Asking
+		// somebody to assign themselves before starting is a step that gets
+		// skipped, and then the column is empty and useless.
+		if _, err := tx.Exec(ctx,
+			`UPDATE work_orders SET assigned_to = $1 WHERE id = $2 AND assigned_to IS NULL`,
+			scope.UserID, jobID); err != nil {
+			return fmt.Errorf("assign job: %w", err)
 		}
 
 		tag, err := tx.Exec(ctx, `

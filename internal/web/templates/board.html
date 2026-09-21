@@ -11,6 +11,7 @@
     </div>
     <div class="vehicle">{{.Make}} {{.Model}}{{if .CustomerName}} &middot; {{.CustomerName}}{{end}}</div>
     <div class="waiting">{{.Waiting}}</div>
+    {{if gt .OpenFindings 0}}<div class="waiting">{{.OpenFindings}} thing{{if ne .OpenFindings 1}}s{{end}} noticed, not priced</div>{{end}}
     {{if gt .WaitingDays 0}}
       <div class="waiting">Uncollected for {{.WaitingDays}} day{{if ne .WaitingDays 1}}s{{end}}</div>
     {{end}}

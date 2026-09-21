@@ -48,6 +48,18 @@ func (r Role) SeesCustomerPersonalData() bool {
 	return false
 }
 
+// SeesParts reports whether this role has the parts desk's screen.
+//
+// The parts person in a small shop is the front desk, and the owner is
+// everybody, so this is not exclusive.
+func (r Role) SeesParts() bool {
+	switch r {
+	case RoleParts, RoleServiceAdvisor, RoleOwner, RoleAdmin:
+		return true
+	}
+	return false
+}
+
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // ErrNoScope is returned when a query is attempted without a shop.

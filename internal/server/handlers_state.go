@@ -14,14 +14,14 @@ import (
 // handleSetState moves an order, and says plainly when it will not move.
 func (s *Server) handleSetState(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
-	if !session.Scope.Role.SeesCustomerPersonalData() {
-		s.renderError(w, r, http.StatusForbidden, "Not for your role",
-			"Moving a job along is done at the front desk.")
-		return
-	}
-
 	id := r.PathValue("id")
 	to := workshop.State(r.FormValue("state"))
+
+	// No blanket role check here. Which moves belong to which role is decided
+	// in SetState, transition by transition: a technician owns "needs parts"
+	// and "ready", the counter owns everything that is a conversation with
+	// the customer. Refusing the whole endpoint to technicians is what made
+	// them walk across the workshop to say the car was finished.
 
 	err := workshop.SetState(r.Context(), s.pool, session.Scope, id, to)
 
@@ -42,7 +42,8 @@ func (s *Server) handleSetState(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusConflict, "Not from here", illegal.Error())
 		return
 	case errors.Is(err, access.ErrForbidden):
-		s.renderError(w, r, http.StatusForbidden, "Not for your role", "")
+		s.renderError(w, r, http.StatusForbidden, "Not for your role",
+			"That move belongs to the front desk.")
 		return
 	case err != nil:
 		s.log.Error("set state", "error", err)

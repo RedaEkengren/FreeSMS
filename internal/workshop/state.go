@@ -101,6 +101,56 @@ var ErrWouldLoseWork = errors.New(
 var ErrNoCustomer = errors.New(
 	"this order has no customer yet, and an invoice needs somebody to address it to")
 
+// technicianMoves are the transitions that belong to the person holding the
+// spanner.
+//
+// "I need parts" and "this is ready" are facts only they have. Routing them
+// through the front desk means the front desk has to be told, which is the
+// walking-across-the-workshop problem the system exists to remove.
+//
+// Everything else -- pricing, approval, invoicing, cancelling -- stays with
+// the counter, because those are conversations with the customer.
+var technicianMoves = map[State][]State{
+	StateApproved:      {StateInProgress},
+	StateInProgress:    {StateAwaitingParts, StateReady},
+	StateAwaitingParts: {StateInProgress},
+	StateReady:         {StateInProgress},
+}
+
+// MayTransition reports whether this role may make this move.
+//
+// Checked in SetState rather than in a handler, so a second caller cannot skip
+// it. The front desk and the owner may make any move the state machine allows;
+// a technician may make theirs.
+func MayTransition(role access.Role, from, to State) bool {
+	if !CanTransition(from, to) {
+		return false
+	}
+	if role.SeesCustomerPersonalData() {
+		return true
+	}
+	if role == access.RoleTechnician {
+		for _, s := range technicianMoves[from] {
+			if s == to {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// TechnicianStates lists the moves a technician may make from here, so their
+// screen can offer exactly those.
+func TechnicianStates(from State, hasWork bool) []State {
+	var out []State
+	for _, s := range AvailableStates(from, hasWork) {
+		if MayTransition(access.RoleTechnician, from, s) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 // CanTransition reports whether a move is legal.
 func CanTransition(from, to State) bool {
 	for _, s := range transitions[from] {
@@ -142,6 +192,20 @@ func AvailableStates(from State, hasWork bool) []State {
 // is how the second answer to "what is legal" gets written.
 func SetState(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string, to State) error {
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var from State
+		if err := tx.QueryRow(ctx,
+			`SELECT state FROM work_orders WHERE id = $1`, jobID).Scan(&from); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrNotFound
+			}
+			return fmt.Errorf("read state: %w", err)
+		}
+		if from != to && !MayTransition(scope.Role, from, to) {
+			if CanTransition(from, to) {
+				return access.ErrForbidden
+			}
+			return ErrIllegalTransition{From: from, To: to}
+		}
 		return setStateTx(ctx, tx, jobID, to)
 	})
 }
