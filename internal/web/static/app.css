@@ -204,3 +204,7 @@ select {
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
+
+dl.totals { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
+dl.totals dd { font-variant-numeric: tabular-nums; }
+dl.totals .grand { font-weight: 700; color: var(--text); font-size: 1.125rem; }

@@ -15,7 +15,7 @@ import (
 type NewLine struct {
 	Kind           string
 	Description    string
-	Quantity       float64
+	QuantityMilli  int64
 	UnitPriceMinor int64
 	VATRateBasis   int
 	CostBearer     string
@@ -32,7 +32,7 @@ func AddLine(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 	switch {
 	case strings.TrimSpace(line.Description) == "":
 		return fmt.Errorf("%w: the line needs a description", ErrInvalid)
-	case line.Quantity < 0:
+	case line.QuantityMilli < 0:
 		return fmt.Errorf("%w: quantity cannot be negative", ErrInvalid)
 	case line.UnitPriceMinor < 0:
 		return fmt.Errorf("%w: a negative price is a credit note, not a line", ErrInvalid)
@@ -84,11 +84,11 @@ func AddLine(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 			INSERT INTO work_order_lines
 			  (shop_id, work_order_id, position, kind, description, quantity,
 			   unit_price_minor, estimated_unit_price_minor, vat_rate_bp, cost_bearer, approved_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+			VALUES ($1, $2, $3, $4, $5, ($6::bigint)::numeric / 1000, $7, $8, $9, $10,
 			        CASE WHEN $11 THEN now() ELSE NULL END)`
 		if _, err := tx.Exec(ctx, insert,
 			scope.ShopID, jobID, position, line.Kind, strings.TrimSpace(line.Description),
-			line.Quantity, line.UnitPriceMinor, estimated, line.VATRateBasis,
+			line.QuantityMilli, line.UnitPriceMinor, estimated, line.VATRateBasis,
 			line.CostBearer, preApproval); err != nil {
 			return fmt.Errorf("add line: %w", err)
 		}

@@ -10,10 +10,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/RedaEkengren/RedaSMS/internal/access"
 	"github.com/RedaEkengren/RedaSMS/internal/database"
+	"github.com/RedaEkengren/RedaSMS/internal/money"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -52,12 +54,49 @@ type Line struct {
 	Position       int
 	Kind           string
 	Description    string
-	Quantity       float64
+	QuantityMilli  int64
 	CostBearer     string
 	ApprovedAt     *time.Time
 	UnitPriceMinor int64
 	EstimatedMinor *int64
+	VATRateBasis   int
 }
+
+// Quantity renders thousandths as a decimal, trimming the noise: 1000 is "1",
+// 4500 is "4.5", 250 is "0.25".
+func (l Line) Quantity() string {
+	whole := l.QuantityMilli / 1000
+	frac := l.QuantityMilli % 1000
+	if frac < 0 {
+		frac = -frac
+	}
+	if frac == 0 {
+		return fmt.Sprintf("%d", whole)
+	}
+	out := fmt.Sprintf("%d.%03d", whole, frac)
+	return strings.TrimRight(out, "0")
+}
+
+// TotalsFor prices a set of lines.
+//
+// The money lives in its own package so that the rounding rule has one home
+// and one set of tests. This is the only adapter between a stored line and
+// that calculation.
+func TotalsFor(lines []Line) money.Totals {
+	priced := make([]money.Line, 0, len(lines))
+	for _, l := range lines {
+		priced = append(priced, money.Line{
+			QuantityMilli:     l.QuantityMilli,
+			UnitPriceMinor:    l.UnitPriceMinor,
+			VATRateBasis:      l.VATRateBasis,
+			ChargedToCustomer: l.CostBearer == "customer",
+		})
+	}
+	return money.Compute(priced)
+}
+
+// Net is what this line comes to before VAT.
+func (l Line) Net() string { return money.Format(money.LineNet(l.QuantityMilli, l.UnitPriceMinor)) }
 
 // Approved reports whether the customer agreed to this line.
 //
@@ -72,26 +111,16 @@ func (l Line) PriceChanged() bool {
 	return l.EstimatedMinor != nil && *l.EstimatedMinor != l.UnitPriceMinor
 }
 
-// Money renders minor units as a decimal string. Formatting per locale is the
-// i18n work; this at least does not lie about the amount.
-func Money(minor int64) string {
-	sign := ""
-	if minor < 0 {
-		sign, minor = "-", -minor
-	}
-	return fmt.Sprintf("%s%d.%02d", sign, minor/100, minor%100)
-}
-
 // EstimatedPrice renders the quoted price, for a line whose price has moved.
 func (l Line) EstimatedPrice() string {
 	if l.EstimatedMinor == nil {
 		return ""
 	}
-	return Money(*l.EstimatedMinor)
+	return money.Format(*l.EstimatedMinor)
 }
 
 // Price renders what is being charged.
-func (l Line) Price() string { return Money(l.UnitPriceMinor) }
+func (l Line) Price() string { return money.Format(l.UnitPriceMinor) }
 
 const jobColumns = `
 	w.id, w.number, w.state, coalesce(w.complaint, ''),
@@ -162,8 +191,14 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 		job = j
 
 		rows, err := tx.Query(ctx, `
-			SELECT position, kind, description, quantity, cost_bearer, approved_at,
-			       unit_price_minor, estimated_unit_price_minor
+			SELECT position, kind, description,
+			       -- Thousandths, taken as an integer. quantity is
+			       -- numeric(12,3), so this is exact; reading it as a float
+			       -- would put a floating point value in the middle of a
+			       -- calculation the rest of this system avoids them in.
+			       (quantity * 1000)::bigint,
+			       cost_bearer, approved_at,
+			       unit_price_minor, estimated_unit_price_minor, vat_rate_bp
 			FROM work_order_lines WHERE work_order_id = $1 ORDER BY position`, id)
 		if err != nil {
 			return fmt.Errorf("read lines: %w", err)
@@ -171,8 +206,9 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 		defer rows.Close()
 		for rows.Next() {
 			var l Line
-			if err := rows.Scan(&l.Position, &l.Kind, &l.Description, &l.Quantity,
-				&l.CostBearer, &l.ApprovedAt, &l.UnitPriceMinor, &l.EstimatedMinor); err != nil {
+			if err := rows.Scan(&l.Position, &l.Kind, &l.Description, &l.QuantityMilli,
+				&l.CostBearer, &l.ApprovedAt, &l.UnitPriceMinor, &l.EstimatedMinor,
+				&l.VATRateBasis); err != nil {
 				return fmt.Errorf("scan line: %w", err)
 			}
 			lines = append(lines, l)

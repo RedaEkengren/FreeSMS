@@ -114,7 +114,7 @@ func TestCancellingAnOrderWithWorkIsRefused(t *testing.T) {
 	id := newJob(t, pool)
 
 	if err := workshop.AddLine(ctx, pool, advisor(), id, workshop.NewLine{
-		Kind: "labour", Description: "Strip and inspect", Quantity: 1,
+		Kind: "labour", Description: "Strip and inspect", QuantityMilli: 1000,
 		UnitPriceMinor: 89500, VATRateBasis: 2500,
 	}); err != nil {
 		t.Fatalf("AddLine: %v", err)
@@ -163,7 +163,7 @@ func TestLinesAddedAfterApprovalAreNotApproved(t *testing.T) {
 	ctx := context.Background()
 	id := newJob(t, pool)
 
-	quoted := workshop.NewLine{Kind: "labour", Description: "Brake pads", Quantity: 1,
+	quoted := workshop.NewLine{Kind: "labour", Description: "Brake pads", QuantityMilli: 1000,
 		UnitPriceMinor: 89500, VATRateBasis: 2500}
 	if err := workshop.AddLine(ctx, pool, advisor(), id, quoted); err != nil {
 		t.Fatalf("AddLine before approval: %v", err)
@@ -172,7 +172,7 @@ func TestLinesAddedAfterApprovalAreNotApproved(t *testing.T) {
 	move(t, pool, id, workshop.StateEstimated, workshop.StateAwaitingApproval,
 		workshop.StateApproved, workshop.StateInProgress)
 
-	extra := workshop.NewLine{Kind: "part", Description: "Seized bolt, drilled out", Quantity: 1,
+	extra := workshop.NewLine{Kind: "part", Description: "Seized bolt, drilled out", QuantityMilli: 1000,
 		UnitPriceMinor: 24000, VATRateBasis: 2500}
 	if err := workshop.AddLine(ctx, pool, advisor(), id, extra); err != nil {
 		t.Fatalf("AddLine after approval: %v", err)
@@ -204,7 +204,7 @@ func TestAWarrantyLineMustBeFree(t *testing.T) {
 	pool := setup(t)
 	id := newJob(t, pool)
 	err := workshop.AddLine(context.Background(), pool, advisor(), id, workshop.NewLine{
-		Kind: "part", Description: "Caliper", Quantity: 1,
+		Kind: "part", Description: "Caliper", QuantityMilli: 1000,
 		UnitPriceMinor: 145000, VATRateBasis: 2500, CostBearer: "supplier",
 	})
 	if !errors.Is(err, workshop.ErrInvalid) {
@@ -223,7 +223,7 @@ func TestNothingCanBeAddedToAnInvoicedOrder(t *testing.T) {
 		workshop.StateInvoiced)
 
 	err := workshop.AddLine(ctx, pool, advisor(), id, workshop.NewLine{
-		Kind: "fee", Description: "One more thing", Quantity: 1, VATRateBasis: 2500,
+		Kind: "fee", Description: "One more thing", QuantityMilli: 1000, VATRateBasis: 2500,
 	})
 	if !errors.Is(err, workshop.ErrInvalid) {
 		t.Fatalf("AddLine to an invoiced order = %v, want ErrInvalid", err)

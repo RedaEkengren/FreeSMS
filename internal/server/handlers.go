@@ -100,6 +100,7 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		Job:     job,
 		Lines:   lines,
 		Next:    workshop.NextStates(workshop.State(job.State)),
+		Totals:  workshop.TotalsFor(lines),
 	})
 }
 

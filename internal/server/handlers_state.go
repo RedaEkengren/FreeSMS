@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -62,10 +63,12 @@ func (s *Server) handleAddLine(w http.ResponseWriter, r *http.Request) {
 	}
 	id := r.PathValue("id")
 
-	quantity, err := strconv.ParseFloat(strings.Replace(strings.TrimSpace(r.FormValue("quantity")), ",", ".", 1), 64)
+	// A Swedish mechanic types 1,5 for an hour and a half. Refusing that is
+	// refusing the way half the intended users write numbers. Parsed to
+	// thousandths as text, because a float has no business anywhere near a
+	// figure that ends up on an invoice.
+	quantity, err := parseScaled(r.FormValue("quantity"), 3)
 	if err != nil {
-		// A Swedish mechanic types 1,5 for an hour and a half. Refusing that
-		// is refusing the way half the intended users write numbers.
 		s.renderError(w, r, http.StatusBadRequest, "That quantity did not parse",
 			"Write it as a number, with a comma or a full stop: 1,5 or 1.5.")
 		return
@@ -84,7 +87,7 @@ func (s *Server) handleAddLine(w http.ResponseWriter, r *http.Request) {
 	line := workshop.NewLine{
 		Kind:           r.FormValue("kind"),
 		Description:    r.FormValue("description"),
-		Quantity:       quantity,
+		QuantityMilli:  quantity,
 		UnitPriceMinor: price,
 		VATRateBasis:   2500,
 		CostBearer:     r.FormValue("cost_bearer"),
@@ -111,7 +114,13 @@ func (s *Server) handleAddLine(w http.ResponseWriter, r *http.Request) {
 // A float cannot hold 129550 as a product of 1295.50 and 100 exactly, and the
 // error is small enough to survive testing and large enough to make an invoice
 // disagree with itself by a krona.
-func parseMinorUnits(s string) (int64, error) {
+func parseMinorUnits(s string) (int64, error) { return parseScaled(s, 2) }
+
+// parseScaled reads a decimal as an integer of 10^decimals units.
+//
+// Prices have two places; quantities have three, because labour is sold by the
+// quarter hour and oil by the tenth of a litre.
+func parseScaled(s string, decimals int) (int64, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return 0, nil
@@ -119,6 +128,11 @@ func parseMinorUnits(s string) (int64, error) {
 	s = strings.ReplaceAll(s, " ", "")
 	s = strings.ReplaceAll(s, " ", "")
 	s = strings.Replace(s, ",", ".", 1)
+
+	scale := int64(1)
+	for i := 0; i < decimals; i++ {
+		scale *= 10
+	}
 
 	whole, frac, hasFrac := strings.Cut(s, ".")
 	if whole == "" {
@@ -131,13 +145,12 @@ func parseMinorUnits(s string) (int64, error) {
 
 	var minor int64
 	if hasFrac {
-		switch len(frac) {
-		case 0:
-		case 1:
+		if len(frac) > decimals {
+			return 0, fmt.Errorf("that has more than %d decimals", decimals)
+		}
+		// Pad so that "5" with two decimals means 50, not 5.
+		for len(frac) < decimals {
 			frac += "0"
-		case 2:
-		default:
-			return 0, errors.New("prices have at most two decimals")
 		}
 		if frac != "" {
 			minor, err = strconv.ParseInt(frac, 10, 64)
@@ -146,5 +159,5 @@ func parseMinorUnits(s string) (int64, error) {
 			}
 		}
 	}
-	return major*100 + minor, nil
+	return major*scale + minor, nil
 }

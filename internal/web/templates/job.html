@@ -35,7 +35,7 @@
   <li>
     <div class="row">
       <span>{{.Description}}</span>
-      <span>{{.Quantity}} &times; {{.Price}}</span>
+      <span>{{.Quantity}} &times; {{.Price}} = {{.Net}}</span>
     </div>
     <div>
       {{if not .Approved}}<span class="tag warranty">added after approval</span>{{end}}
@@ -45,6 +45,16 @@
   </li>
   {{end}}
 </ul>
+{{end}}
+
+{{if .Lines}}
+<dl class="totals">
+  {{range .Totals.Bands}}
+  <dt>VAT {{divide .RateBasisPoints 100}}%</dt><dd>{{fmt .VATMinor}}</dd>
+  {{end}}
+  <dt>Net</dt><dd>{{fmt .Totals.NetMinor}}</dd>
+  <dt class="grand">Total</dt><dd class="grand">{{fmt .Totals.GrossMinor}}</dd>
+</dl>
 {{end}}
 
 {{if .Session.Scope.Role.SeesCustomerPersonalData}}

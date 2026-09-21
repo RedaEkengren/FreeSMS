@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/RedaEkengren/RedaSMS/internal/auth"
+	"github.com/RedaEkengren/RedaSMS/internal/money"
 	"github.com/RedaEkengren/RedaSMS/internal/web"
 	"github.com/RedaEkengren/RedaSMS/internal/workshop"
 )
@@ -19,12 +20,13 @@ type pageData struct {
 	Error   string
 	Email   string
 
-	Jobs  []workshop.Job
-	Job   workshop.Job
-	Lines []workshop.Line
-	Board []workshop.BoardEntry
-	Next  []workshop.State
-	Form  intakeForm
+	Jobs   []workshop.Job
+	Job    workshop.Job
+	Lines  []workshop.Line
+	Board  []workshop.BoardEntry
+	Next   []workshop.State
+	Totals money.Totals
+	Form   intakeForm
 
 	// Setup only.
 	MinPassword int
@@ -48,6 +50,13 @@ type intakeForm struct {
 // setupForm is intakeForm under a name that says which page it belongs to.
 type setupForm = intakeForm
 
+// templateFuncs are the two things a template genuinely cannot do itself.
+// Anything more belongs in Go, where it can be tested.
+var templateFuncs = template.FuncMap{
+	"fmt":    money.Format,
+	"divide": func(a, b int) int { return a / b },
+}
+
 // parseTemplates builds one template set per page.
 //
 // Each page file defines "content", so they cannot be parsed together -- the
@@ -57,7 +66,7 @@ func parseTemplates() (map[string]*template.Template, error) {
 	pages := []string{"login", "jobs", "job", "board", "newjob", "setup", "error"}
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
-		t, err := template.New(name).ParseFS(web.Templates,
+		t, err := template.New(name).Funcs(templateFuncs).ParseFS(web.Templates,
 			"templates/layout.html", "templates/"+name+".html")
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", name, err)
