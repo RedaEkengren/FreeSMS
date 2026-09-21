@@ -25,11 +25,16 @@ INSERT INTO people (id, shop_id, display_name, email, phone) VALUES
    'Anna Lindqvist', 'anna@example.test', '+46700000002')
 ON CONFLICT (id) DO NOTHING;
 
+-- Both accounts have the password "workshop". Development only: this hash is
+-- in a public repository, so anyone who reaches an installation seeded with it
+-- can sign in. Create real users with:
+--
+--   redasms -hash '<password>'
 INSERT INTO users (id, shop_id, person_id, role, password_hash) VALUES
   ('33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111',
-   '22222222-2222-2222-2222-222222222222', 'technician', 'placeholder-not-a-hash'),
+   '22222222-2222-2222-2222-222222222222', 'technician', '$argon2id$v=19$m=65536,t=1,p=4$BVV+8mm22vbHtcffT0ScFg$A7JHKMGDiaW9R0By2DEt3SmuxAasHxogSk2eoGGRCkE'),
   ('33333333-3333-3333-3333-333333333334', '11111111-1111-1111-1111-111111111111',
-   '22222222-2222-2222-2222-222222222223', 'owner', 'placeholder-not-a-hash')
+   '22222222-2222-2222-2222-222222222223', 'owner', '$argon2id$v=19$m=65536,t=1,p=4$BVV+8mm22vbHtcffT0ScFg$A7JHKMGDiaW9R0By2DEt3SmuxAasHxogSk2eoGGRCkE')
 ON CONFLICT (id) DO NOTHING;
 
 -- The technician having their own car serviced where they work.
@@ -59,6 +64,47 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO odometer_readings (id, shop_id, vehicle_id, km, source)
 VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111',
         '55555555-5555-5555-5555-555555555555', 184320, 'drop_off')
+ON CONFLICT (id) DO NOTHING;
+
+-- A second vehicle, so the list is not a single row.
+INSERT INTO vehicles (id, shop_id, make, model, model_year, engine)
+VALUES ('55555555-5555-5555-5555-555555555556', '11111111-1111-1111-1111-111111111111',
+        'Saab', '9-3', 2004, '1.9 TiD')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO vehicle_registrations (id, shop_id, vehicle_id, registration, normalised, country)
+VALUES ('88888888-8888-8888-8888-888888888889', '11111111-1111-1111-1111-111111111111',
+        '55555555-5555-5555-5555-555555555556', 'XKR 907', 'XKR907', 'SE')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO vehicle_ownership (id, shop_id, vehicle_id, customer_id)
+VALUES ('99999999-9999-9999-9999-99999999999a', '11111111-1111-1111-1111-111111111111',
+        '55555555-5555-5555-5555-555555555556', '44444444-4444-4444-4444-444444444444')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO work_orders (id, shop_id, number, vehicle_id, customer_id, state, complaint, promised_at)
+VALUES
+  ('77777777-7777-7777-7777-777777777777', '11111111-1111-1111-1111-111111111111', 1001,
+   '55555555-5555-5555-5555-555555555555', '44444444-4444-4444-4444-444444444444',
+   'approved', 'Grinding from the front when braking. Pulls left.', now() + interval '6 hours'),
+  ('77777777-7777-7777-7777-777777777778', '11111111-1111-1111-1111-111111111111', 1002,
+   '55555555-5555-5555-5555-555555555556', '44444444-4444-4444-4444-444444444444',
+   'awaiting_parts', 'Service, and the glow plug light stays on.', now() + interval '2 days')
+ON CONFLICT (id) DO NOTHING;
+
+-- A normal line, a fractional one, and a warranty replacement at zero that
+-- still appears on the order.
+INSERT INTO work_order_lines
+  (id, shop_id, work_order_id, position, kind, description, quantity, unit_price_minor, vat_rate_bp, cost_bearer)
+VALUES
+  ('cccccccc-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
+   '77777777-7777-7777-7777-777777777777', 1, 'labour', 'Replace front brake pads and discs', 2.5, 89500, 2500, 'customer'),
+  ('cccccccc-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111',
+   '77777777-7777-7777-7777-777777777777', 2, 'part', 'Brake pad set, front', 1, 74900, 2500, 'customer'),
+  ('cccccccc-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111',
+   '77777777-7777-7777-7777-777777777777', 3, 'part', 'Brake caliper, left front (warranty)', 1, 0, 2500, 'supplier'),
+  ('cccccccc-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111',
+   '77777777-7777-7777-7777-777777777778', 1, 'part', 'Engine oil 5W-30', 4.5, 12900, 2500, 'customer')
 ON CONFLICT (id) DO NOTHING;
 
 COMMIT;

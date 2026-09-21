@@ -1,0 +1,24 @@
+{{define "layout"}}<!doctype html>
+<html lang="{{.Locale}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{.Title}}</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+{{if .Session.Scope.UserID}}
+<header>
+  <a href="/" style="font-weight:600;text-decoration:none;color:inherit">RedaSMS</a>
+  <form method="post" action="/logout" style="margin:0">
+    <span class="who">{{.Session.Scope.Role}}</span>
+    <button class="link" type="submit">Sign out</button>
+  </form>
+</header>
+{{end}}
+<main>
+{{template "content" .}}
+</main>
+</body>
+</html>{{end}}

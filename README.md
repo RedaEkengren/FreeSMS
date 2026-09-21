@@ -11,9 +11,9 @@ and no annual contract.
 
 ## Status
 
-Early. The service starts, applies the core schema and answers a health check.
-The data model is in place -- shops, people, users, customers, vehicles, work
-orders, time and parts -- but there is no user interface yet. Progress is tracked in [issues](https://github.com/RedaEkengren/RedaSMS/issues), grouped
+Early, but it runs. A technician can sign in, see what is in the shop, open a
+job and clock on and off it from a phone. The data model, permissions and row
+level security are in place; the front desk, invoicing and inventory are not. Progress is tracked in [issues](https://github.com/RedaEkengren/RedaSMS/issues), grouped
 into four milestones:
 
 | Milestone | What it covers |
@@ -67,10 +67,23 @@ curl http://localhost:8080/healthz
 The health endpoint reaches the database rather than reporting that the
 process is alive, so a green check means the service can actually do its job.
 
-Seed a shop, two users, a customer and a vehicle to look at:
+The database starts empty, and the service refuses to start without a shop
+rather than guessing which one it serves. Seed one:
 
 ```sh
 docker compose exec -T db psql -U redasms -d redasms < scripts/seed.sql
+docker compose restart app
+```
+
+That creates a shop, two users, a customer, two vehicles and two jobs. Sign in
+at <http://localhost:8080> as `reda@example.test` (a technician) or
+`anna@example.test` (the owner). Both have the password `workshop`.
+
+**The seed is for development only.** Its password hash is in a public
+repository. For a real installation, create users with a hash from:
+
+```sh
+docker compose exec app /redasms -hash 'the password'
 ```
 
 ### Tests

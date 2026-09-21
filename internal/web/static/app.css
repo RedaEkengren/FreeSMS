@@ -1,0 +1,174 @@
+/* Designed for a phone held in one hand, in a bay, by someone whose other hand
+   is dirty. Everything here follows from that. */
+
+:root {
+  color-scheme: light dark;
+
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --border: #d3d7de;
+  --text: #14171c;
+  --muted: #5b6270;
+  --accent: #0b5cd5;
+  --accent-text: #ffffff;
+  --running: #0a7d37;
+  --warn: #9a3412;
+
+  /* A tap target below this is missed by a gloved finger. */
+  --tap: 3rem;
+  --radius: 0.625rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1116;
+    --surface: #171b22;
+    --border: #2b313b;
+    --text: #f0f2f5;
+    --muted: #9aa3b2;
+    --accent: #4d94ff;
+    --accent-text: #05080d;
+    --running: #35d07f;
+    --warn: #fca66a;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1116;
+  --surface: #171b22;
+  --border: #2b313b;
+  --text: #f0f2f5;
+  --muted: #9aa3b2;
+  --accent: #4d94ff;
+  --accent-text: #05080d;
+  --running: #35d07f;
+  --warn: #fca66a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 1rem/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* No horizontal scroll, ever. A sideways page in a workshop is a page
+     nobody can read one-handed. */
+  overflow-x: hidden;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+header .who { color: var(--muted); font-size: 0.875rem; }
+
+main {
+  /* 16px gutter at phone width. */
+  padding: 1rem;
+  max-width: 48rem;
+  margin: 0 auto;
+}
+
+h1 { font-size: 1.25rem; margin: 0 0 1rem; }
+h2 { font-size: 1rem; margin: 1.5rem 0 0.5rem; color: var(--muted); font-weight: 600; }
+
+a { color: var(--accent); }
+
+.card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  text-decoration: none;
+  color: inherit;
+}
+.card:active { border-color: var(--accent); }
+
+.plate {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.vehicle { color: var(--muted); }
+.complaint { margin-top: 0.5rem; }
+
+.row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+
+.tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.tag.running { color: var(--running); border-color: var(--running); }
+.tag.warranty { color: var(--warn); border-color: var(--warn); }
+
+button, .button {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+button.stop { background: var(--surface); color: var(--running); border-color: var(--running); }
+button.link { background: none; border: none; color: var(--muted); width: auto; min-height: auto; text-decoration: underline; }
+
+label { display: block; margin-bottom: 1rem; }
+label span { display: block; margin-bottom: 0.25rem; color: var(--muted); font-size: 0.875rem; }
+input {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 0.75rem;
+  font: inherit;
+  /* Below 16px, iOS zooms the page on focus and the layout jumps. */
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+input:focus-visible, button:focus-visible, .card:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.error {
+  background: var(--surface);
+  border: 1px solid var(--warn);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  color: var(--warn);
+}
+
+.empty { color: var(--muted); text-align: center; padding: 3rem 1rem; }
+
+dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; margin: 0 0 1rem; }
+dt { color: var(--muted); }
+dd { margin: 0; text-align: right; }
+
+ul.lines { list-style: none; padding: 0; margin: 0; }
+ul.lines li { padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+ul.lines li:last-child { border-bottom: none; }

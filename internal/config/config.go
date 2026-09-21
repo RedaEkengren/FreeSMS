@@ -25,6 +25,10 @@ type Config struct {
 	DefaultLocale  string
 	LogLevel       string
 	Release        string
+
+	// Which shop this installation serves. Empty means: resolve it, and
+	// require exactly one to exist.
+	ShopID string
 }
 
 // minSecretBytes is the decoded length a session secret must reach. Below
@@ -48,6 +52,7 @@ func Load() (*Config, error) {
 		DefaultLocale:  envOr("DEFAULT_LOCALE", "en"),
 		LogLevel:       envOr("LOG_LEVEL", "info"),
 		Release:        envOr("RELEASE", "dev"),
+		ShopID:         os.Getenv("SHOP_ID"),
 	}
 
 	if cfg.DatabaseURL == "" {

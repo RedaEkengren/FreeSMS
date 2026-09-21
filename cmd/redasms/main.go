@@ -15,12 +15,21 @@ import (
 	"github.com/RedaEkengren/RedaSMS/internal/config"
 	"github.com/RedaEkengren/RedaSMS/internal/database"
 	"github.com/RedaEkengren/RedaSMS/internal/server"
+	"github.com/RedaEkengren/RedaSMS/internal/workshop"
 	"github.com/RedaEkengren/RedaSMS/migrations"
 )
 
 func main() {
 	// A container health check runs the binary again with this flag, because
 	// the runtime image has no shell to run anything else with.
+	if len(os.Args) > 1 && os.Args[1] == "-hash" {
+		if err := hashPassword(os.Args[2:]); err != nil {
+			os.Stderr.WriteString("redasms: " + err.Error() + "\n")
+			os.Exit(1)
+		}
+		return
+	}
+
 	if len(os.Args) > 1 && os.Args[1] == "-healthcheck" {
 		if err := healthcheck(); err != nil {
 			os.Stderr.WriteString("redasms: unhealthy: " + err.Error() + "\n")
@@ -67,7 +76,17 @@ func run() error {
 	}
 	log.Info("migrations up to date")
 
-	return server.New(pool, log, cfg.Release).Run(ctx, cfg.HTTPAddr)
+	shopID, err := workshop.ResolveShop(ctx, pool, cfg.ShopID)
+	if err != nil {
+		return err
+	}
+	log.Info("serving shop", "shop_id", shopID)
+
+	srv, err := server.New(pool, log, cfg, shopID)
+	if err != nil {
+		return err
+	}
+	return srv.Run(ctx, cfg.HTTPAddr)
 }
 
 func logLevel(name string) slog.Level {

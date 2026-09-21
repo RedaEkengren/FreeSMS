@@ -1,0 +1,47 @@
+{{define "content"}}
+<div class="row">
+  <span class="plate">{{if .Job.Registration}}{{.Job.Registration}}{{else}}no plate{{end}}</span>
+  <span class="tag">#{{.Job.Number}}</span>
+</div>
+<p class="vehicle">{{.Job.Make}} {{.Job.Model}}{{if .Job.ModelYear}} {{.Job.ModelYear}}{{end}}</p>
+
+{{if .Job.Complaint}}<p>{{.Job.Complaint}}</p>{{end}}
+
+<div id="clock">{{template "clock" .}}</div>
+
+<dl>
+  <dt>State</dt><dd>{{.Job.State}}</dd>
+  {{if .Job.OdometerKm}}<dt>Odometer</dt><dd>{{.Job.OdometerKm}} km</dd>{{end}}
+</dl>
+
+<h2>Lines</h2>
+{{if not .Lines}}
+  <p class="empty">Nothing on this order yet.</p>
+{{else}}
+<ul class="lines">
+  {{range .Lines}}
+  <li>
+    <div class="row">
+      <span>{{.Description}}</span>
+      <span class="tag">{{.Quantity}}</span>
+    </div>
+    {{if ne .CostBearer "customer"}}<span class="tag warranty">warranty: {{.CostBearer}}</span>{{end}}
+  </li>
+  {{end}}
+</ul>
+{{end}}
+
+<p style="margin-top:2rem"><a href="/">Back</a></p>
+{{end}}
+
+{{define "clock"}}
+{{if .Job.ClockRunning}}
+  <button class="stop" hx-post="/jobs/{{.Job.ID}}/clock-out" hx-target="#clock" hx-swap="innerHTML">
+    Stop clock
+  </button>
+{{else}}
+  <button hx-post="/jobs/{{.Job.ID}}/clock-in" hx-target="#clock" hx-swap="innerHTML">
+    Start clock
+  </button>
+{{end}}
+{{end}}

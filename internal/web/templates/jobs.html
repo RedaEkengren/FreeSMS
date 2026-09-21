@@ -1,0 +1,18 @@
+{{define "content"}}
+<h1>In the shop</h1>
+{{if not .Jobs}}
+  <p class="empty">Nothing open.</p>
+{{else}}
+  {{range .Jobs}}
+  <a class="card" href="/jobs/{{.ID}}">
+    <div class="row">
+      <span class="plate">{{if .Registration}}{{.Registration}}{{else}}no plate{{end}}</span>
+      {{if .ClockRunning}}<span class="tag running">running</span>
+      {{else}}<span class="tag">{{.State}}</span>{{end}}
+    </div>
+    <div class="vehicle">{{.Make}} {{.Model}}{{if .ModelYear}} {{.ModelYear}}{{end}}</div>
+    {{if .Complaint}}<div class="complaint">{{.Complaint}}</div>{{end}}
+  </a>
+  {{end}}
+{{end}}
+{{end}}

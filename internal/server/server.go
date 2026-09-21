@@ -9,36 +9,96 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"html/template"
+	"io/fs"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/RedaEkengren/RedaSMS/internal/config"
+	"github.com/RedaEkengren/RedaSMS/internal/web"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Server holds everything a handler may need.
 type Server struct {
-	pool    *pgxpool.Pool
-	log     *slog.Logger
-	release string
+	pool          *pgxpool.Pool
+	log           *slog.Logger
+	release       string
+	shopID        string
+	locale        string
+	secureCookies bool
+	templates     map[string]*template.Template
 }
 
 // New returns a Server. It does not listen; that is Run's job.
-func New(pool *pgxpool.Pool, log *slog.Logger, release string) *Server {
-	return &Server{pool: pool, log: log, release: release}
+func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string) (*Server, error) {
+	templates, err := parseTemplates()
+	if err != nil {
+		return nil, err
+	}
+	return &Server{
+		pool:      pool,
+		log:       log,
+		release:   cfg.Release,
+		shopID:    shopID,
+		locale:    cfg.DefaultLocale,
+		templates: templates,
+		// A Secure cookie is not sent over plain HTTP, so setting it
+		// unconditionally would break every local and reverse-proxied
+		// installation that terminates TLS elsewhere. BASE_URL is what the
+		// operator says the service is reached as, so it is the honest source.
+		secureCookies: strings.HasPrefix(cfg.BaseURL, "https://"),
+	}, nil
 }
 
-func (s *Server) routes() http.Handler {
+func (s *Server) routes() (http.Handler, error) {
 	mux := http.NewServeMux()
+
+	// Health is outside the session middleware on purpose: a health check must
+	// not depend on authentication working.
 	mux.HandleFunc("GET /healthz", s.handleHealth)
-	return mux
+
+	staticFS, err := fs.Sub(web.Static, "static")
+	if err != nil {
+		return nil, fmt.Errorf("static files: %w", err)
+	}
+	mux.Handle("GET /static/", http.StripPrefix("/static/",
+		cacheForever(http.FileServer(http.FS(staticFS)))))
+
+	mux.HandleFunc("GET /login", s.handleLoginForm)
+	mux.HandleFunc("POST /login", s.handleLogin)
+	mux.HandleFunc("POST /logout", s.handleLogout)
+
+	mux.HandleFunc("GET /{$}", s.requireSession(s.handleJobs))
+	mux.HandleFunc("GET /jobs/{id}", s.requireSession(s.handleJob))
+	mux.HandleFunc("POST /jobs/{id}/clock-in", s.requireSession(s.handleClock(true)))
+	mux.HandleFunc("POST /jobs/{id}/clock-out", s.requireSession(s.handleClock(false)))
+
+	return s.securityHeaders(s.checkOrigin(s.withSession(mux))), nil
+}
+
+// cacheForever is safe here because everything under /static is embedded in
+// the binary and changes only when the binary does.
+func cacheForever(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Run listens until ctx is cancelled, then shuts down gracefully.
 func (s *Server) Run(ctx context.Context, addr string) error {
+	handler, err := s.routes()
+	if err != nil {
+		return err
+	}
+
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: s.routes(),
+		Handler: handler,
 
 		// A server without these keeps a slow or dead client's connection
 		// forever, and enough of them exhaust the process without anything
