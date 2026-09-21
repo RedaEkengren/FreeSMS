@@ -7,6 +7,11 @@ services:
       POSTGRES_DB: redasms
     volumes:
       - db-data:/var/lib/postgresql/data
+    ports:
+      # Bound to loopback, and on 5433 because a developer machine often
+      # already has something on 5432. Without this the integration tests
+      # silently reach whatever else is listening there instead.
+      - "127.0.0.1:${DB_PORT:-55432}:5432"
     healthcheck:
       # pg_isready reports that the server accepts connections. The application
       # waits for this rather than racing the first migration against a

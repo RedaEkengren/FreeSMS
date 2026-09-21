@@ -11,8 +11,9 @@ and no annual contract.
 
 ## Status
 
-Early. The service starts, applies its schema and answers a health check;
-there is no domain functionality yet. Progress is tracked in [issues](https://github.com/RedaEkengren/RedaSMS/issues), grouped
+Early. The service starts, applies the core schema and answers a health check.
+The data model is in place -- shops, people, users, customers, vehicles, work
+orders, time and parts -- but there is no user interface yet. Progress is tracked in [issues](https://github.com/RedaEkengren/RedaSMS/issues), grouped
 into four milestones:
 
 | Milestone | What it covers |
@@ -66,7 +67,29 @@ curl http://localhost:8080/healthz
 The health endpoint reaches the database rather than reporting that the
 process is alive, so a green check means the service can actually do its job.
 
-To work on the code without installing Go locally:
+Seed a shop, two users, a customer and a vehicle to look at:
+
+```sh
+docker compose exec -T db psql -U redasms -d redasms < scripts/seed.sql
+```
+
+### Tests
+
+```sh
+go test ./...
+```
+
+Schema guarantees are constraints rather than Go code, so they are checked
+against a real Postgres. Those tests skip unless a database they may wipe is
+pointed at:
+
+```sh
+docker compose up -d db
+REDASMS_TEST_DATABASE_URL='postgres://redasms:redasms@127.0.0.1:55432/redasms?sslmode=disable' \
+  go test ./internal/database/
+```
+
+Without Go installed, the same works through the build image:
 
 ```sh
 docker run --rm -v "$PWD":/src -w /src golang:1.27-alpine go test ./...
