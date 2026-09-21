@@ -2,10 +2,10 @@ package database
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 
+	"github.com/RedaEkengren/RedaSMS/internal/testsupport"
 	"github.com/RedaEkengren/RedaSMS/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -21,42 +21,8 @@ import (
 //	REDASMS_TEST_DATABASE_URL=postgres://redasms:redasms@127.0.0.1:55432/redasms?sslmode=disable go test ./internal/database/
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	url := os.Getenv("REDASMS_TEST_DATABASE_URL")
-	if url == "" {
-		t.Skip("REDASMS_TEST_DATABASE_URL not set")
-	}
-	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, url)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(pool.Close)
-
-	// Test packages run in parallel, and each of these resets the schema of the
-	// one database it was given. Without this they drop the schema out from
-	// under each other, which surfaces as "relation schema_migrations does not
-	// exist" in whichever package lost the race.
-	//
-	// A Postgres advisory lock serialises them across processes, which a Go
-	// mutex cannot do. It is held on its own connection for the test's
-	// lifetime and released before the pool closes -- t.Cleanup runs in
-	// reverse, so this registration must come after the pool's.
-	lockConn, err := pool.Acquire(ctx)
-	if err != nil {
-		t.Fatalf("acquire lock connection: %v", err)
-	}
-	if _, err := lockConn.Exec(ctx, `SELECT pg_advisory_lock($1)`, int64(991_147_003)); err != nil {
-		t.Fatalf("take test lock: %v", err)
-	}
-	t.Cleanup(func() {
-		_, _ = lockConn.Exec(context.Background(), `SELECT pg_advisory_unlock($1)`, int64(991_147_003))
-		lockConn.Release()
-	})
-
-	if _, err := pool.Exec(ctx, `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`); err != nil {
-		t.Fatalf("reset schema: %v", err)
-	}
-	if err := Migrate(ctx, pool, migrations.FS); err != nil {
+	pool := testsupport.FreshPool(t)
+	if err := Migrate(context.Background(), pool, migrations.FS); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	return pool
