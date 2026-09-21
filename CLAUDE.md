@@ -68,10 +68,21 @@ not exist.
 
 ## Known gaps — written down rather than discovered
 
-- **No Terraform-managed branch protection.** The repository lives under
-  `RedaEkengren`, not `Benbo-se`, so the organisation's `protected_repos` does
-  not cover it. Branch protection is set by hand, or not at all. Check it
-  rather than assuming it.
+- **Branch protection is set by hand.** The repository lives under
+  `RedaEkengren`, not `Benbo-se`, so the organisation's Terraform
+  `protected_repos` does not reach it. It is currently on: force pushes and
+  deletion refused, `go / test` and `image` required. Nothing keeps it that
+  way except this paragraph, so check rather than assume:
+
+  ```sh
+  gh api repos/RedaEkengren/RedaSMS/branches/main/protection \
+    --jq '{checks: .required_status_checks.contexts, force_push: .allow_force_pushes.enabled}'
+  ```
+
+  `enforce_admins` is off deliberately. Direct pushes to `main` are how this
+  project is worked on, and turning it on would mean opening a pull request
+  against yourself for every commit. The protection that matters here is that
+  history cannot be rewritten and a red CI cannot be merged.
 - **Not in `benbo-infra/registry.yml`**, so the estate check does not watch it
   and `benbo-status` does not show it. Nothing will alert if it goes down.
 - **A public repository cannot call a reusable workflow in a private one.**
@@ -82,8 +93,11 @@ not exist.
 - **No self-hosted runner.** GitHub advises against them on public
   repositories, because a fork's pull request could run code on the server.
   Deploy goes over SSH from a GitHub-hosted runner instead.
-- **Nothing is deployed yet.** `DEPLOY.md` describes a target, and says so in
-  its first paragraph. Do not read it as a description of a running system.
+- **Nothing is deployed yet, and there is no `deploy.yml`.** A workflow naming
+  `DEPLOY_HOST` and `DEPLOY_SSH_KEY` when the repository has neither is dead
+  code that answers "is deployment automated?" with yes. `DEPLOY.md` describes
+  the intended shape and says in its first paragraph that it is not a running
+  system.
 
 ## Traps, with the reason attached
 
