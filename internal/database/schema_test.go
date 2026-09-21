@@ -32,6 +32,27 @@ func testPool(t *testing.T) *pgxpool.Pool {
 	}
 	t.Cleanup(pool.Close)
 
+	// Test packages run in parallel, and each of these resets the schema of the
+	// one database it was given. Without this they drop the schema out from
+	// under each other, which surfaces as "relation schema_migrations does not
+	// exist" in whichever package lost the race.
+	//
+	// A Postgres advisory lock serialises them across processes, which a Go
+	// mutex cannot do. It is held on its own connection for the test's
+	// lifetime and released before the pool closes -- t.Cleanup runs in
+	// reverse, so this registration must come after the pool's.
+	lockConn, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("acquire lock connection: %v", err)
+	}
+	if _, err := lockConn.Exec(ctx, `SELECT pg_advisory_lock($1)`, int64(991_147_003)); err != nil {
+		t.Fatalf("take test lock: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = lockConn.Exec(context.Background(), `SELECT pg_advisory_unlock($1)`, int64(991_147_003))
+		lockConn.Release()
+	})
+
 	if _, err := pool.Exec(ctx, `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`); err != nil {
 		t.Fatalf("reset schema: %v", err)
 	}

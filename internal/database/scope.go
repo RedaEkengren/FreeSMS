@@ -22,6 +22,23 @@ func InScope(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fn fun
 	if err := scope.Validate(); err != nil {
 		return err
 	}
+	return InShop(ctx, pool, scope.ShopID, fn)
+}
+
+// InShop is InScope without a user.
+//
+// It exists for the one thing that has to happen before there is a user to
+// scope by: signing in. The shop is known -- resolved from the installation
+// or, later, from the host -- but the role is not, because establishing it is
+// what the caller is about to do.
+//
+// Everything else uses InScope. This is not a way to skip the role check; it
+// is the narrow path that runs before a role exists, and the isolation it
+// provides is the same.
+func InShop(ctx context.Context, pool *pgxpool.Pool, shopID string, fn func(context.Context, pgx.Tx) error) error {
+	if shopID == "" {
+		return access.ErrNoScope
+	}
 
 	tx, err := pool.Begin(ctx)
 	if err != nil {
@@ -40,7 +57,7 @@ func InScope(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fn fun
 	// set_config rather than SET, because SET does not accept bind parameters
 	// and building the statement by hand would put a value from a session
 	// cookie into SQL text. The third argument makes it transaction-local.
-	if _, err := tx.Exec(ctx, `SELECT set_config('app.current_shop', $1, true)`, scope.ShopID); err != nil {
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.current_shop', $1, true)`, shopID); err != nil {
 		return fmt.Errorf("set shop scope: %w", err)
 	}
 

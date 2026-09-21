@@ -155,6 +155,12 @@ func TestEveryTenantTableHasForcedRowLevelSecurity(t *testing.T) {
 		WHERE n.nspname = 'public'
 		  AND c.relkind = 'r'
 		  AND c.relname <> 'schema_migrations'
+		  -- shops is the tenant directory, and is deliberately not FORCEd:
+		  -- something has to resolve which shop a request belongs to before
+		  -- any scope exists. The schema owner may read it; the application
+		  -- role still cannot see a shop other than its own. See
+		  -- 0004_sessions.sql.
+		  AND c.relname <> 'shops'
 		ORDER BY c.relname`)
 	if err != nil {
 		t.Fatalf("query: %v", err)
