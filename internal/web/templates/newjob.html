@@ -1,0 +1,21 @@
+{{define "content"}}
+<h1>Take in a vehicle</h1>
+{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+<form method="post" action="/jobs/new">
+  <label>
+    <span>Registration</span>
+    <input name="registration" value="{{.Form.Registration}}"
+           autocapitalize="characters" autocorrect="off" spellcheck="false" autofocus>
+  </label>
+  <label>
+    <span>Odometer, km</span>
+    <input name="odometer_km" value="{{.Form.OdometerKm}}" inputmode="numeric">
+  </label>
+  <label>
+    <span>What is wrong</span>
+    <input name="complaint" value="{{.Form.Complaint}}" required>
+  </label>
+  <button type="submit">Open the job</button>
+</form>
+<p style="margin-top:1.5rem"><a href="/">Back</a></p>
+{{end}}

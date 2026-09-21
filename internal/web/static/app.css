@@ -172,3 +172,10 @@ dd { margin: 0; text-align: right; }
 ul.lines { list-style: none; padding: 0; margin: 0; }
 ul.lines li { padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
 ul.lines li:last-child { border-bottom: none; }
+
+/* Late is the only colour that means urgency on the board. If finished cars
+   were coloured too, the whole board would be red and red would stop meaning
+   anything. */
+.card.late { border-left: 4px solid var(--warn); }
+.tag.late { color: var(--warn); border-color: var(--warn); }
+.waiting { color: var(--muted); margin-top: 0.25rem; }

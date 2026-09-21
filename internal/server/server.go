@@ -72,7 +72,10 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /login", s.handleLogin)
 	mux.HandleFunc("POST /logout", s.handleLogout)
 
-	mux.HandleFunc("GET /{$}", s.requireSession(s.handleJobs))
+	mux.HandleFunc("GET /{$}", s.requireSession(s.handleHome))
+	mux.HandleFunc("GET /board", s.requireSession(s.handleBoard))
+	mux.HandleFunc("GET /jobs/new", s.requireSession(s.handleNewJobForm))
+	mux.HandleFunc("POST /jobs/new", s.requireSession(s.handleNewJob))
 	mux.HandleFunc("GET /jobs/{id}", s.requireSession(s.handleJob))
 	mux.HandleFunc("POST /jobs/{id}/clock-in", s.requireSession(s.handleClock(true)))
 	mux.HandleFunc("POST /jobs/{id}/clock-out", s.requireSession(s.handleClock(false)))

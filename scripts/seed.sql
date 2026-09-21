@@ -89,8 +89,29 @@ VALUES
    'approved', 'Grinding from the front when braking. Pulls left.', now() + interval '6 hours'),
   ('77777777-7777-7777-7777-777777777778', '11111111-1111-1111-1111-111111111111', 1002,
    '55555555-5555-5555-5555-555555555556', '44444444-4444-4444-4444-444444444444',
-   'awaiting_parts', 'Service, and the glow plug light stays on.', now() + interval '2 days')
+   'awaiting_parts', 'Service, and the glow plug light stays on.', now() - interval '3 hours')
 ON CONFLICT (id) DO NOTHING;
+
+-- A third vehicle, finished and standing uncollected. The trigger sets
+-- ready_at, so the board can say how long it has been in the way.
+INSERT INTO vehicles (id, shop_id, make, model, model_year)
+VALUES ('55555555-5555-5555-5555-555555555557', '11111111-1111-1111-1111-111111111111',
+        'Toyota', 'Hilux', 2016)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO vehicle_registrations (id, shop_id, vehicle_id, registration, normalised, country)
+VALUES ('88888888-8888-8888-8888-88888888888a', '11111111-1111-1111-1111-111111111111',
+        '55555555-5555-5555-5555-555555555557', 'MLR 224', 'MLR224', 'SE')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO work_orders (id, shop_id, number, vehicle_id, customer_id, state, complaint)
+VALUES ('77777777-7777-7777-7777-777777777779', '11111111-1111-1111-1111-111111111111', 1003,
+        '55555555-5555-5555-5555-555555555557', '44444444-4444-4444-4444-444444444444',
+        'ready', 'Annual service.')
+ON CONFLICT (id) DO NOTHING;
+
+UPDATE work_orders SET ready_at = now() - interval '4 days'
+WHERE id = '77777777-7777-7777-7777-777777777779';
 
 -- A normal line, a fractional one, and a warranty replacement at zero that
 -- still appears on the order.

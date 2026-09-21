@@ -58,6 +58,14 @@ var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]
 // and an operator reading "no vehicles" will not go looking for a bug.
 var ErrNoScope = errors.New("access: no shop in scope")
 
+// ErrForbidden is returned when the caller's role does not permit what was
+// asked for.
+//
+// Distinct from "not found" on purpose, and only ever shown to someone already
+// signed in: telling a technician that a page exists but is not theirs is
+// useful, while telling an anonymous visitor the same thing is not.
+var ErrForbidden = errors.New("access: not permitted for this role")
+
 // Scope is who is asking, and is the only way to reach data belonging to a
 // shop. Functions that read or write tenant rows take one.
 type Scope struct {

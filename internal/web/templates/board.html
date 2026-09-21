@@ -1,0 +1,21 @@
+{{define "content"}}
+<h1>In the shop</h1>
+{{if not .Board}}
+  <p class="empty">Nothing open.</p>
+{{else}}
+  {{range .Board}}
+  <a class="card{{if .Late}} late{{end}}" href="/jobs/{{.ID}}">
+    <div class="row">
+      <span class="plate">{{if .Registration}}{{.Registration}}{{else}}no plate{{end}}</span>
+      {{if .Late}}<span class="tag late">late</span>{{end}}
+    </div>
+    <div class="vehicle">{{.Make}} {{.Model}}{{if .CustomerName}} &middot; {{.CustomerName}}{{end}}</div>
+    <div class="waiting">{{.Waiting}}</div>
+    {{if gt .WaitingDays 0}}
+      <div class="waiting">Uncollected for {{.WaitingDays}} day{{if ne .WaitingDays 1}}s{{end}}</div>
+    {{end}}
+  </a>
+  {{end}}
+{{end}}
+<p style="margin-top:1.5rem"><a href="/jobs/new">Take in a vehicle</a></p>
+{{end}}

@@ -25,8 +25,9 @@ const (
 	shopB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 	jobB  = "bbbbbbbb-0000-0000-0000-00000000000f"
 
-	techEmail = "tech@shop-a.test"
-	techPass  = "a reasonable workshop password"
+	techEmail    = "tech@shop-a.test"
+	advisorEmail = "advisor@shop-a.test"
+	techPass     = "a reasonable workshop password"
 )
 
 // Customer details that must never reach a technician's screen.
@@ -58,6 +59,11 @@ func testServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 		`INSERT INTO users (id, shop_id, person_id, role, password_hash) VALUES
 		 ('aaaaaaaa-0000-0000-0000-000000000002','` + shopA + `',
 		  'aaaaaaaa-0000-0000-0000-000000000001','technician','` + hash + `')`,
+		`INSERT INTO people (id, shop_id, display_name, email) VALUES
+		 ('aaaaaaaa-0000-0000-0000-00000000000a','` + shopA + `','An Advisor','` + advisorEmail + `')`,
+		`INSERT INTO users (id, shop_id, person_id, role, password_hash) VALUES
+		 ('aaaaaaaa-0000-0000-0000-00000000000b','` + shopA + `',
+		  'aaaaaaaa-0000-0000-0000-00000000000a','service_advisor','` + hash + `')`,
 		`INSERT INTO people (id, shop_id, display_name, phone) VALUES
 		 ('aaaaaaaa-0000-0000-0000-000000000003','` + shopA + `','` + customerName + `','` + customerPhone + `')`,
 		`INSERT INTO customers (id, shop_id, kind, person_id, address_line1) VALUES
@@ -116,7 +122,7 @@ func seedShop(t *testing.T, pool *pgxpool.Pool, shop string, stmts []string) {
 }
 
 // signIn returns a client carrying a session for shop A's technician.
-func signIn(t *testing.T, ts *httptest.Server) *http.Client {
+func signIn(t *testing.T, ts *httptest.Server, email string) *http.Client {
 	t.Helper()
 	jar, _ := cookiejar.New(nil)
 	client := &http.Client{
@@ -125,7 +131,7 @@ func signIn(t *testing.T, ts *httptest.Server) *http.Client {
 			return http.ErrUseLastResponse
 		},
 	}
-	form := url.Values{"email": {techEmail}, "password": {techPass}}
+	form := url.Values{"email": {email}, "password": {techPass}}
 	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/login", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", ts.URL)
@@ -145,7 +151,7 @@ func signIn(t *testing.T, ts *httptest.Server) *http.Client {
 // The acceptance criterion from the permissions issue, as a test.
 func TestTechnicianGets404ForAnotherShopsJob(t *testing.T) {
 	ts, _ := testServer(t)
-	client := signIn(t, ts)
+	client := signIn(t, ts, techEmail)
 
 	resp, err := client.Get(ts.URL + "/jobs/" + jobB)
 	if err != nil {
@@ -166,7 +172,7 @@ func TestTechnicianGets404ForAnotherShopsJob(t *testing.T) {
 // and the work, and no customer personal data at all.
 func TestTechnicianScreensCarryNoCustomerPersonalData(t *testing.T) {
 	ts, _ := testServer(t)
-	client := signIn(t, ts)
+	client := signIn(t, ts, techEmail)
 
 	for _, path := range []string{"/", "/jobs/aaaaaaaa-0000-0000-0000-00000000000f"} {
 		resp, err := client.Get(ts.URL + path)
@@ -209,7 +215,7 @@ func TestUnauthenticatedRequestsGoToTheSignInPage(t *testing.T) {
 // A form on another site must not be able to act with a workshop's session.
 func TestCrossOriginWriteIsRefused(t *testing.T) {
 	ts, _ := testServer(t)
-	client := signIn(t, ts)
+	client := signIn(t, ts, techEmail)
 
 	req, _ := http.NewRequest(http.MethodPost,
 		ts.URL+"/jobs/aaaaaaaa-0000-0000-0000-00000000000f/clock-in", nil)
@@ -227,7 +233,7 @@ func TestCrossOriginWriteIsRefused(t *testing.T) {
 
 func TestSignOutEndsTheSession(t *testing.T) {
 	ts, _ := testServer(t)
-	client := signIn(t, ts)
+	client := signIn(t, ts, techEmail)
 
 	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/logout", nil)
 	req.Header.Set("Origin", ts.URL)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/RedaEkengren/RedaSMS/internal/testsupport"
 	"github.com/RedaEkengren/RedaSMS/migrations"
@@ -229,5 +230,50 @@ func TestEveryTenantTableCarriesShopID(t *testing.T) {
 	}
 	if len(missing) > 0 {
 		t.Errorf("tables without shop_id: %s", strings.Join(missing, ", "))
+	}
+}
+
+// ready_at is maintained by a trigger rather than by whoever changes the
+// state, because there are already three code paths that move an order and
+// each would have to remember.
+func TestReadyAtIsSetAndClearedByTheTrigger(t *testing.T) {
+	pool := testPool(t)
+	seed(t, pool)
+	ctx := context.Background()
+
+	readyAt := func() *time.Time {
+		var at *time.Time
+		if err := pool.QueryRow(ctx,
+			`SELECT ready_at FROM work_orders WHERE id = '77777777-7777-7777-7777-777777777777'`).
+			Scan(&at); err != nil {
+			t.Fatalf("read ready_at: %v", err)
+		}
+		return at
+	}
+
+	if at := readyAt(); at != nil {
+		t.Fatalf("a new order already has ready_at = %v", at)
+	}
+
+	set := func(state string) {
+		t.Helper()
+		seedAs(t, pool, shopID, []string{
+			`UPDATE work_orders SET state = '` + state +
+				`' WHERE id = '77777777-7777-7777-7777-777777777777'`,
+		})
+	}
+
+	set("ready")
+	first := readyAt()
+	if first == nil {
+		t.Fatal("moving to ready did not set ready_at")
+	}
+
+	// A car sent back to the workshop is no longer waiting to be collected.
+	// Keeping the timestamp would report it as having stood there for a week
+	// when it has been on a lift all along.
+	set("in_progress")
+	if at := readyAt(); at != nil {
+		t.Errorf("leaving ready left ready_at = %v", at)
 	}
 }

@@ -22,6 +22,17 @@ type pageData struct {
 	Jobs  []workshop.Job
 	Job   workshop.Job
 	Lines []workshop.Line
+	Board []workshop.BoardEntry
+	Form  intakeForm
+}
+
+// intakeForm keeps what was typed when a submission is sent back with an
+// error. Clearing a form because one field was wrong is how a counter ends up
+// re-typing a registration number three times.
+type intakeForm struct {
+	Registration string
+	OdometerKm   string
+	Complaint    string
 }
 
 // parseTemplates builds one template set per page.
@@ -30,7 +41,7 @@ type pageData struct {
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "error"}
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).ParseFS(web.Templates,
