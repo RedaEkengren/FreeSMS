@@ -33,7 +33,7 @@ func (s *Server) withSession(next http.Handler) http.Handler {
 			return
 		}
 
-		session, err := auth.Authenticate(r.Context(), s.pool, s.shopID, cookie.Value)
+		session, err := auth.Authenticate(r.Context(), s.pool, s.shop(), cookie.Value)
 		if err != nil {
 			s.clearSessionCookie(w)
 			next.ServeHTTP(w, r)

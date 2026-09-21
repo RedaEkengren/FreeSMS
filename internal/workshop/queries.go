@@ -227,7 +227,7 @@ func ResolveShop(ctx context.Context, pool *pgxpool.Pool, configured string) (st
 
 	switch len(ids) {
 	case 0:
-		return "", errors.New("workshop: no shop exists yet; seed one with scripts/seed.sql")
+		return "", errors.New("workshop: no shop exists yet; the setup page creates one")
 	case 1:
 		return ids[0], nil
 	default:

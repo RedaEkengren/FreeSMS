@@ -15,6 +15,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/RedaEkengren/RedaSMS/internal/config"
@@ -27,10 +28,30 @@ type Server struct {
 	pool          *pgxpool.Pool
 	log           *slog.Logger
 	release       string
-	shopID        string
 	locale        string
 	secureCookies bool
 	templates     map[string]*template.Template
+
+	// Pinned by SHOP_ID when an installation serves a named shop.
+	configuredShopID string
+
+	// Resolved once there is a shop. It starts empty on a fresh installation
+	// and is filled in by setup, while the process is running -- hence the
+	// mutex rather than a plain field read at boot.
+	mu       sync.RWMutex
+	resolved string
+}
+
+func (s *Server) shop() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.resolved
+}
+
+func (s *Server) setShop(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.resolved = id
 }
 
 // New returns a Server. It does not listen; that is Run's job.
@@ -40,12 +61,13 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 		return nil, err
 	}
 	return &Server{
-		pool:      pool,
-		log:       log,
-		release:   cfg.Release,
-		shopID:    shopID,
-		locale:    cfg.DefaultLocale,
-		templates: templates,
+		pool:             pool,
+		log:              log,
+		release:          cfg.Release,
+		resolved:         shopID,
+		configuredShopID: cfg.ShopID,
+		locale:           cfg.DefaultLocale,
+		templates:        templates,
 		// A Secure cookie is not sent over plain HTTP, so setting it
 		// unconditionally would break every local and reverse-proxied
 		// installation that terminates TLS elsewhere. BASE_URL is what the
@@ -68,6 +90,9 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.Handle("GET /static/", http.StripPrefix("/static/",
 		cacheForever(http.FileServer(http.FS(staticFS)))))
 
+	mux.HandleFunc("GET /setup", s.handleSetupForm)
+	mux.HandleFunc("POST /setup", s.handleSetup)
+
 	mux.HandleFunc("GET /login", s.handleLoginForm)
 	mux.HandleFunc("POST /login", s.handleLogin)
 	mux.HandleFunc("POST /logout", s.handleLogout)
@@ -80,7 +105,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/clock-in", s.requireSession(s.handleClock(true)))
 	mux.HandleFunc("POST /jobs/{id}/clock-out", s.requireSession(s.handleClock(false)))
 
-	return s.securityHeaders(s.checkOrigin(s.withSession(mux))), nil
+	return s.securityHeaders(s.checkOrigin(s.requireSetup(s.withSession(mux)))), nil
 }
 
 // cacheForever is safe here because everything under /static is embedded in

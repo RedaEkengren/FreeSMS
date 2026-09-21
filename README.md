@@ -11,9 +11,10 @@ and no annual contract.
 
 ## Status
 
-Early, but it runs. A technician can sign in, see what is in the shop, open a
-job and clock on and off it from a phone. The data model, permissions and row
-level security are in place; the front desk, invoicing and inventory are not. Progress is tracked in [issues](https://github.com/RedaEkengren/RedaSMS/issues), grouped
+Early, but it runs. A fresh installation sets itself up through a page rather
+than a script. A technician sees their work and clocks on and off it from a
+phone; the front desk sees the counter board, takes vehicles in, and is the
+only role shown customer details. Invoicing and inventory are not built. Progress is tracked in [issues](https://github.com/RedaEkengren/RedaSMS/issues), grouped
 into four milestones:
 
 | Milestone | What it covers |
@@ -67,20 +68,27 @@ curl http://localhost:8080/healthz
 The health endpoint reaches the database rather than reporting that the
 process is alive, so a green check means the service can actually do its job.
 
-The database starts empty, and the service refuses to start without a shop
-rather than guessing which one it serves. Seed one:
+Open <http://localhost:8080>. The database starts empty, so the first thing
+served is a setup page: name the workshop, create your account, and it stops
+working from then on.
+
+### Demonstration data
+
+To look at a shop with vehicles already in it, seed one instead of setting up
+by hand:
 
 ```sh
 docker compose exec -T db psql -U redasms -d redasms < scripts/seed.sql
-docker compose restart app
 ```
 
-That creates a shop, two users, a customer, two vehicles and two jobs. Sign in
-at <http://localhost:8080> as `reda@example.test` (a technician) or
-`anna@example.test` (the owner). Both have the password `workshop`.
+That creates a shop, two users, a customer, three vehicles and three jobs —
+one late, one waiting for parts, one finished and uncollected. Sign in as
+`reda@example.test` (a technician) or `anna@example.test` (the owner), both
+with the password `workshop`.
 
 **The seed is for development only.** Its password hash is in a public
-repository. For a real installation, create users with a hash from:
+repository, so anyone reaching an installation seeded with it can sign in. Use
+the setup page for anything real, and create later accounts with a hash from:
 
 ```sh
 docker compose exec app /redasms -hash 'the password'

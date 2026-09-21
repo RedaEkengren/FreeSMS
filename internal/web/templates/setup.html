@@ -1,0 +1,26 @@
+{{define "content"}}
+<h1>Set up this workshop</h1>
+<p>Nothing has been configured yet. This page creates the workshop and your
+account, and then stops working.</p>
+{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+<form method="post" action="/setup">
+  <label>
+    <span>Workshop name</span>
+    <input name="shop_name" value="{{.Form.ShopName}}" required autofocus>
+  </label>
+  <label>
+    <span>Your name</span>
+    <input name="owner_name" value="{{.Form.OwnerName}}" required>
+  </label>
+  <label>
+    <span>Your email</span>
+    <input type="email" name="email" value="{{.Form.Email}}"
+           autocomplete="username" autocapitalize="off" autocorrect="off" required>
+  </label>
+  <label>
+    <span>Password — at least {{.MinPassword}} characters, no other rules</span>
+    <input type="password" name="password" autocomplete="new-password" required>
+  </label>
+  <button type="submit">Create the workshop</button>
+</form>
+{{end}}

@@ -76,11 +76,20 @@ func run() error {
 	}
 	log.Info("migrations up to date")
 
+	// A fresh installation has no shop, and that is not a reason to refuse to
+	// start. It used to be: `docker compose up` against an empty database
+	// produced a container restarting in a loop and a reason buried in a log
+	// nobody had thought to read yet. The server now serves a setup page
+	// instead, and resolves the shop once there is one.
 	shopID, err := workshop.ResolveShop(ctx, pool, cfg.ShopID)
-	if err != nil {
+	switch {
+	case err != nil && cfg.ShopID != "":
 		return err
+	case err != nil:
+		log.Warn("no shop configured yet; serving the setup page", "reason", err)
+	default:
+		log.Info("serving shop", "shop_id", shopID)
 	}
-	log.Info("serving shop", "shop_id", shopID)
 
 	srv, err := server.New(pool, log, cfg, shopID)
 	if err != nil {

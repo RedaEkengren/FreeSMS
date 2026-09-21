@@ -24,6 +24,9 @@ type pageData struct {
 	Lines []workshop.Line
 	Board []workshop.BoardEntry
 	Form  intakeForm
+
+	// Setup only.
+	MinPassword int
 }
 
 // intakeForm keeps what was typed when a submission is sent back with an
@@ -33,7 +36,16 @@ type intakeForm struct {
 	Registration string
 	OdometerKm   string
 	Complaint    string
+
+	// Setup reuses this struct rather than carrying a second one through
+	// every page: the fields are disjoint and no template reads both.
+	ShopName  string
+	OwnerName string
+	Email     string
 }
+
+// setupForm is intakeForm under a name that says which page it belongs to.
+type setupForm = intakeForm
 
 // parseTemplates builds one template set per page.
 //
@@ -41,7 +53,7 @@ type intakeForm struct {
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "board", "newjob", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "setup", "error"}
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).ParseFS(web.Templates,

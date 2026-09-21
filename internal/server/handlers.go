@@ -20,7 +20,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 
-	token, session, err := auth.Login(r.Context(), s.pool, s.shopID, email, password, r.UserAgent())
+	token, session, err := auth.Login(r.Context(), s.pool, s.shop(), email, password, r.UserAgent())
 	switch {
 	case errors.Is(err, auth.ErrThrottled):
 		// 429 rather than 401: the credentials were not judged at all, and a
@@ -53,7 +53,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie(sessionCookie); err == nil && cookie.Value != "" {
-		if err := auth.Logout(r.Context(), s.pool, s.shopID, cookie.Value); err != nil {
+		if err := auth.Logout(r.Context(), s.pool, s.shop(), cookie.Value); err != nil {
 			s.log.Error("logout", "error", err)
 		}
 	}
