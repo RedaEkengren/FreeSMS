@@ -7,6 +7,11 @@
 
 BEGIN;
 
+-- Row level security applies to the owner too (FORCE), so even a seed has to
+-- say which shop it is acting for. Nothing reaches tenant data without a
+-- scope, including this file.
+SELECT set_config('app.current_shop', '11111111-1111-1111-1111-111111111111', true);
+
 INSERT INTO shops (id, name, timezone, locale, currency)
 VALUES ('11111111-1111-1111-1111-111111111111', 'Verkstaden', 'Europe/Stockholm', 'sv', 'SEK')
 ON CONFLICT (id) DO NOTHING;

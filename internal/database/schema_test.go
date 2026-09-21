@@ -43,10 +43,42 @@ func testPool(t *testing.T) *pgxpool.Pool {
 
 const shopID = "11111111-1111-1111-1111-111111111111"
 
-func seed(t *testing.T, pool *pgxpool.Pool) {
+// seedAs runs statements in one transaction with a transaction-local scope.
+//
+// Transaction-local matters. A session-level set_config survives on the pooled
+// connection and is handed to whatever borrows it next, so a later request
+// inherits a scope it never asked for. That is the same leak the InScope
+// wrapper exists to prevent, and it is easy to reintroduce in test setup --
+// this helper was written with a session-level setting first, and
+// TestWithoutScopeNothingIsVisible caught it.
+func seedAs(t *testing.T, pool *pgxpool.Pool, shop string, stmts []string) {
 	t.Helper()
 	ctx := context.Background()
-	stmts := []string{
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin seed: %v", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Row level security applies to the owner as well (FORCE), so a seed
+	// declares its scope exactly as the application does.
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.current_shop', $1, true)`, shop); err != nil {
+		t.Fatalf("set seed scope: %v", err)
+	}
+	for _, s := range stmts {
+		if _, err := tx.Exec(ctx, s); err != nil {
+			t.Fatalf("seed: %v\n  %s", err, s)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit seed: %v", err)
+	}
+}
+
+func seed(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	seedAs(t, pool, shopID, []string{
 		`INSERT INTO shops (id, name) VALUES ('` + shopID + `', 'Test Verkstad')`,
 		`INSERT INTO people (id, shop_id, display_name) VALUES
 		 ('22222222-2222-2222-2222-222222222222','` + shopID + `','A Technician')`,
@@ -60,12 +92,7 @@ func seed(t *testing.T, pool *pgxpool.Pool) {
 		`INSERT INTO work_orders (id, shop_id, number, vehicle_id, customer_id) VALUES
 		 ('77777777-7777-7777-7777-777777777777','` + shopID + `',1,
 		  '55555555-5555-5555-5555-555555555555','44444444-4444-4444-4444-444444444444')`,
-	}
-	for _, s := range stmts {
-		if _, err := pool.Exec(ctx, s); err != nil {
-			t.Fatalf("seed: %v", err)
-		}
-	}
+	})
 }
 
 // A personalised plate moves between cars. It must be impossible for two
