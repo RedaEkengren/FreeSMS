@@ -104,6 +104,8 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /jobs/{id}", s.requireSession(s.handleJob))
 	mux.HandleFunc("POST /jobs/{id}/state", s.requireSession(s.handleSetState))
 	mux.HandleFunc("POST /jobs/{id}/lines", s.requireSession(s.handleAddLine))
+	mux.HandleFunc("POST /jobs/{id}/invoice", s.requireSession(s.handleInvoice))
+	mux.HandleFunc("POST /jobs/{id}/credit", s.requireSession(s.handleCreditNote))
 	mux.HandleFunc("POST /jobs/{id}/clock-in", s.requireSession(s.handleClock(true)))
 	mux.HandleFunc("POST /jobs/{id}/clock-out", s.requireSession(s.handleClock(false)))
 

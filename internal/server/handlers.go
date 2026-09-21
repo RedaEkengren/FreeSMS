@@ -94,13 +94,24 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Only the front desk sees documents; a technician has no use for them
+	// and they carry the customer's name.
+	var invoices []workshop.Invoice
+	if session.Scope.Role.SeesCustomerPersonalData() {
+		invoices, err = workshop.InvoicesFor(r.Context(), s.pool, session.Scope, id)
+		if err != nil {
+			s.log.Error("read invoices", "error", err)
+		}
+	}
+
 	s.render(w, r, http.StatusOK, "job", pageData{
-		Title:   "Job",
-		Session: session,
-		Job:     job,
-		Lines:   lines,
-		Next:    workshop.AvailableStates(workshop.State(job.State), job.HasWork),
-		Totals:  workshop.TotalsFor(lines),
+		Title:    "Job",
+		Session:  session,
+		Job:      job,
+		Lines:    lines,
+		Next:     workshop.AvailableStates(workshop.State(job.State), job.HasWork),
+		Totals:   workshop.TotalsFor(lines),
+		Invoices: invoices,
 	})
 }
 

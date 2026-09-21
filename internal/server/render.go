@@ -20,13 +20,14 @@ type pageData struct {
 	Error   string
 	Email   string
 
-	Jobs   []workshop.Job
-	Job    workshop.Job
-	Lines  []workshop.Line
-	Board  []workshop.BoardEntry
-	Next   []workshop.State
-	Totals money.Totals
-	Form   intakeForm
+	Jobs     []workshop.Job
+	Job      workshop.Job
+	Lines    []workshop.Line
+	Board    []workshop.BoardEntry
+	Next     []workshop.State
+	Totals   money.Totals
+	Invoices []workshop.Invoice
+	Form     intakeForm
 
 	// Setup only.
 	MinPassword int

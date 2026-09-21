@@ -161,3 +161,59 @@ func parseScaled(s string, decimals int) (int64, error) {
 	}
 	return major*scale + minor, nil
 }
+
+// handleInvoice issues the invoice for a job.
+func (s *Server) handleInvoice(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id := r.PathValue("id")
+
+	_, err := workshop.Issue(r.Context(), s.pool, session.Scope, id)
+
+	var illegal workshop.ErrIllegalTransition
+	switch {
+	case errors.Is(err, access.ErrForbidden):
+		s.renderError(w, r, http.StatusForbidden, "Not for your role",
+			"Invoicing is done at the front desk.")
+		return
+	case errors.Is(err, workshop.ErrNotFound):
+		s.renderError(w, r, http.StatusNotFound, "Not found", "No such job.")
+		return
+	case errors.Is(err, workshop.ErrAlreadyInvoiced),
+		errors.Is(err, workshop.ErrNothingToInvoice),
+		errors.Is(err, workshop.ErrNoCustomer):
+		s.renderError(w, r, http.StatusConflict, "Not invoiced", err.Error())
+		return
+	case errors.As(err, &illegal):
+		s.renderError(w, r, http.StatusConflict, "Not from here", illegal.Error())
+		return
+	case err != nil:
+		s.log.Error("issue invoice", "error", err)
+		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		return
+	}
+	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
+}
+
+// handleCreditNote reverses an issued invoice.
+func (s *Server) handleCreditNote(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	jobID := r.PathValue("id")
+
+	_, err := workshop.CreditNote(r.Context(), s.pool, session.Scope, r.FormValue("invoice_id"))
+	switch {
+	case errors.Is(err, access.ErrForbidden):
+		s.renderError(w, r, http.StatusForbidden, "Not for your role", "")
+		return
+	case errors.Is(err, workshop.ErrNotFound):
+		s.renderError(w, r, http.StatusNotFound, "Not found", "No such invoice.")
+		return
+	case errors.Is(err, workshop.ErrInvalid):
+		s.renderError(w, r, http.StatusConflict, "Not credited", trimInvalid(err))
+		return
+	case err != nil:
+		s.log.Error("credit note", "error", err)
+		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		return
+	}
+	http.Redirect(w, r, "/jobs/"+jobID, http.StatusSeeOther)
+}

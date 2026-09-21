@@ -47,6 +47,32 @@
 </ul>
 {{end}}
 
+{{if .Invoices}}
+<h2>Documents</h2>
+<ul class="lines">
+  {{range .Invoices}}
+  <li>
+    <div class="row">
+      <span>{{.Reference}}{{if .IsCreditNote}} &mdash; credit note{{end}}</span>
+      <span>{{.Gross}}</span>
+    </div>
+    {{if not .IsCreditNote}}
+    <form method="post" action="/jobs/{{$.Job.ID}}/credit" style="margin-top:0.5rem">
+      <input type="hidden" name="invoice_id" value="{{.ID}}">
+      <button type="submit" class="secondary">Credit it</button>
+    </form>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{else if eq .Job.State "ready"}}
+  {{if .Session.Scope.Role.SeesCustomerPersonalData}}
+  <form method="post" action="/jobs/{{.Job.ID}}/invoice" style="margin:1rem 0">
+    <button type="submit">Invoice it</button>
+  </form>
+  {{end}}
+{{end}}
+
 {{if .Lines}}
 <dl class="totals">
   {{range .Totals.Bands}}
