@@ -6,13 +6,21 @@
 # fails before any job is created, so there are not even logs to read.
 name: CI
 
+# No paths-ignore, deliberately.
+#
+# Skipping CI for documentation-only changes saves a minute and creates a trap:
+# a required status check that never runs is never reported, so the branch
+# protection waits for it forever. The repository owner can bypass that and
+# will not notice; a contributor's pull request that only fixes a typo becomes
+# unmergeable with no way to fix it from their side.
+#
+# This was found by pushing exactly such a commit and reading "2 of 2 required
+# status checks are expected" in the bypass warning.
 on:
   push:
     branches: [main]
-    paths-ignore: ["**.md", "LICENSE"]
   pull_request:
     branches: [main]
-    paths-ignore: ["**.md", "LICENSE"]
 
 concurrency:
   group: ci-${{ github.ref }}
