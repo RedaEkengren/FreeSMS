@@ -104,6 +104,15 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		s.log.Error("read findings", "error", err)
 	}
 
+	inspections, err := workshop.InspectionsFor(r.Context(), s.pool, session.Scope, id)
+	if err != nil {
+		s.log.Error("read inspections", "error", err)
+	}
+	templates, err := workshop.Templates(r.Context(), s.pool, session.Scope)
+	if err != nil {
+		s.log.Error("read templates", "error", err)
+	}
+
 	// Only the front desk sees documents; a technician has no use for them
 	// and they carry the customer's name.
 	var invoices []workshop.Invoice
@@ -115,15 +124,17 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, r, http.StatusOK, "job", pageData{
-		Title:    "Job",
-		Session:  session,
-		Job:      job,
-		Lines:    lines,
-		Next:     stateChoices(session.Scope.Role, workshop.State(job.State), job.HasWork),
-		Totals:   workshop.TotalsFor(lines),
-		Invoices: invoices,
-		Requests: requests,
-		Findings: findings,
+		Title:       "Job",
+		Session:     session,
+		Job:         job,
+		Lines:       lines,
+		Next:        stateChoices(session.Scope.Role, workshop.State(job.State), job.HasWork),
+		Totals:      workshop.TotalsFor(lines),
+		Invoices:    invoices,
+		Requests:    requests,
+		Findings:    findings,
+		Inspections: inspections,
+		Templates:   templates,
 	})
 }
 

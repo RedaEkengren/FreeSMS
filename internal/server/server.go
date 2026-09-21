@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/RedaEkengren/RedaSMS/internal/config"
+	"github.com/RedaEkengren/RedaSMS/internal/storage"
 	"github.com/RedaEkengren/RedaSMS/internal/web"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -31,6 +32,8 @@ type Server struct {
 	locale        string
 	secureCookies bool
 	templates     map[string]*template.Template
+	photos        *storage.Store
+	baseURL       string
 
 	// Pinned by SHOP_ID when an installation serves a named shop.
 	configuredShopID string
@@ -60,6 +63,10 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 	if err != nil {
 		return nil, err
 	}
+	photos, err := storage.New(cfg.AttachmentsDir)
+	if err != nil {
+		return nil, err
+	}
 	return &Server{
 		pool:             pool,
 		log:              log,
@@ -67,6 +74,8 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 		resolved:         shopID,
 		configuredShopID: cfg.ShopID,
 		locale:           cfg.DefaultLocale,
+		photos:           photos,
+		baseURL:          strings.TrimRight(cfg.BaseURL, "/"),
 		templates:        templates,
 		// A Secure cookie is not sent over plain HTTP, so setting it
 		// unconditionally would break every local and reverse-proxied
@@ -106,6 +115,21 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/lines", s.requireSession(s.handleAddLine))
 	mux.HandleFunc("POST /jobs/{id}/invoice", s.requireSession(s.handleInvoice))
 	mux.HandleFunc("POST /jobs/{id}/credit", s.requireSession(s.handleCreditNote))
+
+	mux.HandleFunc("POST /jobs/{id}/inspect", s.requireSession(s.handleStartInspection))
+	mux.HandleFunc("GET /inspections/{id}", s.requireSession(s.handleInspection))
+	mux.HandleFunc("POST /inspections/{id}/items/{itemID}", s.requireSession(s.handleSetInspectionItem))
+	mux.HandleFunc("POST /inspections/{id}/items/{itemID}/photo", s.requireSession(s.handleUploadPhoto))
+	mux.HandleFunc("POST /inspections/{id}/complete", s.requireSession(s.handleCompleteInspection))
+	mux.HandleFunc("POST /inspections/{id}/share", s.requireSession(s.handleShareInspection))
+	mux.HandleFunc("POST /inspections/{id}/revoke", s.requireSession(s.handleRevokeShare))
+	mux.HandleFunc("GET /photos/{key}", s.requireSession(s.handlePhoto))
+
+	// The customer's link. No session; the token is the whole of the
+	// authorisation, and it authorises exactly one inspection.
+	mux.HandleFunc("GET /i/{token}", s.handleSharedInspection)
+	mux.HandleFunc("POST /i/{token}/items/{itemID}", s.handleSharedDecision)
+	mux.HandleFunc("GET /i/{token}/photos/{key}", s.handleSharedPhoto)
 
 	mux.HandleFunc("GET /parts", s.requireSession(s.handleParts))
 	mux.HandleFunc("POST /parts/arrived", s.requireSession(s.handlePartArrived))

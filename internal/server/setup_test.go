@@ -28,7 +28,13 @@ func emptyServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	cfg := &config.Config{BaseURL: "http://localhost", DefaultLocale: "en", Release: "test"}
+	cfg := &config.Config{
+		BaseURL:       "http://localhost",
+		DefaultLocale: "en",
+		Release:       "test",
+		// Photographs go to a directory that disappears with the test.
+		AttachmentsDir: t.TempDir(),
+	}
 	srv, err := New(pool, slog.New(slog.NewTextHandler(io.Discard, nil)), cfg, "")
 	if err != nil {
 		t.Fatalf("New: %v", err)

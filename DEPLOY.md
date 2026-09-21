@@ -55,6 +55,13 @@ two months later when production is pinned to a SHA that gets deleted.
 4. Restore `ATTACHMENTS_DIR`. **This is the part that cannot be regenerated.**
    The database can be rebuilt from a dump; inspection photographs cannot be
    rebuilt from anything.
+
+   The directory must be writable by the user the container runs as. A Docker
+   named volume is created owned by root while the container runs as
+   `nonroot`, so the image seeds the directory with the right owner and the
+   service refuses to start if it cannot write there. Discovering this at the
+   first photograph of the day, as `mkdir ...: permission denied`, is a long
+   way from where the mistake was made.
 5. Install the schedule from `deploy/crontab` with the install script. A server
    that comes back up with the application, the database and the certificates
    restored, and nothing running the backups, fails silently and is discovered

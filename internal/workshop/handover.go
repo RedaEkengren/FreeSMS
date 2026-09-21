@@ -121,6 +121,9 @@ func OpenPartRequests(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 // waiting on three parts should not look ready to work on because one of them
 // turned up.
 func MarkPartArrived(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, requestID string) error {
+	if !looksLikeUUID(requestID) {
+		return ErrNotFound
+	}
 	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
 		return access.ErrForbidden
 	}
@@ -246,6 +249,9 @@ func FindingsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 // HandleFinding marks a finding as dealt with, whether it was priced or
 // declined. Either way it stops being an open question.
 func HandleFinding(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, findingID string) error {
+	if !looksLikeUUID(findingID) {
+		return ErrNotFound
+	}
 	if !scope.Role.SeesCustomerPersonalData() {
 		return access.ErrForbidden
 	}

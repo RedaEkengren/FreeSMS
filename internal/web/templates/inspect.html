@@ -1,0 +1,92 @@
+{{define "content"}}
+<div class="row">
+  <span class="plate">{{if .Inspection.Registration}}{{.Inspection.Registration}}{{else}}no plate{{end}}</span>
+  {{if .Inspection.Completed}}<span class="tag">done</span>{{end}}
+</div>
+<p class="vehicle">{{.Inspection.Make}} {{.Inspection.Model}} &middot; {{.Inspection.TemplateName}}</p>
+
+{{if .ShareURL}}
+<div class="share">
+  <p><strong>Send this to the customer.</strong> It is shown once — there is
+  nowhere to look it up again, so make a new link if it is lost.</p>
+  <input value="{{.ShareURL}}" readonly onclick="this.select()">
+</div>
+{{end}}
+
+{{range .Inspection.Items}}
+<div class="card">
+  <div class="row">
+    <strong>{{.Label}}</strong>
+    {{if eq .Status "pass"}}<span class="tag pass">pass</span>
+    {{else if eq .Status "attention"}}<span class="tag warranty">attention</span>
+    {{else if eq .Status "fail"}}<span class="tag late">fail</span>{{end}}
+  </div>
+
+  {{if .Note}}<p>{{.Note}}</p>{{end}}
+
+  {{if .Photos}}
+  <div class="photos">
+    {{range .Photos}}<img src="/photos/{{.}}" alt="" loading="lazy">{{end}}
+  </div>
+  {{end}}
+
+  {{if .Decided}}
+    <p class="waiting">Customer {{.Decision}}{{if gt .Superseded 0}} (changed their mind {{.Superseded}} time{{if ne .Superseded 1}}s{{end}}){{end}}</p>
+  {{end}}
+
+  {{if not $.Inspection.Completed}}
+  <form method="post" action="/inspections/{{$.Inspection.ID}}/items/{{.ID}}">
+    <div class="actions">
+      <button name="status" value="pass" class="secondary">Pass</button>
+      <button name="status" value="attention" class="secondary">Attention</button>
+      <button name="status" value="fail" class="secondary">Fail</button>
+    </div>
+    <label style="margin-top:0.75rem">
+      <span>Note</span>
+      <input name="note" value="{{.Note}}" placeholder="Worn to the wear indicator">
+    </label>
+  </form>
+
+  <form method="post" action="/inspections/{{$.Inspection.ID}}/items/{{.ID}}/photo"
+        enctype="multipart/form-data" style="margin-top:0.5rem">
+    <!-- capture sends a phone straight to the camera rather than the gallery,
+         which is one tap fewer with a dirty hand. -->
+    <input type="file" name="photo" accept="image/*" capture="environment" required>
+    <button type="submit" class="secondary" style="margin-top:0.5rem">Add the photograph</button>
+  </form>
+  {{end}}
+</div>
+{{end}}
+
+{{if not .Inspection.Completed}}
+<form method="post" action="/inspections/{{.Inspection.ID}}/complete" style="margin-top:1.5rem">
+  <button type="submit">Finish the inspection</button>
+</form>
+{{else if .Session.Scope.Role.SeesCustomerPersonalData}}
+<form method="post" action="/inspections/{{.Inspection.ID}}/share" style="margin-top:1.5rem">
+  <button type="submit">Make a link for the customer</button>
+</form>
+{{end}}
+
+{{if .Shares}}
+<h2>Links sent to the customer</h2>
+<ul class="lines">
+  {{range .Shares}}
+  <li>
+    <div class="row">
+      <span>Made {{.CreatedAt.Format "2 Jan 15:04"}}</span>
+      {{if .Usable}}<span class="tag pass">open</span>{{else}}<span class="tag">closed</span>{{end}}
+    </div>
+    {{if .Usable}}
+    <form method="post" action="/inspections/{{$.Inspection.ID}}/revoke" style="margin-top:0.5rem">
+      <input type="hidden" name="share_id" value="{{.ID}}">
+      <button type="submit" class="secondary">Close this link</button>
+    </form>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{end}}
+
+<p style="margin-top:2rem"><a href="/jobs/{{.Inspection.WorkOrderID}}">Back to the job</a></p>
+{{end}}

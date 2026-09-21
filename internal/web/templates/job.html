@@ -27,6 +27,32 @@
 </div>
 {{end}}
 
+<h2>Inspections</h2>
+{{if .Inspections}}
+<ul class="lines">
+  {{range .Inspections}}
+  <li>
+    <div class="row">
+      <a href="/inspections/{{.ID}}">{{.TemplateName}}</a>
+      {{if .Completed}}<span class="tag">done</span>{{else}}<span class="tag warranty">in progress</span>{{end}}
+    </div>
+    <div class="waiting">{{.PerformedBy}}{{if .Findings}} &middot; {{len .Findings}} finding{{if ne (len .Findings) 1}}s{{end}}{{end}}</div>
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{if .Templates}}
+<form method="post" action="/jobs/{{.Job.ID}}/inspect" style="margin-top:0.5rem">
+  <label>
+    <span>Start a check</span>
+    <select name="template_id">
+      {{range .Templates}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+    </select>
+  </label>
+  <button type="submit" class="secondary">Start it</button>
+</form>
+{{end}}
+
 {{if .Requests}}
 <h2>Parts</h2>
 <ul class="lines">

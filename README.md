@@ -11,10 +11,16 @@ and no annual contract.
 
 ## Status
 
-Early, but it runs. A fresh installation sets itself up through a page rather
-than a script. A technician sees their work and clocks on and off it from a
-phone; the front desk sees the counter board, takes vehicles in, and is the
-only role shown customer details. Invoicing and inventory are not built. Progress is tracked in [issues](https://github.com/RedaEkengren/RedaSMS/issues), grouped
+Early, but it runs, and a job can travel the whole way round.
+
+A fresh installation sets itself up through a page. The front desk takes a
+vehicle in and sees the counter board; a technician sees their own work, clocks
+on and off it, runs a checklist with photographs from their phone, asks the
+parts desk for what they need and says when the car is ready. The customer gets
+a link showing the evidence and approves each finding. The front desk invoices
+it, with gap-free numbering and documents that cannot be edited.
+
+Inventory is not built. Progress is tracked in [issues](https://github.com/RedaEkengren/RedaSMS/issues), grouped
 into four milestones:
 
 | Milestone | What it covers |

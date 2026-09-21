@@ -91,7 +91,13 @@ func testServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 		  'bbbbbbbb-0000-0000-0000-000000000003','bbbbbbbb-0000-0000-0000-000000000002','Secret complaint')`,
 	})
 
-	cfg := &config.Config{BaseURL: "http://localhost", DefaultLocale: "en", Release: "test"}
+	cfg := &config.Config{
+		BaseURL:       "http://localhost",
+		DefaultLocale: "en",
+		Release:       "test",
+		// Photographs go to a directory that disappears with the test.
+		AttachmentsDir: t.TempDir(),
+	}
 	srv, err := New(pool, slog.New(slog.NewTextHandler(io.Discard, nil)), cfg, shopA)
 	if err != nil {
 		t.Fatalf("New: %v", err)
