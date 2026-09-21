@@ -1,0 +1,52 @@
+# The gate. Nothing merges without this passing.
+#
+# The Go half is shared, from Benbo-se/benbo-workflows. That repository exists
+# because BenboStandard -- where the estate's workflows live -- is private, and
+# a public repository cannot call a reusable workflow in a private one. The run
+# fails before any job is created, so there are not even logs to read.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "LICENSE"]
+  pull_request:
+    branches: [main]
+    paths-ignore: ["**.md", "LICENSE"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    uses: Benbo-se/benbo-workflows/.github/workflows/go-ci.yml@v1
+    with:
+      go-version: "1.27"
+      # Integration tests skip themselves when this is unset, which means a
+      # typo here turns the half of the suite that checks row level security
+      # into silence rather than a failure. The name must match what the tests
+      # read.
+      test-db-env: REDASMS_TEST_DATABASE_URL
+
+  image:
+    # The image is built but not pushed. There is nowhere to deploy it yet, and
+    # publishing artefacts nothing consumes is how a registry fills with
+    # versions no one can account for. What this does catch is a Dockerfile
+    # that stopped building, which the Go job would not notice.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build the image
+        run: docker build --tag redasms:${{ github.sha }} .
+
+      - name: The binary runs and knows its own flags
+        run: |
+          # Not a real test -- a smoke check that the entrypoint is the binary
+          # and the image is not missing something the build assumed.
+          docker run --rm redasms:${{ github.sha }} -hash 'ci smoke test' | grep -q '^\$argon2id\$'

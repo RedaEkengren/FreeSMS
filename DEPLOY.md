@@ -6,7 +6,10 @@
 > read at two in the morning is believed, so nothing here pretends to be a
 > measurement.
 >
-> It is filled in for real by
+> CI exists and gates every change. Deployment does not: there is no server,
+> and a `deploy.yml` naming secrets the repository does not have would be dead
+> code that reads as authoritative. It is added when there is somewhere to
+> deploy to. See
 > [#5](https://github.com/RedaEkengren/RedaSMS/issues/5).
 
 ## Shape
