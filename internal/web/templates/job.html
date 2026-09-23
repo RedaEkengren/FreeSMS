@@ -188,7 +188,7 @@
 
 {{if .Session.Scope.Role.SeesCustomerPersonalData}}
 <h2>Add a line</h2>
-<form method="post" action="/jobs/{{.Job.ID}}/lines">
+<form method="post" action="/jobs/{{.Job.ID}}/lines" data-keep="job-line:{{.Job.ID}}">
   <label>
     <span>What</span>
     <input name="description" required>

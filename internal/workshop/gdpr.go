@@ -450,6 +450,19 @@ func Sweep(ctx context.Context, pool *pgxpool.Pool, shopID string) (SweepResult,
 		}
 		r.LoginAttempts = tag.RowsAffected()
 
+		// Idempotency keys and drafts exist to survive a bad minute, not to be
+		// a record. Keeping them is keeping a log of what somebody was typing.
+		if _, err := tx.Exec(ctx,
+			`DELETE FROM idempotency_keys WHERE created_at < now() - $1::interval`,
+			fmt.Sprintf("%d seconds", int(idempotencyRetention.Seconds()))); err != nil {
+			return fmt.Errorf("sweep idempotency keys: %w", err)
+		}
+		if _, err := tx.Exec(ctx,
+			`DELETE FROM drafts WHERE updated_at < now() - $1::interval`,
+			fmt.Sprintf("%d seconds", int(draftRetention.Seconds()))); err != nil {
+			return fmt.Errorf("sweep drafts: %w", err)
+		}
+
 		tag, err = tx.Exec(ctx,
 			`DELETE FROM inspection_shares WHERE expires_at < now() - $1::interval`,
 			fmt.Sprintf("%d seconds", int(expiredShareRetention.Seconds())))

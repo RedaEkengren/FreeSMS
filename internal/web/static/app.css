@@ -242,3 +242,8 @@ form.scan input { font-family: ui-monospace, Menlo, monospace; font-size: 1.125r
   main { padding: 0; max-width: none; }
   .label { break-inside: avoid; }
 }
+
+/* Work held because there was no connection. Visible without being alarming:
+   nothing is lost, it just has not gone yet. */
+.held { background: var(--warn); color: var(--bg); padding: 0.5rem 1rem; font-size: 0.9375rem; text-align: center; }
+.held[hidden] { display: none; }

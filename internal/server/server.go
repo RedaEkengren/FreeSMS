@@ -183,6 +183,10 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /time", s.requireSession(s.handleTime))
 	mux.HandleFunc("POST /time/correct", s.requireSession(s.handleCorrectTime))
 
+	mux.HandleFunc("POST /drafts", s.requireSession(s.handleSaveDraft))
+	mux.HandleFunc("GET /drafts", s.requireSession(s.handleLoadDraft))
+	mux.HandleFunc("DELETE /drafts", s.requireSession(s.handleDiscardDraft))
+
 	mux.HandleFunc("GET /search", s.requireSession(s.handleSearch))
 	mux.HandleFunc("GET /vehicles/{id}", s.requireSession(s.handleVehicle))
 
@@ -200,7 +204,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/clock-in", s.requireSession(s.handleClock(true)))
 	mux.HandleFunc("POST /jobs/{id}/clock-out", s.requireSession(s.handleClock(false)))
 
-	return s.securityHeaders(s.checkOrigin(s.requireSetup(s.withSession(mux)))), nil
+	return s.securityHeaders(s.checkOrigin(s.requireSetup(s.withSession(s.idempotent(mux))))), nil
 }
 
 // cacheForever is safe here because everything under /static is embedded in

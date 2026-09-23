@@ -1,7 +1,7 @@
 {{define "content"}}
 <h1>Take in a vehicle</h1>
 {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-<form method="post" action="/jobs/new">
+<form method="post" action="/jobs/new" data-keep="intake">
   <label>
     <span>Registration</span>
     <input name="registration" value="{{.Form.Registration}}"

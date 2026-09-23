@@ -6,6 +6,7 @@
 <title>{{.Title}}</title>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/htmx.min.js" defer></script>
+<script src="/static/keep.js" defer></script>
 </head>
 <body>
 {{if .Session.Scope.UserID}}
@@ -28,6 +29,7 @@
   </form>
 </header>
 {{end}}
+<div id="held" class="held" hidden></div>
 <main>
 {{template "content" .}}
 </main>
