@@ -113,6 +113,21 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		s.log.Error("read templates", "error", err)
 	}
 
+	// Stored times for this vehicle, so the counter can price a job from what
+	// the shop already knows rather than from memory.
+	var suggestions []workshop.Suggestion
+	var labourRate int64
+	if session.Scope.Role.SeesCustomerPersonalData() {
+		suggestions, err = workshop.SuggestFor(r.Context(), s.pool, session.Scope, job.VehicleID)
+		if err != nil {
+			s.log.Error("suggest labour times", "error", err)
+		}
+		labourRate, err = workshop.LabourRate(r.Context(), s.pool, session.Scope)
+		if err != nil {
+			s.log.Error("labour rate", "error", err)
+		}
+	}
+
 	// Only the front desk sees documents; a technician has no use for them
 	// and they carry the customer's name.
 	var invoices []workshop.Invoice
@@ -135,6 +150,8 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		Findings:    findings,
 		Inspections: inspections,
 		Templates:   templates,
+		Suggestions: suggestions,
+		LabourRate:  labourRate,
 	})
 }
 

@@ -33,6 +33,7 @@ var ErrNotFound = errors.New("workshop: not found")
 // is not fetched, and a column nobody selects cannot leak.
 type Job struct {
 	ID           string
+	VehicleID    string
 	Number       int64
 	State        string
 	Complaint    string
@@ -136,7 +137,7 @@ func (l Line) EstimatedPrice() string {
 func (l Line) Price() string { return money.Format(l.UnitPriceMinor) }
 
 const jobColumns = `
-	w.id, w.number, w.state, coalesce(w.complaint, ''),
+	w.id, v.id, w.number, w.state, coalesce(w.complaint, ''),
 	coalesce(r.registration, ''), coalesce(v.make, ''), coalesce(v.model, ''), v.model_year,
 	w.opened_at, w.promised_at,
 	(SELECT o.km FROM odometer_readings o
@@ -163,7 +164,7 @@ const jobFrom = `
 
 func scanJob(row pgx.Row) (Job, error) {
 	var j Job
-	err := row.Scan(&j.ID, &j.Number, &j.State, &j.Complaint,
+	err := row.Scan(&j.ID, &j.VehicleID, &j.Number, &j.State, &j.Complaint,
 		&j.Registration, &j.Make, &j.Model, &j.ModelYear,
 		&j.OpenedAt, &j.PromisedAt, &j.OdometerKm, &j.ClockStartedAt, &j.HasWork,
 		&j.AssignedTo, &j.AssignedToMe, &j.OpenRequests, &j.OpenFindings)

@@ -19,6 +19,12 @@ type NewLine struct {
 	UnitPriceMinor int64
 	VATRateBasis   int
 	CostBearer     string
+
+	// Set when the line came from the shop's own time library, so that what
+	// was actually clocked can be compared with what was expected. Without it
+	// the library never learns and a wrong entry poisons every future
+	// estimate quietly.
+	LabourTimeID string
 }
 
 // AddLine puts a line on an order.
@@ -83,13 +89,14 @@ func AddLine(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 		const insert = `
 			INSERT INTO work_order_lines
 			  (shop_id, work_order_id, position, kind, description, quantity,
-			   unit_price_minor, estimated_unit_price_minor, vat_rate_bp, cost_bearer, approved_at)
+			   unit_price_minor, estimated_unit_price_minor, vat_rate_bp, cost_bearer,
+			   approved_at, labour_time_id)
 			VALUES ($1, $2, $3, $4, $5, ($6::bigint)::numeric / 1000, $7, $8, $9, $10,
-			        CASE WHEN $11 THEN now() ELSE NULL END)`
+			        CASE WHEN $11 THEN now() ELSE NULL END, nullif($12, '')::uuid)`
 		if _, err := tx.Exec(ctx, insert,
 			scope.ShopID, jobID, position, line.Kind, strings.TrimSpace(line.Description),
 			line.QuantityMilli, line.UnitPriceMinor, estimated, line.VATRateBasis,
-			line.CostBearer, preApproval); err != nil {
+			line.CostBearer, preApproval, line.LabourTimeID); err != nil {
 			return fmt.Errorf("add line: %w", err)
 		}
 		return nil

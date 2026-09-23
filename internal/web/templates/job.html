@@ -166,6 +166,26 @@
 </form>
 {{end}}
 
+{{if .Suggestions}}
+<h2>From the shop's time library</h2>
+{{range .Suggestions}}
+<form method="post" action="/jobs/{{$.Job.ID}}/lines" class="suggestion">
+  <input type="hidden" name="kind" value="labour">
+  <input type="hidden" name="cost_bearer" value="customer">
+  <input type="hidden" name="labour_time_id" value="{{.ID}}">
+  <input type="hidden" name="description" value="{{.Operation}}">
+  <input type="hidden" name="quantity" value="{{.Hours}}">
+  <input type="hidden" name="unit_price" value="{{fmt $.LabourRate}}">
+  <div class="row">
+    <span>{{.Operation}}</span>
+    <span class="tag">{{.Hours}} h</span>
+  </div>
+  <div class="waiting">matched on {{.MatchedRule}}{{if .Actuals.Known}} &middot; really took {{.Actuals.MedianHours}} h across {{.Actuals.Jobs}}{{end}}</div>
+  <button type="submit" class="secondary" style="margin-top:0.5rem">Put it on the order</button>
+</form>
+{{end}}
+{{end}}
+
 {{if .Session.Scope.Role.SeesCustomerPersonalData}}
 <h2>Add a line</h2>
 <form method="post" action="/jobs/{{.Job.ID}}/lines">
