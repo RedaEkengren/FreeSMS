@@ -1,0 +1,55 @@
+{{define "content"}}
+<h1>Figures</h1>
+
+<form method="get" action="/figures">
+  <div class="pair">
+    <label><span>From</span><input type="date" name="from" value="{{.Dashboard.From.Format "2006-01-02"}}"></label>
+    <label><span>To</span><input type="date" name="to" value="{{.Dashboard.To.AddDate 0 0 -1 | date}}"></label>
+  </div>
+  <button type="submit" class="secondary">Show it</button>
+</form>
+
+<h2>Invoiced</h2>
+<dl class="totals">
+  <dt>Invoices issued</dt><dd>{{.Dashboard.Invoices}}</dd>
+  <dt>Net</dt><dd>{{.Dashboard.Net}}</dd>
+  <dt>Average order</dt><dd>{{.Dashboard.Mean}}</dd>
+  <dt>Middle order</dt><dd>{{.Dashboard.Median}}</dd>
+</dl>
+<p class="waiting">Counted by the day the invoice was issued, not the day the
+job was opened. Credit notes are included as the negatives they are.
+The average and the middle are both here because one large job moves the
+average and does not move the middle.</p>
+
+<h2>Hours</h2>
+<dl class="totals">
+  <dt>Clocked</dt><dd>{{printf "%.1f" .Dashboard.HoursClocked}}</dd>
+  <dt>Sold</dt><dd>{{printf "%.1f" .Dashboard.HoursBilled}}</dd>
+</dl>
+
+{{if .Dashboard.HasFindings}}
+<h2>Inspections</h2>
+<dl class="totals">
+  <dt>Findings answered</dt><dd>{{.Dashboard.FindingsDecided}}</dd>
+  <dt>Approved</dt><dd>{{.Dashboard.ApprovalRate}}%</dd>
+</dl>
+{{end}}
+
+{{if .Dashboard.Technicians}}
+<h2>Per person</h2>
+<ul class="lines">
+  {{range .Dashboard.Technicians}}
+  <li>
+    <div class="row">
+      <span>{{.Name}}</span>
+      <span>{{printf "%.1f" .Clocked}} clocked &middot; {{printf "%.1f" .Billed}} sold</span>
+    </div>
+  </li>
+  {{end}}
+</ul>
+<p class="waiting">Clocked and sold, both, rather than one efficiency figure.
+A single score becomes a stick, and the number that makes somebody look bad is
+often the job nobody else wanted. Everyone can see their own figures on their
+hours screen.</p>
+{{end}}
+{{end}}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"time"
 
 	"github.com/RedaEkengren/RedaSMS/internal/auth"
 	"github.com/RedaEkengren/RedaSMS/internal/money"
@@ -50,6 +51,7 @@ type pageData struct {
 	LabourTimes []workshop.LabourTime
 	LabourRate  int64
 	Suggestions []workshop.Suggestion
+	Dashboard   workshop.Dashboard
 	Form        intakeForm
 
 	// Setup only.
@@ -79,6 +81,7 @@ type setupForm = intakeForm
 var templateFuncs = template.FuncMap{
 	"fmt":    money.Format,
 	"divide": func(a, b int) int { return a / b },
+	"date":   func(t time.Time) string { return t.Format("2006-01-02") },
 }
 
 // parseTemplates builds one template set per page.
@@ -87,7 +90,7 @@ var templateFuncs = template.FuncMap{
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "search", "vehicle", "time", "labour", "setup", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "search", "vehicle", "time", "labour", "dashboard", "setup", "error"}
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).Funcs(templateFuncs).ParseFS(web.Templates,

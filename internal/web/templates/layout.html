@@ -13,6 +13,7 @@
   <nav>
     <a href="/" style="font-weight:600;text-decoration:none;color:inherit">RedaSMS</a>
     {{if .Session.Scope.Role.SeesParts}}<a href="/parts" class="nav">Parts</a>{{end}}
+    {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/figures" class="nav">Figures</a>{{end}}
     <a href="/time" class="nav">Hours</a>
     {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/labour" class="nav">Times</a>{{end}}
     <a href="/search" class="nav">Search</a>
