@@ -256,11 +256,64 @@ func setStateTx(ctx context.Context, tx pgx.Tx, jobID string, to State) error {
 		}
 	}
 
+	// A part put aside for a job that is no longer happening has to stop being
+	// reserved, or the shop looks short of stock it has on the shelf.
+	switch to {
+	case StateDeclined, StateCancelled, StateInvoiced, StateClosed:
+		if err := releaseReservationsForOrder(ctx, tx, jobID); err != nil {
+			return err
+		}
+	}
+
 	if _, err := tx.Exec(ctx,
 		`UPDATE work_orders SET state = $1, updated_at = now(),
 		        closed_at = CASE WHEN $1 IN ('closed', 'cancelled') THEN now() ELSE NULL END
 		 WHERE id = $2`, to, jobID); err != nil {
 		return fmt.Errorf("set state: %w", err)
+	}
+	return nil
+}
+
+// releaseReservationsForOrder frees whatever a job still has put aside.
+//
+// It runs inside the state change rather than beside it, so a job that becomes
+// declined always releases -- there is no path that changes the state and
+// forgets.
+func releaseReservationsForOrder(ctx context.Context, tx pgx.Tx, jobID string) error {
+	rows, err := tx.Query(ctx, `
+		SELECT shop_id, part_id, sum(quantity)
+		FROM stock_movements
+		WHERE work_order_id = $1 AND kind IN ('reserved', 'unreserved')
+		GROUP BY shop_id, part_id
+		HAVING sum(quantity) <> 0`, jobID)
+	if err != nil {
+		return fmt.Errorf("read reservations: %w", err)
+	}
+	type release struct {
+		shop, part string
+		quantity   float64
+	}
+	var out []release
+	for rows.Next() {
+		var r release
+		if err := rows.Scan(&r.shop, &r.part, &r.quantity); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan reservation: %w", err)
+		}
+		out = append(out, r)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, r := range out {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO stock_movements (shop_id, part_id, kind, quantity, work_order_id, note)
+			VALUES ($1, $2, 'unreserved', $3, $4, 'Released when the job stopped needing it')`,
+			r.shop, r.part, -r.quantity, jobID); err != nil {
+			return fmt.Errorf("release reservation: %w", err)
+		}
 	}
 	return nil
 }

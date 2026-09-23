@@ -1,0 +1,84 @@
+{{define "content"}}
+<h1>Stock</h1>
+<p class="waiting">What is on the shelf is the sum of every movement, never a
+number typed over another. That is what lets the shop ask what a year of
+wrongly ordered parts cost.</p>
+
+{{if .WriteOffs}}
+<h2>Written off this month</h2>
+<ul class="lines">
+  {{range .WriteOffs}}
+  <li><div class="row"><span>{{.Label}}</span><span class="tag late">{{.Cost}}</span></div>
+      <div class="waiting">{{.Quantity}} units</div></li>
+  {{end}}
+</ul>
+{{end}}
+
+<h2>Parts</h2>
+{{if not .Parts}}
+  <p class="empty">Nothing stocked yet.</p>
+{{else}}
+{{range .Parts}}
+<div class="card">
+  <div class="row">
+    <span>{{.Number}} &middot; {{.Name}}</span>
+    <span class="tag{{if .Negative}} late{{else if .Short}} warranty{{end}}">
+      {{.OnHand}} {{.Unit}}
+    </span>
+  </div>
+  <div class="waiting">
+    {{if ne .Reserved 0.0}}{{.Reserved}} reserved &middot; {{.Available}} available{{end}}
+    {{if .Location}} &middot; {{.Location}}{{end}}
+    {{if .Price}} &middot; {{.Price}}{{end}}
+  </div>
+  {{if .Negative}}<div class="waiting">Less than nothing on the shelf — something was fitted that was never booked in.</div>{{end}}
+  {{if .Short}}<div class="waiting">At or below the minimum.</div>{{end}}
+
+  <form method="post" action="/stock/move" style="margin-top:0.75rem">
+    <input type="hidden" name="part_id" value="{{.ID}}">
+    <div class="pair">
+      <label><span>How many</span><input name="quantity" value="1" inputmode="decimal"></label>
+      <label>
+        <span>What happened</span>
+        <select name="kind">
+          <option value="received">Arrived</option>
+          <option value="returned">Went back</option>
+          <option value="written_off">Written off</option>
+          <option value="counted">Stocktake difference</option>
+        </select>
+      </label>
+    </div>
+    <label>
+      <span>If written off, why</span>
+      <select name="reason">
+        <option value="">—</option>
+        {{range $key, $label := $.Reasons}}<option value="{{$key}}">{{$label}}</option>{{end}}
+      </select>
+    </label>
+    <button type="submit" class="secondary">Record it</button>
+  </form>
+</div>
+{{end}}
+{{end}}
+
+<h2>Markup</h2>
+{{if .PriceBands}}
+<ul class="lines">
+  {{range .PriceBands}}
+  <li><div class="row"><span>{{.UpTo}}</span><span class="tag">{{.Markup}}</span></div></li>
+  {{end}}
+</ul>
+{{else}}
+  <p class="waiting">No bands set, so cost is price. A five-krona clip and a
+  five-thousand-krona turbo do not carry the same markup.</p>
+{{end}}
+{{if .Session.Scope.Role.SeesCustomerPersonalData}}
+<form method="post" action="/stock/bands">
+  <div class="pair">
+    <label><span>Costs under</span><input name="up_to" placeholder="blank for the top band"></label>
+    <label><span>Markup %</span><input name="markup" value="45" inputmode="decimal"></label>
+  </div>
+  <button type="submit" class="secondary">Save the band</button>
+</form>
+{{end}}
+{{end}}
