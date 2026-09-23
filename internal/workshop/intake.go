@@ -35,7 +35,24 @@ func NormaliseRegistration(s string) string {
 // The vehicle is created if it is not known. The customer is whoever owns it
 // now, and is left empty when nobody does -- see the migration for why a job
 // without a customer is allowed and an invoice without one is not.
+// Details are what a lookup or a person filled in. They are applied only to a
+// vehicle being created: a car already on file has a history, and overwriting
+// its make from a third party because somebody opened a job is not an
+// improvement.
+type Details struct {
+	Make      string
+	Model     string
+	ModelYear *int16
+	Engine    string
+	VIN       string
+}
+
 func TakeIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, registration, complaint string, odometerKm *int64) (string, error) {
+	return TakeInWith(ctx, pool, scope, registration, complaint, odometerKm, Details{})
+}
+
+// TakeInWith opens a job, filling in a new vehicle's details.
+func TakeInWith(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, registration, complaint string, odometerKm *int64, d Details) (string, error) {
 	if !scope.Role.SeesCustomerPersonalData() {
 		return "", access.ErrForbidden
 	}
@@ -62,9 +79,13 @@ func TakeIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, registr
 			// Unknown vehicle, or none given. Either way a row is created: the
 			// alternative is refusing to take the car in, and the car is
 			// already here.
-			if err := tx.QueryRow(ctx,
-				`INSERT INTO vehicles (shop_id) VALUES ($1) RETURNING id`,
-				scope.ShopID).Scan(&vehicleID); err != nil {
+			if err := tx.QueryRow(ctx, `
+				INSERT INTO vehicles (shop_id, make, model, model_year, engine, vin)
+				VALUES ($1, nullif($2,''), nullif($3,''), $4, nullif($5,''), nullif($6,''))
+				RETURNING id`,
+				scope.ShopID, strings.TrimSpace(d.Make), strings.TrimSpace(d.Model),
+				d.ModelYear, strings.TrimSpace(d.Engine), strings.TrimSpace(d.VIN),
+			).Scan(&vehicleID); err != nil {
 				return fmt.Errorf("create vehicle: %w", err)
 			}
 			if normalised != "" {

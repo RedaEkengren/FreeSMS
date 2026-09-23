@@ -29,6 +29,13 @@ type Config struct {
 	// Which shop this installation serves. Empty means: resolve it, and
 	// require exactly one to exist.
 	ShopID string
+
+	// Where to look a registration up, if the shop has an arrangement with
+	// anybody. Empty means no lookup, which is the default: no provider ships
+	// with this project, because Swedish vehicle data comes under an agreement
+	// that is the shop's to hold.
+	VehicleLookupURL   string
+	VehicleLookupToken string
 }
 
 // minSecretBytes is the decoded length a session secret must reach. Below
@@ -45,14 +52,16 @@ func Load() (*Config, error) {
 	var problems []string
 
 	cfg := &Config{
-		DatabaseURL:    os.Getenv("DATABASE_URL"),
-		HTTPAddr:       envOr("HTTP_ADDR", ":8080"),
-		BaseURL:        os.Getenv("BASE_URL"),
-		AttachmentsDir: envOr("ATTACHMENTS_DIR", "/var/lib/redasms/attachments"),
-		DefaultLocale:  envOr("DEFAULT_LOCALE", "en"),
-		LogLevel:       envOr("LOG_LEVEL", "info"),
-		Release:        envOr("RELEASE", "dev"),
-		ShopID:         os.Getenv("SHOP_ID"),
+		DatabaseURL:        os.Getenv("DATABASE_URL"),
+		HTTPAddr:           envOr("HTTP_ADDR", ":8080"),
+		BaseURL:            os.Getenv("BASE_URL"),
+		AttachmentsDir:     envOr("ATTACHMENTS_DIR", "/var/lib/redasms/attachments"),
+		DefaultLocale:      envOr("DEFAULT_LOCALE", "en"),
+		LogLevel:           envOr("LOG_LEVEL", "info"),
+		Release:            envOr("RELEASE", "dev"),
+		ShopID:             os.Getenv("SHOP_ID"),
+		VehicleLookupURL:   os.Getenv("VEHICLE_LOOKUP_URL"),
+		VehicleLookupToken: os.Getenv("VEHICLE_LOOKUP_TOKEN"),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -98,6 +107,13 @@ func Load() (*Config, error) {
 					"(generate: openssl rand -base64 32)", len(key), minSecretBytes))
 		}
 		cfg.SessionSecret = key
+	}
+
+	// A URL with nowhere to put the registration would silently look up the
+	// same thing every time.
+	if cfg.VehicleLookupURL != "" && !strings.Contains(cfg.VehicleLookupURL, "{registration}") {
+		problems = append(problems,
+			"VEHICLE_LOOKUP_URL must contain {registration} where the plate goes")
 	}
 
 	switch cfg.LogLevel {

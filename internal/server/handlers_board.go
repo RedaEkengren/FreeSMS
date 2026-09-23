@@ -84,7 +84,23 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 		odometer = &km
 	}
 
-	id, err := workshop.TakeIn(r.Context(), s.pool, session.Scope, form.Registration, form.Complaint, odometer)
+	// Details only matter for a vehicle being created; TakeInWith ignores them
+	// for a car already on file.
+	details := workshop.Details{
+		Make:   strings.TrimSpace(r.FormValue("make")),
+		Model:  strings.TrimSpace(r.FormValue("model")),
+		Engine: strings.TrimSpace(r.FormValue("engine")),
+		VIN:    strings.TrimSpace(r.FormValue("vin")),
+	}
+	if v := strings.TrimSpace(r.FormValue("model_year")); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 16); err == nil {
+			y := int16(n)
+			details.ModelYear = &y
+		}
+	}
+
+	id, err := workshop.TakeInWith(r.Context(), s.pool, session.Scope,
+		form.Registration, form.Complaint, odometer, details)
 	switch {
 	case errors.Is(err, access.ErrForbidden):
 		s.renderError(w, r, http.StatusForbidden, "Not for your role",

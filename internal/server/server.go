@@ -20,6 +20,7 @@ import (
 
 	"github.com/RedaEkengren/RedaSMS/internal/config"
 	"github.com/RedaEkengren/RedaSMS/internal/storage"
+	"github.com/RedaEkengren/RedaSMS/internal/vehicledata"
 	"github.com/RedaEkengren/RedaSMS/internal/web"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -34,6 +35,7 @@ type Server struct {
 	templates     map[string]*template.Template
 	photos        *storage.Store
 	baseURL       string
+	vehicleLookup vehicledata.Lookup
 
 	// Pinned by SHOP_ID when an installation serves a named shop.
 	configuredShopID string
@@ -43,6 +45,21 @@ type Server struct {
 	// mutex rather than a plain field read at boot.
 	mu       sync.RWMutex
 	resolved string
+}
+
+// newLookup returns whatever the configuration asks for, or nothing.
+//
+// Nothing is the default and is not a degraded mode: a shop without an
+// arrangement types the make and model, which is what it does today on paper.
+func newLookup(cfg *config.Config) vehicledata.Lookup {
+	if cfg.VehicleLookupURL == "" {
+		return vehicledata.None{}
+	}
+	return vehicledata.HTTPLookup{
+		URL:    cfg.VehicleLookupURL,
+		Token:  cfg.VehicleLookupToken,
+		Fields: vehicledata.DefaultFields(),
+	}
 }
 
 func (s *Server) shop() string {
@@ -75,6 +92,7 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 		configuredShopID: cfg.ShopID,
 		locale:           cfg.DefaultLocale,
 		photos:           photos,
+		vehicleLookup:    newLookup(cfg),
 		baseURL:          strings.TrimRight(cfg.BaseURL, "/"),
 		templates:        templates,
 		// A Secure cookie is not sent over plain HTTP, so setting it
@@ -110,6 +128,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /board", s.requireSession(s.handleBoard))
 	mux.HandleFunc("GET /jobs/new", s.requireSession(s.handleNewJobForm))
 	mux.HandleFunc("POST /jobs/new", s.requireSession(s.handleNewJob))
+	mux.HandleFunc("GET /jobs/new/lookup", s.requireSession(s.handleVehicleLookup))
 	mux.HandleFunc("GET /jobs/{id}", s.requireSession(s.handleJob))
 	mux.HandleFunc("POST /jobs/{id}/state", s.requireSession(s.handleSetState))
 	mux.HandleFunc("POST /jobs/{id}/lines", s.requireSession(s.handleAddLine))

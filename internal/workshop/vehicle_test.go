@@ -216,3 +216,45 @@ func TestAnUnidentifiedVehicleIsFoundByItsLabel(t *testing.T) {
 }
 
 var _ = pgxpool.Pool{}
+
+// A car already on file has a history. Overwriting its make from a third
+// party because somebody opened a job is not an improvement.
+func TestDetailsOnlyApplyToAVehicleBeingCreated(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+
+	// The fixture's Volvo is already on file with its plate.
+	if _, err := workshop.TakeInWith(ctx, pool, advisor(), "ABC 12D", "Service", nil,
+		workshop.Details{Make: "Definitely Not Volvo", Model: "Wrong"}); err != nil {
+		t.Fatalf("TakeInWith: %v", err)
+	}
+	v, err := workshop.VehicleByID(ctx, pool, advisor(), vehicleA)
+	if err != nil {
+		t.Fatalf("VehicleByID: %v", err)
+	}
+	if v.Make != "Volvo" {
+		t.Errorf("the known vehicle's make became %q", v.Make)
+	}
+
+	// A plate nobody has seen gets what was filled in.
+	year := int16(2015)
+	id, err := workshop.TakeInWith(ctx, pool, advisor(), "NEW 777", "Knocking", nil,
+		workshop.Details{Make: "Toyota", Model: "Hilux", ModelYear: &year, Engine: "2.4 D-4D"})
+	if err != nil {
+		t.Fatalf("TakeInWith: %v", err)
+	}
+	job, _, err := workshop.JobByID(ctx, pool, advisor(), id)
+	if err != nil {
+		t.Fatalf("JobByID: %v", err)
+	}
+	fresh, err := workshop.VehicleByID(ctx, pool, advisor(), job.VehicleID)
+	if err != nil {
+		t.Fatalf("VehicleByID: %v", err)
+	}
+	if fresh.Make != "Toyota" || fresh.Model != "Hilux" || fresh.Engine != "2.4 D-4D" {
+		t.Errorf("the new vehicle is %+v", fresh)
+	}
+	if fresh.ModelYear == nil || *fresh.ModelYear != 2015 {
+		t.Error("the model year was not stored")
+	}
+}

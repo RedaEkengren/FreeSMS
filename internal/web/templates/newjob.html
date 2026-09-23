@@ -7,6 +7,14 @@
     <input name="registration" value="{{.Form.Registration}}"
            autocapitalize="characters" autocorrect="off" spellcheck="false" autofocus>
   </label>
+
+  <button type="button" class="secondary"
+          hx-get="/jobs/new/lookup" hx-include="[name='registration']"
+          hx-target="#lookup" hx-swap="innerHTML">
+    Look the registration up
+  </button>
+  <div id="lookup">{{template "lookup" .}}</div>
+
   <label>
     <span>Odometer, km</span>
     <input name="odometer_km" value="{{.Form.OdometerKm}}" inputmode="numeric">
@@ -17,5 +25,21 @@
   </label>
   <button type="submit">Open the job</button>
 </form>
+<p class="waiting">The lookup never stops you taking a car in. If the service
+is down, or the shop has none, type what you know.</p>
 <p style="margin-top:1.5rem"><a href="/">Back</a></p>
+{{end}}
+
+{{define "lookup"}}
+{{if .LookupNote}}<p class="waiting">{{.LookupNote}}</p>{{end}}
+<div class="pair">
+  <label><span>Make</span><input name="make" value="{{.Lookup.Make}}"></label>
+  <label><span>Model</span><input name="model" value="{{.Lookup.Model}}"></label>
+</div>
+<div class="pair">
+  <label><span>Year</span><input name="model_year" inputmode="numeric"
+         value="{{if .Lookup.ModelYear}}{{.Lookup.ModelYear}}{{end}}"></label>
+  <label><span>Engine</span><input name="engine" value="{{.Lookup.Engine}}"></label>
+</div>
+<label><span>Chassis number</span><input name="vin" value="{{.Lookup.VIN}}"></label>
 {{end}}

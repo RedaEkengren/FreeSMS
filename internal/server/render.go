@@ -8,6 +8,7 @@ import (
 
 	"github.com/RedaEkengren/RedaSMS/internal/auth"
 	"github.com/RedaEkengren/RedaSMS/internal/money"
+	"github.com/RedaEkengren/RedaSMS/internal/vehicledata"
 	"github.com/RedaEkengren/RedaSMS/internal/web"
 	"github.com/RedaEkengren/RedaSMS/internal/workshop"
 )
@@ -63,6 +64,8 @@ type pageData struct {
 	Exports     []workshop.AccountingExport
 	PeriodFrom  time.Time
 	PeriodTo    time.Time
+	Lookup      vehicledata.Vehicle
+	LookupNote  string
 	Form        intakeForm
 
 	// Setup only.
