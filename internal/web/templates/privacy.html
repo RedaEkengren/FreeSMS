@@ -1,0 +1,38 @@
+{{define "content"}}
+<h1>Personal data</h1>
+
+<h2>What is kept, and for how long</h2>
+<ul class="lines">
+  <li><div class="row"><span>Issued invoices</span><span class="tag">seven years</span></div>
+      <div class="waiting">Required by Swedish bookkeeping law, including the name and address they were addressed to. This is why erasure anonymises a person rather than deleting them.</div></li>
+  <li><div class="row"><span>A vehicle's technical history</span><span class="tag">kept</span></div>
+      <div class="waiting">It belongs to the vehicle, not to a person, and survives a sale. The next owner sees what was done and not who paid.</div></li>
+  <li><div class="row"><span>Clocked hours</span><span class="tag">kept</span></div>
+      <div class="waiting">They support payroll records and stay attributable to a person whose name may have been cleared.</div></li>
+  <li><div class="row"><span>Failed sign-in attempts</span><span class="tag">90 days</span></div>
+      <div class="waiting">They exist to slow down guessing over minutes. Keeping them longer would be keeping a record of who tried to sign in, with no remaining purpose.</div></li>
+  <li><div class="row"><span>Customer inspection links</span><span class="tag">180 days</span></div>
+      <div class="waiting">The link itself stops working after a fortnight; the record that one was sent is kept a while longer, then removed.</div></li>
+</ul>
+<p class="waiting">There is no national identity number and no driving licence
+field anywhere in this system. A field with no purpose does not exist.</p>
+
+<h2>Erasures actioned</h2>
+{{if not .Erasures}}
+  <p class="empty">None yet.</p>
+{{else}}
+<ul class="lines">
+  {{range .Erasures}}
+  <li>
+    <div class="row">
+      <span>{{.ErasedAt.Format "2 Jan 2006"}}</span>
+      <span class="tag">by {{.ErasedBy}}</span>
+    </div>
+    <div class="waiting"><strong>Cleared:</strong> {{.Cleared}}</div>
+    <div class="waiting"><strong>Kept:</strong> {{.Kept}}</div>
+    {{if .Reason}}<div class="waiting"><strong>Reason:</strong> {{.Reason}}</div>{{end}}
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{end}}

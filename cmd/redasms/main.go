@@ -11,12 +11,14 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/RedaEkengren/RedaSMS/internal/config"
 	"github.com/RedaEkengren/RedaSMS/internal/database"
 	"github.com/RedaEkengren/RedaSMS/internal/server"
 	"github.com/RedaEkengren/RedaSMS/internal/workshop"
 	"github.com/RedaEkengren/RedaSMS/migrations"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -95,6 +97,12 @@ func run() error {
 	if err != nil {
 		return err
 	}
+
+	// The retention policy is applied rather than written down and forgotten.
+	// A policy that depends on somebody remembering to press something is not
+	// a policy.
+	go sweepPeriodically(ctx, pool, log, shopID)
+
 	return srv.Run(ctx, cfg.HTTPAddr)
 }
 
@@ -108,5 +116,44 @@ func logLevel(name string) slog.Level {
 		return slog.LevelError
 	default:
 		return slog.LevelInfo
+	}
+}
+
+// sweepPeriodically applies the data retention policy once a day.
+//
+// Once on startup as well, so that a service which is restarted more often
+// than it is left running still does it, and so that a fresh deployment does
+// not wait a day before its first sweep.
+func sweepPeriodically(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger, shopID string) {
+	const every = 24 * time.Hour
+
+	run := func() {
+		if shopID == "" {
+			return
+		}
+		result, err := workshop.Sweep(ctx, pool, shopID)
+		if err != nil {
+			// Worth logging and not worth stopping for: a sweep that failed
+			// today runs again tomorrow, and the data it would have removed is
+			// not doing harm in the meantime.
+			log.Error("retention sweep", "error", err)
+			return
+		}
+		if !result.Empty() {
+			log.Info("retention sweep",
+				"login_attempts", result.LoginAttempts, "shares", result.Shares)
+		}
+	}
+
+	run()
+	ticker := time.NewTicker(every)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			run()
+		}
 	}
 }

@@ -52,6 +52,7 @@ type pageData struct {
 	LabourRate  int64
 	Suggestions []workshop.Suggestion
 	Dashboard   workshop.Dashboard
+	Erasures    []workshop.Erasure
 	Form        intakeForm
 
 	// Setup only.
@@ -90,7 +91,7 @@ var templateFuncs = template.FuncMap{
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "search", "vehicle", "time", "labour", "dashboard", "setup", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "search", "vehicle", "time", "labour", "dashboard", "privacy", "setup", "error"}
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).Funcs(templateFuncs).ParseFS(web.Templates,
