@@ -1,0 +1,37 @@
+{{define "content"}}
+<h1>Accounting</h1>
+<p class="waiting">A SIE 4 file, which every Swedish accounting package
+imports. No licence, no integration to be approved for — it is an open format
+and a file you hand over.</p>
+
+<form method="post" action="/accounting/export">
+  <div class="pair">
+    <label><span>From</span><input type="date" name="from" value="{{.PeriodFrom.Format "2006-01-02"}}" required></label>
+    <label><span>To</span><input type="date" name="to" value="{{.PeriodTo.Format "2006-01-02"}}" required></label>
+  </div>
+  <label style="display:flex;gap:0.5rem;align-items:center">
+    <input type="checkbox" name="again" value="yes" style="width:auto;min-height:auto">
+    <span style="margin:0">Send a period that has already gone over</span>
+  </label>
+  <button type="submit">Download the file</button>
+</form>
+<p class="waiting">Defaults to last month, because this one is not finished and
+handing over a running month is how a period gets exported twice.</p>
+
+<h2>Already handed over</h2>
+{{if not .Exports}}
+  <p class="empty">Nothing yet.</p>
+{{else}}
+<ul class="lines">
+  {{range .Exports}}
+  <li>
+    <div class="row">
+      <span>{{.From.Format "2 Jan 2006"}} – {{.To.Format "2 Jan 2006"}}</span>
+      <span class="tag">{{.InvoiceCount}} document{{if ne .InvoiceCount 1}}s{{end}}</span>
+    </div>
+    <div class="waiting">{{.ExportedAt.Format "2 Jan 15:04"}}{{if .ExportedBy}} &middot; {{.ExportedBy}}{{end}}</div>
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{end}}
