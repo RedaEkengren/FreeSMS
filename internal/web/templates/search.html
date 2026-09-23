@@ -1,0 +1,27 @@
+{{define "content"}}
+<h1>Search</h1>
+<form method="get" action="/search">
+  <label>
+    <span>Registration, chassis number{{if .Session.Scope.Role.SeesCustomerPersonalData}} or a name{{end}}</span>
+    <input name="q" value="{{.Query}}" autocapitalize="characters" autocorrect="off"
+           spellcheck="false" autofocus>
+  </label>
+  <button type="submit">Look</button>
+</form>
+
+{{if .Query}}
+  {{if not .Results}}
+    <p class="empty">Nothing matched “{{.Query}}”.</p>
+  {{else}}
+    {{range .Results}}
+    <a class="card" href="/vehicles/{{.VehicleID}}">
+      <div class="row">
+        <span class="plate">{{.Describe}}</span>
+        <span class="tag">{{.MatchedOn}}</span>
+      </div>
+      <div class="vehicle">{{.Make}} {{.Model}}{{if .ModelYear}} {{.ModelYear}}{{end}}{{if .OwnerName}} &middot; {{.OwnerName}}{{end}}</div>
+    </a>
+    {{end}}
+  {{end}}
+{{end}}
+{{end}}

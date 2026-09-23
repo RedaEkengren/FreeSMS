@@ -1,0 +1,69 @@
+{{define "content"}}
+<div class="row">
+  <span class="plate">{{.Vehicle.Describe}}</span>
+</div>
+<p class="vehicle">{{.Vehicle.Make}} {{.Vehicle.Model}}{{if .Vehicle.ModelYear}} {{.Vehicle.ModelYear}}{{end}}{{if .Vehicle.Engine}} &middot; {{.Vehicle.Engine}}{{end}}</p>
+
+<dl>
+  {{if .Vehicle.VIN}}<dt>Chassis number</dt><dd>{{.Vehicle.VIN}}</dd>{{end}}
+  {{if .Vehicle.OwnerName}}<dt>Owner</dt><dd>{{.Vehicle.OwnerName}}</dd>{{end}}
+</dl>
+
+{{if gt (len .Vehicle.Registrations) 1}}
+<h2>Plates it has carried</h2>
+<ul class="lines">
+  {{range .Vehicle.Registrations}}
+  <li>
+    <div class="row">
+      <span class="plate" style="font-size:1rem">{{.Registration}}</span>
+      {{if .Current}}<span class="tag pass">now</span>
+      {{else}}<span class="tag">until {{.ValidTo.Format "2 Jan 2006"}}</span>{{end}}
+    </div>
+  </li>
+  {{end}}
+</ul>
+{{end}}
+
+<h2>History</h2>
+{{if not .Vehicle.History}}
+  <p class="empty">Nothing recorded for this vehicle yet.</p>
+{{else}}
+  {{range .Vehicle.History}}
+  <div class="card">
+    <div class="row">
+      <a href="/jobs/{{.WorkOrderID}}">#{{.Number}} &middot; {{.OpenedAt.Format "2 Jan 2006"}}</a>
+      <span class="tag">{{.State}}</span>
+    </div>
+    {{if .Complaint}}<div class="complaint">{{.Complaint}}</div>{{end}}
+    {{if .Lines}}
+      <ul class="lines" style="margin-top:0.5rem">
+        {{range .Lines}}<li>{{.}}</li>{{end}}
+      </ul>
+    {{end}}
+    <div class="waiting">
+      {{if .OdometerKm}}{{.OdometerKm}} km{{end}}
+      {{if .CustomerName}} &middot; {{.CustomerName}}{{end}}
+      {{if .Total}} &middot; {{.Total}}{{end}}
+    </div>
+    {{if .PreviousOwner}}
+      <div class="waiting">Before the current owner — what was done is shown, who paid and what they paid is not.</div>
+    {{end}}
+  </div>
+  {{end}}
+{{end}}
+
+{{if .Vehicle.Readings}}
+<h2>Odometer</h2>
+<ul class="lines">
+  {{range .Vehicle.Readings}}
+  <li>
+    <div class="row">
+      <span>{{.Km}} km</span>
+      <span class="tag{{if .Decreasing}} late{{end}}">{{.ReadAt.Format "2 Jan 2006"}}</span>
+    </div>
+    {{if .Decreasing}}<div class="waiting">Lower than an earlier reading</div>{{end}}
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{end}}
