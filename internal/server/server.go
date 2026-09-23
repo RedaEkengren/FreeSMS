@@ -146,6 +146,8 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /search", s.requireSession(s.handleSearch))
 	mux.HandleFunc("GET /vehicles/{id}", s.requireSession(s.handleVehicle))
 
+	mux.HandleFunc("GET /scan", s.requireSession(s.handleScan))
+	mux.HandleFunc("GET /labels", s.requireSession(s.handleLabels))
 	mux.HandleFunc("GET /stock", s.requireSession(s.handleStock))
 	mux.HandleFunc("POST /stock/move", s.requireSession(s.handleStockMove))
 	mux.HandleFunc("POST /stock/bands", s.requireSession(s.handleSavePriceBand))

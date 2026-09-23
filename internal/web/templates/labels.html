@@ -1,0 +1,19 @@
+{{define "content"}}
+<h1>Labels</h1>
+<p class="waiting no-print">A sheet for an ordinary printer. A thermal label
+printer is the right tool and a painful one from a browser; this is the path
+that always works. The number is printed in readable text as well as in bars,
+because labels in a workshop get oily, torn and painted over.</p>
+<p class="no-print"><button onclick="window.print()" type="button">Print</button></p>
+
+<div class="labels">
+  {{range .Labels}}
+  <div class="label">
+    {{if .SVG}}{{.SVG}}{{end}}
+    <div class="code">{{.Part.Number}}</div>
+    <div class="name">{{.Part.Name}}</div>
+    {{if .Part.Location}}<div class="name">{{.Part.Location}}</div>{{end}}
+  </div>
+  {{end}}
+</div>
+{{end}}

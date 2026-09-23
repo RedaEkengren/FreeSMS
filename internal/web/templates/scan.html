@@ -1,0 +1,74 @@
+{{define "content"}}
+<h1>Scan</h1>
+
+<form method="get" action="/scan" class="scan">
+  <label>
+    <span>Scan or type a code</span>
+    <input name="code" value="" autofocus autocomplete="off"
+           autocapitalize="characters" autocorrect="off" spellcheck="false">
+  </label>
+  <button type="submit">Look it up</button>
+</form>
+<p class="waiting">Nothing else on this page takes a keystroke. A handheld
+scanner is a keyboard — it types very fast and presses Enter — and on a page
+with several fields that lands wherever the focus happened to be.</p>
+
+{{if .Error}}
+  <p class="error">{{.Error}} <a href="/stock">Add it to stock</a></p>
+{{end}}
+
+{{if .Part.ID}}
+<div class="card">
+  <div class="row">
+    <span>{{.Part.Number}} &middot; {{.Part.Name}}</span>
+    <span class="tag{{if .Part.Negative}} late{{else if .Part.Short}} warranty{{end}}">
+      {{.Part.OnHand}} {{.Part.Unit}}
+    </span>
+  </div>
+  <div class="waiting">
+    {{if .Part.Location}}{{.Part.Location}} &middot; {{end}}
+    {{.Part.Available}} available{{if ne .Part.Reserved 0.0}} &middot; {{.Part.Reserved}} reserved{{end}}
+  </div>
+
+  <form method="post" action="/stock/move" style="margin-top:0.75rem">
+    <input type="hidden" name="part_id" value="{{.Part.ID}}">
+    <div class="pair">
+      <label><span>How many</span><input name="quantity" value="1" inputmode="decimal"></label>
+      <label>
+        <span>What happened</span>
+        <select name="kind">
+          <option value="counted">Stocktake difference</option>
+          <option value="received">Arrived</option>
+          <option value="written_off">Written off</option>
+        </select>
+      </label>
+    </div>
+    <label>
+      <span>If written off, why</span>
+      <select name="reason">
+        <option value="">—</option>
+        {{range $key, $label := .Reasons}}<option value="{{$key}}">{{$label}}</option>{{end}}
+      </select>
+    </label>
+    <button type="submit" class="secondary">Record it</button>
+  </form>
+  <p class="waiting">Counting by volume? Scan the container and type the
+  quantity — oil is not a count.</p>
+</div>
+
+{{if .Movements}}
+<h2>Recent movements</h2>
+<ul class="lines">
+  {{range .Movements}}
+  <li>
+    <div class="row">
+      <span>{{.Kind}}{{if .Reason}} &middot; {{.ReasonLabel}}{{end}}</span>
+      <span class="tag">{{.Quantity}}</span>
+    </div>
+    <div class="waiting">{{.MovedAt.Format "2 Jan 15:04"}}{{if .MovedBy}} &middot; {{.MovedBy}}{{end}}{{if .OrderNum}} &middot; job #{{.OrderNum}}{{end}}</div>
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{end}}
+{{end}}

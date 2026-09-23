@@ -226,3 +226,19 @@ a.nav:hover, a.nav:focus-visible { color: var(--accent); }
 input[type="file"] { border: 1px dashed var(--border); padding: 0.75rem; background: var(--surface); }
 
 form.suggestion { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; }
+
+/* Scanning gets its own screen with one target, so a handheld scanner cannot
+   type into the wrong field. */
+form.scan input { font-family: ui-monospace, Menlo, monospace; font-size: 1.125rem; }
+
+.labels { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 0.5rem; }
+.label { border: 1px solid var(--border); border-radius: 0.25rem; padding: 0.5rem; text-align: center; background: #fff; color: #000; }
+.label svg { width: 100%; height: auto; }
+.label .code { font-family: ui-monospace, Menlo, monospace; font-weight: 700; letter-spacing: 0.05em; }
+.label .name { font-size: 0.75rem; }
+
+@media print {
+  header, .no-print, nav { display: none !important; }
+  main { padding: 0; max-width: none; }
+  .label { break-inside: avoid; }
+}
