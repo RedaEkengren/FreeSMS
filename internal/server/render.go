@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/RedaEkengren/RedaSMS/internal/auth"
+	"github.com/RedaEkengren/RedaSMS/internal/i18n"
 	"github.com/RedaEkengren/RedaSMS/internal/money"
 	"github.com/RedaEkengren/RedaSMS/internal/vehicledata"
 	"github.com/RedaEkengren/RedaSMS/internal/web"
@@ -16,8 +17,13 @@ import (
 // pageData is what every template receives. One struct rather than a map, so
 // a typo in a field name fails to compile instead of rendering nothing.
 type pageData struct {
-	Title   string
-	Locale  string
+	Title  string
+	Locale string
+
+	// The reader's language. Templates call .T and .N rather than a global
+	// function, because a template function is bound when the template is
+	// parsed and the language is not known until the request.
+	printer *i18n.Printer
 	Session auth.Session
 	Error   string
 	Email   string
@@ -98,6 +104,26 @@ var templateFuncs = template.FuncMap{
 	"date":   func(t time.Time) string { return t.Format("2006-01-02") },
 }
 
+// T renders a message in the reader's language.
+//
+// The key is the English text: it reads at the call site, it survives a
+// catalogue going missing, and a string nobody has translated still says
+// something sensible.
+func (d pageData) T(key string, args ...any) string {
+	if d.printer == nil {
+		return key
+	}
+	return d.printer.T(key, args...)
+}
+
+// N renders a message with a count, choosing the plural form.
+func (d pageData) N(key string, count int, args ...any) string {
+	if d.printer == nil {
+		return key
+	}
+	return d.printer.N(key, count, args...)
+}
+
 // parseTemplates builds one template set per page.
 //
 // Each page file defines "content", so they cannot be parsed together -- the
@@ -130,8 +156,9 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 		return
 	}
 	if data.Locale == "" {
-		data.Locale = s.locale
+		data.Locale = s.localeFor(data.Session)
 	}
+	data.printer = s.catalogues.For(data.Locale)
 
 	buf := newBuffer()
 	defer releaseBuffer(buf)
@@ -154,6 +181,10 @@ func (s *Server) renderPartial(w http.ResponseWriter, r *http.Request, page, blo
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	if data.Locale == "" {
+		data.Locale = s.localeFor(data.Session)
+	}
+	data.printer = s.catalogues.For(data.Locale)
 	buf := newBuffer()
 	defer releaseBuffer(buf)
 

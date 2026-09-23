@@ -40,6 +40,10 @@ var (
 type Session struct {
 	Scope     access.Scope
 	ExpiresAt time.Time
+
+	// The language this person reads: theirs, or the shop's. A workshop with
+	// one Polish technician and three Swedish ones is ordinary.
+	Locale string
 }
 
 // newToken returns a session token and the hash stored against it.
@@ -185,15 +189,17 @@ func Authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string)
 	var s Session
 	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
 		const lookup = `
-			SELECT s.id, s.user_id, u.role, s.expires_at, s.last_seen_at, u.active
+			SELECT s.id, s.user_id, u.role, s.expires_at, s.last_seen_at, u.active,
+			       coalesce(u.locale, sh.locale, 'en')
 			FROM sessions s
-			JOIN users u ON u.id = s.user_id
+			JOIN users u  ON u.id = s.user_id
+			JOIN shops sh ON sh.id = s.shop_id
 			WHERE s.token_sha256 = $1`
-		var sessionID, userID, role string
+		var sessionID, userID, role, locale string
 		var expires, lastSeen time.Time
 		var active bool
 
-		err := tx.QueryRow(ctx, lookup, sum[:]).Scan(&sessionID, &userID, &role, &expires, &lastSeen, &active)
+		err := tx.QueryRow(ctx, lookup, sum[:]).Scan(&sessionID, &userID, &role, &expires, &lastSeen, &active, &locale)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNoSession
 		}
@@ -217,6 +223,7 @@ func Authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string)
 		s = Session{
 			Scope:     access.Scope{ShopID: shopID, UserID: userID, Role: access.Role(role)},
 			ExpiresAt: expires,
+			Locale:    locale,
 		}
 		return nil
 	})

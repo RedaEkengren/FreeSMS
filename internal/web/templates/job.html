@@ -1,6 +1,6 @@
 {{define "content"}}
 <div class="row">
-  <span class="plate">{{if .Job.Registration}}{{.Job.Registration}}{{else}}no plate{{end}}</span>
+  <span class="plate">{{if .Job.Registration}}{{.Job.Registration}}{{else}}{{.T "no plate"}}{{end}}</span>
   <span class="tag">#{{.Job.Number}}</span>
 </div>
 <p class="vehicle">{{.Job.Make}} {{.Job.Model}}{{if .Job.ModelYear}} {{.Job.ModelYear}}{{end}}</p>
@@ -10,9 +10,9 @@
 <div id="clock">{{template "clock" .}}</div>
 
 <dl>
-  <dt>State</dt><dd>{{.Job.State}}</dd>
-  {{if .Job.OdometerKm}}<dt>Odometer</dt><dd>{{.Job.OdometerKm}} km</dd>{{end}}
-  {{if .Job.AssignedTo}}<dt>On it</dt><dd>{{.Job.AssignedTo}}</dd>{{end}}
+  <dt>{{.T "State"}}</dt><dd>{{.Job.State}}</dd>
+  {{if .Job.OdometerKm}}<dt>{{.T "Odometer"}}</dt><dd>{{.Job.OdometerKm}} km</dd>{{end}}
+  {{if .Job.AssignedTo}}<dt>{{.T "On it"}}</dt><dd>{{.Job.AssignedTo}}</dd>{{end}}
 </dl>
 
 {{if .Next}}
@@ -27,7 +27,7 @@
 </div>
 {{end}}
 
-<h2>Inspections</h2>
+<h2>{{.T "Inspections"}}</h2>
 {{if .Inspections}}
 <ul class="lines">
   {{range .Inspections}}
@@ -44,17 +44,17 @@
 {{if .Templates}}
 <form method="post" action="/jobs/{{.Job.ID}}/inspect" style="margin-top:0.5rem">
   <label>
-    <span>Start a check</span>
+    <span>{{.T "Start a check"}}</span>
     <select name="template_id">
       {{range .Templates}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
     </select>
   </label>
-  <button type="submit" class="secondary">Start it</button>
+  <button type="submit" class="secondary">{{.T "Start it"}}</button>
 </form>
 {{end}}
 
 {{if .Requests}}
-<h2>Parts</h2>
+<h2>{{.T "Parts"}}</h2>
 <ul class="lines">
   {{range .Requests}}
   <li>
@@ -91,9 +91,9 @@
 </ul>
 {{end}}
 
-<h2>Lines</h2>
+<h2>{{.T "Lines"}}</h2>
 {{if not .Lines}}
-  <p class="empty">Nothing on this order yet.</p>
+  <p class="empty">{{.T "Nothing on this order yet."}}</p>
 {{else}}
 <ul class="lines">
   {{range .Lines}}
@@ -149,20 +149,20 @@
 {{end}}
 
 {{if not .Session.Scope.Role.SeesCustomerPersonalData}}
-<h2>Hand it on</h2>
+<h2>{{.T "Hand it on"}}</h2>
 <form method="post" action="/jobs/{{.Job.ID}}/parts">
   <label>
-    <span>I need a part to carry on</span>
+    <span>{{.T "I need a part to carry on"}}</span>
     <input name="description" placeholder="Track rod end, left front">
   </label>
-  <button type="submit" class="secondary">Ask the parts desk</button>
+  <button type="submit" class="secondary">{{.T "Ask the parts desk"}}</button>
 </form>
 <form method="post" action="/jobs/{{.Job.ID}}/findings" style="margin-top:1rem">
   <label>
-    <span>Something else needs doing</span>
+    <span>{{.T "Something else needs doing"}}</span>
     <input name="note" placeholder="Other track rod end is going too">
   </label>
-  <button type="submit" class="secondary">Tell the front desk</button>
+  <button type="submit" class="secondary">{{.T "Tell the front desk"}}</button>
 </form>
 {{end}}
 
@@ -224,17 +224,17 @@
 </form>
 {{end}}
 
-<p style="margin-top:2rem"><a href="/">Back</a></p>
+<p style="margin-top:2rem"><a href="/">{{.T "Back"}}</a></p>
 {{end}}
 
 {{define "clock"}}
 {{if .Job.ClockRunning}}
   <button class="stop" hx-post="/jobs/{{.Job.ID}}/clock-out" hx-target="#clock" hx-swap="innerHTML">
-    Stop clock
+    {{$.T "Stop clock"}}
   </button>
 {{else}}
   <button hx-post="/jobs/{{.Job.ID}}/clock-in" hx-target="#clock" hx-swap="innerHTML">
-    Start clock
+    {{$.T "Start clock"}}
   </button>
 {{end}}
 {{end}}

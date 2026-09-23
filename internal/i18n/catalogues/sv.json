@@ -1,0 +1,139 @@
+{
+  "locale": "sv",
+  "name": "Svenska",
+  "messages": {
+    "Sign in": {
+      "other": "Logga in"
+    },
+    "Sign out": {
+      "other": "Logga ut"
+    },
+    "Email": {
+      "other": "E-post"
+    },
+    "Password": {
+      "other": "Lösenord"
+    },
+    "In the shop": {
+      "other": "Inne på verkstaden"
+    },
+    "Nothing open.": {
+      "other": "Inget öppet."
+    },
+    "no plate": {
+      "other": "ingen skylt"
+    },
+    "Start clock": {
+      "other": "Starta klockan"
+    },
+    "Stop clock": {
+      "other": "Stoppa klockan"
+    },
+    "State": {
+      "other": "Status"
+    },
+    "Odometer": {
+      "other": "Mätarställning"
+    },
+    "On it": {
+      "other": "Jobbar på den"
+    },
+    "Lines": {
+      "other": "Rader"
+    },
+    "Nothing on this order yet.": {
+      "other": "Inget på ordern än."
+    },
+    "Back": {
+      "other": "Tillbaka"
+    },
+    "Hand it on": {
+      "other": "Lämna över"
+    },
+    "I need a part to carry on": {
+      "other": "Jag behöver en del för att komma vidare"
+    },
+    "Ask the parts desk": {
+      "other": "Fråga lagret"
+    },
+    "Something else needs doing": {
+      "other": "Något mer behöver göras"
+    },
+    "Tell the front desk": {
+      "other": "Säg till framdisken"
+    },
+    "Parts": {
+      "other": "Delar"
+    },
+    "waiting": {
+      "other": "väntar"
+    },
+    "arrived": {
+      "other": "kommit"
+    },
+    "Noticed under the car": {
+      "other": "Upptäckt under bilen"
+    },
+    "needs pricing": {
+      "other": "behöver prissättas"
+    },
+    "mine": {
+      "other": "min"
+    },
+    "running": {
+      "other": "igång"
+    },
+    "Inspections": {
+      "other": "Kontroller"
+    },
+    "Start a check": {
+      "other": "Starta en kontroll"
+    },
+    "Start it": {
+      "other": "Starta"
+    },
+    "done": {
+      "other": "klar"
+    },
+    "in progress": {
+      "other": "pågår"
+    },
+    "Waiting for %d part": {
+      "one": "Väntar på %d del",
+      "other": "Väntar på %d delar"
+    },
+    "%d finding": {
+      "one": "%d fynd",
+      "other": "%d fynd"
+    },
+    "Those details do not match an account.": {
+      "other": "De uppgifterna stämmer inte mot något konto."
+    },
+    "Too many attempts. Wait a few minutes and try again.": {
+      "other": "För många försök. Vänta några minuter och försök igen."
+    },
+    "late": {
+      "other": "sen"
+    },
+    "Uncollected for %d day": {
+      "one": "Ohämtad i %d dag",
+      "other": "Ohämtad i %d dagar"
+    },
+    "%d thing noticed, not priced": {
+      "one": "%d sak upptäckt, inte prissatt",
+      "other": "%d saker upptäckta, inte prissatta"
+    },
+    "Take in a vehicle": {
+      "other": "Ta in en bil"
+    },
+    "Waiting for parts": {
+      "other": "Väntar på delar"
+    },
+    "Nothing outstanding.": {
+      "other": "Inget utestående."
+    },
+    "It has arrived": {
+      "other": "Den har kommit"
+    }
+  }
+}

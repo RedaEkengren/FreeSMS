@@ -18,7 +18,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/RedaEkengren/RedaSMS/internal/auth"
 	"github.com/RedaEkengren/RedaSMS/internal/config"
+	"github.com/RedaEkengren/RedaSMS/internal/i18n"
 	"github.com/RedaEkengren/RedaSMS/internal/storage"
 	"github.com/RedaEkengren/RedaSMS/internal/vehicledata"
 	"github.com/RedaEkengren/RedaSMS/internal/web"
@@ -36,6 +38,7 @@ type Server struct {
 	photos        *storage.Store
 	baseURL       string
 	vehicleLookup vehicledata.Lookup
+	catalogues    *i18n.Catalogues
 
 	// Pinned by SHOP_ID when an installation serves a named shop.
 	configuredShopID string
@@ -62,6 +65,15 @@ func newLookup(cfg *config.Config) vehicledata.Lookup {
 	}
 }
 
+// localeFor resolves the language for a request: the person's, then the
+// shop's, then the fallback.
+func (s *Server) localeFor(session auth.Session) string {
+	if session.Locale != "" {
+		return session.Locale
+	}
+	return s.locale
+}
+
 func (s *Server) shop() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -84,6 +96,12 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 	if err != nil {
 		return nil, err
 	}
+	// Strict outside production: a string nobody has translated should be
+	// obvious to whoever is looking at the screen and invisible to a workshop.
+	catalogues, err := i18n.Load("en", cfg.Release == "dev")
+	if err != nil {
+		return nil, err
+	}
 	return &Server{
 		pool:             pool,
 		log:              log,
@@ -93,6 +111,7 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 		locale:           cfg.DefaultLocale,
 		photos:           photos,
 		vehicleLookup:    newLookup(cfg),
+		catalogues:       catalogues,
 		baseURL:          strings.TrimRight(cfg.BaseURL, "/"),
 		templates:        templates,
 		// A Secure cookie is not sent over plain HTTP, so setting it

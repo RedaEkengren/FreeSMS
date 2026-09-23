@@ -93,6 +93,15 @@ not exist.
 - **No self-hosted runner.** GitHub advises against them on public
   repositories, because a fork's pull request could run code on the server.
   Deploy goes over SSH from a GitHub-hosted runner instead.
+- **The translation is partial.** The mechanism is in place and Swedish
+  ships, but only the screens people stand in front of all day are converted:
+  sign-in, the technician's list and job, the counter board, the parts desk.
+  The administrative screens -- figures, stock, accounting, privacy, the time
+  library -- still carry English literals. A page can therefore declare
+  `lang="sv"` and show English, which is honest about the state and wrong for
+  a screen reader. Converting the rest is mechanical; adding a string without
+  a catalogue key is not acceptable in new work.
+
 - **Nothing is deployed yet, and there is no `deploy.yml`.** A workflow naming
   `DEPLOY_HOST` and `DEPLOY_SSH_KEY` when the repository has neither is dead
   code that answers "is deployment automated?" with yes. `DEPLOY.md` describes

@@ -24,7 +24,7 @@
   </nav>
   <form method="post" action="/logout" style="margin:0">
     <span class="who">{{.Session.Scope.Role}}</span>
-    <button class="link" type="submit">Sign out</button>
+    <button class="link" type="submit">{{.T "Sign out"}}</button>
   </form>
 </header>
 {{end}}
