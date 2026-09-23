@@ -258,10 +258,11 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 // taps in a workshop is how hours go missing.
 func ClockIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) error {
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx,
-			`UPDATE time_entries SET ended_at = now() WHERE user_id = $1 AND ended_at IS NULL`,
-			scope.UserID); err != nil {
-			return fmt.Errorf("stop running clock: %w", err)
+		// Closes whatever was running, and flags it when the result is longer
+		// than anybody works in one go. Silently closing a sixteen-hour entry
+		// hides a payroll dispute rather than settling one.
+		if err := closeRunning(ctx, tx, scope.UserID); err != nil {
+			return err
 		}
 
 		// Picking a job up is what assigns it, when nobody has it. Asking

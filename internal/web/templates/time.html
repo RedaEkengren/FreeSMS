@@ -1,0 +1,62 @@
+{{define "content"}}
+<h1>Hours</h1>
+
+{{if .TimeFlagged}}
+<h2>Needs a second look</h2>
+<p class="waiting">A clock that ran longer than anybody works in one go. It was
+closed when the next job was started; somebody has to say what it should have
+been.</p>
+{{range .TimeFlagged}}
+<div class="card">
+  <div class="row">
+    <a href="/jobs/{{.WorkOrderID}}">#{{.Number}} {{.Registration}}</a>
+    <span class="tag late">{{.Hours}} h</span>
+  </div>
+  <div class="waiting">{{.UserName}} &middot; {{.StartedAt.Format "2 Jan 15:04"}}</div>
+  {{if .Note}}<div class="waiting">{{.Note}}</div>{{end}}
+  <form method="post" action="/time/correct" style="margin-top:0.75rem">
+    <input type="hidden" name="entry_id" value="{{.ID}}">
+    <div class="pair">
+      <label>
+        <span>Started</span>
+        <input type="datetime-local" name="started_at" value="{{.StartedAt.Format "2006-01-02T15:04"}}" required>
+      </label>
+      <label>
+        <span>Ended</span>
+        <input type="datetime-local" name="ended_at" value="{{if .EndedAt}}{{.EndedAt.Format "2006-01-02T15:04"}}{{end}}" required>
+      </label>
+    </div>
+    <label>
+      <span>Why</span>
+      <input name="note" placeholder="Forgot to clock out, went home at 17:00">
+    </label>
+    <button type="submit" class="secondary">Correct it</button>
+  </form>
+</div>
+{{end}}
+{{end}}
+
+<h2>Mine, the last fortnight</h2>
+{{if not .TimeMine}}
+  <p class="empty">Nothing clocked.</p>
+{{else}}
+<ul class="lines">
+  {{range .TimeMine}}
+  <li>
+    <div class="row">
+      <a href="/jobs/{{.WorkOrderID}}">#{{.Number}} {{.Registration}}</a>
+      <span class="tag{{if .Running}} running{{else if .Flagged}} late{{end}}">
+        {{if .Running}}running{{else}}{{.Hours}} h{{end}}
+      </span>
+    </div>
+    <div class="waiting">{{.StartedAt.Format "Mon 2 Jan 15:04"}}</div>
+    {{if .Corrected}}
+      <div class="waiting">Corrected by {{.CorrectedBy}} — was
+      {{.OriginalStart.Format "15:04"}}{{if .OriginalEnd}}–{{.OriginalEnd.Format "15:04"}}{{end}}</div>
+    {{end}}
+    {{if .Note}}<div class="waiting">{{.Note}}</div>{{end}}
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{end}}
