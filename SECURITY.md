@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Report privately through GitHub's
-[security advisories](https://github.com/RedaEkengren/RedaSMS/security/advisories/new).
+[security advisories](https://github.com/RedaEkengren/FreeSMS/security/advisories/new).
 Do not open a public issue for anything that could be exploited against a
 running installation.
 

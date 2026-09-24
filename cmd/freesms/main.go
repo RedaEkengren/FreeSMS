@@ -1,4 +1,4 @@
-// Command redasms is the whole application: one binary, one database.
+// Command freesms is the whole application: one binary, one database.
 //
 // Self-hosting is the point of this project, so the deployment story is "run
 // this next to a Postgres". Anything that would make that harder needs a
@@ -13,11 +13,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/RedaEkengren/RedaSMS/internal/config"
-	"github.com/RedaEkengren/RedaSMS/internal/database"
-	"github.com/RedaEkengren/RedaSMS/internal/server"
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
-	"github.com/RedaEkengren/RedaSMS/migrations"
+	"github.com/RedaEkengren/FreeSMS/internal/config"
+	"github.com/RedaEkengren/FreeSMS/internal/database"
+	"github.com/RedaEkengren/FreeSMS/internal/server"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -26,7 +26,7 @@ func main() {
 	// the runtime image has no shell to run anything else with.
 	if len(os.Args) > 1 && os.Args[1] == "-hash" {
 		if err := hashPassword(os.Args[2:]); err != nil {
-			os.Stderr.WriteString("redasms: " + err.Error() + "\n")
+			os.Stderr.WriteString("freesms: " + err.Error() + "\n")
 			os.Exit(1)
 		}
 		return
@@ -34,7 +34,7 @@ func main() {
 
 	if len(os.Args) > 1 && os.Args[1] == "-healthcheck" {
 		if err := healthcheck(); err != nil {
-			os.Stderr.WriteString("redasms: unhealthy: " + err.Error() + "\n")
+			os.Stderr.WriteString("freesms: unhealthy: " + err.Error() + "\n")
 			os.Exit(1)
 		}
 		return
@@ -44,7 +44,7 @@ func main() {
 		// Configuration errors arrive as a list, so print rather than log:
 		// slog would put the newlines inside a quoted field and make the list
 		// unreadable at exactly the moment it needs to be read.
-		os.Stderr.WriteString("redasms: " + err.Error() + "\n")
+		os.Stderr.WriteString("freesms: " + err.Error() + "\n")
 		os.Exit(1)
 	}
 }

@@ -3,7 +3,7 @@
 -- Safe to run more than once. Not for production -- the password hash below is
 -- a placeholder, not a hash of anything, and authentication is not built yet.
 --
---   docker compose exec -T db psql -U redasms -d redasms < scripts/seed.sql
+--   docker compose exec -T db psql -U freesms -d freesms < scripts/seed.sql
 
 BEGIN;
 
@@ -29,7 +29,7 @@ ON CONFLICT (id) DO NOTHING;
 -- in a public repository, so anyone who reaches an installation seeded with it
 -- can sign in. Create real users with:
 --
---   redasms -hash '<password>'
+--   freesms -hash '<password>'
 INSERT INTO users (id, shop_id, person_id, role, password_hash) VALUES
   ('33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111',
    '22222222-2222-2222-2222-222222222222', 'technician', '$argon2id$v=19$m=65536,t=1,p=4$BVV+8mm22vbHtcffT0ScFg$A7JHKMGDiaW9R0By2DEt3SmuxAasHxogSk2eoGGRCkE'),

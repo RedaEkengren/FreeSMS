@@ -53,7 +53,7 @@
   // server shortly after, because a phone that is lost or swapped takes its
   // local storage with it.
 
-  function draftKey(name) { return "redasms.draft." + name; }
+  function draftKey(name) { return "freesms.draft." + name; }
 
   function restore(form, name) {
     var local = store.get(draftKey(name));
@@ -116,7 +116,7 @@
   // that fails because of that is held and sent when the connection comes
   // back, with a key that makes arriving twice harmless.
 
-  var QUEUE = "redasms.queue";
+  var QUEUE = "freesms.queue";
 
   function queue() {
     try { return JSON.parse(store.get(QUEUE) || "[]"); } catch (e) { return []; }

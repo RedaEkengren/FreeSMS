@@ -15,4 +15,4 @@
 -- database they should not. A morning was spent on it.
 --
 -- Run automatically by the Postgres image on first initialisation.
-CREATE DATABASE redasms_test OWNER redasms;
+CREATE DATABASE freesms_test OWNER freesms;

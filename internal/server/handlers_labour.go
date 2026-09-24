@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // handleLabour is the shop's own time library.

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/RedaEkengren/RedaSMS/internal/barcode"
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/internal/barcode"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // handleScan is the counting screen.

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RedaEkengren/RedaSMS/internal/testsupport"
-	"github.com/RedaEkengren/RedaSMS/migrations"
+	"github.com/RedaEkengren/FreeSMS/internal/testsupport"
+	"github.com/RedaEkengren/FreeSMS/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -15,11 +15,11 @@ import (
 // being checked are constraints rather than Go code -- an exclusion constraint
 // that is subtly wrong cannot be caught by a unit test.
 //
-// Skipped unless REDASMS_TEST_DATABASE_URL points at a database that may be
+// Skipped unless FREESMS_TEST_DATABASE_URL points at a database that may be
 // wiped. CI supplies one; locally:
 //
 //	docker compose up -d db
-//	REDASMS_TEST_DATABASE_URL=postgres://redasms:redasms@127.0.0.1:55432/redasms_test?sslmode=disable go test ./internal/database/
+//	FREESMS_TEST_DATABASE_URL=postgres://freesms:freesms@127.0.0.1:55432/freesms_test?sslmode=disable go test ./internal/database/
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	pool := testsupport.FreshPool(t)

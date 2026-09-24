@@ -4,9 +4,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/RedaEkengren/RedaSMS/internal/access"
-	"github.com/RedaEkengren/RedaSMS/internal/auth"
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/auth"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {

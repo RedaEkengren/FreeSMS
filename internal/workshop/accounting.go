@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/RedaEkengren/RedaSMS/internal/access"
-	"github.com/RedaEkengren/RedaSMS/internal/database"
-	"github.com/RedaEkengren/RedaSMS/internal/sie"
+	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/database"
+	"github.com/RedaEkengren/FreeSMS/internal/sie"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -114,7 +114,7 @@ func ExportAccounting(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			}
 		}
 
-		file.Program, file.ProgramVer = "RedaSMS", "1"
+		file.Program, file.ProgramVer = "FreeSMS", "1"
 		file.Generated = time.Now()
 		file.YearFrom = time.Date(from.Year(), 1, 1, 0, 0, 0, 0, from.Location())
 		file.YearTo = time.Date(from.Year(), 12, 31, 0, 0, 0, 0, from.Location())

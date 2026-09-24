@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // IdempotencyHeader is what a client sends to make a repeat safe.

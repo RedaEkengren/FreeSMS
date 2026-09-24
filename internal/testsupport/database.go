@@ -15,7 +15,7 @@ import (
 
 // EnvDatabaseURL names the variable that points at a database these tests may
 // wipe. It must match what the CI workflow sets.
-const EnvDatabaseURL = "REDASMS_TEST_DATABASE_URL"
+const EnvDatabaseURL = "FREESMS_TEST_DATABASE_URL"
 
 // testLockKey serialises the packages that reset the schema.
 const testLockKey int64 = 991_147_003
@@ -44,9 +44,9 @@ func FreshPool(t *testing.T) *pgxpool.Pool {
 	// connection, and recreating the schema gives citext a new one. Every
 	// query touching a citext column then fails with "cache lookup failed for
 	// type N", which reads as corruption. docker-compose.yml creates
-	// redasms_test for exactly this.
-	if strings.HasSuffix(url, "/redasms?sslmode=disable") || strings.HasSuffix(url, "/redasms") {
-		t.Fatalf("%s points at the development database; use redasms_test", EnvDatabaseURL)
+	// freesms_test for exactly this.
+	if strings.HasSuffix(url, "/freesms?sslmode=disable") || strings.HasSuffix(url, "/freesms") {
+		t.Fatalf("%s points at the development database; use freesms_test", EnvDatabaseURL)
 	}
 
 	if url == "" {

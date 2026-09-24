@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/RedaEkengren/RedaSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -77,7 +77,7 @@ func TestWithoutScopeNothingIsVisible(t *testing.T) {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if _, err := tx.Exec(ctx, `SET LOCAL ROLE redasms_app`); err != nil {
+	if _, err := tx.Exec(ctx, `SET LOCAL ROLE freesms_app`); err != nil {
 		t.Fatalf("assume role: %v", err)
 	}
 	// Deliberately no app.current_shop.

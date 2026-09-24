@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RedaEkengren/RedaSMS/internal/access"
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 func thisMonth() (time.Time, time.Time) {

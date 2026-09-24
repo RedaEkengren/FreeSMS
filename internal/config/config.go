@@ -55,7 +55,7 @@ func Load() (*Config, error) {
 		DatabaseURL:        os.Getenv("DATABASE_URL"),
 		HTTPAddr:           envOr("HTTP_ADDR", ":8080"),
 		BaseURL:            os.Getenv("BASE_URL"),
-		AttachmentsDir:     envOr("ATTACHMENTS_DIR", "/var/lib/redasms/attachments"),
+		AttachmentsDir:     envOr("ATTACHMENTS_DIR", "/var/lib/freesms/attachments"),
 		DefaultLocale:      envOr("DEFAULT_LOCALE", "en"),
 		LogLevel:           envOr("LOG_LEVEL", "info"),
 		Release:            envOr("RELEASE", "dev"),

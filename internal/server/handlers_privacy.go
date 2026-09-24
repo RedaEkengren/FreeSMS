@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // handleExportPerson sends somebody a copy of what is held about them.

@@ -1,4 +1,4 @@
-# RedaSMS
+# FreeSMS
 
 An open source shop management system for independent auto repair shops.
 
@@ -25,7 +25,7 @@ accountant as a SIE file.
 
 What is not built: a deploy pipeline, because there is nowhere to deploy to
 yet, and parts supplier ordering, which is
-[deliberately deferred](https://github.com/RedaEkengren/RedaSMS/issues/25).
+[deliberately deferred](https://github.com/RedaEkengren/FreeSMS/issues/25).
 
 ### What it does
 
@@ -39,7 +39,7 @@ yet, and parts supplier ordering, which is
 | **Throughout** | Row level security, personal data export and erasure, Swedish and English, autosave and an offline queue |
 
 Progress is tracked in
-[issues](https://github.com/RedaEkengren/RedaSMS/issues), grouped into
+[issues](https://github.com/RedaEkengren/FreeSMS/issues), grouped into
 milestones:
 
 | Milestone | What it covers |
@@ -62,7 +62,7 @@ Meanwhile there is no credible open source alternative. The most-starred
 "garage management system" on GitHub is a microservices sample application, not
 a product; the only serious attempt has fifty stars.
 
-RedaSMS is built around three decisions that follow from that:
+FreeSMS is built around three decisions that follow from that:
 
 - **The technician's phone is the primary interface.** Portrait, one thumb,
   usable on bad workshop wifi. Every other role consumes data the technician
@@ -104,7 +104,7 @@ To look at a shop with vehicles already in it, seed one instead of setting up
 by hand:
 
 ```sh
-docker compose exec -T db psql -U redasms -d redasms < scripts/seed.sql
+docker compose exec -T db psql -U freesms -d freesms < scripts/seed.sql
 ```
 
 That creates a shop, two users, a customer, three vehicles, three jobs — one
@@ -118,7 +118,7 @@ repository, so anyone reaching an installation seeded with it can sign in. Use
 the setup page for anything real, and create later accounts with a hash from:
 
 ```sh
-docker compose exec app /redasms -hash 'the password'
+docker compose exec app /freesms -hash 'the password'
 ```
 
 ### Languages
@@ -148,11 +148,11 @@ they refuse to run against the development database by name:
 
 ```sh
 docker compose up -d db
-REDASMS_TEST_DATABASE_URL='postgres://redasms:redasms@127.0.0.1:55432/redasms_test?sslmode=disable' \
+FREESMS_TEST_DATABASE_URL='postgres://freesms:freesms@127.0.0.1:55432/freesms_test?sslmode=disable' \
   go test ./...
 ```
 
-`docker-compose.yml` creates `redasms_test` alongside `redasms` for exactly
+`docker-compose.yml` creates `freesms_test` alongside `freesms` for exactly
 this. Pointing them at the running instance's database destroys its data and
 poisons its connection pool.
 

@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/RedaEkengren/RedaSMS/internal/access"
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // handleSetState moves an order, and says plainly when it will not move.

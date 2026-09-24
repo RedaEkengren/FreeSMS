@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/RedaEkengren/RedaSMS/internal/access"
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // handleDashboard shows the month, or whatever period was asked for.

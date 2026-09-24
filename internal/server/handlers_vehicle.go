@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/RedaEkengren/RedaSMS/internal/vehicledata"
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/internal/vehicledata"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // handleSearch is the one field at the top of every screen.

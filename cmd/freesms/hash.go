@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/RedaEkengren/RedaSMS/internal/auth"
+	"github.com/RedaEkengren/FreeSMS/internal/auth"
 )
 
 // hashPassword prints an argon2id hash for a password given on the command
@@ -16,7 +16,7 @@ import (
 // -- which some installations would keep -- or writing a throwaway program.
 func hashPassword(args []string) error {
 	if len(args) != 1 {
-		return fmt.Errorf("usage: redasms -hash <password>")
+		return fmt.Errorf("usage: freesms -hash <password>")
 	}
 	hash, err := auth.HashPassword(args[0])
 	if err != nil {

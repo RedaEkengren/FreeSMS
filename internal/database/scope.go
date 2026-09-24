@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/RedaEkengren/RedaSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -50,7 +50,7 @@ func InShop(ctx context.Context, pool *pgxpool.Pool, shopID string, fn func(cont
 
 	// Drop to the role that cannot change the schema. SET LOCAL lasts until
 	// the transaction ends, so the connection returns to the pool unchanged.
-	if _, err := tx.Exec(ctx, `SET LOCAL ROLE redasms_app`); err != nil {
+	if _, err := tx.Exec(ctx, `SET LOCAL ROLE freesms_app`); err != nil {
 		return fmt.Errorf("assume application role: %w", err)
 	}
 

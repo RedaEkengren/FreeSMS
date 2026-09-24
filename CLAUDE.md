@@ -1,4 +1,4 @@
-# Working in RedaSMS
+# Working in FreeSMS
 
 Context for Claude Code sessions. Read this before changing anything.
 
@@ -81,7 +81,7 @@ not exist.
   way except this paragraph, so check rather than assume:
 
   ```sh
-  gh api repos/RedaEkengren/RedaSMS/branches/main/protection \
+  gh api repos/RedaEkengren/FreeSMS/branches/main/protection \
     --jq '{checks: .required_status_checks.contexts, force_push: .allow_force_pushes.enabled}'
   ```
 
@@ -95,14 +95,14 @@ not exist.
   `BenboStandard` is private and stays private, so its `v1` workflows are
   unreachable from here. The run fails before any job is created, which means
   no logs — just "workflow file issue". See
-  [#5](https://github.com/RedaEkengren/RedaSMS/issues/5).
+  [#5](https://github.com/RedaEkengren/FreeSMS/issues/5).
 - **No self-hosted runner.** GitHub advises against them on public
   repositories, because a fork's pull request could run code on the server.
   Deploy goes over SSH from a GitHub-hosted runner instead.
 - **Two issues stay open on purpose.**
-  [#5](https://github.com/RedaEkengren/RedaSMS/issues/5) is the deploy half,
+  [#5](https://github.com/RedaEkengren/FreeSMS/issues/5) is the deploy half,
   waiting on there being a server;
-  [#25](https://github.com/RedaEkengren/RedaSMS/issues/25) is parts supplier
+  [#25](https://github.com/RedaEkengren/FreeSMS/issues/25) is parts supplier
   ordering, filed as a record of why it is not being built rather than as work.
 
 - **No provider ships for vehicle lookup.** Swedish vehicle data comes under an
@@ -127,7 +127,7 @@ not exist.
 ## Traps, with the reason attached
 
 - **`/home/reda/backups` is owned by root.** Nothing running as `reda` can
-  create a directory in it. Write into `/home/reda/backups/redasms` or
+  create a directory in it. Write into `/home/reda/backups/freesms` or
   elsewhere under `/home/reda` directly. This has been walked into twice
   elsewhere in the estate.
 - **"Best effort" has to cover the whole block.** Under `set -euo pipefail`, an
@@ -154,7 +154,7 @@ not exist.
   ship with an open project, and the competitors are criticised for theirs. The
   request and the return -- the parts of the job a shop actually loses money on
   -- are built and need no supplier. See
-  [#25](https://github.com/RedaEkengren/RedaSMS/issues/25).
+  [#25](https://github.com/RedaEkengren/FreeSMS/issues/25).
 
 - No PDF of an invoice. The document's data is frozen, so rendering is
   deterministic and a stored PDF would be a cache. A signed archival PDF is a

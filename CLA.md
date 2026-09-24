@@ -5,7 +5,7 @@
 > good enough to keep the relicensing option open while the project is small.
 > Have it reviewed before relying on it for a commercial licence sale.
 
-By contributing to RedaSMS you agree to the following. It applies to code,
+By contributing to FreeSMS you agree to the following. It applies to code,
 documentation, translations, configuration, and anything else you submit.
 
 ## 1. You keep your copyright
@@ -20,7 +20,7 @@ perpetual, worldwide, irrevocable, royalty-free licence to use, reproduce,
 modify, publish, sublicense and distribute your contribution, **including the
 right to distribute it under licence terms other than the AGPL-3.0**.
 
-That last clause is the point of this document. RedaSMS is AGPL-3.0, and
+That last clause is the point of this document. FreeSMS is AGPL-3.0, and
 the AGPL obliges anyone running a modified version as a network service to
 offer its source to that service's users. Some organisations cannot accept
 that, so a commercial licence has to be available. Selling one requires holding

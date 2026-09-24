@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // handleTime is the hours screen: mine, and — for the front desk — everything

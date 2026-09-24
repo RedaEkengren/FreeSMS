@@ -12,7 +12,7 @@ func day(y, m, d int) time.Time { return time.Date(y, time.Month(m), d, 0, 0, 0,
 
 func sample() File {
 	return File{
-		Program: "RedaSMS", ProgramVer: "1.0",
+		Program: "FreeSMS", ProgramVer: "1.0",
 		Generated:   day(2026, 9, 23),
 		CompanyName: "Öbergs Verkstad",
 		OrgNumber:   "556677-8899",

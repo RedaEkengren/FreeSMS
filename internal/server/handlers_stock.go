@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 func (s *Server) handleStock(w http.ResponseWriter, r *http.Request) {

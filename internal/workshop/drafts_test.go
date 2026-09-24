@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // A flaky connection means the same request arrives twice. Without this each

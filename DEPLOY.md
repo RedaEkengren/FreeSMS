@@ -1,4 +1,4 @@
-# Deploying RedaSMS
+# Deploying FreeSMS
 
 > **Nothing is deployed yet.** This file describes the intended shape so that
 > the decisions are recorded while they are fresh. Every number in it is an
@@ -10,7 +10,7 @@
 > and a `deploy.yml` naming secrets the repository does not have would be dead
 > code that reads as authoritative. It is added when there is somewhere to
 > deploy to. See
-> [#5](https://github.com/RedaEkengren/RedaSMS/issues/5).
+> [#5](https://github.com/RedaEkengren/FreeSMS/issues/5).
 
 ## Shape
 
@@ -48,7 +48,7 @@ two months later when production is pinned to a SHA that gets deleted.
 
 ## Rebuilding on a bare machine
 
-1. Install Docker and clone the repository to `/opt/redasms`.
+1. Install Docker and clone the repository to `/opt/freesms`.
 2. Copy `.env.example` to `.env` and fill it in. The values are not in the
    repository; they are in the encrypted off-host backup.
 3. Restore the newest database dump. The schema is applied by the binary on

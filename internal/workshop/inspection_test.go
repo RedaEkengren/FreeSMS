@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/RedaEkengren/RedaSMS/internal/database"
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/internal/database"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/RedaEkengren/RedaSMS/internal/auth"
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/internal/auth"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // needsSetup reports whether this installation still has no shop.

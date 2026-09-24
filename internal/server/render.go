@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/RedaEkengren/RedaSMS/internal/auth"
-	"github.com/RedaEkengren/RedaSMS/internal/i18n"
-	"github.com/RedaEkengren/RedaSMS/internal/money"
-	"github.com/RedaEkengren/RedaSMS/internal/vehicledata"
-	"github.com/RedaEkengren/RedaSMS/internal/web"
-	"github.com/RedaEkengren/RedaSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/internal/auth"
+	"github.com/RedaEkengren/FreeSMS/internal/i18n"
+	"github.com/RedaEkengren/FreeSMS/internal/money"
+	"github.com/RedaEkengren/FreeSMS/internal/vehicledata"
+	"github.com/RedaEkengren/FreeSMS/internal/web"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // pageData is what every template receives. One struct rather than a map, so

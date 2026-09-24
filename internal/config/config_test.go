@@ -8,7 +8,7 @@ import (
 
 func valid(t *testing.T) {
 	t.Helper()
-	t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/redasms")
+	t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/freesms")
 	t.Setenv("BASE_URL", "http://localhost:8080")
 	t.Setenv("SESSION_SECRET", "0123456789abcdef0123456789abcdef")
 }

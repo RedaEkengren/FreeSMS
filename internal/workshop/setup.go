@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/RedaEkengren/RedaSMS/internal/auth"
+	"github.com/RedaEkengren/FreeSMS/internal/auth"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

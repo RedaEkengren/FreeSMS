@@ -6,10 +6,10 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/RedaEkengren/RedaSMS/internal/auth"
+	"github.com/RedaEkengren/FreeSMS/internal/auth"
 )
 
-const sessionCookie = "redasms_session"
+const sessionCookie = "freesms_session"
 
 type contextKey string
 

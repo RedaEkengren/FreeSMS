@@ -11,11 +11,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/RedaEkengren/RedaSMS/internal/auth"
-	"github.com/RedaEkengren/RedaSMS/internal/config"
-	"github.com/RedaEkengren/RedaSMS/internal/database"
-	"github.com/RedaEkengren/RedaSMS/internal/testsupport"
-	"github.com/RedaEkengren/RedaSMS/migrations"
+	"github.com/RedaEkengren/FreeSMS/internal/auth"
+	"github.com/RedaEkengren/FreeSMS/internal/config"
+	"github.com/RedaEkengren/FreeSMS/internal/database"
+	"github.com/RedaEkengren/FreeSMS/internal/testsupport"
+	"github.com/RedaEkengren/FreeSMS/migrations"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
