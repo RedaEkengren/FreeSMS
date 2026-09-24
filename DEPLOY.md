@@ -51,7 +51,9 @@ two months later when production is pinned to a SHA that gets deleted.
 1. Install Docker and clone the repository to `/opt/redasms`.
 2. Copy `.env.example` to `.env` and fill it in. The values are not in the
    repository; they are in the encrypted off-host backup.
-3. Restore the newest database dump.
+3. Restore the newest database dump. The schema is applied by the binary on
+   start, from migrations embedded in it -- there is no separate migration
+   artefact to keep in step.
 4. Restore `ATTACHMENTS_DIR`. **This is the part that cannot be regenerated.**
    The database can be rebuilt from a dump; inspection photographs cannot be
    rebuilt from anything.
@@ -77,7 +79,16 @@ two months later when production is pinned to a SHA that gets deleted.
 - The pull refuses to run when the drive is not mounted, and warns when the
   newest dump is older than 48 hours — which catches the server side stopping,
   not only the pull failing.
-- **Attachments are backed up too.** They are the only irreplaceable thing here.
+- **Attachments are backed up too.** They are the only irreplaceable thing
+  here: inspection photographs are not in a database dump and cannot be
+  rebuilt from anything.
+
+- **Some tables are deliberately not worth keeping.** `idempotency_keys` and
+  `drafts` exist to survive a bad minute, `login_attempts` to slow down
+  guessing over minutes, and expired `inspection_shares` to answer "was this
+  sent". All four are swept on a schedule by the running service, because a
+  retention policy that depends on somebody remembering is not a policy. A
+  restore that brings them back is harmless; the next sweep clears them.
 - **Restore one, and write down how long it took.** A backup nobody has
   restored is a hypothesis. Check row counts after the restore, not that the
   process exited zero.

@@ -45,6 +45,12 @@ Claude-Session: <the session URL>
 | **English source, i18n from the first template** | Swedish is the first translation, not the source language. Retrofitting i18n means touching every template. |
 | **AGPL-3.0 plus a CLA** | AGPL stops a competitor running it as a closed service. The CLA keeps a commercial licence possible, which is the only revenue path that is not "give it away and hope". It cannot be added retroactively. |
 | **Technician view first** | Not because it matters most, but because it is the root of the dependency tree: the manager dashboard, the front desk board and inventory all display data the technician creates. Building them first produces beautiful views of nothing. |
+| **Anything that can happen twice is a row, not a column** | Ownership, registrations, odometer readings, stock, clocked time, customer decisions. A number written over cannot answer "where did it go", and that question is the whole reason a shop keeps records. Stock on hand and reserved are both derived from the ledger. |
+| **Money lives in `internal/money`** | One rounding rule, one set of tests, one place it can be wrong. Half away from zero, per line then summed -- the alternative gives a nicer number and an invoice whose printed lines do not add up to its printed total. |
+| **Documents are frozen, corrections are new documents** | An issued invoice is immutable by trigger, not by convention. Conventions are kept until somebody is in a hurry at five to five. |
+| **Which role owns which transition, per transition** | Not a blanket check on an endpoint. "I need parts" and "this is ready" are facts only the person holding the spanner has; pricing and approval are conversations with the customer. |
+| **English is the source language, keys are the English text** | It reads at the call site, survives a catalogue going missing, and an untranslated string still says something sensible. Swedish is the first translation, not the source. |
+| **No dependency where a hundred lines will do** | Code 128 and the CP437 encoder are written out. Both are table lookups, and a dependency is a thing to keep up to date for the life of the project. |
 
 ## Permissions are not a later layer
 
@@ -93,6 +99,16 @@ not exist.
 - **No self-hosted runner.** GitHub advises against them on public
   repositories, because a fork's pull request could run code on the server.
   Deploy goes over SSH from a GitHub-hosted runner instead.
+- **Two issues stay open on purpose.**
+  [#5](https://github.com/RedaEkengren/RedaSMS/issues/5) is the deploy half,
+  waiting on there being a server;
+  [#25](https://github.com/RedaEkengren/RedaSMS/issues/25) is parts supplier
+  ordering, filed as a record of why it is not being built rather than as work.
+
+- **No provider ships for vehicle lookup.** Swedish vehicle data comes under an
+  agreement that is the shop's to hold. `VEHICLE_LOOKUP_URL` points at whatever
+  a shop has; empty is the default and is not a degraded mode.
+
 - **The translation is partial.** The mechanism is in place and Swedish
   ships, but only the screens people stand in front of all day are converted:
   sign-in, the technician's list and job, the counter board, the parts desk.
@@ -134,5 +150,12 @@ not exist.
 - No hosted offering, no payment processing, no cash register. Invoiced sales
   are exempt from the Swedish certified cash register requirement; a cash
   drawer would pull the project into scope for it.
-- No parts supplier integrations until the boring inventory works. That is
-  where every competitor is weakest, and it is not where the first user is won.
+- No parts supplier ordering. It needs agreements rather than code, it cannot
+  ship with an open project, and the competitors are criticised for theirs. The
+  request and the return -- the parts of the job a shop actually loses money on
+  -- are built and need no supplier. See
+  [#25](https://github.com/RedaEkengren/RedaSMS/issues/25).
+
+- No PDF of an invoice. The document's data is frozen, so rendering is
+  deterministic and a stored PDF would be a cache. A signed archival PDF is a
+  separate question for whenever somebody needs to send one.

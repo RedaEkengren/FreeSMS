@@ -11,17 +11,36 @@ and no annual contract.
 
 ## Status
 
-Early, but it runs, and a job can travel the whole way round.
+Early, and a job can travel the whole way round without anybody walking across
+the workshop to say something out loud.
 
 A fresh installation sets itself up through a page. The front desk takes a
-vehicle in and sees the counter board; a technician sees their own work, clocks
-on and off it, runs a checklist with photographs from their phone, asks the
-parts desk for what they need and says when the car is ready. The customer gets
-a link showing the evidence and approves each finding. The front desk invoices
-it, with gap-free numbering and documents that cannot be edited.
+vehicle in, prices it from the shop's own time library, and sees the counter
+board. A technician sees their own work first, clocks on and off it, runs a
+checklist with photographs from their phone, asks the parts desk for what they
+need and says when the car is ready. The customer opens a link, sees the
+evidence and approves each finding. The front desk invoices it, with gap-free
+numbering and documents that cannot be edited, and hands the month to the
+accountant as a SIE file.
 
-Inventory is not built. Progress is tracked in [issues](https://github.com/RedaEkengren/RedaSMS/issues), grouped
-into four milestones:
+What is not built: a deploy pipeline, because there is nowhere to deploy to
+yet, and parts supplier ordering, which is
+[deliberately deferred](https://github.com/RedaEkengren/RedaSMS/issues/25).
+
+### What it does
+
+| | |
+|---|---|
+| **Front desk** | Counter board with late and uncollected flagged, vehicle intake, pricing, approvals, invoicing, credit notes |
+| **Technician** | Own jobs first, clock on and off, digital inspections with photographs, ask for parts, report findings, say when it is ready |
+| **Parts** | What is being waited for, stock as a movement ledger, write-offs by reason, barcode scanning, printable labels |
+| **Owner** | Revenue, hours clocked against hours sold, approval rate, what a month of wrong orders cost |
+| **Customer** | A link showing the evidence, approving or declining each finding. No account, no password |
+| **Throughout** | Row level security, personal data export and erasure, Swedish and English, autosave and an offline queue |
+
+Progress is tracked in
+[issues](https://github.com/RedaEkengren/RedaSMS/issues), grouped into
+milestones:
 
 | Milestone | What it covers |
 |---|---|
@@ -29,6 +48,7 @@ into four milestones:
 | M2 Technician | The view that creates the data: the bay, the phone |
 | M3 Front desk and money | Approvals, invoicing, accounting integrity |
 | M4 Manager and inventory | Views that consume what the technician produces |
+| M5 Parity | The gap to the Swedish incumbents, ordered by cost against value |
 
 ## Why this exists
 
@@ -87,8 +107,9 @@ by hand:
 docker compose exec -T db psql -U redasms -d redasms < scripts/seed.sql
 ```
 
-That creates a shop, two users, a customer, three vehicles and three jobs —
-one late, one waiting for parts, one finished and uncollected. Sign in as
+That creates a shop, two users, a customer, three vehicles, three jobs — one
+late, one waiting for parts, one finished and uncollected — and an inspection
+checklist to run. Sign in as
 `reda@example.test` (a technician) or `anna@example.test` (the owner), both
 with the password `workshop`.
 
@@ -100,21 +121,40 @@ the setup page for anything real, and create later accounts with a hash from:
 docker compose exec app /redasms -hash 'the password'
 ```
 
+### Languages
+
+English is the source language and Swedish ships with it. A person's language
+is their own setting, falling back to the shop's, falling back to English --
+a workshop with one Polish technician and three Swedish ones is ordinary.
+
+Translations are a JSON file per language in `internal/i18n/catalogues/`, which
+somebody who does not program can edit. The keys are the English text, so a
+string nobody has translated still reads.
+
+The screens people stand in front of all day are translated; the
+administrative ones are not yet.
+
 ### Tests
 
 ```sh
 go test ./...
 ```
 
-Schema guarantees are constraints rather than Go code, so they are checked
-against a real Postgres. Those tests skip unless a database they may wipe is
-pointed at:
+Much of what this system promises is a database constraint rather than Go
+code -- one plate cannot be on two vehicles at once, an issued invoice cannot
+be edited, a shop cannot see another's rows -- so those tests run against a
+real Postgres. They skip unless a database they may wipe is pointed at, and
+they refuse to run against the development database by name:
 
 ```sh
 docker compose up -d db
 REDASMS_TEST_DATABASE_URL='postgres://redasms:redasms@127.0.0.1:55432/redasms_test?sslmode=disable' \
-  go test ./internal/database/
+  go test ./...
 ```
+
+`docker-compose.yml` creates `redasms_test` alongside `redasms` for exactly
+this. Pointing them at the running instance's database destroys its data and
+poisons its connection pool.
 
 Without Go installed, the same works through the build image:
 
