@@ -8,6 +8,7 @@
 {{if .Job.Complaint}}<p>{{.Job.Complaint}}</p>{{end}}
 
 <div id="clock">{{template "clock" .}}</div>
+{{if .Job.OthersRunning}}<p class="waiting">{{.Job.OthersRunning}} still has a clock running on this job.</p>{{end}}
 
 <dl>
   <dt>{{.T "State"}}</dt><dd>{{.Job.State}}</dd>
@@ -182,6 +183,31 @@
   </div>
   <div class="waiting">matched on {{.MatchedRule}}{{if .Actuals.Known}} &middot; really took {{.Actuals.MedianHours}} h across {{.Actuals.Jobs}}{{end}}</div>
   <button type="submit" class="secondary" style="margin-top:0.5rem">Put it on the order</button>
+</form>
+{{end}}
+{{end}}
+
+{{if and .Session.Scope.Role.SeesCustomerPersonalData .Parts}}
+<h2>From the shelf</h2>
+{{range .Parts}}
+<form method="post" action="/jobs/{{$.Job.ID}}/lines" class="suggestion">
+  <input type="hidden" name="kind" value="part">
+  <input type="hidden" name="cost_bearer" value="customer">
+  <input type="hidden" name="part_id" value="{{.ID}}">
+  <input type="hidden" name="description" value="{{.Name}} ({{.Number}})">
+  <input type="hidden" name="unit_price" value="{{.Price}}">
+  <div class="row">
+    <span>{{.Number}} &middot; {{.Name}}</span>
+    <span class="tag{{if .Negative}} late{{else if .Short}} warranty{{end}}">{{.Available}} {{.Unit}}</span>
+  </div>
+  <div class="waiting">
+    {{if .Location}}{{.Location}} &middot; {{end}}{{.Price}}
+    {{if le .Available 0.0}} &middot; none on the shelf; this will show as a shortfall{{end}}
+  </div>
+  <div class="pair" style="margin-top:0.5rem">
+    <label><span>How many</span><input name="quantity" value="1" inputmode="decimal"></label>
+    <label><span>&nbsp;</span><button type="submit" class="secondary">Put it on the order</button></label>
+  </div>
 </form>
 {{end}}
 {{end}}

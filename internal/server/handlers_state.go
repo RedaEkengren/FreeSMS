@@ -93,6 +93,7 @@ func (s *Server) handleAddLine(w http.ResponseWriter, r *http.Request) {
 		VATRateBasis:   2500,
 		CostBearer:     r.FormValue("cost_bearer"),
 		LabourTimeID:   strings.TrimSpace(r.FormValue("labour_time_id")),
+		PartID:         strings.TrimSpace(r.FormValue("part_id")),
 	}
 
 	err = workshop.AddLine(r.Context(), s.pool, session.Scope, id, line)

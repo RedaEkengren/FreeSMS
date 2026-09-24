@@ -206,7 +206,25 @@ func SetState(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID
 			}
 			return ErrIllegalTransition{From: from, To: to}
 		}
-		return setStateTx(ctx, tx, jobID, to)
+		if err := setStateTx(ctx, tx, jobID, to); err != nil {
+			return err
+		}
+
+		// Handing the car back is the one moment somebody is certainly
+		// finished with it, so it is the moment their clock stops. Left
+		// running it goes until they happen to clock onto something else,
+		// which on a Friday afternoon is never -- and then Monday's first
+		// clock-in closes a seventy-hour entry and flags it for somebody to
+		// correct.
+		//
+		// Only the caller's clock. A second technician on the same gearbox has
+		// not finished because this one handed the keys over.
+		if to == StateReady && scope.UserID != "" {
+			if err := stopClockOn(ctx, tx, scope.UserID, jobID); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
@@ -270,6 +288,28 @@ func setStateTx(ctx context.Context, tx pgx.Tx, jobID string, to State) error {
 		        closed_at = CASE WHEN $1 IN ('closed', 'cancelled') THEN now() ELSE NULL END
 		 WHERE id = $2`, to, jobID); err != nil {
 		return fmt.Errorf("set state: %w", err)
+	}
+	return nil
+}
+
+// stopClockOn ends one person's running entry on one job.
+//
+// Through the same flagging as anywhere else: a stretch longer than anybody
+// works in one go is marked whether it was ended by clocking onto the next car
+// or by handing this one back.
+func stopClockOn(ctx context.Context, tx pgx.Tx, userID, jobID string) error {
+	const q = `
+		UPDATE time_entries
+		   SET ended_at = now(),
+		       flagged = (now() - started_at) > interval '10 hours',
+		       note = CASE WHEN (now() - started_at) > interval '10 hours'
+		                   THEN concat_ws(' ', note,
+		                        'Closed when the car was handed back; it had been running for '
+		                        || round(extract(epoch from now() - started_at) / 3600)::text || ' hours.')
+		                   ELSE note END
+		 WHERE user_id = $1 AND work_order_id = $2 AND ended_at IS NULL`
+	if _, err := tx.Exec(ctx, q, userID, jobID); err != nil {
+		return fmt.Errorf("stop the clock: %w", err)
 	}
 	return nil
 }

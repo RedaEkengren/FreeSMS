@@ -98,10 +98,15 @@ func Summary(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, from, 
 		// Hours clocked against jobs in the period, and hours sold on labour
 		// lines of the same jobs. Two different questions, and the gap between
 		// them is the one an owner actually acts on.
+		// A running entry counts up to now. Only finished ones meant that a
+		// day in progress read as nothing, which is defensible for a closed
+		// month and wrong for today -- and today is the period somebody
+		// actually looks at. The figure changes while you watch it, which is
+		// correct.
 		const hours = `
-			SELECT coalesce(sum(extract(epoch from (t.ended_at - t.started_at)) / 3600), 0)
+			SELECT coalesce(sum(extract(epoch from (coalesce(t.ended_at, now()) - t.started_at)) / 3600), 0)
 			FROM time_entries t
-			WHERE t.ended_at IS NOT NULL AND t.started_at >= $1 AND t.started_at < $2`
+			WHERE t.started_at >= $1 AND t.started_at < $2`
 		if err := tx.QueryRow(ctx, hours, from, to).Scan(&d.HoursClocked); err != nil {
 			return fmt.Errorf("read clocked hours: %w", err)
 		}
@@ -136,7 +141,7 @@ func Summary(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, from, 
 		// comparable on absolutes, so these are hours and not a ranking.
 		const perTech = `
 			SELECT coalesce(p.display_name, 'unknown'),
-			       coalesce(sum(extract(epoch from (t.ended_at - t.started_at)) / 3600), 0),
+			       coalesce(sum(extract(epoch from (coalesce(t.ended_at, now()) - t.started_at)) / 3600), 0),
 			       coalesce((
 			           SELECT sum(l.quantity)
 			           FROM work_order_lines l
@@ -147,7 +152,7 @@ func Summary(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, from, 
 			FROM time_entries t
 			LEFT JOIN users u  ON u.id = t.user_id
 			LEFT JOIN people p ON p.id = u.person_id
-			WHERE t.ended_at IS NOT NULL AND t.started_at >= $1 AND t.started_at < $2
+			WHERE t.started_at >= $1 AND t.started_at < $2
 			GROUP BY t.user_id, p.display_name
 			ORDER BY 2 DESC`
 		rows, err := tx.Query(ctx, perTech, from, to)

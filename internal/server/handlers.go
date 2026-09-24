@@ -128,6 +128,16 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// What is on the shelf, so the counter prices a part onto the job rather
+	// than typing a number and leaving the stock untouched.
+	var stocked []workshop.Part
+	if session.Scope.Role.SeesCustomerPersonalData() {
+		stocked, err = workshop.Parts(r.Context(), s.pool, session.Scope)
+		if err != nil {
+			s.log.Error("read parts", "error", err)
+		}
+	}
+
 	// Only the front desk sees documents; a technician has no use for them
 	// and they carry the customer's name.
 	var invoices []workshop.Invoice
@@ -151,6 +161,7 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		Inspections: inspections,
 		Templates:   templates,
 		Suggestions: suggestions,
+		Parts:       stocked,
 		LabourRate:  labourRate,
 	})
 }

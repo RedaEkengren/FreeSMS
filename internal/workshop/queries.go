@@ -61,6 +61,11 @@ type Job struct {
 	// Counts the front desk and the technician both need at a glance.
 	OpenRequests int
 	OpenFindings int
+
+	// Somebody other than the caller with a clock running on this job. Handing
+	// the car back stops the caller's clock and not theirs, so the page has to
+	// say so rather than leaving it to be discovered on Friday.
+	OthersRunning string
 }
 
 // Line is one line of a work order.
@@ -154,7 +159,13 @@ const jobColumns = `
 	(SELECT count(*) FROM part_requests pr
 	  WHERE pr.work_order_id = w.id AND pr.arrived_at IS NULL AND pr.cancelled_at IS NULL) AS open_requests,
 	(SELECT count(*) FROM findings f
-	  WHERE f.work_order_id = w.id AND f.handled_at IS NULL) AS open_findings`
+	  WHERE f.work_order_id = w.id AND f.handled_at IS NULL) AS open_findings,
+	coalesce((SELECT string_agg(p2.display_name, ', ')
+	            FROM time_entries t3
+	            JOIN users u2  ON u2.id = t3.user_id
+	            JOIN people p2 ON p2.id = u2.person_id
+	           WHERE t3.work_order_id = w.id AND t3.ended_at IS NULL
+	             AND t3.user_id IS DISTINCT FROM $1), '') AS others_running`
 
 const jobFrom = `
 	FROM work_orders w
@@ -167,7 +178,7 @@ func scanJob(row pgx.Row) (Job, error) {
 	err := row.Scan(&j.ID, &j.VehicleID, &j.Number, &j.State, &j.Complaint,
 		&j.Registration, &j.Make, &j.Model, &j.ModelYear,
 		&j.OpenedAt, &j.PromisedAt, &j.OdometerKm, &j.ClockStartedAt, &j.HasWork,
-		&j.AssignedTo, &j.AssignedToMe, &j.OpenRequests, &j.OpenFindings)
+		&j.AssignedTo, &j.AssignedToMe, &j.OpenRequests, &j.OpenFindings, &j.OthersRunning)
 	j.ClockRunning = j.ClockStartedAt != nil
 	return j, err
 }

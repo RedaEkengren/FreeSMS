@@ -20,6 +20,11 @@ type NewLine struct {
 	VATRateBasis   int
 	CostBearer     string
 
+	// Set when the line is for something on the shelf. Pricing it onto a job
+	// reserves it; invoicing the job takes it off. Without this the part is
+	// sold and never leaves stock.
+	PartID string
+
 	// Set when the line came from the shop's own time library, so that what
 	// was actually clocked can be compared with what was expected. Without it
 	// the library never learns and a wrong entry poisons every future
@@ -90,14 +95,26 @@ func AddLine(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 			INSERT INTO work_order_lines
 			  (shop_id, work_order_id, position, kind, description, quantity,
 			   unit_price_minor, estimated_unit_price_minor, vat_rate_bp, cost_bearer,
-			   approved_at, labour_time_id)
+			   approved_at, labour_time_id, part_id)
 			VALUES ($1, $2, $3, $4, $5, ($6::bigint)::numeric / 1000, $7, $8, $9, $10,
-			        CASE WHEN $11 THEN now() ELSE NULL END, nullif($12, '')::uuid)`
+			        CASE WHEN $11 THEN now() ELSE NULL END, nullif($12, '')::uuid,
+			        nullif($13, '')::uuid)`
 		if _, err := tx.Exec(ctx, insert,
 			scope.ShopID, jobID, position, line.Kind, strings.TrimSpace(line.Description),
 			line.QuantityMilli, line.UnitPriceMinor, estimated, line.VATRateBasis,
-			line.CostBearer, preApproval, line.LabourTimeID); err != nil {
+			line.CostBearer, preApproval, line.LabourTimeID, line.PartID); err != nil {
 			return fmt.Errorf("add line: %w", err)
+		}
+
+		// Pricing a part onto a job puts it aside. Reserving more than is on
+		// the shelf is allowed and shows as a shortfall: the shop may well be
+		// ordering more, and refusing here sends somebody to a spreadsheet.
+		if line.PartID != "" && line.QuantityMilli > 0 {
+			if err := moveTx(ctx, tx, scope,
+				Movement{Kind: "reserved", Quantity: float64(line.QuantityMilli) / 1000},
+				line.PartID, jobID, ""); err != nil {
+				return err
+			}
 		}
 		return nil
 	})

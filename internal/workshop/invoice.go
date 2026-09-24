@@ -131,6 +131,12 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 			return err
 		}
 
+		// The parts leave the shelf here, in the transaction that issues the
+		// document. Anywhere else and the two can disagree.
+		if err := consumeForInvoice(ctx, tx, scope, workOrderID); err != nil {
+			return err
+		}
+
 		inv.Series, inv.Number = DefaultSeries, number
 		inv.WorkOrderID = workOrderID
 		inv.CustomerName = *name
@@ -279,6 +285,57 @@ func InvoicesFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, wo
 
 // IsCreditNote reports whether this document reverses another.
 func (i Invoice) IsCreditNote() bool { return i.CreditOfID != nil }
+
+// consumeForInvoice takes the job's parts off the shelf.
+//
+// Every line with a part, whoever is paying for it: a warranty replacement
+// costs the customer nothing and the part left the shelf all the same.
+// Consuming releases whatever was reserved for the job first, so nothing is
+// counted as both put aside and used.
+func consumeForInvoice(ctx context.Context, tx pgx.Tx, scope access.Scope, workOrderID string) error {
+	rows, err := tx.Query(ctx, `
+		SELECT part_id, sum(quantity)
+		FROM work_order_lines
+		WHERE work_order_id = $1 AND part_id IS NOT NULL AND quantity > 0
+		GROUP BY part_id`, workOrderID)
+	if err != nil {
+		return fmt.Errorf("read the job's parts: %w", err)
+	}
+	type use struct {
+		part     string
+		quantity float64
+	}
+	var used []use
+	for rows.Next() {
+		var u use
+		if err := rows.Scan(&u.part, &u.quantity); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan part: %w", err)
+		}
+		used = append(used, u)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(used) == 0 {
+		return nil
+	}
+
+	if err := releaseReservationsForOrder(ctx, tx, workOrderID); err != nil {
+		return err
+	}
+	for _, u := range used {
+		// Nothing here refuses because the shelf would go negative. The car
+		// has left; a negative figure is a symptom to be seen, not a reason to
+		// stop an invoice.
+		if err := moveTx(ctx, tx, scope,
+			Movement{Kind: "consumed", Quantity: -u.quantity}, u.part, workOrderID, ""); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // nextNumber allocates the next number in a series.
 //
