@@ -107,17 +107,33 @@ not exist.
 
 - **No provider ships for vehicle lookup.** Swedish vehicle data comes under an
   agreement that is the shop's to hold. `VEHICLE_LOOKUP_URL` points at whatever
-  a shop has; empty is the default and is not a degraded mode.
+  a shop has; empty is the default and is not a degraded mode. The intake form
+  does not yet know that: it offers "Look the registration up" whether or not
+  a provider is configured, and with none the button does nothing visible.
+
+- **An invoice does not carry the seller's registration details.** `shops` has
+  a name and nothing else -- no address, organisation number, VAT number,
+  payment terms or bank details -- so the rendered document is missing fields a
+  Swedish invoice is legally required to carry. The rendering is there; the
+  columns are not.
 
 - **The translation is partial.** The mechanism is in place and Swedish
-  ships, but only the screens people stand in front of all day are converted:
-  sign-in, the technician's list and job, the counter board, the parts desk,
-  and the customer's page.
-  The administrative screens -- figures, stock, accounting, privacy, the time
-  library -- still carry English literals. A page can therefore declare
-  `lang="sv"` and show English, which is honest about the state and wrong for
-  a screen reader. Converting the rest is mechanical; adding a string without
-  a catalogue key is not acceptable in new work.
+  ships. Converted: the navigation and the role in the header, every work
+  order state, the technician's list and job, the counter board, the parts
+  desk, the customer's page and the invoice document. Still carrying English
+  literals: the bodies of the administrative screens -- figures, stock,
+  accounting, privacy, the time library -- and some headings on the job page.
+  A page can therefore declare `lang="sv"` and show English, which is honest
+  about the state and wrong for a screen reader. Converting the rest is
+  mechanical; adding a string without a catalogue key is not acceptable in
+  new work.
+
+  Two things about *which* language a page picks are not done, and both are
+  the same shape as the customer's page. Sign-in has catalogue keys and
+  renders in `DEFAULT_LOCALE`, because `handleLoginForm` never asks for the
+  shop's language; and a signed-in user whose own `locale` is null falls back
+  to `DEFAULT_LOCALE` rather than to the shop's. A Swedish workshop running
+  with the shipped default therefore reads English at the door.
 
   A shop's own words are never translated and must not be: inspection
   template labels, part names, a technician's note. They go straight onto the
