@@ -342,9 +342,9 @@ func TestNoScreenShowsAStateIdentifier(t *testing.T) {
 	}
 
 	pages := map[string]*http.Client{
-		"/":                 advisor,
-		"/board":            advisor,
-		"/jobs/" + jobA:     advisor,
+		"/":             advisor,
+		"/board":        advisor,
+		"/jobs/" + jobA: advisor,
 		"/vehicles/aaaaaaaa-0000-0000-0000-000000000005": advisor,
 	}
 	for path, client := range pages {

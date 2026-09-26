@@ -35,9 +35,9 @@ type BoardEntry struct {
 	// neither. The front desk needs to tell those apart, because the second
 	// one cannot be invoiced until it is fixed.
 	HasCustomer bool
-	OpenedAt     time.Time
-	PromisedAt   *time.Time
-	ReadyAt      *time.Time
+	OpenedAt    time.Time
+	PromisedAt  *time.Time
+	ReadyAt     *time.Time
 
 	// Who has a clock running on it, if anyone.
 	WorkingNow string
