@@ -43,7 +43,7 @@
     <div class="waiting">
       {{if .OdometerKm}}{{.OdometerKm}} km{{end}}
       {{if .CustomerName}} &middot; {{.CustomerName}}{{end}}
-      {{if .Total}} &middot; {{.Total}}{{end}}
+      {{if .TotalMinor}} &middot; {{$.MoneyOrBlank .TotalMinor}}{{end}}
     </div>
     {{if .PreviousOwner}}
       <div class="waiting">Before the current owner — what was done is shown, who paid and what they paid is not.</div>

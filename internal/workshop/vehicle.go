@@ -175,10 +175,21 @@ type HistoryEntry struct {
 // StateLabel is the condition the job was left in, as a catalogue key.
 func (h HistoryEntry) StateLabel() string { return State(h.State).Label() }
 
-
-// Total renders what the job came to, for a job the viewer may see it for.
-func (h HistoryEntry) Total() string {
+// TotalMinor is what the job came to, and nil where the viewer may not see
+// it: a previous owner's bill is not the new owner's to read. The page formats
+// what it is given and decides nothing.
+func (h HistoryEntry) TotalMinor() *int64 {
 	if h.PreviousOwner || !h.HasInvoice {
+		return nil
+	}
+	gross := h.GrossMinor
+	return &gross
+}
+
+// Total renders what the job came to as a plain decimal, for anything that is
+// not a rendered page.
+func (h HistoryEntry) Total() string {
+	if h.TotalMinor() == nil {
 		return ""
 	}
 	return money.Format(h.GrossMinor)

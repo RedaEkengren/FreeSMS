@@ -49,6 +49,12 @@ type Server struct {
 	// mutex rather than a plain field read at boot.
 	mu       sync.RWMutex
 	resolved string
+
+	// The shop's currency, read when the shop resolves. A workshop does not
+	// change currency while the process is running, so this is not re-read
+	// per page: that would be a query on every render for a value that only
+	// setup can change.
+	resolvedCurrency string
 }
 
 // newLookup returns whatever the configuration asks for, or nothing.
@@ -100,10 +106,28 @@ func (s *Server) shop() string {
 	return s.resolved
 }
 
+func (s *Server) currency() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.resolvedCurrency
+}
+
 func (s *Server) setShop(id string) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.resolved = id
+	s.mu.Unlock()
+
+	// Best effort, and on its own connection: a shop that cannot be read is
+	// already failing louder elsewhere, and a page with no currency symbol is
+	// better than no page.
+	currency, err := workshop.ShopCurrency(context.Background(), s.pool, id)
+	if err != nil {
+		s.log.Warn("read shop currency", "error", err)
+		return
+	}
+	s.mu.Lock()
+	s.resolvedCurrency = currency
+	s.mu.Unlock()
 }
 
 // New returns a Server. It does not listen; that is Run's job.
@@ -122,11 +146,10 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 	if err != nil {
 		return nil, err
 	}
-	return &Server{
+	srv := &Server{
 		pool:             pool,
 		log:              log,
 		release:          cfg.Release,
-		resolved:         shopID,
 		configuredShopID: cfg.ShopID,
 		locale:           cfg.DefaultLocale,
 		photos:           photos,
@@ -139,7 +162,13 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 		// installation that terminates TLS elsewhere. BASE_URL is what the
 		// operator says the service is reached as, so it is the honest source.
 		secureCookies: strings.HasPrefix(cfg.BaseURL, "https://"),
-	}, nil
+	}
+
+	// Through setShop, not by assigning the field: the currency is read at the
+	// same moment, and a second way to resolve a shop is a second way to
+	// forget something that goes with it.
+	srv.setShop(shopID)
+	return srv, nil
 }
 
 func (s *Server) routes() (http.Handler, error) {

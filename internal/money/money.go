@@ -10,6 +10,8 @@
 // the quarter hour. 4.5 litres is 4500.
 package money
 
+import "strings"
+
 // Rounding
 //
 // Two decisions, both of which change totals, so both are written down rather
@@ -175,4 +177,86 @@ func pad2(n int64) string {
 		return "0" + itoa(n)
 	}
 	return itoa(n)
+}
+
+// Display renders an amount for somebody to read, in a language and a
+// currency.
+//
+// Separate from Format, which stays the canonical machine form: it is what
+// goes into a form field that will be posted back and parsed, and the SIE
+// export has its own representation that must not follow a locale. Grouped
+// digits in a hidden input would come back as a parse error, so the two have
+// to be different functions and the call site has to choose.
+//
+// The grouping character is a non-breaking space in the languages that group
+// with a space. An ordinary space lets a browser break "1 234 567,89" across
+// two lines, and half a total on each line is worse than no grouping at all.
+type Display struct {
+	// Group separates thousands, Point is the decimal mark.
+	Group, Point string
+
+	// Currency as the shop writes it, and whether it goes before the number.
+	// Swedish writes "1 295,50 kr"; English writes "SEK 1,295.50".
+	Currency string
+	Prefix   bool
+}
+
+// DisplayFor returns how a language writes money in a currency.
+//
+// Currency is a property of the shop and language is a property of the reader,
+// so they are two arguments. A Swedish workshop invoicing in euro writes
+// "1 295,50 €", and an English-speaking reader of that same shop's screens
+// sees the same currency, not a converted one.
+func DisplayFor(locale, currency string) Display {
+	// Empty means the shop is not resolved yet, which happens only before
+	// setup, when no amount is on screen anyway. Rendering a bare number is
+	// honest; guessing a currency is not.
+	currency = strings.TrimSpace(currency)
+	switch locale {
+	case "sv":
+		symbol := currency
+		if currency == "SEK" {
+			symbol = "kr"
+		}
+		return Display{Group: " ", Point: ",", Currency: symbol}
+	default:
+		return Display{Group: ",", Point: ".", Currency: currency, Prefix: true}
+	}
+}
+
+// Amount renders minor units.
+func (d Display) Amount(minor int64) string {
+	sign := ""
+	if minor < 0 {
+		sign, minor = "-", -minor
+	}
+	// The sign goes in front of the whole thing, currency included. A credit
+	// note reading "SEK -1 295,50" invites the eye to read the minus as part
+	// of the number and the currency as part of the label above it.
+	number := sign + group(itoa(minor/100), d.Group) + d.Point + pad2(minor%100)
+	if d.Currency == "" {
+		return number
+	}
+	if d.Prefix {
+		return d.Currency + " " + number
+	}
+	return number + " " + d.Currency
+}
+
+// group inserts sep every three digits from the right.
+func group(digits, sep string) string {
+	if len(digits) <= 3 || sep == "" {
+		return digits
+	}
+	var b strings.Builder
+	lead := len(digits) % 3
+	if lead == 0 {
+		lead = 3
+	}
+	b.WriteString(digits[:lead])
+	for i := lead; i < len(digits); i += 3 {
+		b.WriteString(sep)
+		b.WriteString(digits[i : i+3])
+	}
+	return b.String()
 }

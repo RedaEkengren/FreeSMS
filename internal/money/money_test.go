@@ -1,6 +1,10 @@
 package money
 
-import "testing"
+import (
+	"strconv"
+	"strings"
+	"testing"
+)
 
 func TestLineNet(t *testing.T) {
 	for _, c := range []struct {
@@ -179,6 +183,75 @@ func TestDivRoundGoesAwayFromZero(t *testing.T) {
 	} {
 		if got := divRound(c.n, c.d); got != c.want {
 			t.Errorf("divRound(%d, %d) = %d, want %d", c.n, c.d, got, c.want)
+		}
+	}
+}
+
+func TestSwedishWritesMoneyTheSwedishWay(t *testing.T) {
+	d := DisplayFor("sv", "SEK")
+	for _, c := range []struct {
+		minor int64
+		want  string
+	}{
+		{0, "0,00 kr"},
+		{50, "0,50 kr"},
+		{129550, "1 295,50 kr"},
+		{123456789, "1 234 567,89 kr"},
+		{100000000, "1 000 000,00 kr"},
+		// The sign goes in front of the whole thing. A credit note reading
+		// "1 295,50 -kr" is nobody's idea of an amount.
+		{-129550, "-1 295,50 kr"},
+	} {
+		if got := d.Amount(c.minor); got != c.want {
+			t.Errorf("Amount(%d) = %q, want %q", c.minor, got, c.want)
+		}
+	}
+}
+
+func TestEnglishWritesMoneyTheOtherWay(t *testing.T) {
+	d := DisplayFor("en", "SEK")
+	if got, want := d.Amount(123456789), "SEK 1,234,567.89"; got != want {
+		t.Errorf("Amount = %q, want %q", got, want)
+	}
+}
+
+// A shop is not required to invoice in the currency of the language it writes
+// in, and nothing here converts anything.
+func TestTheCurrencyIsTheShopsAndNotTheLanguages(t *testing.T) {
+	if got, want := DisplayFor("sv", "EUR").Amount(129550), "1 295,50 EUR"; got != want {
+		t.Errorf("Amount = %q, want %q", got, want)
+	}
+}
+
+// Before setup there is no shop and so no currency. A bare number is honest;
+// inventing kronor is not.
+func TestAnUnknownCurrencyIsNotGuessed(t *testing.T) {
+	if got, want := DisplayFor("sv", "").Amount(129550), "1 295,50"; got != want {
+		t.Errorf("Amount = %q, want %q", got, want)
+	}
+}
+
+// The grouping character must not let a browser break a total across two
+// lines. Half a figure on each line is worse than no grouping at all.
+func TestThousandsAreSeparatedByANonBreakingSpace(t *testing.T) {
+	got := DisplayFor("sv", "SEK").Amount(123456789)
+	if strings.Contains(got, " ") {
+		t.Errorf("Amount = %q contains an ordinary space, which can wrap", got)
+	}
+}
+
+// Format is the machine form and must stay parseable: it goes into form fields
+// that are posted back, and into places that have their own representation.
+func TestFormatStaysAPlainDecimal(t *testing.T) {
+	for _, minor := range []int64{0, 50, 129550, 123456789, -129550} {
+		got := Format(minor)
+		for _, bad := range []string{" ", ",", "kr", "SEK"} {
+			if strings.Contains(got, bad) {
+				t.Errorf("Format(%d) = %q contains %q; a form value would not parse back", minor, got, bad)
+			}
+		}
+		if _, err := strconv.ParseFloat(got, 64); err != nil {
+			t.Errorf("Format(%d) = %q does not parse: %v", minor, got, err)
 		}
 	}
 }

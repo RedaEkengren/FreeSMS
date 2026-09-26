@@ -124,8 +124,12 @@ func TotalsFor(lines []Line) money.Totals {
 	return money.Compute(priced)
 }
 
-// Net is what this line comes to before VAT.
-func (l Line) Net() string { return money.Format(money.LineNet(l.QuantityMilli, l.UnitPriceMinor)) }
+// NetMinor is what this line comes to before VAT. The page formats it; Net
+// stays for the machine form and for anything outside a rendered page.
+func (l Line) NetMinor() int64 { return money.LineNet(l.QuantityMilli, l.UnitPriceMinor) }
+
+// Net is what this line comes to before VAT, as a plain decimal.
+func (l Line) Net() string { return money.Format(l.NetMinor()) }
 
 // Approved reports whether the customer agreed to this line.
 //

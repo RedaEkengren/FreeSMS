@@ -236,3 +236,20 @@ func ShopLocale(ctx context.Context, pool *pgxpool.Pool, shopID string) (string,
 	})
 	return locale, err
 }
+
+// ShopCurrency is the currency the shop invoices in.
+//
+// A property of the shop and not of the reader's language: an English-speaking
+// reader of a Swedish shop's screens sees kronor, not a conversion. Nothing in
+// this system converts between currencies, and nothing should -- a rate has a
+// date, and a document that is frozen cannot carry one that moves.
+func ShopCurrency(ctx context.Context, pool *pgxpool.Pool, shopID string) (string, error) {
+	if shopID == "" {
+		return "", nil
+	}
+	var currency string
+	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT currency FROM shops WHERE id = $1`, shopID).Scan(&currency)
+	})
+	return currency, err
+}

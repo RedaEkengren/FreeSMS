@@ -434,12 +434,18 @@ type PriceBand struct {
 	MarkupBasis int
 }
 
-// UpTo renders the ceiling, or says it is the top band.
+// TopBand reports whether this is the band with no ceiling. The words and the
+// amount are the page's to put together: "up to %s" is a catalogue key and the
+// amount inside it is formatted for the reader, so neither can be built here.
+func (b PriceBand) TopBand() bool { return b.UpToMinor == nil }
+
+// UpTo renders the ceiling as a plain decimal, for anything that is not a
+// rendered page.
 func (b PriceBand) UpTo() string {
 	if b.UpToMinor == nil {
-		return "and above"
+		return ""
 	}
-	return "up to " + money.Format(*b.UpToMinor)
+	return money.Format(*b.UpToMinor)
 }
 
 // Markup renders the percentage.

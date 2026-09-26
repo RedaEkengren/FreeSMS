@@ -101,7 +101,7 @@
   <li>
     <div class="row">
       <span>{{.Description}}</span>
-      <span>{{.Quantity}} &times; {{.Price}} = {{.Net}}</span>
+      <span>{{.Quantity}} &times; {{$.Money .UnitPriceMinor}} = {{$.Money .NetMinor}}</span>
     </div>
     <div>
       {{if not .Approved}}<span class="tag warranty">added after approval</span>{{end}}
@@ -120,7 +120,7 @@
   <li>
     <div class="row">
       <span>{{.Reference}}{{if .IsCreditNote}} &mdash; credit note{{end}}</span>
-      <span>{{.Gross}}</span>
+      <span>{{$.Money .GrossMinor}}</span>
     </div>
     {{if not .IsCreditNote}}
     <form method="post" action="/jobs/{{$.Job.ID}}/credit" style="margin-top:0.5rem">
@@ -142,10 +142,10 @@
 {{if .Lines}}
 <dl class="totals">
   {{range .Totals.Bands}}
-  <dt>VAT {{divide .RateBasisPoints 100}}%</dt><dd>{{fmt .VATMinor}}</dd>
+  <dt>VAT {{divide .RateBasisPoints 100}}%</dt><dd>{{$.Money .VATMinor}}</dd>
   {{end}}
-  <dt>Net</dt><dd>{{fmt .Totals.NetMinor}}</dd>
-  <dt class="grand">Total</dt><dd class="grand">{{fmt .Totals.GrossMinor}}</dd>
+  <dt>Net</dt><dd>{{.Money .Totals.NetMinor}}</dd>
+  <dt class="grand">Total</dt><dd class="grand">{{.Money .Totals.GrossMinor}}</dd>
 </dl>
 {{end}}
 
@@ -201,7 +201,7 @@
     <span class="tag{{if .Negative}} late{{else if .Short}} warranty{{end}}">{{.Available}} {{.Unit}}</span>
   </div>
   <div class="waiting">
-    {{if .Location}}{{.Location}} &middot; {{end}}{{.Price}}
+    {{if .Location}}{{.Location}} &middot; {{end}}{{$.MoneyOrBlank .PriceMinor}}
     {{if le .Available 0.0}} &middot; none on the shelf; this will show as a shortfall{{end}}
   </div>
   <div class="pair" style="margin-top:0.5rem">

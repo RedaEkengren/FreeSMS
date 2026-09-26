@@ -365,3 +365,50 @@ func TestNoScreenShowsAStateIdentifier(t *testing.T) {
 		t.Error("the technician's list shows a state identifier")
 	}
 }
+
+// A form value is posted back and parsed. Locale formatting in one -- a
+// non-breaking space between thousands, a comma for the decimal -- returns as
+// a parse error, so the machine form and the display form have to stay
+// separate and the templates have to pick the right one.
+func TestFormValuesStayMachineReadable(t *testing.T) {
+	ts, _ := testServer(t)
+	advisor := signIn(t, ts, advisorEmail)
+
+	for _, path := range []string{"/jobs/" + jobA, "/labour"} {
+		body := get(t, advisor, ts.URL+path, http.StatusOK)
+		for _, marker := range []string{`value="1 `, "value=\"1 ", `kr"`, `,00"`} {
+			if strings.Contains(body, marker) {
+				t.Errorf("%s has a formatted amount in a form value (%q); it will not parse when posted back", path, marker)
+			}
+		}
+	}
+}
+
+// The reader's language decides the separators. This is the whole point of
+// moving the formatting out of the model.
+func TestAmountsFollowTheReadersLanguage(t *testing.T) {
+	ts, pool := testServer(t)
+	advisor := signIn(t, ts, advisorEmail)
+
+	post(t, advisor, ts.URL+"/jobs/"+jobA+"/lines", url.Values{
+		"kind": {"labour"}, "description": {"Replace front pads"},
+		"quantity": {"2.5"}, "unit_price": {"895.00"}, "vat_rate": {"25"},
+	})
+
+	english := get(t, advisor, ts.URL+"/jobs/"+jobA, http.StatusOK)
+	if !strings.Contains(english, "SEK 2,237.50") {
+		t.Errorf("an English reader does not see a grouped amount with a currency:\n%s", firstLines(english, 5))
+	}
+
+	if err := database.InShop(context.Background(), pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE users SET locale = 'sv' WHERE id = 'aaaaaaaa-0000-0000-0000-00000000000b'`)
+		return err
+	}); err != nil {
+		t.Fatalf("set locale: %v", err)
+	}
+
+	swedish := get(t, signIn(t, ts, advisorEmail), ts.URL+"/jobs/"+jobA, http.StatusOK)
+	if !strings.Contains(swedish, "2 237,50 kr") {
+		t.Errorf("a Swedish reader does not see kronor with a comma:\n%s", firstLines(swedish, 5))
+	}
+}

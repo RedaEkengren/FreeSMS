@@ -12,9 +12,9 @@
 <h2>Invoiced</h2>
 <dl class="totals">
   <dt>Invoices issued</dt><dd>{{.Dashboard.Invoices}}</dd>
-  <dt>Net</dt><dd>{{.Dashboard.Net}}</dd>
-  <dt>Average order</dt><dd>{{.Dashboard.Mean}}</dd>
-  <dt>Middle order</dt><dd>{{.Dashboard.Median}}</dd>
+  <dt>Net</dt><dd>{{$.Money .Dashboard.NetMinor}}</dd>
+  <dt>Average order</dt><dd>{{$.Money .Dashboard.MeanMinor}}</dd>
+  <dt>Middle order</dt><dd>{{$.Money .Dashboard.MedianMinor}}</dd>
 </dl>
 <p class="waiting">Counted by the day the invoice was issued, not the day the
 job was opened. Credit notes are included as the negatives they are.

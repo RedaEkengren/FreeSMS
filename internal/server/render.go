@@ -24,6 +24,10 @@ type pageData struct {
 	// function, because a template function is bound when the template is
 	// parsed and the language is not known until the request.
 	printer *i18n.Printer
+
+	// How this page writes money: the reader's language decides the
+	// separators, the shop's currency decides the symbol.
+	display money.Display
 	Session auth.Session
 	Error   string
 	Email   string
@@ -116,6 +120,22 @@ func (d pageData) T(key string, args ...any) string {
 	return d.printer.T(key, args...)
 }
 
+// Money renders an amount for somebody to read.
+//
+// Templates call this rather than the fmt function, which stays the canonical
+// decimal for a value that will be posted back and parsed. A grouped number in
+// a hidden input returns as a parse error.
+func (d pageData) Money(minor int64) string { return d.display.Amount(minor) }
+
+// MoneyOrBlank renders an optional amount, and nothing at all when there is
+// none. A part with no price set has no price, which is not the same as zero.
+func (d pageData) MoneyOrBlank(minor *int64) string {
+	if minor == nil {
+		return ""
+	}
+	return d.display.Amount(*minor)
+}
+
 // N renders a message with a count, choosing the plural form.
 func (d pageData) N(key string, count int, args ...any) string {
 	if d.printer == nil {
@@ -159,6 +179,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 		data.Locale = s.localeFor(data.Session)
 	}
 	data.printer = s.catalogues.For(data.Locale)
+	data.display = money.DisplayFor(data.Locale, s.currency())
 
 	buf := newBuffer()
 	defer releaseBuffer(buf)

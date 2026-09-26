@@ -8,7 +8,7 @@ wrongly ordered parts cost.</p>
 <h2>Written off this month</h2>
 <ul class="lines">
   {{range .WriteOffs}}
-  <li><div class="row"><span>{{.Label}}</span><span class="tag late">{{.Cost}}</span></div>
+  <li><div class="row"><span>{{.Label}}</span><span class="tag late">{{$.Money .CostMinor}}</span></div>
       <div class="waiting">{{.Quantity}} units</div></li>
   {{end}}
 </ul>
@@ -29,7 +29,7 @@ wrongly ordered parts cost.</p>
   <div class="waiting">
     {{if ne .Reserved 0.0}}{{.Reserved}} reserved &middot; {{.Available}} available{{end}}
     {{if .Location}} &middot; {{.Location}}{{end}}
-    {{if .Price}} &middot; {{.Price}}{{end}}
+    {{if .PriceMinor}} &middot; {{$.MoneyOrBlank .PriceMinor}}{{end}}
   </div>
   {{if .Negative}}<div class="waiting">Less than nothing on the shelf — something was fitted that was never booked in.</div>{{end}}
   {{if .Short}}<div class="waiting">At or below the minimum.</div>{{end}}
@@ -65,7 +65,7 @@ wrongly ordered parts cost.</p>
 {{if .PriceBands}}
 <ul class="lines">
   {{range .PriceBands}}
-  <li><div class="row"><span>{{.UpTo}}</span><span class="tag">{{.Markup}}</span></div></li>
+  <li><div class="row"><span>{{if .TopBand}}{{$.T "and above"}}{{else}}{{$.T "up to %s" ($.MoneyOrBlank .UpToMinor)}}{{end}}</span><span class="tag">{{.Markup}}</span></div></li>
   {{end}}
 </ul>
 {{else}}
