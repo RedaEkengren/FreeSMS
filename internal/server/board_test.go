@@ -412,3 +412,42 @@ func TestAmountsFollowTheReadersLanguage(t *testing.T) {
 		t.Errorf("a Swedish reader does not see kronor with a comma:\n%s", firstLines(swedish, 5))
 	}
 }
+
+// The document has to be reachable and has to be refused, both by HTTP.
+func TestAnIssuedInvoiceCanBeLookedAt(t *testing.T) {
+	ts, _ := testServer(t)
+	advisor := signIn(t, ts, advisorEmail)
+
+	post(t, advisor, ts.URL+"/jobs/"+jobA+"/lines", url.Values{
+		"kind": {"labour"}, "description": {"Replace front pads"},
+		"quantity": {"2.5"}, "unit_price": {"895.00"}, "vat_rate": {"25"},
+	})
+	for _, state := range []string{"estimated", "awaiting_approval", "approved", "in_progress", "ready"} {
+		post(t, advisor, ts.URL+"/jobs/"+jobA+"/state", url.Values{"state": {state}})
+	}
+	post(t, advisor, ts.URL+"/jobs/"+jobA+"/invoice", url.Values{})
+
+	// The job page links it rather than printing a reference and nothing else.
+	job := get(t, advisor, ts.URL+"/jobs/"+jobA, http.StatusOK)
+	i := strings.Index(job, `href="/invoices/`)
+	if i < 0 {
+		t.Fatalf("the job page does not link the invoice it just issued:\n%s", firstLines(job, 40))
+	}
+	rest := job[i+len(`href="`):]
+	link := rest[:strings.IndexByte(rest, '"')]
+
+	doc := get(t, advisor, ts.URL+link, http.StatusOK)
+	for _, want := range []string{"A-1", customerName, "Replace front pads", "SEK\u00a02,237.50"} {
+		if !strings.Contains(doc, want) {
+			t.Errorf("the invoice does not show %q:\n%s", want, firstLines(doc, 60))
+		}
+	}
+
+	// A technician with the link in hand is refused by the read, not by a
+	// template that leaves the prices out.
+	tech := signIn(t, ts, techEmail)
+	refusal := get(t, tech, ts.URL+link, http.StatusForbidden)
+	if strings.Contains(refusal, customerName) || strings.Contains(refusal, "2,237.50") {
+		t.Error("the refusal page leaked the invoice")
+	}
+}

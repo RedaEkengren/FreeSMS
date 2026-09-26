@@ -33,11 +33,17 @@
     "Back": {
       "other": "Tillbaka"
     },
+    "Back to the job": {
+      "other": "Tillbaka till jobbet"
+    },
     "Being worked on": {
       "other": "Under arbete"
     },
     "Being written up": {
       "other": "Skrivs upp"
+    },
+    "Billed to": {
+      "other": "Faktureras till"
     },
     "Cancel it": {
       "other": "Avbeställ den"
@@ -51,11 +57,29 @@
     "Closed": {
       "other": "Avslutad"
     },
+    "Company number": {
+      "other": "Organisationsnummer"
+    },
+    "Credit it": {
+      "other": "Kreditera den"
+    },
+    "Credit note": {
+      "other": "Kreditnota"
+    },
+    "Credited by %s": {
+      "other": "Krediterad av %s"
+    },
+    "Credits %s": {
+      "other": "Krediterar %s"
+    },
     "Declined": {
       "other": "Nekad"
     },
     "Declined — still needs invoicing": {
       "other": "Nekad — ska fortfarande faktureras"
+    },
+    "Documents": {
+      "other": "Dokument"
     },
     "Email": {
       "other": "E-post"
@@ -81,11 +105,17 @@
     "Inspections": {
       "other": "Kontroller"
     },
+    "Invoice": {
+      "other": "Faktura"
+    },
     "Invoice it": {
       "other": "Fakturera den"
     },
     "Invoiced": {
       "other": "Fakturerad"
+    },
+    "Issued by %s": {
+      "other": "Utställd av %s"
     },
     "It has arrived": {
       "other": "Den har kommit"
@@ -107,6 +137,9 @@
     },
     "My hours": {
       "other": "Mina timmar"
+    },
+    "Net": {
+      "other": "Netto"
     },
     "No customer recorded yet": {
       "other": "Ingen kund noterad än"
@@ -155,6 +188,9 @@
     },
     "Priced, not sent": {
       "other": "Prissatt, inte skickad"
+    },
+    "Print": {
+      "other": "Skriv ut"
     },
     "Privacy": {
       "other": "Personuppgifter"
@@ -237,12 +273,24 @@
     "Too many attempts. Wait a few minutes and try again.": {
       "other": "För många försök. Vänta några minuter och försök igen."
     },
+    "Total": {
+      "other": "Summa"
+    },
     "Try again shortly.": {
       "other": "Försök igen om en stund."
     },
     "Uncollected for %d day": {
       "one": "Ohämtad i %d dag",
       "other": "Ohämtad i %d dagar"
+    },
+    "VAT": {
+      "other": "Moms"
+    },
+    "VAT number": {
+      "other": "Momsregistreringsnummer"
+    },
+    "Vehicle": {
+      "other": "Fordon"
     },
     "Waiting for %d part": {
       "one": "Väntar på %d del",
@@ -274,6 +322,9 @@
     },
     "checked by %s at %s": {
       "other": "kontrollerad av %s hos %s"
+    },
+    "credit note": {
+      "other": "kreditnota"
     },
     "done": {
       "other": "klar"

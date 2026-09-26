@@ -220,3 +220,34 @@ func (s *Server) handleCreditNote(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, "/jobs/"+jobID, http.StatusSeeOther)
 }
+
+// handleInvoice renders an issued document.
+//
+// There is no PDF, and there is deliberately no stored file: the rows are
+// frozen, so rendering them is deterministic and a file would be a cache of
+// something that cannot change. The browser's own print is how this becomes
+// paper, which is why the stylesheet has a print block.
+func (s *Server) handleInvoiceDocument(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+
+	doc, err := workshop.DocumentByID(r.Context(), s.pool, session.Scope, r.PathValue("id"))
+	switch {
+	case errors.Is(err, access.ErrForbidden):
+		s.renderError(w, r, http.StatusForbidden, "Not for your role",
+			"An invoice is the front desk's business.")
+		return
+	case errors.Is(err, workshop.ErrNotFound):
+		s.renderError(w, r, http.StatusNotFound, "Not found", "No such invoice.")
+		return
+	case err != nil:
+		s.log.Error("read invoice", "error", err)
+		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		return
+	}
+
+	s.render(w, r, http.StatusOK, "invoice", pageData{
+		Title:    doc.Reference(),
+		Session:  session,
+		Document: doc,
+	})
+}

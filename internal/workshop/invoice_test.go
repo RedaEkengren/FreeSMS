@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 	"github.com/jackc/pgx/v5"
@@ -230,5 +231,160 @@ func TestAnOrderCannotBeInvoicedTwice(t *testing.T) {
 	}
 	if _, err := workshop.Issue(ctx, pool, advisor(), id); !errors.Is(err, workshop.ErrAlreadyInvoiced) {
 		t.Fatalf("second Issue = %v, want ErrAlreadyInvoiced", err)
+	}
+}
+
+// The document is read back from the frozen rows, never from the work order.
+// A second visit is a second job on the same order, and reading the order
+// would make an invoice that changes after it was sent.
+func TestTheDocumentDoesNotFollowTheWorkOrder(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	id := readyToInvoice(t, pool)
+
+	inv, err := workshop.Issue(ctx, pool, advisor(), id)
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+
+	before, err := workshop.DocumentByID(ctx, pool, advisor(), inv.ID)
+	if err != nil {
+		t.Fatalf("DocumentByID: %v", err)
+	}
+
+	// The work order's own rows move. The state machine refuses invoiced ->
+	// in_progress, so this is not a path a user has today -- which is exactly
+	// why it is done in SQL: the test is about which table the document reads,
+	// not about which route happens to be open this month.
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx,
+			`UPDATE work_order_lines
+			    SET unit_price_minor = unit_price_minor * 10,
+			        description = 'Rewritten after the invoice'
+			  WHERE work_order_id = $1`, id)
+		return err
+	}); err != nil {
+		t.Fatalf("move the work order: %v", err)
+	}
+
+	after, err := workshop.DocumentByID(ctx, pool, advisor(), inv.ID)
+	if err != nil {
+		t.Fatalf("DocumentByID: %v", err)
+	}
+	if len(after.Lines) != len(before.Lines) {
+		t.Errorf("the document went from %d lines to %d; it is reading the work order",
+			len(before.Lines), len(after.Lines))
+	}
+	if after.GrossMinor != before.GrossMinor {
+		t.Errorf("the document's total moved from %d to %d after it was issued",
+			before.GrossMinor, after.GrossMinor)
+	}
+	for _, l := range after.Lines {
+		if l.Description == "Rewritten after the invoice" {
+			t.Error("the issued document shows a line the work order changed afterwards")
+		}
+		if l.NetMinor*10 == l.UnitPriceMinor {
+			t.Error("the issued document picked up a price the work order changed afterwards")
+		}
+	}
+}
+
+// A job can carry two rates -- twenty-five per cent on the work and twelve on
+// something else -- and the document has to show the split.
+func TestTheDocumentGroupsVATByRate(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	id := newJob(t, pool)
+
+	for _, l := range []workshop.NewLine{
+		{Kind: "labour", Description: "Work", QuantityMilli: 1000,
+			UnitPriceMinor: 100000, VATRateBasis: 2500},
+		{Kind: "part", Description: "Something at twelve", QuantityMilli: 1000,
+			UnitPriceMinor: 50000, VATRateBasis: 1200},
+	} {
+		if err := workshop.AddLine(ctx, pool, advisor(), id, l); err != nil {
+			t.Fatalf("AddLine: %v", err)
+		}
+	}
+	move(t, pool, id, workshop.StateEstimated, workshop.StateAwaitingApproval,
+		workshop.StateApproved, workshop.StateInProgress, workshop.StateReady)
+
+	inv, err := workshop.Issue(ctx, pool, advisor(), id)
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	doc, err := workshop.DocumentByID(ctx, pool, advisor(), inv.ID)
+	if err != nil {
+		t.Fatalf("DocumentByID: %v", err)
+	}
+	if len(doc.Bands) != 2 {
+		t.Fatalf("%d VAT bands, want 2: %+v", len(doc.Bands), doc.Bands)
+	}
+	// Ordered by rate, so the document reads the same way every time.
+	if doc.Bands[0].RateBasisPoints != 1200 || doc.Bands[1].RateBasisPoints != 2500 {
+		t.Errorf("bands are not in rate order: %+v", doc.Bands)
+	}
+	var vat int64
+	for _, b := range doc.Bands {
+		vat += b.VATMinor
+	}
+	if vat != doc.VATMinor {
+		t.Errorf("the bands sum to %d and the document says %d", vat, doc.VATMinor)
+	}
+}
+
+// A credit note is an invoice and renders through the same view. Both halves
+// name the other.
+func TestACreditNoteAndItsInvoicePointAtEachOther(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	id := readyToInvoice(t, pool)
+
+	inv, err := workshop.Issue(ctx, pool, advisor(), id)
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	note, err := workshop.CreditNote(ctx, pool, advisor(), inv.ID)
+	if err != nil {
+		t.Fatalf("CreditNote: %v", err)
+	}
+
+	doc, err := workshop.DocumentByID(ctx, pool, advisor(), note.ID)
+	if err != nil {
+		t.Fatalf("DocumentByID(note): %v", err)
+	}
+	if !doc.IsCreditNote() {
+		t.Error("the credit note does not know it is one")
+	}
+	if doc.CreditOf != inv.Reference() {
+		t.Errorf("the note credits %q, want %q", doc.CreditOf, inv.Reference())
+	}
+	if doc.GrossMinor >= 0 {
+		t.Errorf("the note's total is %d; a credit note is negative", doc.GrossMinor)
+	}
+
+	original, err := workshop.DocumentByID(ctx, pool, advisor(), inv.ID)
+	if err != nil {
+		t.Fatalf("DocumentByID(invoice): %v", err)
+	}
+	if len(original.CreditedBy) != 1 || original.CreditedBy[0] != note.Reference() {
+		t.Errorf("the invoice does not say it was credited: %v", original.CreditedBy)
+	}
+}
+
+// Authorisation is on the read. A technician with an invoice id in hand is
+// refused by the function that would fetch it, not by a template.
+func TestATechnicianCannotReadAnInvoice(t *testing.T) {
+	pool := setup(t)
+	addTechnician(t, pool)
+	ctx := context.Background()
+	id := readyToInvoice(t, pool)
+
+	inv, err := workshop.Issue(ctx, pool, advisor(), id)
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	if _, err := workshop.DocumentByID(ctx, pool, technician(), inv.ID); !errors.Is(err, access.ErrForbidden) {
+		t.Errorf("DocumentByID as a technician = %v, want ErrForbidden", err)
 	}
 }

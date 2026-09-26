@@ -1,0 +1,52 @@
+{{define "content"}}
+{{with .Document}}
+<article class="document">
+  <div class="row">
+    <div>
+      <h1>{{if .IsCreditNote}}{{$.T "Credit note"}}{{else}}{{$.T "Invoice"}}{{end}} {{.Reference}}</h1>
+      <div class="waiting">{{.ShopName}}</div>
+    </div>
+    <div class="waiting">{{.IssuedAt.Format "2 Jan 2006"}}</div>
+  </div>
+
+  {{/* Both halves point at the other. A document that has been reversed and
+       does not say so is a document somebody chases. */}}
+  {{if .CreditOf}}<p class="waiting">{{$.T "Credits %s" .CreditOf}}</p>{{end}}
+  {{range .CreditedBy}}<p class="waiting">{{$.T "Credited by %s" .}}</p>{{end}}
+
+  <h2>{{$.T "Billed to"}}</h2>
+  <div>{{.CustomerName}}</div>
+  {{if .CustomerAddress}}<div class="waiting">{{.CustomerAddress}}</div>{{end}}
+  {{if .CustomerOrgNumber}}<div class="waiting">{{$.T "Company number"}} {{.CustomerOrgNumber}}</div>{{end}}
+  {{if .CustomerVATNumber}}<div class="waiting">{{$.T "VAT number"}} {{.CustomerVATNumber}}</div>{{end}}
+  {{if .Registration}}<div class="waiting">{{$.T "Vehicle"}} {{.Registration}}</div>{{end}}
+
+  <h2>{{$.T "Lines"}}</h2>
+  <ul class="lines">
+    {{range .Lines}}
+    <li>
+      <div class="row">
+        <span>{{.Description}}</span>
+        <span>{{.Quantity}} &times; {{$.Money .UnitPriceMinor}} = {{$.Money .NetMinor}}</span>
+      </div>
+    </li>
+    {{end}}
+  </ul>
+
+  <dl class="totals">
+    {{range .Bands}}
+    <dt>{{$.T "VAT"}} {{divide .RateBasisPoints 100}}%</dt><dd>{{$.Money .VATMinor}}</dd>
+    {{end}}
+    <dt>{{$.T "Net"}}</dt><dd>{{$.Money .NetMinor}}</dd>
+    <dt class="grand">{{$.T "Total"}}</dt><dd class="grand">{{$.Money .GrossMinor}}</dd>
+  </dl>
+
+  {{if .IssuedBy}}<p class="waiting">{{$.T "Issued by %s" .IssuedBy}}</p>{{end}}
+</article>
+
+<div class="no-print">
+  <button type="button" class="secondary" data-print>{{$.T "Print"}}</button>
+  <p style="margin-top:1.5rem"><a href="/jobs/{{.WorkOrderID}}">{{$.T "Back to the job"}}</a></p>
+</div>
+{{end}}
+{{end}}

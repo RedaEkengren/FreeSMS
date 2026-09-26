@@ -242,9 +242,17 @@ form.scan input { font-family: ui-monospace, Menlo, monospace; font-size: 1.125r
 .label .code { font-family: ui-monospace, Menlo, monospace; font-weight: 700; letter-spacing: 0.05em; }
 .label .name { font-size: 0.75rem; }
 
+/* An issued invoice. Plain, because it is a document somebody hands over or
+   prints, not a screen with actions on it. */
+.document { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1rem; }
+.document h1 { margin-bottom: 0.25rem; }
+.document ul.lines li .row span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
 @media print {
   header, .no-print, nav { display: none !important; }
   main { padding: 0; max-width: none; }
+  /* The border and the fill are screen furniture; on paper they are toner. */
+  .document { border: none; padding: 0; background: none; }
   .label { break-inside: avoid; }
 }
 

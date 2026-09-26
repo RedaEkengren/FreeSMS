@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
@@ -429,4 +431,194 @@ func writeInvoiceLines(ctx context.Context, tx pgx.Tx, shopID, invoiceID string,
 		}
 	}
 	return nil
+}
+
+// Document is an issued invoice as it is read back: the frozen header, the
+// frozen lines, and the shop that issued it.
+//
+// Every figure here comes from invoices and invoice_lines, never from the work
+// order. The order can be added to after the invoice is issued -- that is
+// ordinary, a second visit is a second job on the same car -- and reading it
+// would make a document that changes after it was sent. Freezing the rows is
+// the whole point; reading the wrong table throws it away.
+type Document struct {
+	Invoice
+
+	// The shop's own details, as it is called today. Not frozen, because a
+	// workshop that changes its name has not changed who issued the invoice.
+	ShopName string
+	Currency string
+
+	// The customer as they were when it was issued. An address typed over
+	// later does not rewrite what was sent.
+	CustomerAddress   string
+	CustomerOrgNumber string
+	CustomerVATNumber string
+
+	IssuedBy string
+	Lines    []DocumentLine
+	Bands    []money.VATBand
+
+	// Set on a credit note, and on an invoice that has been credited: both
+	// halves need to point at the other, because a document that has been
+	// reversed and does not say so is a document somebody chases.
+	CreditOf   string
+	CreditedBy []string
+
+	Registration string
+}
+
+// DocumentLine is one frozen line.
+type DocumentLine struct {
+	Position       int
+	Kind           string
+	Description    string
+	QuantityMilli  int64
+	UnitPriceMinor int64
+	VATRateBasis   int
+	NetMinor       int64
+	VATMinor       int64
+}
+
+// Quantity renders thousandths the way a work order line does.
+func (l DocumentLine) Quantity() string {
+	return Line{QuantityMilli: l.QuantityMilli}.Quantity()
+}
+
+// DocumentByID reads an issued invoice.
+//
+// The role check is here and not in the handler. A technician asking for an
+// invoice id by hand is refused by the function that would fetch it, which is
+// the rule this whole system is arranged around: a handler must not be able to
+// read a row it may not show.
+func DocumentByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id string) (Document, error) {
+	if !scope.Role.SeesCustomerPersonalData() {
+		return Document{}, access.ErrForbidden
+	}
+
+	var d Document
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var creditOf *string
+		var issuedBy, address, org, vat *string
+		err := tx.QueryRow(ctx, `
+			SELECT i.id, i.series, i.number, i.work_order_id, i.credit_of_id, i.issued_at,
+			       i.customer_name, i.customer_address, i.customer_org_number,
+			       i.customer_vat_number, i.currency,
+			       i.net_minor, i.vat_minor, i.gross_minor,
+			       s.name, p.display_name,
+			       coalesce(r.registration, '')
+			FROM invoices i
+			JOIN shops s ON s.id = i.shop_id
+			LEFT JOIN users u ON u.id = i.issued_by
+			LEFT JOIN people p ON p.id = u.person_id
+			LEFT JOIN work_orders w ON w.id = i.work_order_id
+			LEFT JOIN vehicle_registrations r
+			       ON r.vehicle_id = w.vehicle_id AND r.valid_to IS NULL
+			WHERE i.id = $1`, id).
+			Scan(&d.ID, &d.Series, &d.Number, &d.WorkOrderID, &creditOf, &d.IssuedAt,
+				&d.CustomerName, &address, &org, &vat, &d.Currency,
+				&d.NetMinor, &d.VATMinor, &d.GrossMinor,
+				&d.ShopName, &issuedBy, &d.Registration)
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Not visible under this shop's policy is the same answer as not
+			// existing. A different answer tells the caller a document exists
+			// somewhere they cannot see.
+			return ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("read invoice: %w", err)
+		}
+		d.CreditOfID = creditOf
+		d.CustomerAddress = deref(address)
+		d.CustomerOrgNumber = deref(org)
+		d.CustomerVATNumber = deref(vat)
+		d.IssuedBy = deref(issuedBy)
+		d.Currency = strings.TrimSpace(d.Currency)
+
+		if creditOf != nil {
+			if err := tx.QueryRow(ctx,
+				`SELECT series || '-' || number FROM invoices WHERE id = $1`, *creditOf).
+				Scan(&d.CreditOf); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("read credited invoice: %w", err)
+			}
+		}
+		credited, err := tx.Query(ctx,
+			`SELECT series || '-' || number FROM invoices
+			  WHERE credit_of_id = $1 ORDER BY number`, id)
+		if err != nil {
+			return fmt.Errorf("read credit notes: %w", err)
+		}
+		for credited.Next() {
+			var ref string
+			if err := credited.Scan(&ref); err != nil {
+				credited.Close()
+				return fmt.Errorf("scan credit note: %w", err)
+			}
+			d.CreditedBy = append(d.CreditedBy, ref)
+		}
+		credited.Close()
+		if err := credited.Err(); err != nil {
+			return err
+		}
+
+		rows, err := tx.Query(ctx, `
+			SELECT position, kind, description,
+			       (quantity * 1000)::bigint, unit_price_minor, vat_rate_bp,
+			       net_minor, vat_minor
+			FROM invoice_lines WHERE invoice_id = $1 ORDER BY position`, id)
+		if err != nil {
+			return fmt.Errorf("read invoice lines: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var l DocumentLine
+			if err := rows.Scan(&l.Position, &l.Kind, &l.Description,
+				&l.QuantityMilli, &l.UnitPriceMinor, &l.VATRateBasis,
+				&l.NetMinor, &l.VATMinor); err != nil {
+				return fmt.Errorf("scan invoice line: %w", err)
+			}
+			d.Lines = append(d.Lines, l)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return Document{}, err
+	}
+
+	// VAT per rate, because a job can carry two: a Swedish workshop charges 25
+	// per cent on the work and can carry a 12 or 6 per cent line. Summed from
+	// the frozen lines rather than recomputed from quantities and prices,
+	// which would let a change to the rounding rule alter a document that has
+	// already been sent.
+	d.Bands = bandsFrom(d.Lines)
+	return d, nil
+}
+
+// bandsFrom groups the frozen line amounts by rate, in rate order.
+func bandsFrom(lines []DocumentLine) []money.VATBand {
+	byRate := map[int]*money.VATBand{}
+	var rates []int
+	for _, l := range lines {
+		b, ok := byRate[l.VATRateBasis]
+		if !ok {
+			b = &money.VATBand{RateBasisPoints: l.VATRateBasis}
+			byRate[l.VATRateBasis] = b
+			rates = append(rates, l.VATRateBasis)
+		}
+		b.NetMinor += l.NetMinor
+		b.VATMinor += l.VATMinor
+	}
+	sort.Ints(rates)
+	out := make([]money.VATBand, 0, len(rates))
+	for _, r := range rates {
+		out = append(out, *byRate[r])
+	}
+	return out
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
