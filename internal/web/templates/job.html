@@ -22,6 +22,16 @@
   {{if .Job.AssignedTo}}<dt>{{.T "On it"}}</dt><dd>{{.Job.AssignedTo}}</dd>{{end}}
 </dl>
 
+{{if .Contact.Known}}
+<h2>{{.T "Customer"}}</h2>
+<div class="waiting">{{.Contact.Name}}</div>
+{{if .Contact.Phone}}<div><a href="tel:{{.Contact.Phone}}">{{.Contact.Phone}}</a></div>{{end}}
+{{if .Contact.Email}}<div class="waiting">{{.Contact.Email}}</div>{{end}}
+{{else if .Session.Scope.Role.SeesCustomerPersonalData}}
+<h2>{{.T "Customer"}}</h2>
+<p class="waiting">{{.T "No customer recorded yet"}}</p>
+{{end}}
+
 {{if .Next}}
 <h2>{{.T "Move it along"}}</h2>
 <div class="actions">
@@ -209,10 +219,7 @@
     <span>{{.Number}} &middot; {{.Name}}</span>
     <span class="tag{{if .Negative}} late{{else if .Short}} warranty{{end}}">{{.Available}} {{.Unit}}</span>
   </div>
-  <div class="waiting">
-    {{if .Location}}{{.Location}} &middot; {{end}}{{$.MoneyOrBlank .PriceMinor}}
-    {{if le .Available 0.0}} &middot; none on the shelf; this will show as a shortfall{{end}}
-  </div>
+  <div class="waiting">{{$.Dot .Location ($.MoneyOrBlank .PriceMinor) ($.T .ShortfallNote)}}</div>
   <div class="pair" style="margin-top:0.5rem">
     <label><span>How many</span><input name="quantity" value="1" inputmode="decimal"></label>
     <label><span>&nbsp;</span><button type="submit" class="secondary">Put it on the order</button></label>

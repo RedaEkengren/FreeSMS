@@ -52,7 +52,11 @@ func (s *Server) handleNewJobForm(w http.ResponseWriter, r *http.Request) {
 			"Taking a vehicle in is done at the front desk.")
 		return
 	}
-	s.render(w, r, http.StatusOK, "newjob", pageData{Title: "Take in a vehicle", Session: session})
+	s.render(w, r, http.StatusOK, "newjob", pageData{
+		Title:     "Take in a vehicle",
+		Session:   session,
+		CanLookUp: s.canLookUp(),
+	})
 }
 
 func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {

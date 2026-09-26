@@ -26,11 +26,7 @@ wrongly ordered parts cost.</p>
       {{.OnHand}} {{.Unit}}
     </span>
   </div>
-  <div class="waiting">
-    {{if ne .Reserved 0.0}}{{.Reserved}} reserved &middot; {{.Available}} available{{end}}
-    {{if .Location}} &middot; {{.Location}}{{end}}
-    {{if .PriceMinor}} &middot; {{$.MoneyOrBlank .PriceMinor}}{{end}}
-  </div>
+  <div class="waiting">{{$.Dot ($.T .ReservedNote .Reserved .Available) .Location ($.MoneyOrBlank .PriceMinor)}}</div>
   {{if .Negative}}<div class="waiting">Less than nothing on the shelf — something was fitted that was never booked in.</div>{{end}}
   {{if .Short}}<div class="waiting">At or below the minimum.</div>{{end}}
 

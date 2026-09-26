@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/auth"
@@ -40,6 +41,7 @@ type pageData struct {
 	Totals   money.Totals
 	Invoices []workshop.Invoice
 	Document workshop.Document
+	Contact  workshop.Contact
 	Requests []workshop.PartRequest
 	Findings []workshop.Finding
 
@@ -77,7 +79,13 @@ type pageData struct {
 	PeriodTo    time.Time
 	Lookup      vehicledata.Vehicle
 	LookupNote  string
-	Form        intakeForm
+
+	// Whether a vehicle lookup provider is configured at all. Empty is the
+	// default and is not a degraded mode -- a shop without an arrangement
+	// types what it knows -- so the intake form must not offer a button that
+	// cannot do anything.
+	CanLookUp bool
+	Form      intakeForm
 
 	// Setup only.
 	MinPassword int
@@ -115,7 +123,7 @@ var templateFuncs = template.FuncMap{
 // catalogue going missing, and a string nobody has translated still says
 // something sensible.
 func (d pageData) T(key string, args ...any) string {
-	if d.printer == nil {
+	if key == "" || d.printer == nil {
 		return key
 	}
 	return d.printer.T(key, args...)
@@ -135,6 +143,24 @@ func (d pageData) MoneyOrBlank(minor *int64) string {
 		return ""
 	}
 	return d.display.Amount(*minor)
+}
+
+// Dot joins the parts that are there, separated, and leaves out the ones that
+// are not.
+//
+// Three screens printed a separator alongside the field after it rather than
+// between two fields that both exist, which put "· Shelf A2" on the stock page
+// when nothing was reserved, "Shelf A2 ·" on the job page when the part had no
+// price, and "Floor E · ·" when both were missing at once. A separator belongs
+// between things, so something has to know how many things there are.
+func (d pageData) Dot(parts ...string) string {
+	kept := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			kept = append(kept, p)
+		}
+	}
+	return strings.Join(kept, " \u00b7 ")
 }
 
 // N renders a message with a count, choosing the plural form.
@@ -177,7 +203,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 		return
 	}
 	if data.Locale == "" {
-		data.Locale = s.localeFor(data.Session)
+		data.Locale = s.localeFor(r, data.Session)
 	}
 	data.printer = s.catalogues.For(data.Locale)
 	data.display = money.DisplayFor(data.Locale, s.currency())
@@ -204,9 +230,10 @@ func (s *Server) renderPartial(w http.ResponseWriter, r *http.Request, page, blo
 		return
 	}
 	if data.Locale == "" {
-		data.Locale = s.localeFor(data.Session)
+		data.Locale = s.localeFor(r, data.Session)
 	}
 	data.printer = s.catalogues.For(data.Locale)
+	data.display = money.DisplayFor(data.Locale, s.currency())
 	buf := newBuffer()
 	defer releaseBuffer(buf)
 

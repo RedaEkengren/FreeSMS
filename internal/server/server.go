@@ -74,11 +74,18 @@ func newLookup(cfg *config.Config) vehicledata.Lookup {
 
 // localeFor resolves the language for a request: the person's, then the
 // shop's, then the fallback.
-func (s *Server) localeFor(session auth.Session) string {
+func (s *Server) localeFor(r *http.Request, session auth.Session) string {
 	if session.Locale != "" {
 		return session.Locale
 	}
-	return s.locale
+	// The shop's language, not DEFAULT_LOCALE. A user who has never opened a
+	// setting -- which is most of them -- and a page with nobody signed in
+	// both belong to the shop, and a Swedish workshop running with the shipped
+	// default was reading English at the door.
+	//
+	// The query only happens on this path, so a user who has chosen a language
+	// costs nothing, and a user who has not costs one row by primary key.
+	return s.shopLocale(r)
 }
 
 // shopLocale is the language for a page with nobody signed in.
@@ -169,6 +176,16 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 	// forget something that goes with it.
 	srv.setShop(shopID)
 	return srv, nil
+}
+
+// canLookUp reports whether a registration lookup provider is configured.
+//
+// Asked of the value rather than of the configuration, so there is one answer:
+// newLookup is the only place that decides, and a second reading of the
+// environment is a second thing to keep in step with it.
+func (s *Server) canLookUp() bool {
+	_, none := s.vehicleLookup.(vehicledata.None)
+	return !none
 }
 
 func (s *Server) routes() (http.Handler, error) {

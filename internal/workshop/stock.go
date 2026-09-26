@@ -69,6 +69,27 @@ func (p Part) Short() bool { return p.Minimum > 0 && p.Available() <= p.Minimum 
 // reappear on the shelf, it just moves the discrepancy somewhere nobody looks.
 func (p Part) Negative() bool { return p.OnHand < 0 }
 
+// ReservedNote is the catalogue key for what is spoken for, and empty when
+// nothing is. A key rather than a finished sentence, so the numbers are
+// substituted by the page in the reader's language; empty rather than a
+// condition in the template, so the page can join the facts it has without
+// knowing which of them exist.
+func (p Part) ReservedNote() string {
+	if p.Reserved == 0 {
+		return ""
+	}
+	return "%v reserved \u00b7 %v available"
+}
+
+// ShortfallNote is the catalogue key warning that putting this part on a job
+// will take the shelf below nothing, and empty when it will not.
+func (p Part) ShortfallNote() string {
+	if p.Available() > 0 {
+		return ""
+	}
+	return "none on the shelf; this will show as a shortfall"
+}
+
 // Cost and Price render the money.
 func (p Part) Cost() string {
 	if p.CostMinor == nil {

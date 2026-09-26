@@ -141,10 +141,17 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 	// Only the front desk sees documents; a technician has no use for them
 	// and they carry the customer's name.
 	var invoices []workshop.Invoice
+	var contact workshop.Contact
 	if session.Scope.Role.SeesCustomerPersonalData() {
 		invoices, err = workshop.InvoicesFor(r.Context(), s.pool, session.Scope, id)
 		if err != nil {
 			s.log.Error("read invoices", "error", err)
+		}
+		// Who to ring. The board carries the name and the job did not, so a
+		// front desk reading a job had nobody to call about it.
+		contact, err = workshop.ContactFor(r.Context(), s.pool, session.Scope, id)
+		if err != nil {
+			s.log.Error("read contact", "error", err)
 		}
 	}
 
@@ -156,6 +163,7 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		Next:        stateChoices(session.Scope.Role, workshop.State(job.State), job.HasWork),
 		Totals:      workshop.TotalsFor(lines),
 		Invoices:    invoices,
+		Contact:     contact,
 		Requests:    requests,
 		Findings:    findings,
 		Inspections: inspections,

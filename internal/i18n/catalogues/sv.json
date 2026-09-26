@@ -12,6 +12,9 @@
     "%s is on it": {
       "other": "%s jobbar på den"
     },
+    "%v reserved · %v available": {
+      "other": "%v reserverade · %v tillgängliga"
+    },
     "Accounting": {
       "other": "Bokföring"
     },
@@ -60,6 +63,12 @@
     "Company number": {
       "other": "Organisationsnummer"
     },
+    "Copied": {
+      "other": "Kopierad"
+    },
+    "Copy the link": {
+      "other": "Kopiera länken"
+    },
     "Credit it": {
       "other": "Kreditera den"
     },
@@ -71,6 +80,9 @@
     },
     "Credits %s": {
       "other": "Krediterar %s"
+    },
+    "Customer": {
+      "other": "Kund"
     },
     "Declined": {
       "other": "Nekad"
@@ -128,6 +140,9 @@
     },
     "Lines": {
       "other": "Rader"
+    },
+    "Look the registration up": {
+      "other": "Slå upp registreringsnumret"
     },
     "Mark it approved": {
       "other": "Markera som godkänd"
@@ -258,6 +273,9 @@
     "The customer said no": {
       "other": "Kunden sa nej"
     },
+    "The lookup never stops you taking a car in. If the service is down, type what you know.": {
+      "other": "Uppslaget hindrar aldrig att du tar in en bil. Om tjänsten ligger nere, skriv det du vet."
+    },
     "These need your decision. Approve what you want done.": {
       "other": "De här behöver ditt besked. Godkänn det du vill ha gjort."
     },
@@ -320,6 +338,9 @@
     "arrived": {
       "other": "kommit"
     },
+    "attention": {
+      "other": "se över"
+    },
     "checked by %s at %s": {
       "other": "kontrollerad av %s hos %s"
     },
@@ -328,6 +349,9 @@
     },
     "done": {
       "other": "klar"
+    },
+    "fail": {
+      "other": "underkänd"
     },
     "in progress": {
       "other": "pågår"
@@ -349,6 +373,15 @@
     },
     "no plate": {
       "other": "ingen skylt"
+    },
+    "none on the shelf; this will show as a shortfall": {
+      "other": "inget på hyllan; det här blir ett underskott"
+    },
+    "not checked": {
+      "other": "inte kontrollerad"
+    },
+    "pass": {
+      "other": "ok"
     },
     "quoted %s": {
       "other": "offererat %s"

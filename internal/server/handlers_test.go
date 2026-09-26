@@ -35,6 +35,11 @@ const (
 	customerName    = "Margareta Wikstrom"
 	customerAddress = "Kungsgatan 44"
 	customerPhone   = "+46701234567"
+
+	// html/template escapes the leading plus to &#43;, so a search for
+	// customerPhone in a rendered page finds nothing whether or not the number
+	// is there. The digits are what a leak test has to look for.
+	customerPhoneDigits = "46701234567"
 )
 
 func testServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
@@ -191,7 +196,7 @@ func TestTechnicianScreensCarryNoCustomerPersonalData(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("%s returned %d, want 200", path, resp.StatusCode)
 		}
-		for _, secret := range []string{customerName, customerAddress, customerPhone} {
+		for _, secret := range []string{customerName, customerAddress, customerPhoneDigits} {
 			if strings.Contains(string(body), secret) {
 				t.Errorf("%s contains customer personal data: %q", path, secret)
 			}

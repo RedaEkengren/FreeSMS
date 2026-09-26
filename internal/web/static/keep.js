@@ -206,6 +206,36 @@
     Array.prototype.forEach.call(document.querySelectorAll("[data-print]"), function (el) {
       el.addEventListener("click", function () { window.print(); });
     });
+
+    Array.prototype.forEach.call(document.querySelectorAll("[data-select]"), function (el) {
+      el.addEventListener("click", function () { el.select(); });
+    });
+
+    // The customer's link is shown once and is sixty characters long. Selecting
+    // that by hand to paste into a message is the kind of small friction that
+    // makes somebody stop sending links.
+    Array.prototype.forEach.call(document.querySelectorAll("[data-copy]"), function (el) {
+      el.addEventListener("click", function () {
+        var field = document.querySelector(el.getAttribute("data-copy"));
+        if (!field) return;
+        var said = el.textContent;
+        var done = function () {
+          el.textContent = el.getAttribute("data-copied") || "Copied";
+          setTimeout(function () { el.textContent = said; }, 2000);
+        };
+        // The clipboard API needs a secure context, which a shop reaching the
+        // service over plain HTTP on its own network does not have. The old
+        // selection is the fallback, and the button says what to do next
+        // rather than appearing to have failed silently.
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(field.value).then(done, function () {
+            field.select();
+          });
+          return;
+        }
+        field.select();
+      });
+    });
   });
 
   window.addEventListener("online", flush);

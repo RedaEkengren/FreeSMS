@@ -451,3 +451,43 @@ func TestAnIssuedInvoiceCanBeLookedAt(t *testing.T) {
 		t.Error("the refusal page leaked the invoice")
 	}
 }
+
+// A technician's job query has no customer column in it, and the contact is a
+// separate read that refuses the role. Both halves matter: the page must show
+// the front desk somebody to ring, and must not fetch it for anybody else.
+func TestTheJobPageShowsWhoToRingAndOnlyToTheFrontDesk(t *testing.T) {
+	ts, _ := testServer(t)
+
+	advisor := get(t, signIn(t, ts, advisorEmail), ts.URL+"/jobs/"+jobA, http.StatusOK)
+	if !strings.Contains(advisor, customerName) || !strings.Contains(advisor, customerPhoneDigits) {
+		t.Errorf("the front desk cannot see who to ring about this job:\n%s", firstLines(advisor, 40))
+	}
+
+	tech := get(t, signIn(t, ts, techEmail), ts.URL+"/jobs/"+jobA, http.StatusOK)
+	for _, leaked := range []string{customerName, customerPhoneDigits, customerAddress} {
+		if strings.Contains(tech, leaked) {
+			t.Errorf("the technician's job page shows %q", leaked)
+		}
+	}
+}
+
+// Three screens printed a separator with nothing on one side of it. The
+// character itself is the tell, because nothing in the catalogue starts or
+// ends a line with one.
+func TestNoScreenPrintsAnOrphanSeparator(t *testing.T) {
+	ts, _ := testServer(t)
+	advisor := signIn(t, ts, advisorEmail)
+
+	for _, path := range []string{"/", "/board", "/jobs/" + jobA, "/stock", "/parts"} {
+		for _, line := range strings.Split(visibleText(get(t, advisor, ts.URL+path, http.StatusOK)), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			if strings.HasPrefix(line, "·") || strings.HasSuffix(line, "·") ||
+				strings.Contains(line, "· ·") {
+				t.Errorf("%s prints a separator with nothing beside it: %q", path, line)
+			}
+		}
+	}
+}

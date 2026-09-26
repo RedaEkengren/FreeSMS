@@ -8,11 +8,13 @@
            autocapitalize="characters" autocorrect="off" spellcheck="false" autofocus>
   </label>
 
+  {{if .CanLookUp}}
   <button type="button" class="secondary"
           hx-get="/jobs/new/lookup" hx-include="[name='registration']"
           hx-target="#lookup" hx-swap="innerHTML">
-    Look the registration up
+    {{.T "Look the registration up"}}
   </button>
+  {{end}}
   <div id="lookup">{{template "lookup" .}}</div>
 
   <label>
@@ -25,8 +27,9 @@
   </label>
   <button type="submit">Open the job</button>
 </form>
-<p class="waiting">The lookup never stops you taking a car in. If the service
-is down, or the shop has none, type what you know.</p>
+{{if .CanLookUp}}
+<p class="waiting">{{.T "The lookup never stops you taking a car in. If the service is down, type what you know."}}</p>
+{{end}}
 <p style="margin-top:1.5rem"><a href="/">Back</a></p>
 {{end}}
 

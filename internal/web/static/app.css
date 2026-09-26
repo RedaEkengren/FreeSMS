@@ -148,6 +148,26 @@ input {
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
+/* A checkbox is not a text field. The rule above gives every input a full
+   width, a tall minimum, a border and padding, which turns a checkbox into an
+   empty rounded box with its label stranded underneath. */
+input[type="checkbox"], input[type="radio"] {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  /* Big enough for a finger, which is the whole premise of this stylesheet. */
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  flex: none;
+}
+/* The label sits beside it, not above it. */
+label.tick { display: flex; align-items: center; gap: 0.625rem; min-height: var(--tap); }
+label.tick span { display: inline; margin: 0; font-size: 1rem; color: var(--text); }
+
 input:focus-visible, button:focus-visible, .card:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;

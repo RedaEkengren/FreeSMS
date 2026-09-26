@@ -9,9 +9,9 @@ and a file you hand over.</p>
     <label><span>From</span><input type="date" name="from" value="{{.PeriodFrom.Format "2006-01-02"}}" required></label>
     <label><span>To</span><input type="date" name="to" value="{{.PeriodTo.Format "2006-01-02"}}" required></label>
   </div>
-  <label style="display:flex;gap:0.5rem;align-items:center">
-    <input type="checkbox" name="again" value="yes" style="width:auto;min-height:auto">
-    <span style="margin:0">Send a period that has already gone over</span>
+  <label class="tick">
+    <input type="checkbox" name="again" value="yes">
+    <span>Send a period that has already gone over</span>
   </label>
   <button type="submit">Download the file</button>
 </form>

@@ -11,7 +11,9 @@
       {{else if .AssignedToMe}}<span class="tag running">{{$.T "mine"}}</span>
       {{else}}<span class="tag">{{$.T .StateLabel}}</span>{{end}}
     </div>
-    <div class="vehicle">{{.Make}} {{.Model}}{{if .ModelYear}} {{.ModelYear}}{{end}}</div>
+    {{/* The number, because two jobs on the same car are otherwise two
+         identical cards and the only way to tell them apart is to open both. */}}
+    <div class="vehicle">#{{.Number}} &middot; {{.Make}} {{.Model}}{{if .ModelYear}} {{.ModelYear}}{{end}}</div>
     {{if .Complaint}}<div class="complaint">{{.Complaint}}</div>{{end}}
     {{if gt .OpenRequests 0}}<div class="waiting">{{$.N "Waiting for %d part" .OpenRequests}}</div>{{end}}
     {{if and .AssignedTo (not .AssignedToMe)}}<div class="waiting">{{$.T "%s is on it" .AssignedTo}}</div>{{end}}

@@ -2,6 +2,7 @@ package workshop
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -177,3 +178,50 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 	})
 	return out, err
 }
+
+// Contact is who to ring about a job.
+//
+// A separate read from Job on purpose, and not a set of columns added to it.
+// A technician's job query has no customer column in it, so there is nothing
+// to hide in a template and nothing to leak when somebody adds a field to the
+// struct later. This function refuses the role instead, and the handler only
+// calls it for the roles that may have it.
+//
+// The name, the telephone number and the email. Not the address: ringing
+// somebody about their car does not need to know where they live, and a field
+// with no purpose does not exist.
+type Contact struct {
+	Name  string
+	Phone string
+	Email string
+}
+
+// ContactFor returns the customer on a work order, and an empty Contact when
+// the order has none -- which is ordinary, because a car can be taken in
+// before anybody has typed the details.
+func ContactFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) (Contact, error) {
+	if !scope.Role.SeesCustomerPersonalData() {
+		return Contact{}, access.ErrForbidden
+	}
+
+	var c Contact
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		err := tx.QueryRow(ctx, `
+			SELECT coalesce(p.display_name, cu.company_name, ''),
+			       coalesce(p.phone, ''), coalesce(p.email, '')
+			FROM work_orders w
+			JOIN customers cu ON cu.id = w.customer_id
+			LEFT JOIN people p ON p.id = cu.person_id
+			WHERE w.id = $1`, jobID).Scan(&c.Name, &c.Phone, &c.Email)
+		if errors.Is(err, pgx.ErrNoRows) {
+			// No customer on the order, or no order visible here. Both are
+			// "nobody to ring", and the page says so rather than erroring.
+			return nil
+		}
+		return err
+	})
+	return c, err
+}
+
+// Known reports whether there is anybody to ring.
+func (c Contact) Known() bool { return c.Name != "" || c.Phone != "" }

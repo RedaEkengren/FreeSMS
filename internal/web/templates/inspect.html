@@ -9,7 +9,8 @@
 <div class="share">
   <p><strong>Send this to the customer.</strong> It is shown once — there is
   nowhere to look it up again, so make a new link if it is lost.</p>
-  <input value="{{.ShareURL}}" readonly onclick="this.select()">
+  <input id="share-url" value="{{.ShareURL}}" readonly data-select>
+  <button type="button" class="secondary" data-copy="#share-url" data-copied="{{$.T "Copied"}}">{{$.T "Copy the link"}}</button>
 </div>
 {{end}}
 
@@ -17,9 +18,13 @@
 <div class="card">
   <div class="row">
     <strong>{{.Label}}</strong>
-    {{if eq .Status "pass"}}<span class="tag pass">pass</span>
-    {{else if eq .Status "attention"}}<span class="tag warranty">attention</span>
-    {{else if eq .Status "fail"}}<span class="tag late">fail</span>{{end}}
+    {{/* An item with no status has to say so. "Checked and fine" and "never
+         looked at" were the same picture, for the next technician and for the
+         customer reading the same list. */}}
+    {{if eq .Status "pass"}}<span class="tag pass">{{$.T "pass"}}</span>
+    {{else if eq .Status "attention"}}<span class="tag warranty">{{$.T "attention"}}</span>
+    {{else if eq .Status "fail"}}<span class="tag late">{{$.T "fail"}}</span>
+    {{else}}<span class="tag">{{$.T "not checked"}}</span>{{end}}
   </div>
 
   {{if .Note}}<p>{{.Note}}</p>{{end}}
