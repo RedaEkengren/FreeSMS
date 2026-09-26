@@ -68,6 +68,11 @@ type Job struct {
 	OthersRunning string
 }
 
+// AcceptsWork reports whether a clock may still run on this job, so that the
+// button is not offered where the query would refuse it. The refusal is in
+// the query; this only keeps the page honest about it.
+func (j Job) AcceptsWork() bool { return State(j.State).AcceptsWork() }
+
 // Line is one line of a work order.
 type Line struct {
 	Position       int
@@ -270,6 +275,24 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 // taps in a workshop is how hours go missing.
 func ClockIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) error {
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// Refuse before anything else happens. The transaction would roll a
+		// late refusal back anyway, but the clock the technician already has
+		// running on another car is stopped in the next statement, and a
+		// reader should not have to trust the rollback to see that it
+		// survives.
+		var current State
+		switch err := tx.QueryRow(ctx,
+			`SELECT state FROM work_orders WHERE id = $1`, jobID).Scan(&current); {
+		case errors.Is(err, pgx.ErrNoRows):
+			// Not visible under this shop's policy is the same answer as not
+			// existing.
+			return ErrNotFound
+		case err != nil:
+			return fmt.Errorf("read state: %w", err)
+		case !current.AcceptsWork():
+			return ErrFinished
+		}
+
 		// Closes whatever was running, and flags it when the result is longer
 		// than anybody works in one go. Silently closing a sixteen-hour entry
 		// hides a payroll dispute rather than settling one.
@@ -302,11 +325,7 @@ func ClockIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 		// Moving to a job implies work has started on it -- but through the
 		// state machine, not a bare UPDATE. A second place deciding what is
 		// legal is how a system ends up with two answers.
-		var state State
-		if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1`, jobID).Scan(&state); err != nil {
-			return fmt.Errorf("read state: %w", err)
-		}
-		if state == StateApproved || state == StateAwaitingParts {
+		if current == StateApproved || current == StateAwaitingParts {
 			return setStateTx(ctx, tx, jobID, StateInProgress)
 		}
 		return nil

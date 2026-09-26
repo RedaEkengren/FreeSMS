@@ -101,6 +101,30 @@ var ErrWouldLoseWork = errors.New(
 var ErrNoCustomer = errors.New(
 	"this order has no customer yet, and an invoice needs somebody to address it to")
 
+// ErrFinished is returned when a clock is started on an order that is over.
+//
+// Time booked after the invoice is issued can never be charged for. It is not
+// lost -- it is worse than lost, because it sits in the clocked total and not
+// in the sold one, and the figures screen then reports a technician as slow
+// for hours nobody could have billed.
+var ErrFinished = errors.New(
+	"this order is finished, so time cannot be booked against it")
+
+// AcceptsWork reports whether a clock may run against an order in this state.
+//
+// Declined is deliberately absent from the refusals. A customer who says no
+// while the car is in pieces still owes the diagnosis and the reassembly, and
+// that work happens after the decision. Ready is absent too: a car goes back
+// on the lift when something is wrong, and the state machine already allows
+// ready -> in_progress.
+func (s State) AcceptsWork() bool {
+	switch s {
+	case StateInvoiced, StateClosed, StateCancelled:
+		return false
+	}
+	return true
+}
+
 // technicianMoves are the transitions that belong to the person holding the
 // spanner.
 //

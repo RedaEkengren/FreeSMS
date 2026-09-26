@@ -2,6 +2,7 @@ package workshop_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -263,3 +264,76 @@ func TestTheFiguresCountAClockThatIsStillRunning(t *testing.T) {
 }
 
 var _ = access.RoleParts
+
+// Time booked after the invoice can never be charged for, and it is not
+// harmless: it lands in the clocked total and not the sold one, so the figures
+// screen reports somebody as slow for hours nobody could have billed.
+func TestAClockIsRefusedOnAnInvoicedOrder(t *testing.T) {
+	pool := setup(t)
+	addTechnician(t, pool)
+	ctx := context.Background()
+
+	id := readyToInvoice(t, pool)
+	if _, err := workshop.Issue(ctx, pool, advisor(), id); err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+
+	if err := workshop.ClockIn(ctx, pool, technician(), id); !errors.Is(err, workshop.ErrFinished) {
+		t.Errorf("ClockIn on an invoiced order = %v, want ErrFinished", err)
+	}
+	entries, _ := workshop.TimeFor(ctx, pool, advisor(), id)
+	for _, e := range entries {
+		if e.Running() {
+			t.Error("a clock is running on an invoiced order")
+		}
+	}
+
+	// And the page stops offering it.
+	job, _, err := workshop.JobByID(ctx, pool, technician(), id)
+	if err != nil {
+		t.Fatalf("JobByID: %v", err)
+	}
+	if job.AcceptsWork() {
+		t.Error("the job page still offers the clock on an invoiced order")
+	}
+}
+
+// Declined is the case that must keep working. The customer said no with the
+// car in pieces; the diagnosis and the reassembly are still owed and still
+// have to be clocked.
+func TestAClockStillRunsOnADeclinedOrder(t *testing.T) {
+	pool := setup(t)
+	addTechnician(t, pool)
+	ctx := context.Background()
+
+	id := newJob(t, pool)
+	move(t, pool, id, workshop.StateEstimated, workshop.StateAwaitingApproval,
+		workshop.StateDeclined)
+
+	if err := workshop.ClockIn(ctx, pool, technician(), id); err != nil {
+		t.Errorf("ClockIn on a declined order: %v -- the reassembly is still work", err)
+	}
+}
+
+// A refusal must not stop the clock the technician already had running on
+// another car on its way out.
+func TestARefusedClockLeavesTheRunningOneAlone(t *testing.T) {
+	pool := setup(t)
+	addTechnician(t, pool)
+	ctx := context.Background()
+
+	other := working(t, pool)
+
+	done := readyToInvoice(t, pool)
+	if _, err := workshop.Issue(ctx, pool, advisor(), done); err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	if err := workshop.ClockIn(ctx, pool, technician(), done); !errors.Is(err, workshop.ErrFinished) {
+		t.Fatalf("ClockIn = %v, want ErrFinished", err)
+	}
+
+	entries, _ := workshop.TimeFor(ctx, pool, advisor(), other)
+	if len(entries) != 1 || !entries[0].Running() {
+		t.Errorf("the clock on the other car was stopped by a refused clock-in: %+v", entries)
+	}
+}

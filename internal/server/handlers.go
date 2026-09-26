@@ -185,6 +185,13 @@ func (s *Server) handleClock(in bool) http.HandlerFunc {
 			http.Error(w, "no such job", http.StatusNotFound)
 			return
 		}
+		// 409 rather than 400: the request was well formed and the answer
+		// depends on the state of the order, which may have changed under a
+		// page that was already open.
+		if errors.Is(err, workshop.ErrFinished) {
+			http.Error(w, workshop.ErrFinished.Error(), http.StatusConflict)
+			return
+		}
 		if err != nil {
 			s.log.Error("clock", "in", in, "error", err)
 			http.Error(w, "could not change the clock", http.StatusInternalServerError)

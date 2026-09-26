@@ -254,7 +254,10 @@
 {{end}}
 
 {{define "clock"}}
-{{if .Job.ClockRunning}}
+{{if not .Job.AcceptsWork}}
+  {{/* Nothing: an order that is over takes no more time, and a button that
+       always fails is worse than no button. */}}
+{{else if .Job.ClockRunning}}
   <button class="stop" hx-post="/jobs/{{.Job.ID}}/clock-out" hx-target="#clock" hx-swap="innerHTML">
     {{$.T "Stop clock"}}
   </button>
