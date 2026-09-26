@@ -101,6 +101,65 @@ var ErrWouldLoseWork = errors.New(
 var ErrNoCustomer = errors.New(
 	"this order has no customer yet, and an invoice needs somebody to address it to")
 
+// Label is the condition an order is in, in the words somebody in a workshop
+// would use. Action is the instruction that moves an order into that state.
+//
+// Both return English text, which is the catalogue key everywhere else in this
+// system, so the caller renders them through the printer. They are two maps
+// rather than one because the same state needs both voices: a button that says
+// "Start work" leaves the order in a condition described as "Being worked on",
+// and using one string for both gives a button nobody can read or a status
+// that sounds like an order.
+//
+// Every state appears in both, including cancelled and declined. Those are the
+// rare ones, which makes them exactly the ones a switch quietly omits.
+var stateLabels = map[State]string{
+	StateDraft:            "Being written up",
+	StateEstimated:        "Priced, not sent",
+	StateAwaitingApproval: "Waiting for the customer",
+	StateApproved:         "Approved, not started",
+	StateInProgress:       "Being worked on",
+	StateAwaitingParts:    "Waiting for parts",
+	StateReady:            "Ready for collection",
+	StateInvoiced:         "Invoiced",
+	StateClosed:           "Closed",
+	StateDeclined:         "Declined",
+	StateCancelled:        "Cancelled",
+}
+
+var stateActions = map[State]string{
+	StateDraft:            "Put it back to a draft",
+	StateEstimated:        "Price it",
+	StateAwaitingApproval: "Ask the customer",
+	StateApproved:         "Mark it approved",
+	StateInProgress:       "Start work",
+	StateAwaitingParts:    "Park it for parts",
+	StateReady:            "It is ready",
+	StateInvoiced:         "Invoice it",
+	StateClosed:           "Close it",
+	StateDeclined:         "The customer said no",
+	StateCancelled:        "Cancel it",
+}
+
+// Label falls back to the raw value rather than to nothing. A state added to
+// the column and forgotten here should read oddly, not render an empty badge
+// that looks like the order has no state at all.
+func (s State) Label() string {
+	if label, ok := stateLabels[s]; ok {
+		return label
+	}
+	return string(s)
+}
+
+// Action falls back to the label, and the label falls back to the raw value,
+// so a forgotten state still produces a button with words on it.
+func (s State) Action() string {
+	if action, ok := stateActions[s]; ok {
+		return action
+	}
+	return s.Label()
+}
+
 // ErrFinished is returned when a clock is started on an order that is over.
 //
 // Time booked after the invoice is issued can never be charged for. It is not

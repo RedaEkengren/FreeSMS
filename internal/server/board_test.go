@@ -302,3 +302,66 @@ func firstLines(s string, n int) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// jobA is the work order shop A's fixture opens.
+const jobA = "aaaaaaaa-0000-0000-0000-00000000000f"
+
+// visibleText strips the markup, so that a hidden input carrying a state as a
+// form value is not mistaken for a state shown to a person.
+func visibleText(html string) string {
+	var out strings.Builder
+	depth := 0
+	for _, r := range html {
+		switch {
+		case r == '<':
+			depth++
+		case r == '>':
+			if depth > 0 {
+				depth--
+			}
+		case depth == 0:
+			out.WriteRune(r)
+		}
+	}
+	return out.String()
+}
+
+// The state machine's identifiers are for the column and the code. A person
+// reading a screen sees words, and an underscore in visible text is the tell
+// that one got out. This caught in_progress on buttons, approved in a status
+// line and AWAITING_APPROVAL in a badge, all at once.
+func TestNoScreenShowsAStateIdentifier(t *testing.T) {
+	ts, _ := testServer(t)
+	advisor := signIn(t, ts, advisorEmail)
+	tech := signIn(t, ts, techEmail)
+
+	// Walk the order through the states that have the most identifiers in
+	// reach: buttons for what is next, a badge for where it is now.
+	for _, state := range []string{"estimated", "awaiting_approval", "approved", "in_progress"} {
+		post(t, advisor, ts.URL+"/jobs/"+jobA+"/state", url.Values{"state": {state}})
+	}
+
+	pages := map[string]*http.Client{
+		"/":                 advisor,
+		"/board":            advisor,
+		"/jobs/" + jobA:     advisor,
+		"/vehicles/aaaaaaaa-0000-0000-0000-000000000005": advisor,
+	}
+	for path, client := range pages {
+		body := visibleText(get(t, client, ts.URL+path, http.StatusOK))
+		for _, id := range []string{
+			"awaiting_approval", "in_progress", "awaiting_parts",
+			"AWAITING_APPROVAL", "IN_PROGRESS", "AWAITING_PARTS",
+		} {
+			if strings.Contains(body, id) {
+				t.Errorf("%s shows the identifier %q to a person", path, id)
+			}
+		}
+	}
+
+	// The technician's own list too, which has its own badge.
+	body := visibleText(get(t, tech, ts.URL+"/", http.StatusOK))
+	if strings.Contains(body, "in_progress") {
+		t.Error("the technician's list shows a state identifier")
+	}
+}

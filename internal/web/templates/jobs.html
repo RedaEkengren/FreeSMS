@@ -9,12 +9,12 @@
       <span class="plate">{{if .Registration}}{{.Registration}}{{else}}{{$.T "no plate"}}{{end}}</span>
       {{if .ClockRunning}}<span class="tag running">{{$.T "running"}}</span>
       {{else if .AssignedToMe}}<span class="tag running">{{$.T "mine"}}</span>
-      {{else}}<span class="tag">{{.State}}</span>{{end}}
+      {{else}}<span class="tag">{{$.T .StateLabel}}</span>{{end}}
     </div>
     <div class="vehicle">{{.Make}} {{.Model}}{{if .ModelYear}} {{.ModelYear}}{{end}}</div>
     {{if .Complaint}}<div class="complaint">{{.Complaint}}</div>{{end}}
     {{if gt .OpenRequests 0}}<div class="waiting">{{$.N "Waiting for %d part" .OpenRequests}}</div>{{end}}
-    {{if and .AssignedTo (not .AssignedToMe)}}<div class="waiting">{{.AssignedTo}} is on it</div>{{end}}
+    {{if and .AssignedTo (not .AssignedToMe)}}<div class="waiting">{{$.T "%s is on it" .AssignedTo}}</div>{{end}}
   </a>
   {{end}}
 {{end}}

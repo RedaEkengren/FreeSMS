@@ -32,7 +32,7 @@
   <div class="card">
     <div class="row">
       <a href="/jobs/{{.WorkOrderID}}">#{{.Number}} &middot; {{.OpenedAt.Format "2 Jan 2006"}}</a>
-      <span class="tag">{{.State}}</span>
+      <span class="tag">{{$.T .StateLabel}}</span>
     </div>
     {{if .Complaint}}<div class="complaint">{{.Complaint}}</div>{{end}}
     {{if .Lines}}

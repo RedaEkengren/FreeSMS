@@ -11,18 +11,18 @@
 {{if .Job.OthersRunning}}<p class="waiting">{{.Job.OthersRunning}} still has a clock running on this job.</p>{{end}}
 
 <dl>
-  <dt>{{.T "State"}}</dt><dd>{{.Job.State}}</dd>
+  <dt>{{.T "State"}}</dt><dd>{{.T .Job.StateLabel}}</dd>
   {{if .Job.OdometerKm}}<dt>{{.T "Odometer"}}</dt><dd>{{.Job.OdometerKm}} km</dd>{{end}}
   {{if .Job.AssignedTo}}<dt>{{.T "On it"}}</dt><dd>{{.Job.AssignedTo}}</dd>{{end}}
 </dl>
 
 {{if .Next}}
-<h2>Move it along</h2>
+<h2>{{.T "Move it along"}}</h2>
 <div class="actions">
   {{range .Next}}
   <form method="post" action="/jobs/{{$.Job.ID}}/state" style="margin:0">
     <input type="hidden" name="state" value="{{.}}">
-    <button type="submit" class="secondary">{{.}}</button>
+    <button type="submit" class="secondary">{{$.T .Action}}</button>
   </form>
   {{end}}
 </div>

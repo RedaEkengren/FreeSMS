@@ -11,7 +11,7 @@
     </div>
     <div class="vehicle">{{.Make}} {{.Model}}{{if .CustomerName}} &middot; {{.CustomerName}}{{end}}</div>
     {{if not .HasCustomer}}<div class="waiting">{{$.T "No customer recorded yet"}}</div>{{end}}
-    <div class="waiting">{{.Waiting}}</div>
+    <div class="waiting">{{$.T .Waiting .WaitingArg}}</div>
     {{if gt .OpenFindings 0}}<div class="waiting">{{$.N "%d thing noticed, not priced" .OpenFindings}}</div>{{end}}
     {{if gt .WaitingDays 0}}
       <div class="waiting">{{$.N "Uncollected for %d day" .WaitingDays}}</div>

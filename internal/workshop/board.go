@@ -48,28 +48,39 @@ type BoardEntry struct {
 }
 
 // Waiting says what the vehicle is waiting for, in words a person at a counter
-// would use.
+// would use. It returns the catalogue key, not the finished sentence, so the
+// board reads in the shop's language like every other screen; the page renders
+// it through the printer with WaitingArg.
+//
+// The counter's words are not the state machine's. "Declined" is a state; what
+// the front desk needs to see is that somebody still has to invoice it. Where
+// there is nothing better to say, the state's own label is used rather than
+// the bare identifier.
 func (b BoardEntry) Waiting() string {
 	switch b.State {
 	case "draft", "estimated":
 		return "Not sent to the customer yet"
 	case "awaiting_approval":
 		return "Waiting for the customer to approve"
-	case "approved":
-		return "Approved, not started"
 	case "in_progress":
 		if b.WorkingNow != "" {
-			return b.WorkingNow + " is on it"
+			return "%s is on it"
 		}
 		return "Started, nobody on it right now"
-	case "awaiting_parts":
-		return "Waiting for parts"
-	case "ready":
-		return "Ready for collection"
 	case "declined":
 		return "Declined — still needs invoicing"
 	}
-	return b.State
+	return State(b.State).Label()
+}
+
+// WaitingArg is the single value Waiting's key may interpolate, and empty
+// where it takes none. The printer ignores arguments for a text without a verb,
+// so the page passes it unconditionally.
+func (b BoardEntry) WaitingArg() string {
+	if b.State == "in_progress" {
+		return b.WorkingNow
+	}
+	return ""
 }
 
 // Late reports whether the promised time has passed on a job that is not

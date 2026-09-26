@@ -68,6 +68,11 @@ type Job struct {
 	OthersRunning string
 }
 
+// StateLabel is the condition this job is in, as a catalogue key. The column
+// is a string because that is what the database holds; the words come from the
+// one place that knows them.
+func (j Job) StateLabel() string { return State(j.State).Label() }
+
 // AcceptsWork reports whether a clock may still run on this job, so that the
 // button is not offered where the query would refuse it. The refusal is in
 // the query; this only keeps the page honest about it.

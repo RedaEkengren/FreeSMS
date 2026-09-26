@@ -1,5 +1,4 @@
 {
-  "No customer recorded yet": "Ingen kund noterad än",
   "locale": "sv",
   "messages": {
     "%d finding": {
@@ -10,6 +9,15 @@
       "one": "%d sak upptäckt, inte prissatt",
       "other": "%d saker upptäckta, inte prissatta"
     },
+    "%s is on it": {
+      "other": "%s jobbar på den"
+    },
+    "Approved, not started": {
+      "other": "Godkänd, inte påbörjad"
+    },
+    "Ask the customer": {
+      "other": "Fråga kunden"
+    },
     "Ask the parts desk": {
       "other": "Fråga lagret"
     },
@@ -18,6 +26,30 @@
     },
     "Back": {
       "other": "Tillbaka"
+    },
+    "Being worked on": {
+      "other": "Under arbete"
+    },
+    "Being written up": {
+      "other": "Skrivs upp"
+    },
+    "Cancel it": {
+      "other": "Avbeställ den"
+    },
+    "Cancelled": {
+      "other": "Avbeställd"
+    },
+    "Close it": {
+      "other": "Avsluta den"
+    },
+    "Closed": {
+      "other": "Avslutad"
+    },
+    "Declined": {
+      "other": "Nekad"
+    },
+    "Declined — still needs invoicing": {
+      "other": "Nekad — ska fortfarande faktureras"
     },
     "Email": {
       "other": "E-post"
@@ -37,14 +69,35 @@
     "Inspections": {
       "other": "Kontroller"
     },
+    "Invoice it": {
+      "other": "Fakturera den"
+    },
+    "Invoiced": {
+      "other": "Fakturerad"
+    },
     "It has arrived": {
       "other": "Den har kommit"
+    },
+    "It is ready": {
+      "other": "Den är klar"
     },
     "Lines": {
       "other": "Rader"
     },
+    "Mark it approved": {
+      "other": "Markera som godkänd"
+    },
+    "Move it along": {
+      "other": "Flytta den vidare"
+    },
+    "No customer recorded yet": {
+      "other": "Ingen kund noterad än"
+    },
     "No, leave it": {
       "other": "Nej, låt den vara"
+    },
+    "Not sent to the customer yet": {
+      "other": "Inte skickad till kunden än"
     },
     "Nothing on this order yet.": {
       "other": "Inget på ordern än."
@@ -67,11 +120,26 @@
     "Open the link again and try once more.": {
       "other": "Öppna länken igen och försök en gång till."
     },
+    "Park it for parts": {
+      "other": "Ställ av i väntan på delar"
+    },
     "Parts": {
       "other": "Delar"
     },
     "Password": {
       "other": "Lösenord"
+    },
+    "Price it": {
+      "other": "Prissätt den"
+    },
+    "Priced, not sent": {
+      "other": "Prissatt, inte skickad"
+    },
+    "Put it back to a draft": {
+      "other": "Tillbaka till utkast"
+    },
+    "Ready for collection": {
+      "other": "Klar för hämtning"
     },
     "Sign in": {
       "other": "Logga in"
@@ -94,6 +162,12 @@
     "Start it": {
       "other": "Starta"
     },
+    "Start work": {
+      "other": "Börja jobba"
+    },
+    "Started, nobody on it right now": {
+      "other": "Påbörjad, ingen på den just nu"
+    },
     "State": {
       "other": "Status"
     },
@@ -108,6 +182,9 @@
     },
     "That did not go through": {
       "other": "Det gick inte igenom"
+    },
+    "The customer said no": {
+      "other": "Kunden sa nej"
     },
     "These need your decision. Approve what you want done.": {
       "other": "De här behöver ditt besked. Godkänn det du vill ha gjort."
@@ -137,6 +214,12 @@
     },
     "Waiting for parts": {
       "other": "Väntar på delar"
+    },
+    "Waiting for the customer": {
+      "other": "Väntar på kunden"
+    },
+    "Waiting for the customer to approve": {
+      "other": "Väntar på kundens godkännande"
     },
     "Yes, do it": {
       "other": "Ja, gör det"

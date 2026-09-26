@@ -172,6 +172,10 @@ type HistoryEntry struct {
 	HasInvoice    bool
 }
 
+// StateLabel is the condition the job was left in, as a catalogue key.
+func (h HistoryEntry) StateLabel() string { return State(h.State).Label() }
+
+
 // Total renders what the job came to, for a job the viewer may see it for.
 func (h HistoryEntry) Total() string {
 	if h.PreviousOwner || !h.HasInvoice {
