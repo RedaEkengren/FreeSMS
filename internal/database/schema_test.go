@@ -277,3 +277,61 @@ func TestReadyAtIsSetAndClearedByTheTrigger(t *testing.T) {
 		t.Errorf("leaving ready left ready_at = %v", at)
 	}
 }
+
+// on_hand is a plain sum(quantity), so the sign is what makes the ledger tell
+// the truth. A 'consumed' row written positive raises the figure on the shelf,
+// and the page reports it without complaint: thirteen litres of oil read as a
+// hundred and seven while a demonstration was being seeded by hand.
+//
+// The application has never written the wrong sign. The column is the record
+// and the code is this year's way of writing to it.
+func TestAMovementCarriesTheSignOfItsKind(t *testing.T) {
+	pool := testPool(t)
+	seed(t, pool)
+	ctx := context.Background()
+
+	const part = "eeeeeeee-0000-0000-0000-000000000001"
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO parts (id, shop_id, number, name) VALUES ($1, $2, 'BP-100', 'Brake pad set')`,
+		part, shopID); err != nil {
+		t.Fatalf("seed a part: %v", err)
+	}
+
+	const insert = `INSERT INTO stock_movements (shop_id, part_id, kind, quantity, reason)
+	                VALUES ($1, $2, $3, $4, $5)`
+
+	for _, c := range []struct {
+		kind     string
+		quantity float64
+		reason   any
+		allowed  bool
+		why      string
+	}{
+		{"received", 4, nil, true, "stock arriving"},
+		{"received", -4, nil, false, "stock cannot arrive off the shelf"},
+		{"consumed", -1, nil, true, "a part fitted to a car"},
+		{"consumed", 1, nil, false, "fitting a part cannot raise the shelf"},
+		{"returned", -1, nil, true, "going back to the supplier"},
+		{"returned", 1, nil, false, "a return cannot add stock"},
+		{"written_off", -1, "damaged", true, "a write-off is a loss"},
+		{"written_off", 1, "damaged", false, "a write-off cannot be a gain"},
+		{"reserved", 1, nil, true, "promised to a job"},
+		{"reserved", -1, nil, false, "a reservation is a positive claim"},
+		{"unreserved", -1, nil, true, "the claim released"},
+		{"unreserved", 1, nil, false, "releasing a claim cannot add one"},
+		// The one kind that stays free. A stocktake is negative when somebody
+		// took something without booking it out and positive when a part turns
+		// up behind another one; forcing a direction makes the honest entry
+		// impossible to record.
+		{"counted", -2, nil, true, "a shortfall found at stocktake"},
+		{"counted", 3, nil, true, "a part found at stocktake"},
+	} {
+		_, err := pool.Exec(ctx, insert, shopID, part, c.kind, c.quantity, c.reason)
+		if c.allowed && err != nil {
+			t.Errorf("%s %+v was refused (%s): %v", c.kind, c.quantity, c.why, err)
+		}
+		if !c.allowed && err == nil {
+			t.Errorf("%s %+v was accepted; %s", c.kind, c.quantity, c.why)
+		}
+	}
+}
