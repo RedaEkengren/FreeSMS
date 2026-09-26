@@ -13,18 +13,20 @@
 <header>
   <nav>
     <a href="/" style="font-weight:600;text-decoration:none;color:inherit">FreeSMS</a>
-    {{if .Session.Scope.Role.SeesParts}}<a href="/parts" class="nav">Parts</a>
-    <a href="/stock" class="nav">Stock</a>
-    <a href="/scan" class="nav">Scan</a>{{end}}
-    {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/figures" class="nav">Figures</a>
-    <a href="/accounting" class="nav">Accounting</a>
-    <a href="/privacy" class="nav">Privacy</a>{{end}}
-    <a href="/time" class="nav">Hours</a>
-    {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/labour" class="nav">Times</a>{{end}}
-    <a href="/search" class="nav">Search</a>
+    {{if .Session.Scope.Role.SeesParts}}<a href="/parts" class="nav">{{.T "Parts"}}</a>
+    <a href="/stock" class="nav">{{.T "Stock"}}</a>
+    <a href="/scan" class="nav">{{.T "Scan"}}</a>{{end}}
+    {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/figures" class="nav">{{.T "Figures"}}</a>
+    <a href="/accounting" class="nav">{{.T "Accounting"}}</a>
+    <a href="/privacy" class="nav">{{.T "Privacy"}}</a>{{end}}
+    {{/* "Hours" and "Times" were two words apart and meant opposite things:
+         your own clock, and the shop's labour guide. Both say which now. */}}
+    <a href="/time" class="nav">{{.T "My hours"}}</a>
+    {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/labour" class="nav">{{.T "Labour times"}}</a>{{end}}
+    <a href="/search" class="nav">{{.T "Search"}}</a>
   </nav>
   <form method="post" action="/logout" style="margin:0">
-    <span class="who">{{.Session.Scope.Role}}</span>
+    <span class="who">{{.T .Session.Scope.Role.Label}}</span>
     <button class="link" type="submit">{{.T "Sign out"}}</button>
   </form>
 </header>

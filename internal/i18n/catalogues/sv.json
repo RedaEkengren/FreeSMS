@@ -12,6 +12,12 @@
     "%s is on it": {
       "other": "%s jobbar på den"
     },
+    "Accounting": {
+      "other": "Bokföring"
+    },
+    "Administrator": {
+      "other": "Administratör"
+    },
     "Approved, not started": {
       "other": "Godkänd, inte påbörjad"
     },
@@ -57,6 +63,12 @@
     "Everything checked was in order. Nothing needs doing.": {
       "other": "Allt som kontrollerades var i ordning. Inget behöver göras."
     },
+    "Figures": {
+      "other": "Siffror"
+    },
+    "Front desk": {
+      "other": "Kundmottagning"
+    },
     "Hand it on": {
       "other": "Lämna över"
     },
@@ -81,6 +93,9 @@
     "It is ready": {
       "other": "Den är klar"
     },
+    "Labour times": {
+      "other": "Arbetstider"
+    },
     "Lines": {
       "other": "Rader"
     },
@@ -89,6 +104,9 @@
     },
     "Move it along": {
       "other": "Flytta den vidare"
+    },
+    "My hours": {
+      "other": "Mina timmar"
     },
     "No customer recorded yet": {
       "other": "Ingen kund noterad än"
@@ -120,6 +138,9 @@
     "Open the link again and try once more.": {
       "other": "Öppna länken igen och försök en gång till."
     },
+    "Owner": {
+      "other": "Ägare"
+    },
     "Park it for parts": {
       "other": "Ställ av i väntan på delar"
     },
@@ -135,11 +156,20 @@
     "Priced, not sent": {
       "other": "Prissatt, inte skickad"
     },
+    "Privacy": {
+      "other": "Personuppgifter"
+    },
     "Put it back to a draft": {
       "other": "Tillbaka till utkast"
     },
     "Ready for collection": {
       "other": "Klar för hämtning"
+    },
+    "Scan": {
+      "other": "Skanna"
+    },
+    "Search": {
+      "other": "Sök"
     },
     "Sign in": {
       "other": "Logga in"
@@ -171,11 +201,17 @@
     "State": {
       "other": "Status"
     },
+    "Stock": {
+      "other": "Lager"
+    },
     "Stop clock": {
       "other": "Stoppa klockan"
     },
     "Take in a vehicle": {
       "other": "Ta in en bil"
+    },
+    "Technician": {
+      "other": "Mekaniker"
     },
     "Tell the front desk": {
       "other": "Säg till framdisken"
@@ -262,6 +298,9 @@
     },
     "no plate": {
       "other": "ingen skylt"
+    },
+    "quoted %s": {
+      "other": "offererat %s"
     },
     "running": {
       "other": "igång"

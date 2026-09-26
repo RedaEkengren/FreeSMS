@@ -209,7 +209,12 @@ dl.totals { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--
 dl.totals dd { font-variant-numeric: tabular-nums; }
 dl.totals .grand { font-weight: 700; color: var(--text); font-size: 1.125rem; }
 
-nav { display: flex; align-items: baseline; gap: 1rem; }
+/* Wraps, because it has to. The owner has nine links and the body forbids a
+   sideways page, so without this the last four are off the right edge of a
+   phone and cannot be reached at all -- measured at 390px, which is most
+   phones. A tighter row gap keeps a second line from eating a fifth of the
+   screen under a sticky header. */
+nav { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 1rem; row-gap: 0.125rem; }
 a.nav { color: var(--muted); text-decoration: none; font-size: 0.9375rem; }
 a.nav:hover, a.nav:focus-visible { color: var(--accent); }
 

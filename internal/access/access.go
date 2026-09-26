@@ -34,6 +34,27 @@ func (r Role) Valid() bool {
 	return false
 }
 
+// roleLabels are the words for a role, as a catalogue key. service_advisor is
+// the reason this exists: it is the one role whose identifier has an
+// underscore in it, and the header printed it.
+var roleLabels = map[Role]string{
+	RoleOwner:          "Owner",
+	RoleServiceAdvisor: "Front desk",
+	RoleTechnician:     "Technician",
+	RoleParts:          "Parts",
+	RoleAdmin:          "Administrator",
+}
+
+// Label is the role in words. An unknown role falls back to its value rather
+// than to nothing, so a role added to the constraint and forgotten here reads
+// oddly instead of leaving a blank where somebody's job title goes.
+func (r Role) Label() string {
+	if label, ok := roleLabels[r]; ok {
+		return label
+	}
+	return string(r)
+}
+
 // SeesCustomerPersonalData reports whether this role may be shown a customer's
 // name, address, telephone number or email.
 //

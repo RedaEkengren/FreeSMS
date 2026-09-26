@@ -106,7 +106,7 @@
     <div>
       {{if not .Approved}}<span class="tag warranty">added after approval</span>{{end}}
       {{if ne .CostBearer "customer"}}<span class="tag warranty">warranty: {{.CostBearer}}</span>{{end}}
-      {{if .PriceChanged}}<span class="tag warranty">quoted {{.EstimatedPrice}}</span>{{end}}
+      {{if .PriceChanged}}<span class="tag warranty">{{$.T "quoted %s" ($.MoneyOrBlank .EstimatedMinor)}}</span>{{end}}
     </div>
   </li>
   {{end}}
