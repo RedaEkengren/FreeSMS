@@ -121,6 +121,44 @@ func TestTakingInAnUnknownVehicleOpensAJob(t *testing.T) {
 	}
 }
 
+// A vehicle nobody has seen before is taken in with no customer, because
+// migration 0005 made the column nullable rather than push the front desk
+// into inventing one. It must still be on the board. The whole existing suite
+// missed an inner join here for weeks because every other fixture seeds a
+// customer, so this test opens the job the way the front desk does.
+func TestAVehicleWithNoCustomerIsStillOnTheBoard(t *testing.T) {
+	ts, pool := testServer(t)
+	client := signIn(t, ts, advisorEmail)
+
+	form := url.Values{
+		"registration": {"NOC 001"},
+		"complaint":    {"Will not start"},
+	}
+	post(t, client, ts.URL+"/jobs/new", form)
+
+	// Nothing linked a customer, which is the case under test.
+	var customers int
+	if err := database.InShop(context.Background(), pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx,
+			`SELECT count(*) FROM work_orders w
+			  JOIN vehicle_registrations r ON r.vehicle_id = w.vehicle_id
+			 WHERE r.normalised = 'NOC001' AND w.customer_id IS NOT NULL`).Scan(&customers)
+	}); err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if customers != 0 {
+		t.Fatalf("the fixture gave the job a customer, so it does not test anything")
+	}
+
+	body := get(t, client, ts.URL+"/board", http.StatusOK)
+	if !strings.Contains(body, "NOC 001") {
+		t.Errorf("a vehicle with no customer is missing from the board; it is on the ramp and the counter cannot see it:\n%s", body)
+	}
+	if !strings.Contains(body, "No customer recorded yet") {
+		t.Errorf("the board does not say the customer is missing, so nobody will fill it in before invoicing:\n%s", body)
+	}
+}
+
 func get(t *testing.T, client *http.Client, url string, wantStatus int) string {
 	t.Helper()
 	resp, err := client.Get(url)

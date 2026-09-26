@@ -1,51 +1,29 @@
 {
+  "No customer recorded yet": "Ingen kund noterad än",
   "locale": "sv",
-  "name": "Svenska",
   "messages": {
-    "Sign in": {
-      "other": "Logga in"
+    "%d finding": {
+      "one": "%d fynd",
+      "other": "%d fynd"
     },
-    "Sign out": {
-      "other": "Logga ut"
+    "%d thing noticed, not priced": {
+      "one": "%d sak upptäckt, inte prissatt",
+      "other": "%d saker upptäckta, inte prissatta"
+    },
+    "Ask the parts desk": {
+      "other": "Fråga lagret"
+    },
+    "Ask the workshop for a new one.": {
+      "other": "Be verkstaden om en ny."
+    },
+    "Back": {
+      "other": "Tillbaka"
     },
     "Email": {
       "other": "E-post"
     },
-    "Password": {
-      "other": "Lösenord"
-    },
-    "In the shop": {
-      "other": "Inne på verkstaden"
-    },
-    "Nothing open.": {
-      "other": "Inget öppet."
-    },
-    "no plate": {
-      "other": "ingen skylt"
-    },
-    "Start clock": {
-      "other": "Starta klockan"
-    },
-    "Stop clock": {
-      "other": "Stoppa klockan"
-    },
-    "State": {
-      "other": "Status"
-    },
-    "Odometer": {
-      "other": "Mätarställning"
-    },
-    "On it": {
-      "other": "Jobbar på den"
-    },
-    "Lines": {
-      "other": "Rader"
-    },
-    "Nothing on this order yet.": {
-      "other": "Inget på ordern än."
-    },
-    "Back": {
-      "other": "Tillbaka"
+    "Everything checked was in order. Nothing needs doing.": {
+      "other": "Allt som kontrollerades var i ordning. Inget behöver göras."
     },
     "Hand it on": {
       "other": "Lämna över"
@@ -53,58 +31,92 @@
     "I need a part to carry on": {
       "other": "Jag behöver en del för att komma vidare"
     },
-    "Ask the parts desk": {
-      "other": "Fråga lagret"
-    },
-    "Something else needs doing": {
-      "other": "Något mer behöver göras"
-    },
-    "Tell the front desk": {
-      "other": "Säg till framdisken"
-    },
-    "Parts": {
-      "other": "Delar"
-    },
-    "waiting": {
-      "other": "väntar"
-    },
-    "arrived": {
-      "other": "kommit"
-    },
-    "Noticed under the car": {
-      "other": "Upptäckt under bilen"
-    },
-    "needs pricing": {
-      "other": "behöver prissättas"
-    },
-    "mine": {
-      "other": "min"
-    },
-    "running": {
-      "other": "igång"
+    "In the shop": {
+      "other": "Inne på verkstaden"
     },
     "Inspections": {
       "other": "Kontroller"
     },
+    "It has arrived": {
+      "other": "Den har kommit"
+    },
+    "Lines": {
+      "other": "Rader"
+    },
+    "No, leave it": {
+      "other": "Nej, låt den vara"
+    },
+    "Nothing on this order yet.": {
+      "other": "Inget på ordern än."
+    },
+    "Nothing open.": {
+      "other": "Inget öppet."
+    },
+    "Nothing outstanding.": {
+      "other": "Inget utestående."
+    },
+    "Noticed under the car": {
+      "other": "Upptäckt under bilen"
+    },
+    "Odometer": {
+      "other": "Mätarställning"
+    },
+    "On it": {
+      "other": "Jobbar på den"
+    },
+    "Open the link again and try once more.": {
+      "other": "Öppna länken igen och försök en gång till."
+    },
+    "Parts": {
+      "other": "Delar"
+    },
+    "Password": {
+      "other": "Lösenord"
+    },
+    "Sign in": {
+      "other": "Logga in"
+    },
+    "Sign out": {
+      "other": "Logga ut"
+    },
+    "Something else needs doing": {
+      "other": "Något mer behöver göras"
+    },
+    "Something went wrong": {
+      "other": "Något gick fel"
+    },
     "Start a check": {
       "other": "Starta en kontroll"
+    },
+    "Start clock": {
+      "other": "Starta klockan"
     },
     "Start it": {
       "other": "Starta"
     },
-    "done": {
-      "other": "klar"
+    "State": {
+      "other": "Status"
     },
-    "in progress": {
-      "other": "pågår"
+    "Stop clock": {
+      "other": "Stoppa klockan"
     },
-    "Waiting for %d part": {
-      "one": "Väntar på %d del",
-      "other": "Väntar på %d delar"
+    "Take in a vehicle": {
+      "other": "Ta in en bil"
     },
-    "%d finding": {
-      "one": "%d fynd",
-      "other": "%d fynd"
+    "Tell the front desk": {
+      "other": "Säg till framdisken"
+    },
+    "That did not go through": {
+      "other": "Det gick inte igenom"
+    },
+    "These need your decision. Approve what you want done.": {
+      "other": "De här behöver ditt besked. Godkänn det du vill ha gjort."
+    },
+    "This link is no longer open": {
+      "other": "Den här länken är inte öppen längre"
+    },
+    "This link is personal to your vehicle and stops working after a while. It shows no prices — the workshop will quote you for whatever you approve.": {
+      "other": "Den här länken hör till din bil och slutar fungera efter ett tag. Den visar inga priser — verkstaden lämnar pris på det du godkänner."
     },
     "Those details do not match an account.": {
       "other": "De uppgifterna stämmer inte mot något konto."
@@ -112,76 +124,65 @@
     "Too many attempts. Wait a few minutes and try again.": {
       "other": "För många försök. Vänta några minuter och försök igen."
     },
-    "late": {
-      "other": "sen"
+    "Try again shortly.": {
+      "other": "Försök igen om en stund."
     },
     "Uncollected for %d day": {
       "one": "Ohämtad i %d dag",
       "other": "Ohämtad i %d dagar"
     },
-    "%d thing noticed, not priced": {
-      "one": "%d sak upptäckt, inte prissatt",
-      "other": "%d saker upptäckta, inte prissatta"
-    },
-    "Take in a vehicle": {
-      "other": "Ta in en bil"
+    "Waiting for %d part": {
+      "one": "Väntar på %d del",
+      "other": "Väntar på %d delar"
     },
     "Waiting for parts": {
       "other": "Väntar på delar"
     },
-    "Nothing outstanding.": {
-      "other": "Inget utestående."
-    },
-    "It has arrived": {
-      "other": "Den har kommit"
-    },
-    "checked by %s at %s": {
-      "other": "kontrollerad av %s hos %s"
-    },
-    "Everything checked was in order. Nothing needs doing.": {
-      "other": "Allt som kontrollerades var i ordning. Inget behöver göras."
-    },
-    "These need your decision. Approve what you want done.": {
-      "other": "De här behöver ditt besked. Godkänn det du vill ha gjort."
-    },
-    "needs doing": {
-      "other": "behöver göras"
-    },
-    "keep an eye on": {
-      "other": "håll ett öga på"
-    },
-    "You said yes to this. You can change it.": {
-      "other": "Du sa ja till det här. Du kan ändra dig."
+    "Yes, do it": {
+      "other": "Ja, gör det"
     },
     "You said no to this. You can change it.": {
       "other": "Du sa nej till det här. Du kan ändra dig."
     },
-    "Yes, do it": {
-      "other": "Ja, gör det"
+    "You said yes to this. You can change it.": {
+      "other": "Du sa ja till det här. Du kan ändra dig."
     },
-    "No, leave it": {
-      "other": "Nej, låt den vara"
+    "arrived": {
+      "other": "kommit"
     },
-    "This link is personal to your vehicle and stops working after a while. It shows no prices — the workshop will quote you for whatever you approve.": {
-      "other": "Den här länken hör till din bil och slutar fungera efter ett tag. Den visar inga priser — verkstaden lämnar pris på det du godkänner."
+    "checked by %s at %s": {
+      "other": "kontrollerad av %s hos %s"
     },
-    "This link is no longer open": {
-      "other": "Den här länken är inte öppen längre"
+    "done": {
+      "other": "klar"
     },
-    "Ask the workshop for a new one.": {
-      "other": "Be verkstaden om en ny."
+    "in progress": {
+      "other": "pågår"
     },
-    "Something went wrong": {
-      "other": "Något gick fel"
+    "keep an eye on": {
+      "other": "håll ett öga på"
     },
-    "Try again shortly.": {
-      "other": "Försök igen om en stund."
+    "late": {
+      "other": "sen"
     },
-    "That did not go through": {
-      "other": "Det gick inte igenom"
+    "mine": {
+      "other": "min"
     },
-    "Open the link again and try once more.": {
-      "other": "Öppna länken igen och försök en gång till."
+    "needs doing": {
+      "other": "behöver göras"
+    },
+    "needs pricing": {
+      "other": "behöver prissättas"
+    },
+    "no plate": {
+      "other": "ingen skylt"
+    },
+    "running": {
+      "other": "igång"
+    },
+    "waiting": {
+      "other": "väntar"
     }
-  }
+  },
+  "name": "Svenska"
 }

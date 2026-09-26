@@ -10,6 +10,7 @@
       {{if .Late}}<span class="tag late">{{$.T "late"}}</span>{{end}}
     </div>
     <div class="vehicle">{{.Make}} {{.Model}}{{if .CustomerName}} &middot; {{.CustomerName}}{{end}}</div>
+    {{if not .HasCustomer}}<div class="waiting">{{$.T "No customer recorded yet"}}</div>{{end}}
     <div class="waiting">{{.Waiting}}</div>
     {{if gt .OpenFindings 0}}<div class="waiting">{{$.N "%d thing noticed, not priced" .OpenFindings}}</div>{{end}}
     {{if gt .WaitingDays 0}}

@@ -28,6 +28,13 @@ type BoardEntry struct {
 	Complaint    string
 
 	CustomerName string
+
+	// Whether a customer is recorded at all, which is not the same as having
+	// a name. A company with no contact person has a customer and an empty
+	// display name; a vehicle taken in before anybody typed the details has
+	// neither. The front desk needs to tell those apart, because the second
+	// one cannot be invoiced until it is fixed.
+	HasCustomer bool
 	OpenedAt     time.Time
 	PromisedAt   *time.Time
 	ReadyAt      *time.Time
@@ -107,6 +114,7 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 			       coalesce(r.registration, ''), coalesce(v.make, ''), coalesce(v.model, ''),
 			       coalesce(w.complaint, ''),
 			       coalesce(cp.display_name, c.company_name, ''),
+			       w.customer_id IS NOT NULL,
 			       w.opened_at, w.promised_at, w.ready_at,
 			       coalesce((
 			           SELECT p.display_name
@@ -119,7 +127,14 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 			         WHERE f.work_order_id = w.id AND f.handled_at IS NULL)
 			FROM work_orders w
 			JOIN vehicles v  ON v.id = w.vehicle_id
-			JOIN customers c ON c.id = w.customer_id
+			-- Left, not inner. A work order is allowed to have no customer --
+			-- migration 0005 made the column nullable so that the front desk
+			-- is never pushed into inventing one -- and an inner join here
+			-- would hide exactly those vehicles from the board that exists to
+			-- show what is in the shop. The technician's list does not touch
+			-- this table, so the car would be worked on while the counter
+			-- could not see it.
+			LEFT JOIN customers c ON c.id = w.customer_id
 			LEFT JOIN people cp ON cp.id = c.person_id
 			LEFT JOIN vehicle_registrations r
 			       ON r.vehicle_id = v.id AND r.valid_to IS NULL
@@ -141,7 +156,7 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 			var b BoardEntry
 			if err := rows.Scan(&b.ID, &b.Number, &b.State,
 				&b.Registration, &b.Make, &b.Model, &b.Complaint,
-				&b.CustomerName, &b.OpenedAt, &b.PromisedAt, &b.ReadyAt,
+				&b.CustomerName, &b.HasCustomer, &b.OpenedAt, &b.PromisedAt, &b.ReadyAt,
 				&b.WorkingNow, &b.OpenFindings); err != nil {
 				return fmt.Errorf("scan board entry: %w", err)
 			}
