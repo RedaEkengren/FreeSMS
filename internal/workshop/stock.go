@@ -543,7 +543,10 @@ func PartsForJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 	// A cap rather than paging. Somebody looking at a job wants the part they
 	// have in their hand, and a list long enough to scroll means the search
 	// box is the answer, not the next page.
-	const shortList, searchResults = 8, 25
+	// Six, not eight. The list is a shortcut, not a catalogue: past about
+	// half a dozen the eye stops scanning and the search box is the faster
+	// route anyway.
+	const shortList, searchResults = 6, 25
 
 	query = strings.TrimSpace(query)
 	var out []Part

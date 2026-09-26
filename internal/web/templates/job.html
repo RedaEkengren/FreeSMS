@@ -108,29 +108,95 @@
 </ul>
 {{end}}
 
+{{if .Lines}}
+{{/* In the side rail rather than under the lines: the total is what the front
+     desk is asked for on the telephone, and it used to scroll away with
+     everything else. On a phone the rail is simply the top of the page, so it
+     reads in the same order it always did. */}}
+<dl class="totals">
+  {{range .Totals.Bands}}
+  <dt>{{$.T "VAT"}} {{divide .RateBasisPoints 100}}%</dt><dd>{{$.Money .VATMinor}}</dd>
+  {{end}}
+  <dt>{{.T "Net"}}</dt><dd>{{.Money .Totals.NetMinor}}</dd>
+  <dt class="grand">{{.T "Total"}}</dt><dd class="grand">{{.Money .Totals.GrossMinor}}</dd>
+</dl>
+{{end}}
+
 </div>
 
 <div class="main">
 <h2>{{.T "Lines"}}</h2>
-{{if not .Lines}}
-  <p class="empty">{{.T "Nothing on this order yet."}}</p>
-{{else}}
-<ul class="lines">
-  {{range .Lines}}
-  <li>
-    <div class="row">
-      <span>{{.Description}}</span>
-      <span>{{.Quantity}} &times; {{$.Money .UnitPriceMinor}} = {{$.Money .NetMinor}}</span>
-    </div>
-    <div>
-      {{if not .Approved}}<span class="tag warranty">added after approval</span>{{end}}
-      {{if ne .CostBearer "customer"}}<span class="tag warranty">warranty: {{.CostBearer}}</span>{{end}}
-      {{if .PriceChanged}}<span class="tag warranty">{{$.T "quoted %s" ($.MoneyOrBlank .EstimatedMinor)}}</span>{{end}}
-    </div>
-  </li>
-  {{end}}
-</ul>
+{{/* The form element is here and empty; its fields live in the last rows of
+     the table below, joined to it by the HTML form attribute. A form cannot be
+     nested inside a table, and this form carries data-keep -- the autosave and
+     offline queue -- so it is the element that has to survive, not its
+     position. */}}
+{{if .Session.Scope.Role.SeesCustomerPersonalData}}
+<form id="add-line" method="post" action="/jobs/{{.Job.ID}}/lines"
+      data-keep="job-line:{{.Job.ID}}"></form>
 {{end}}
+
+<table class="lines-table">
+  <thead>
+    <tr>
+      <th>{{.T "What"}}</th>
+      <th class="num">{{.T "Quantity"}}</th>
+      <th class="num">{{.T "Unit price"}}</th>
+      <th class="num">{{.T "Amount"}}</th>
+    </tr>
+  </thead>
+  <tbody>
+  {{range .Lines}}
+    <tr>
+      <td>
+        {{.Description}}
+        {{if not .Approved}}<span class="tag warranty">{{$.T "added after approval"}}</span>{{end}}
+        {{if ne .CostBearer "customer"}}<span class="tag warranty">{{$.T "warranty: %s" .CostBearer}}</span>{{end}}
+        {{if .PriceChanged}}<span class="tag warranty">{{$.T "quoted %s" ($.MoneyOrBlank .EstimatedMinor)}}</span>{{end}}
+      </td>
+      <td class="num" data-label="{{$.T "Quantity"}}">{{.Quantity}}</td>
+      <td class="num" data-label="{{$.T "Unit price"}}">{{$.Money .UnitPriceMinor}}</td>
+      <td class="num" data-label="{{$.T "Amount"}}">{{$.Money .NetMinor}}</td>
+    </tr>
+  {{else}}
+    <tr><td colspan="4" class="empty">{{.T "Nothing on this order yet."}}</td></tr>
+  {{end}}
+  </tbody>
+  {{if .Session.Scope.Role.SeesCustomerPersonalData}}
+  <tfoot>
+    <tr class="add">
+      <td><input form="add-line" name="description" required
+                 placeholder="{{.T "What"}}"></td>
+      <td class="num"><input form="add-line" name="quantity" value="1" inputmode="decimal"></td>
+      <td class="num"><input form="add-line" name="unit_price" value="0" inputmode="decimal"></td>
+      <td class="num"><button form="add-line" type="submit" class="secondary">{{.T "Add"}}</button></td>
+    </tr>
+    <tr class="add">
+      <td colspan="4">
+        <div class="pair">
+          <label>
+            <span>{{.T "Kind"}}</span>
+            <select form="add-line" name="kind">
+              <option value="labour">{{.T "Labour"}}</option>
+              <option value="part">{{.T "Part"}}</option>
+              <option value="sublet">{{.T "Sublet"}}</option>
+              <option value="fee">{{.T "Fee"}}</option>
+            </select>
+          </label>
+          <label>
+            <span>{{.T "Who pays"}}</span>
+            <select form="add-line" name="cost_bearer">
+              <option value="customer">{{.T "The customer"}}</option>
+              <option value="supplier">{{.T "Supplier warranty"}}</option>
+              <option value="shop">{{.T "The workshop"}}</option>
+            </select>
+          </label>
+        </div>
+      </td>
+    </tr>
+  </tfoot>
+  {{end}}
+</table>
 
 {{if .Invoices}}
 <h2>{{.T "Documents"}}</h2>
@@ -158,16 +224,6 @@
   {{end}}
 {{end}}
 
-{{if .Lines}}
-<dl class="totals">
-  {{range .Totals.Bands}}
-  <dt>VAT {{divide .RateBasisPoints 100}}%</dt><dd>{{$.Money .VATMinor}}</dd>
-  {{end}}
-  <dt>Net</dt><dd>{{.Money .Totals.NetMinor}}</dd>
-  <dt class="grand">Total</dt><dd class="grand">{{.Money .Totals.GrossMinor}}</dd>
-</dl>
-{{end}}
-
 {{if not .Session.Scope.Role.SeesCustomerPersonalData}}
 <h2>{{.T "Hand it on"}}</h2>
 <form method="post" action="/jobs/{{.Job.ID}}/parts">
@@ -186,27 +242,32 @@
 </form>
 {{end}}
 
+{{/* One row each rather than a card each. Thirteen cards of a hundred and
+     twenty pixels was most of the page's height, and none of it was the order. */}}
+<div class="picks">
 {{if .Suggestions}}
-<h2>From the shop's time library</h2>
+<div>
+<h2>{{.T "From the shop's time library"}}</h2>
 {{range .Suggestions}}
-<form method="post" action="/jobs/{{$.Job.ID}}/lines" class="suggestion">
+<form method="post" action="/jobs/{{$.Job.ID}}/lines" class="pick">
   <input type="hidden" name="kind" value="labour">
   <input type="hidden" name="cost_bearer" value="customer">
   <input type="hidden" name="labour_time_id" value="{{.ID}}">
   <input type="hidden" name="description" value="{{.Operation}}">
   <input type="hidden" name="quantity" value="{{.Hours}}">
   <input type="hidden" name="unit_price" value="{{fmt $.LabourRate}}">
-  <div class="row">
-    <span>{{.Operation}}</span>
-    <span class="tag">{{.Hours}} h</span>
-  </div>
-  <div class="waiting">matched on {{.MatchedRule}}{{if .Actuals.Known}} &middot; really took {{.Actuals.MedianHours}} h across {{.Actuals.Jobs}}{{end}}</div>
-  <button type="submit" class="secondary" style="margin-top:0.5rem">Put it on the order</button>
+  <span class="what">{{.Operation}}
+    <small>{{$.T "matched on %s" .MatchedRule}}{{if .Actuals.Known}} &middot; {{$.T "really took %s h across %s" .Actuals.MedianHours .Actuals.Jobs}}{{end}}</small>
+  </span>
+  <span class="tag">{{.Hours}} h</span>
+  <button type="submit" class="secondary">{{$.T "Add"}}</button>
 </form>
 {{end}}
+</div>
 {{end}}
 
 {{if .Session.Scope.Role.SeesCustomerPersonalData}}
+<div>
 <h2>{{.T "From the shelf"}}</h2>
 {{/* A search rather than the whole catalogue. The input is outside any form
      on purpose: a handheld scanner types fast and presses Enter, and Enter
@@ -219,46 +280,11 @@
          hx-trigger="input changed delay:200ms, keyup[key=='Enter']">
 </label>
 <div id="shelf">{{template "shelf" .}}</div>
+</div>
 {{end}}
+</div>
 
 
-{{if .Session.Scope.Role.SeesCustomerPersonalData}}
-<h2>Add a line</h2>
-<form method="post" action="/jobs/{{.Job.ID}}/lines" data-keep="job-line:{{.Job.ID}}">
-  <label>
-    <span>What</span>
-    <input name="description" required>
-  </label>
-  <div class="pair">
-    <label>
-      <span>Quantity</span>
-      <input name="quantity" value="1" inputmode="decimal">
-    </label>
-    <label>
-      <span>Unit price</span>
-      <input name="unit_price" value="0" inputmode="decimal">
-    </label>
-  </div>
-  <label>
-    <span>Kind</span>
-    <select name="kind">
-      <option value="labour">Labour</option>
-      <option value="part">Part</option>
-      <option value="sublet">Sublet</option>
-      <option value="fee">Fee</option>
-    </select>
-  </label>
-  <label>
-    <span>Who pays</span>
-    <select name="cost_bearer">
-      <option value="customer">The customer</option>
-      <option value="supplier">Supplier warranty</option>
-      <option value="shop">The workshop</option>
-    </select>
-  </label>
-  <button type="submit">Add the line</button>
-</form>
-{{end}}
 </div>
 </div>
 
@@ -270,21 +296,19 @@
   <p class="waiting">{{.T "Nothing matched."}}</p>
 {{end}}
 {{range .Parts}}
-<form method="post" action="/jobs/{{$.Job.ID}}/lines" class="suggestion">
+<form method="post" action="/jobs/{{$.Job.ID}}/lines" class="pick">
   <input type="hidden" name="kind" value="part">
   <input type="hidden" name="cost_bearer" value="customer">
   <input type="hidden" name="part_id" value="{{.ID}}">
   <input type="hidden" name="description" value="{{.Name}} ({{.Number}})">
   <input type="hidden" name="unit_price" value="{{.Price}}">
-  <div class="row">
-    <span>{{.Number}} &middot; {{.Name}}</span>
-    <span class="tag{{if .Negative}} late{{else if .Short}} warranty{{end}}">{{.Available}} {{.Unit}}</span>
-  </div>
-  <div class="waiting">{{$.Dot .Location ($.MoneyOrBlank .PriceMinor) ($.T .ShortfallNote)}}</div>
-  <div class="pair" style="margin-top:0.5rem">
-    <label><span>How many</span><input name="quantity" value="1" inputmode="decimal"></label>
-    <label><span>&nbsp;</span><button type="submit" class="secondary">Put it on the order</button></label>
-  </div>
+  <span class="what">{{.Number}} &middot; {{.Name}}
+    <small>{{$.Dot .Location ($.MoneyOrBlank .PriceMinor) ($.T .ShortfallNote)}}</small>
+  </span>
+  <span class="tag{{if .Negative}} late{{else if .Short}} warranty{{end}}">{{.Available}} {{.Unit}}</span>
+  <input name="quantity" value="1" inputmode="decimal" class="qty"
+         aria-label="{{$.T "How many"}}">
+  <button type="submit" class="secondary">{{$.T "Add"}}</button>
 </form>
 {{end}}
 {{end}}

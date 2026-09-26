@@ -18,8 +18,14 @@
     "Accounting": {
       "other": "Bokföring"
     },
+    "Add": {
+      "other": "Lägg till"
+    },
     "Administrator": {
       "other": "Administratör"
+    },
+    "Amount": {
+      "other": "Belopp"
     },
     "Approved, not started": {
       "other": "Godkänd, inte påbörjad"
@@ -105,11 +111,17 @@
     "Everything checked was in order. Nothing needs doing.": {
       "other": "Allt som kontrollerades var i ordning. Inget behöver göras."
     },
+    "Fee": {
+      "other": "Avgift"
+    },
     "Figures": {
       "other": "Siffror"
     },
     "From the shelf": {
       "other": "Från hyllan"
+    },
+    "From the shop's time library": {
+      "other": "Från verkstadens tidsbibliotek"
     },
     "Front desk": {
       "other": "Kundmottagning"
@@ -149,6 +161,12 @@
     },
     "It is ready": {
       "other": "Den är klar"
+    },
+    "Kind": {
+      "other": "Sort"
+    },
+    "Labour": {
+      "other": "Arbete"
     },
     "Labour times": {
       "other": "Arbetstider"
@@ -213,6 +231,9 @@
     "Park it for parts": {
       "other": "Ställ av i väntan på delar"
     },
+    "Part": {
+      "other": "Del"
+    },
     "Part number or name": {
       "other": "Artikelnummer eller namn"
     },
@@ -236,6 +257,9 @@
     },
     "Put it back to a draft": {
       "other": "Tillbaka till utkast"
+    },
+    "Quantity": {
+      "other": "Antal"
     },
     "Ready for collection": {
       "other": "Klar för hämtning"
@@ -291,6 +315,12 @@
     "Stop clock": {
       "other": "Stoppa klockan"
     },
+    "Sublet": {
+      "other": "Underleverantör"
+    },
+    "Supplier warranty": {
+      "other": "Leverantörsgaranti"
+    },
     "Take in a vehicle": {
       "other": "Ta in en bil"
     },
@@ -303,11 +333,17 @@
     "That did not go through": {
       "other": "Det gick inte igenom"
     },
+    "The customer": {
+      "other": "Kunden"
+    },
     "The customer said no": {
       "other": "Kunden sa nej"
     },
     "The lookup never stops you taking a car in. If the service is down, type what you know.": {
       "other": "Uppslaget hindrar aldrig att du tar in en bil. Om tjänsten ligger nere, skriv det du vet."
+    },
+    "The workshop": {
+      "other": "Verkstaden"
     },
     "These need your decision. Approve what you want done.": {
       "other": "De här behöver ditt besked. Godkänn det du vill ha gjort."
@@ -334,6 +370,9 @@
       "one": "Ohämtad i %d dag",
       "other": "Ohämtad i %d dagar"
     },
+    "Unit price": {
+      "other": "Á-pris"
+    },
     "VAT": {
       "other": "Moms"
     },
@@ -359,8 +398,14 @@
     "Went back": {
       "other": "Returnerat"
     },
+    "What": {
+      "other": "Vad"
+    },
     "What happened": {
       "other": "Vad hände"
+    },
+    "Who pays": {
+      "other": "Vem betalar"
     },
     "Written off": {
       "other": "Avskrivet"
@@ -373,6 +418,9 @@
     },
     "You said yes to this. You can change it.": {
       "other": "Du sa ja till det här. Du kan ändra dig."
+    },
+    "added after approval": {
+      "other": "tillagd efter godkännande"
     },
     "and above": {
       "other": "och uppåt"
@@ -404,6 +452,9 @@
     "late": {
       "other": "sen"
     },
+    "matched on %s": {
+      "other": "matchad på %s"
+    },
     "mine": {
       "other": "min"
     },
@@ -428,6 +479,9 @@
     "quoted %s": {
       "other": "offererat %s"
     },
+    "really took %s h across %s": {
+      "other": "tog i själva verket %s h över %s"
+    },
     "running": {
       "other": "igång"
     },
@@ -436,6 +490,9 @@
     },
     "waiting": {
       "other": "väntar"
+    },
+    "warranty: %s": {
+      "other": "garanti: %s"
     }
   },
   "name": "Svenska"

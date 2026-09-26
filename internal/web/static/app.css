@@ -9,16 +9,27 @@
   --border: #d3d7de;
   --text: #14171c;
   --muted: #5b6270;
-  --accent: #0b5cd5;
+
+  /* Graphite, not blue. The palette a workshop lives in is black, grey, white
+     and red, and red is spoken for -- see --danger. */
+  --accent: #1f2328;
   --accent-text: #ffffff;
   --running: #0a7d37;
-  --warn: #9a3412;
+
+  /* Two urgencies, not one. --attention is a thing to note: a supplier
+     warranty, a part at its minimum. --danger is a thing that is wrong now: a
+     car past its promised time, less than nothing on the shelf, a failed
+     request. Only the second is red, and it is the only red on the screen. */
+  --attention: #8a5a00;
+  --danger: #c0261f;
 
   /* A tap target below this is missed by a gloved finger. */
   --tap: 3rem;
   --radius: 0.625rem;
 }
 
+/* One definition of the dark values, applied both by preference and by an
+   explicit choice, so the two cannot drift apart. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0e1116;
@@ -26,10 +37,13 @@
     --border: #2b313b;
     --text: #f0f2f5;
     --muted: #9aa3b2;
-    --accent: #4d94ff;
-    --accent-text: #05080d;
+    /* Inverted: on a near-black page the accent has to be the light one, or a
+       button and its focus ring both disappear. */
+    --accent: #e8ebf0;
+    --accent-text: #0e1116;
     --running: #35d07f;
-    --warn: #fca66a;
+    --attention: #e0a458;
+    --danger: #ff6b5e;
   }
 }
 :root[data-theme="dark"] {
@@ -38,10 +52,11 @@
   --border: #2b313b;
   --text: #f0f2f5;
   --muted: #9aa3b2;
-  --accent: #4d94ff;
-  --accent-text: #05080d;
+  --accent: #e8ebf0;
+  --accent-text: #0e1116;
   --running: #35d07f;
-  --warn: #fca66a;
+  --attention: #e0a458;
+  --danger: #ff6b5e;
 }
 
 * { box-sizing: border-box; }
@@ -80,7 +95,8 @@ main {
 h1 { font-size: 1.25rem; margin: 0 0 1rem; }
 h2 { font-size: 1rem; margin: 1.5rem 0 0.5rem; color: var(--muted); font-weight: 600; }
 
-a { color: var(--accent); }
+/* Blue said "link" on its own. Graphite does not, so it is underlined. */
+a { color: var(--accent); text-underline-offset: 0.2em; }
 
 .card {
   display: block;
@@ -117,7 +133,7 @@ a { color: var(--accent); }
   white-space: nowrap;
 }
 .tag.running { color: var(--running); border-color: var(--running); }
-.tag.warranty { color: var(--warn); border-color: var(--warn); }
+.tag.warranty { color: var(--attention); border-color: var(--attention); }
 
 button, .button {
   display: block;
@@ -175,12 +191,12 @@ input:focus-visible, button:focus-visible, .card:focus-visible {
 
 .error {
   background: var(--surface);
-  border: 1px solid var(--warn);
+  border: 1px solid var(--danger);
   border-left-width: 4px;
   border-radius: var(--radius);
   padding: 0.75rem 1rem;
   margin-bottom: 1rem;
-  color: var(--warn);
+  color: var(--danger);
 }
 
 .empty { color: var(--muted); text-align: center; padding: 3rem 1rem; }
@@ -196,8 +212,8 @@ ul.lines li:last-child { border-bottom: none; }
 /* Late is the only colour that means urgency on the board. If finished cars
    were coloured too, the whole board would be red and red would stop meaning
    anything. */
-.card.late { border-left: 4px solid var(--warn); }
-.tag.late { color: var(--warn); border-color: var(--warn); }
+.card.late { border-left: 4px solid var(--danger); }
+.tag.late { color: var(--danger); border-color: var(--danger); }
 .waiting { color: var(--muted); margin-top: 0.25rem; }
 
 /* State actions: several small buttons rather than one big one, because none
@@ -268,6 +284,74 @@ form.scan input { font-family: ui-monospace, Menlo, monospace; font-size: 1.125r
 summary { min-height: var(--tap); display: flex; align-items: center; cursor: pointer; color: var(--accent); font-size: 0.9375rem; }
 summary::marker { color: var(--muted); }
 
+/* Order lines as a table, because numbers that line up can be read down a
+   column and a sentence cannot. This replaced "2,5 × 895,00 kr = 2 237,50 kr"
+   on every row. */
+table.lines-table { width: 100%; border-collapse: collapse; }
+table.lines-table th {
+  text-align: left;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 0 0.5rem 0.375rem;
+  border-bottom: 1px solid var(--border);
+}
+table.lines-table td { padding: 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+table.lines-table tbody tr:last-child td { border-bottom: none; }
+table.lines-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.lines-table td.empty { text-align: center; padding: 2rem 1rem; }
+/* Adding a line happens in the table, as its last rows, so the fields sit
+   under the columns they fill. */
+table.lines-table tfoot td { border-bottom: none; padding-top: 0.75rem; }
+table.lines-table tfoot input, table.lines-table tfoot select { min-height: var(--tap); }
+table.lines-table tfoot .num input { text-align: right; }
+table.lines-table tfoot label { margin-bottom: 0; }
+table.lines-table .tag { margin-left: 0.375rem; }
+
+/* Something you can put on the order: one row, not a card. The name grows,
+   the facts sit under it in small text, and the button takes only the width it
+   needs. Thirteen of these used to be thirteen cards. */
+.pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.pick:last-child { border-bottom: none; }
+/* Wide enough to be worth reading; below that the button wraps under it
+   rather than the name being crushed to two characters. */
+.pick .what { flex: 1 1 11rem; min-width: 0; }
+.pick .what small { display: block; color: var(--muted); font-size: 0.8125rem; }
+.pick button { width: auto; min-width: 0; padding: 0 0.875rem; }
+.pick input.qty { width: 4rem; text-align: right; }
+
+/* A phone cannot hold four columns of figures, and the body forbids a sideways
+   page, so below the breakpoint the table stops being one: each row becomes a
+   block with its numbers on a second line. The technician sees this table too
+   -- the lines are not hidden from them, only the prices they may not set --
+   so this is the default shape and the columns are the exception.
+
+   Labels come from the cells' own data-label, because a header row that has
+   been hidden cannot say which number is which. */
+@media (max-width: 59.999rem) {
+  table.lines-table, table.lines-table tbody, table.lines-table tfoot,
+  table.lines-table tr, table.lines-table td { display: block; width: auto; }
+  table.lines-table thead { display: none; }
+  table.lines-table tr { padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+  table.lines-table tr:last-child { border-bottom: none; }
+  table.lines-table td { border: none; padding: 0; }
+  table.lines-table td.num { display: inline-block; margin-right: 1rem; color: var(--muted); }
+  table.lines-table td.num::before { content: attr(data-label) " "; font-size: 0.8125rem; }
+  table.lines-table tfoot td.num { display: block; margin-right: 0; }
+  table.lines-table tfoot td.num::before { content: none; }
+  table.lines-table tfoot input, table.lines-table tfoot button { width: 100%; }
+  table.lines-table tfoot .num input { text-align: left; }
+}
+
 /* An issued invoice. Plain, because it is a document somebody hands over or
    prints, not a screen with actions on it. */
 .document { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1rem; }
@@ -285,7 +369,10 @@ summary::marker { color: var(--muted); }
    --tap does not move. A tablet on a workbench is a wide screen with gloves in
    front of it, and every tap target keeps its height. */
 @media (min-width: 60rem) {
-  main { max-width: 72rem; }
+  /* 88rem, not 72. A column of prose wants to stay narrow; a screen of
+     figures and part numbers wants the window, and at 72rem the part names
+     wrapped onto three lines while a third of a 1920px display sat empty. */
+  main { max-width: 88rem; }
 
   /* Cards side by side instead of a single tall stack. auto-fill rather than
      a fixed count, so the board fills whatever screen the counter has. */
@@ -295,7 +382,12 @@ summary::marker { color: var(--muted); }
   /* The job page: what the car is and where it has got to on the left, what
      it costs on the right. align-items: start keeps the short column short
      instead of stretching it to match the long one. */
-  .split { display: grid; grid-template-columns: minmax(16rem, 20rem) 1fr; gap: 2.5rem; align-items: start; }
+  .split { display: grid; grid-template-columns: minmax(16rem, 21rem) 1fr; gap: 2.5rem; align-items: start; }
+  /* The rail stays while the lines scroll: the total and the telephone number
+     are what somebody is asked for, and they used to scroll away. Sticky only
+     here -- on a phone the header is already sticky and a second fixed block
+     would eat a fifth of the screen. */
+  .split > .side { position: sticky; top: 4.5rem; }
   /* The first h2 in each column would otherwise push one of them down. */
   .split > * > h2:first-child { margin-top: 0; }
 
@@ -309,6 +401,14 @@ summary::marker { color: var(--muted); }
     padding: 0 1.5rem;
   }
   main > form > button.link, .no-print > button.link { min-width: 0; padding: 0; }
+
+  /* The two places to pick from sit side by side. They answer the same
+     question -- what goes on this order -- and stacking them put the shelf
+     two screens below the table it fills. */
+  /* Not equal shares: the shelf row carries a quantity box and a button as
+     well as a name, so it needs the wider half or the part number wraps onto
+     three lines. */
+  .picks { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 0 2rem; align-items: start; }
 
   /* Figures and totals read as columns when the numbers line up. */
   dl.totals dd, ul.lines .row span:last-child { font-variant-numeric: tabular-nums; }
@@ -326,5 +426,5 @@ summary::marker { color: var(--muted); }
 
 /* Work held because there was no connection. Visible without being alarming:
    nothing is lost, it just has not gone yet. */
-.held { background: var(--warn); color: var(--bg); padding: 0.5rem 1rem; font-size: 0.9375rem; text-align: center; }
+.held { background: var(--attention); color: var(--bg); padding: 0.5rem 1rem; font-size: 0.9375rem; text-align: center; }
 .held[hidden] { display: none; }
