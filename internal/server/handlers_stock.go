@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -15,6 +16,14 @@ func (s *Server) handleStock(w http.ResponseWriter, r *http.Request) {
 	if s.handoverError(w, r, err) {
 		return
 	}
+	// What is running out goes to the top. The parts desk opens this screen to
+	// find out what to order, and a catalogue in number order answers a
+	// question nobody asked. Sorted here rather than in the query because
+	// "short" is Available() against the minimum, which is Go's answer and
+	// should have one definition.
+	sort.SliceStable(parts, func(i, j int) bool {
+		return partUrgency(parts[i]) < partUrgency(parts[j])
+	})
 	bands, err := workshop.PriceBands(r.Context(), s.pool, session.Scope)
 	if err != nil {
 		s.log.Error("price bands", "error", err)
@@ -110,4 +119,19 @@ func (s *Server) handleSavePriceBand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/stock", http.StatusSeeOther)
+}
+
+// partUrgency ranks a part for the stock screen: below nothing first, because
+// that is a discrepancy somebody has to explain; then at or below the minimum,
+// which is an order to place; then everything else, in number order, which the
+// query already produced and a stable sort preserves.
+func partUrgency(p workshop.Part) int {
+	switch {
+	case p.Negative():
+		return 0
+	case p.Short():
+		return 1
+	default:
+		return 2
+	}
 }

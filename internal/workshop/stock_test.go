@@ -338,3 +338,136 @@ func TestStockIsNotForTechnicians(t *testing.T) {
 		t.Errorf("a technician read the stock list: %v", err)
 	}
 }
+
+// seedCatalogue puts a shelf of parts in, enough that a short list is
+// visibly shorter than all of them.
+func seedCatalogue(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	err := database.InShop(context.Background(), pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		for _, p := range []struct{ number, name string }{
+			{"AF-88", "Cabin filter"},
+			{"BAT-70", "Battery 70Ah"},
+			{"BD-220", "Brake disc, front"},
+			{"GP-4C", "Glow plug, set of four"},
+			{"OF-31", "Oil filter"},
+			{"OIL-5W30", "Engine oil 5W-30"},
+			{"SP-IR", "Spark plug, iridium"},
+			{"WB-24", "Wiper blade 600mm"},
+			{"WB-16", "Wiper blade 400mm"},
+			{"TB-9", "Timing belt kit"},
+			{"CL-2", "Clutch kit"},
+			{"TU-1", "Turbocharger"},
+		} {
+			if _, err := tx.Exec(ctx,
+				`INSERT INTO parts (shop_id, number, name) VALUES ($1, $2, $3)`,
+				shopID, p.number, p.name); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("seed the catalogue: %v", err)
+	}
+}
+
+// The job page used to render every part inline. Nine in a demonstration is
+// fine; two thousand in a workshop is a page nobody can navigate.
+func TestTheJobOffersAShortListAndNotTheCatalogue(t *testing.T) {
+	pool := setup(t)
+	seedCatalogue(t, pool)
+	ctx := context.Background()
+	job := newJob(t, pool)
+
+	all, err := workshop.Parts(ctx, pool, advisor())
+	if err != nil {
+		t.Fatalf("Parts: %v", err)
+	}
+	short, err := workshop.PartsForJob(ctx, pool, advisor(), job, "")
+	if err != nil {
+		t.Fatalf("PartsForJob: %v", err)
+	}
+	if len(short) >= len(all) {
+		t.Errorf("the job offers %d of %d parts; that is the catalogue again", len(short), len(all))
+	}
+	if len(short) == 0 {
+		t.Error("the job offers nothing at all, so the shelf is unreachable")
+	}
+}
+
+// A second brake pad set is the commonest second line, so a part already on
+// the order is the most likely next pick.
+func TestAPartAlreadyOnTheOrderComesFirst(t *testing.T) {
+	pool := setup(t)
+	seedCatalogue(t, pool)
+	ctx := context.Background()
+	job := newJob(t, pool)
+
+	// Turbocharger sorts last by number and has never moved, so it would be
+	// nowhere near the top on its own merits.
+	var turbo string
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT id FROM parts WHERE number = 'TU-1'`).Scan(&turbo)
+	}); err != nil {
+		t.Fatalf("find the part: %v", err)
+	}
+	if err := workshop.AddLine(ctx, pool, advisor(), job, workshop.NewLine{
+		Kind: "part", Description: "Turbocharger", QuantityMilli: 1000,
+		UnitPriceMinor: 1500000, VATRateBasis: 2500, PartID: turbo,
+	}); err != nil {
+		t.Fatalf("AddLine: %v", err)
+	}
+
+	short, err := workshop.PartsForJob(ctx, pool, advisor(), job, "")
+	if err != nil {
+		t.Fatalf("PartsForJob: %v", err)
+	}
+	if len(short) == 0 || short[0].Number != "TU-1" {
+		t.Errorf("the part already on the order is not first: %v", numbers(short))
+	}
+}
+
+// The number is what is on the shelf label and what a scanner types, so an
+// exact one is certain and goes first.
+func TestSearchingTheShelfPrefersAnExactNumber(t *testing.T) {
+	pool := setup(t)
+	seedCatalogue(t, pool)
+	ctx := context.Background()
+	job := newJob(t, pool)
+
+	// WB-16 is an exact number; WB-24 shares its prefix.
+	got, err := workshop.PartsForJob(ctx, pool, advisor(), job, "wb-16")
+	if err != nil {
+		t.Fatalf("PartsForJob: %v", err)
+	}
+	if len(got) == 0 || got[0].Number != "WB-16" {
+		t.Errorf("an exact number is not first: %v", numbers(got))
+	}
+
+	// A prefix finds both wipers and nothing else.
+	got, err = workshop.PartsForJob(ctx, pool, advisor(), job, "WB")
+	if err != nil {
+		t.Fatalf("PartsForJob: %v", err)
+	}
+	if len(got) != 2 {
+		t.Errorf("searching WB found %v, want both wiper blades", numbers(got))
+	}
+
+	// And the name is searched too, because somebody at a counter knows what
+	// the thing is called and not what it is numbered.
+	got, err = workshop.PartsForJob(ctx, pool, advisor(), job, "wiper")
+	if err != nil {
+		t.Fatalf("PartsForJob: %v", err)
+	}
+	if len(got) != 2 {
+		t.Errorf("searching by name found %v, want both wiper blades", numbers(got))
+	}
+}
+
+func numbers(parts []workshop.Part) []string {
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		out = append(out, p.Number)
+	}
+	return out
+}

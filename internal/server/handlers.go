@@ -130,9 +130,12 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 
 	// What is on the shelf, so the counter prices a part onto the job rather
 	// than typing a number and leaving the stock untouched.
+	// A short list, not the catalogue: the whole shelf inline is thousands of
+	// lines in a workshop that stocks properly. The search box beside it is
+	// how the rest is reached.
 	var stocked []workshop.Part
 	if session.Scope.Role.SeesCustomerPersonalData() {
-		stocked, err = workshop.Parts(r.Context(), s.pool, session.Scope)
+		stocked, err = workshop.PartsForJob(r.Context(), s.pool, session.Scope, id, "")
 		if err != nil {
 			s.log.Error("read parts", "error", err)
 		}

@@ -262,6 +262,12 @@ form.scan input { font-family: ui-monospace, Menlo, monospace; font-size: 1.125r
 .label .code { font-family: ui-monospace, Menlo, monospace; font-weight: 700; letter-spacing: 0.05em; }
 .label .name { font-size: 0.75rem; }
 
+/* A movement form is one part's business, so it stays out of the way until
+   somebody asks for it. Native details/summary: no script, which the content
+   security policy would refuse anyway. */
+summary { min-height: var(--tap); display: flex; align-items: center; cursor: pointer; color: var(--accent); font-size: 0.9375rem; }
+summary::marker { color: var(--muted); }
+
 /* An issued invoice. Plain, because it is a document somebody hands over or
    prints, not a screen with actions on it. */
 .document { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1rem; }

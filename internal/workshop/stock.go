@@ -515,3 +515,76 @@ func SavePriceBand(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		return err
 	})
 }
+
+// PartsForJob is the short list of parts the job page offers, and the results
+// of a search when somebody types one.
+//
+// The whole catalogue used to be rendered inline, one card with a quantity box
+// and a button per part. Nine parts in a demonstration and two thousand in a
+// workshop, which makes the job page thousands of lines with nothing to
+// navigate by. The time library on the same page never had this problem
+// because it is filtered to the vehicle; this is that idea applied to the
+// shelf, where the filter cannot be the vehicle because a wiper blade fits
+// everything.
+//
+// With no query, the order is what somebody is most likely to reach for:
+// already on this order first, because a second brake pad set is the commonest
+// second line; then by how recently the shop has moved the part at all, which
+// puts the fast-moving shelf above the turbo nobody has touched since spring.
+//
+// With a query, the number is matched as a prefix and the name anywhere. The
+// number comes first because that is what is on the shelf label and what a
+// handheld scanner types.
+func PartsForJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID, query string) ([]Part, error) {
+	if !scope.Role.SeesParts() {
+		return nil, access.ErrForbidden
+	}
+
+	// A cap rather than paging. Somebody looking at a job wants the part they
+	// have in their hand, and a list long enough to scroll means the search
+	// box is the answer, not the next page.
+	const shortList, searchResults = 8, 25
+
+	query = strings.TrimSpace(query)
+	var out []Part
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var rows pgx.Rows
+		var err error
+		if query == "" {
+			rows, err = tx.Query(ctx, `SELECT`+partColumns+`
+				FROM parts p
+				WHERE p.active
+				ORDER BY
+				    EXISTS (SELECT 1 FROM work_order_lines l
+				             WHERE l.work_order_id = $1 AND l.part_id = p.id) DESC,
+				    (SELECT max(m.moved_at) FROM stock_movements m
+				      WHERE m.part_id = p.id) DESC NULLS LAST,
+				    p.number
+				LIMIT $2`, jobID, shortList)
+		} else {
+			rows, err = tx.Query(ctx, `SELECT`+partColumns+`
+				FROM parts p
+				WHERE p.active
+				  AND (upper(p.number) LIKE upper($1) || '%' OR p.name ILIKE '%' || $1 || '%')
+				ORDER BY
+				    -- An exact number is a scanner, and a scanner is certain.
+				    (upper(p.number) = upper($1)) DESC,
+				    (upper(p.number) LIKE upper($1) || '%') DESC,
+				    p.number
+				LIMIT $2`, query, searchResults)
+		}
+		if err != nil {
+			return fmt.Errorf("list parts for job: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			p, err := scanPart(rows)
+			if err != nil {
+				return fmt.Errorf("scan part: %w", err)
+			}
+			out = append(out, p)
+		}
+		return rows.Err()
+	})
+	return out, err
+}

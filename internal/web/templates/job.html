@@ -206,27 +206,21 @@
 {{end}}
 {{end}}
 
-{{if and .Session.Scope.Role.SeesCustomerPersonalData .Parts}}
-<h2>From the shelf</h2>
-{{range .Parts}}
-<form method="post" action="/jobs/{{$.Job.ID}}/lines" class="suggestion">
-  <input type="hidden" name="kind" value="part">
-  <input type="hidden" name="cost_bearer" value="customer">
-  <input type="hidden" name="part_id" value="{{.ID}}">
-  <input type="hidden" name="description" value="{{.Name}} ({{.Number}})">
-  <input type="hidden" name="unit_price" value="{{.Price}}">
-  <div class="row">
-    <span>{{.Number}} &middot; {{.Name}}</span>
-    <span class="tag{{if .Negative}} late{{else if .Short}} warranty{{end}}">{{.Available}} {{.Unit}}</span>
-  </div>
-  <div class="waiting">{{$.Dot .Location ($.MoneyOrBlank .PriceMinor) ($.T .ShortfallNote)}}</div>
-  <div class="pair" style="margin-top:0.5rem">
-    <label><span>How many</span><input name="quantity" value="1" inputmode="decimal"></label>
-    <label><span>&nbsp;</span><button type="submit" class="secondary">Put it on the order</button></label>
-  </div>
-</form>
+{{if .Session.Scope.Role.SeesCustomerPersonalData}}
+<h2>{{.T "From the shelf"}}</h2>
+{{/* A search rather than the whole catalogue. The input is outside any form
+     on purpose: a handheld scanner types fast and presses Enter, and Enter
+     inside a form submits it. */}}
+<label>
+  <span>{{.T "Part number or name"}}</span>
+  <input name="q" value="{{.PartQuery}}" autocomplete="off"
+         autocapitalize="characters" autocorrect="off" spellcheck="false"
+         hx-get="/jobs/{{.Job.ID}}/parts" hx-target="#shelf" hx-swap="innerHTML"
+         hx-trigger="input changed delay:200ms, keyup[key=='Enter']">
+</label>
+<div id="shelf">{{template "shelf" .}}</div>
 {{end}}
-{{end}}
+
 
 {{if .Session.Scope.Role.SeesCustomerPersonalData}}
 <h2>Add a line</h2>
@@ -269,6 +263,30 @@
 </div>
 
 <p style="margin-top:2rem"><a href="/">{{.T "Back"}}</a></p>
+{{end}}
+
+{{define "shelf"}}
+{{if not .Parts}}
+  <p class="waiting">{{.T "Nothing matched."}}</p>
+{{end}}
+{{range .Parts}}
+<form method="post" action="/jobs/{{$.Job.ID}}/lines" class="suggestion">
+  <input type="hidden" name="kind" value="part">
+  <input type="hidden" name="cost_bearer" value="customer">
+  <input type="hidden" name="part_id" value="{{.ID}}">
+  <input type="hidden" name="description" value="{{.Name}} ({{.Number}})">
+  <input type="hidden" name="unit_price" value="{{.Price}}">
+  <div class="row">
+    <span>{{.Number}} &middot; {{.Name}}</span>
+    <span class="tag{{if .Negative}} late{{else if .Short}} warranty{{end}}">{{.Available}} {{.Unit}}</span>
+  </div>
+  <div class="waiting">{{$.Dot .Location ($.MoneyOrBlank .PriceMinor) ($.T .ShortfallNote)}}</div>
+  <div class="pair" style="margin-top:0.5rem">
+    <label><span>How many</span><input name="quantity" value="1" inputmode="decimal"></label>
+    <label><span>&nbsp;</span><button type="submit" class="secondary">Put it on the order</button></label>
+  </div>
+</form>
+{{end}}
 {{end}}
 
 {{define "clock"}}

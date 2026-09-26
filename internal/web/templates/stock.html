@@ -18,6 +18,11 @@ wrongly ordered parts cost.</p>
 {{if not .Parts}}
   <p class="empty">Nothing stocked yet.</p>
 {{else}}
+{{/* The whole shelf, because this is the parts desk's screen and it needs
+     it. But a form per part is a wall: at two thousand parts the page was
+     thousands of lines of identical inputs, and the one thing anybody wants to
+     see -- what is running out -- was buried in it. The rows are rows; the
+     form is behind the part it belongs to. */}}
 {{range .Parts}}
 <div class="card">
   <div class="row">
@@ -27,32 +32,35 @@ wrongly ordered parts cost.</p>
     </span>
   </div>
   <div class="waiting">{{$.Dot ($.T .ReservedNote .Reserved .Available) .Location ($.MoneyOrBlank .PriceMinor)}}</div>
-  {{if .Negative}}<div class="waiting">Less than nothing on the shelf — something was fitted that was never booked in.</div>{{end}}
-  {{if .Short}}<div class="waiting">At or below the minimum.</div>{{end}}
+  {{if .Negative}}<div class="waiting">{{$.T "Less than nothing on the shelf — something was fitted that was never booked in."}}</div>{{end}}
+  {{if .Short}}<div class="waiting">{{$.T "At or below the minimum."}}</div>{{end}}
 
-  <form method="post" action="/stock/move" style="margin-top:0.75rem">
-    <input type="hidden" name="part_id" value="{{.ID}}">
-    <div class="pair">
-      <label><span>How many</span><input name="quantity" value="1" inputmode="decimal"></label>
+  <details>
+    <summary>{{$.T "Record a movement"}}</summary>
+    <form method="post" action="/stock/move" style="margin-top:0.75rem">
+      <input type="hidden" name="part_id" value="{{.ID}}">
+      <div class="pair">
+        <label><span>{{$.T "How many"}}</span><input name="quantity" value="1" inputmode="decimal"></label>
+        <label>
+          <span>{{$.T "What happened"}}</span>
+          <select name="kind">
+            <option value="received">{{$.T "Arrived"}}</option>
+            <option value="returned">{{$.T "Went back"}}</option>
+            <option value="written_off">{{$.T "Written off"}}</option>
+            <option value="counted">{{$.T "Stocktake difference"}}</option>
+          </select>
+        </label>
+      </div>
       <label>
-        <span>What happened</span>
-        <select name="kind">
-          <option value="received">Arrived</option>
-          <option value="returned">Went back</option>
-          <option value="written_off">Written off</option>
-          <option value="counted">Stocktake difference</option>
+        <span>{{$.T "If written off, why"}}</span>
+        <select name="reason">
+          <option value="">&mdash;</option>
+          {{range $key, $label := $.Reasons}}<option value="{{$key}}">{{$label}}</option>{{end}}
         </select>
       </label>
-    </div>
-    <label>
-      <span>If written off, why</span>
-      <select name="reason">
-        <option value="">—</option>
-        {{range $key, $label := $.Reasons}}<option value="{{$key}}">{{$label}}</option>{{end}}
-      </select>
-    </label>
-    <button type="submit" class="secondary">Record it</button>
-  </form>
+      <button type="submit" class="secondary">{{$.T "Record it"}}</button>
+    </form>
+  </details>
 </div>
 {{end}}
 {{end}}

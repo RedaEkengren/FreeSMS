@@ -251,3 +251,32 @@ func (s *Server) handleInvoiceDocument(w http.ResponseWriter, r *http.Request) {
 		Document: doc,
 	})
 }
+
+// handleJobParts answers the search beside the shelf on a job page.
+//
+// A separate route rather than a reload of the whole job, because the job page
+// is long and re-rendering it to filter one list is the kind of thing that
+// makes a page feel slow -- which is the single most common complaint about
+// every system this one is meant to replace.
+func (s *Server) handleJobParts(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id := r.PathValue("id")
+
+	parts, err := workshop.PartsForJob(r.Context(), s.pool, session.Scope, id, r.URL.Query().Get("q"))
+	switch {
+	case errors.Is(err, access.ErrForbidden):
+		s.renderError(w, r, http.StatusForbidden, "Not for your role", "")
+		return
+	case err != nil:
+		s.log.Error("search parts", "error", err)
+		http.Error(w, "could not search", http.StatusInternalServerError)
+		return
+	}
+
+	s.renderPartial(w, r, "job", "shelf", pageData{
+		Session:   session,
+		Job:       workshop.Job{ID: id},
+		Parts:     parts,
+		PartQuery: r.URL.Query().Get("q"),
+	})
+}

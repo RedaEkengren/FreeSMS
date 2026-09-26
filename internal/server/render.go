@@ -68,6 +68,7 @@ type pageData struct {
 	Dashboard   workshop.Dashboard
 	Erasures    []workshop.Erasure
 	Parts       []workshop.Part
+	PartQuery   string
 	PriceBands  []workshop.PriceBand
 	WriteOffs   []workshop.WriteOffCost
 	Reasons     map[string]string
