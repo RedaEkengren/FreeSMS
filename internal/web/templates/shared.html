@@ -1,23 +1,23 @@
 {{define "content"}}
 {{if .Error}}
-  <h1>{{.Title}}</h1>
-  <p class="error">{{.Error}}</p>
+  <h1>{{.T .Title}}</h1>
+  <p class="error">{{.T .Error}}</p>
 {{else}}
   <h1>{{.Inspection.Registration}}</h1>
-  <p class="vehicle">{{.Inspection.Make}} {{.Inspection.Model}} &middot; checked by
-  {{.Inspection.PerformedBy}} at {{.Inspection.ShopName}}</p>
+  <p class="vehicle">{{.Inspection.Make}} {{.Inspection.Model}} &middot;
+  {{.T "checked by %s at %s" .Inspection.PerformedBy .Inspection.ShopName}}</p>
 
   {{$findings := .Inspection.Findings}}
   {{if not $findings}}
-    <p class="empty">Everything checked was in order. Nothing needs doing.</p>
+    <p class="empty">{{.T "Everything checked was in order. Nothing needs doing."}}</p>
   {{else}}
-    <p>These need your decision. Approve what you want done.</p>
+    <p>{{.T "These need your decision. Approve what you want done."}}</p>
     {{range $findings}}
     <div class="card">
       <div class="row">
         <strong>{{.Label}}</strong>
-        {{if eq .Status "fail"}}<span class="tag late">needs doing</span>
-        {{else}}<span class="tag warranty">keep an eye on</span>{{end}}
+        {{if eq .Status "fail"}}<span class="tag late">{{$.T "needs doing"}}</span>
+        {{else}}<span class="tag warranty">{{$.T "keep an eye on"}}</span>{{end}}
       </div>
       {{if .Note}}<p>{{.Note}}</p>{{end}}
 
@@ -28,20 +28,22 @@
       {{end}}
 
       {{if .Decided}}
-        <p class="waiting">You {{.Decision}} this. You can change it.</p>
+        {{if eq .Decision "approved"}}
+          <p class="waiting">{{$.T "You said yes to this. You can change it."}}</p>
+        {{else}}
+          <p class="waiting">{{$.T "You said no to this. You can change it."}}</p>
+        {{end}}
       {{end}}
       <form method="post" action="/i/{{$.ShareToken}}/items/{{.ID}}">
         <div class="actions">
-          <button name="decision" value="approved">Yes, do it</button>
-          <button name="decision" value="declined" class="secondary">No, leave it</button>
+          <button name="decision" value="approved">{{$.T "Yes, do it"}}</button>
+          <button name="decision" value="declined" class="secondary">{{$.T "No, leave it"}}</button>
         </div>
       </form>
     </div>
     {{end}}
   {{end}}
 
-  <p class="waiting" style="margin-top:2rem">This link is personal to your
-  vehicle and stops working after a while. It shows no prices — the workshop
-  will quote you for whatever you approve.</p>
+  <p class="waiting" style="margin-top:2rem">{{.T "This link is personal to your vehicle and stops working after a while. It shows no prices — the workshop will quote you for whatever you approve."}}</p>
 {{end}}
 {{end}}

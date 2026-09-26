@@ -24,6 +24,7 @@ import (
 	"github.com/RedaEkengren/FreeSMS/internal/storage"
 	"github.com/RedaEkengren/FreeSMS/internal/vehicledata"
 	"github.com/RedaEkengren/FreeSMS/internal/web"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -72,6 +73,25 @@ func (s *Server) localeFor(session auth.Session) string {
 		return session.Locale
 	}
 	return s.locale
+}
+
+// shopLocale is the language for a page with nobody signed in.
+//
+// The customer's page is the case. They have no account, no setting and no way
+// to ask for another language, so the shop's is the only honest signal.
+// Accept-Language from the browser is tempting and wrong: a workshop writes to
+// its customers in the language it does business in, and a Swedish shop should
+// not address somebody in German because their phone is set that way.
+func (s *Server) shopLocale(r *http.Request) string {
+	locale, err := workshop.ShopLocale(r.Context(), s.pool, s.shop())
+	if err != nil {
+		s.log.Warn("read shop locale", "error", err)
+		return s.locale
+	}
+	if locale == "" {
+		return s.locale
+	}
+	return locale
 }
 
 func (s *Server) shop() string {

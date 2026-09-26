@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/jackc/pgx/v5"
 )
@@ -131,4 +133,134 @@ func get(t *testing.T, client *http.Client, url string, wantStatus int) string {
 		t.Fatalf("%s returned %d, want %d\n%s", url, resp.StatusCode, wantStatus, body)
 	}
 	return string(body)
+}
+
+// The customer has no account, no setting and no way to ask for another
+// language, so the shop's is the only honest signal.
+func TestTheCustomersPageFollowsTheShopsLanguage(t *testing.T) {
+	ts, pool := testServer(t)
+	ctx := context.Background()
+
+	// Build an inspection with a finding and a link to it.
+	advisor := signIn(t, ts, advisorEmail)
+	form := url.Values{"template_id": {seedTemplate(t, pool)}}
+	req, _ := http.NewRequest(http.MethodPost,
+		ts.URL+"/jobs/aaaaaaaa-0000-0000-0000-00000000000f/inspect", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", ts.URL)
+	resp, err := advisor.Do(req)
+	if err != nil {
+		t.Fatalf("start inspection: %v", err)
+	}
+	resp.Body.Close()
+	inspection := strings.TrimPrefix(resp.Header.Get("Location"), "/inspections/")
+	if inspection == "" {
+		t.Fatalf("no inspection was started: %d", resp.StatusCode)
+	}
+
+	// A finding, or there is nothing for the customer to decide and the page
+	// correctly shows no buttons at all.
+	var itemID string
+	if err := database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `
+			UPDATE inspection_items SET status = 'fail', note = 'Belägg nere på plåten'
+			WHERE inspection_id = $1 RETURNING id`, inspection).Scan(&itemID)
+	}); err != nil {
+		t.Fatalf("mark the item: %v", err)
+	}
+
+	// The shop does business in Swedish.
+	if err := database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE shops SET locale = 'sv' WHERE id = $1`, shopA)
+		return err
+	}); err != nil {
+		t.Fatalf("set the shop's language: %v", err)
+	}
+
+	share := post(t, advisor, ts.URL+"/inspections/"+inspection+"/share", url.Values{})
+	// The page prints the link using BASE_URL, which is not where the test
+	// server is listening; only the path matters here.
+	body := get(t, &http.Client{}, ts.URL+sharePath(t, share), http.StatusOK)
+	if !strings.Contains(body, `lang="sv"`) {
+		t.Error("the customer's page does not declare Swedish")
+	}
+	if !strings.Contains(body, "Ja, gör det") {
+		t.Errorf("the page is not in Swedish:\n%s", firstLines(body, 40))
+	}
+	if strings.Contains(body, "Yes, do it") {
+		t.Error("the page still carries the English button")
+	}
+}
+
+// A link that no longer works is refused in the shop's language too.
+func TestAClosedLinkIsRefusedInTheShopsLanguage(t *testing.T) {
+	ts, pool := testServer(t)
+	if err := database.InShop(context.Background(), pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE shops SET locale = 'sv' WHERE id = $1`, shopA)
+		return err
+	}); err != nil {
+		t.Fatalf("set the shop's language: %v", err)
+	}
+
+	body := get(t, &http.Client{}, ts.URL+"/i/not-a-real-token", http.StatusNotFound)
+	if !strings.Contains(body, "Be verkstaden om en ny") {
+		t.Errorf("the refusal is not in Swedish:\n%s", firstLines(body, 30))
+	}
+}
+
+func seedTemplate(t *testing.T, pool *pgxpool.Pool) string {
+	t.Helper()
+	var id string
+	err := database.InShop(context.Background(), pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx,
+			`INSERT INTO inspection_templates (shop_id, name) VALUES ($1, 'Service check') RETURNING id`,
+			shopA).Scan(&id); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx,
+			`INSERT INTO inspection_template_items (shop_id, template_id, position, label)
+			 VALUES ($1, $2, 1, 'Front brakes')`, shopA, id)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed template: %v", err)
+	}
+	return id
+}
+
+func post(t *testing.T, client *http.Client, url string, form url.Values) string {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodPost, url, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", "http://"+req.URL.Host)
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("post %s: %v", url, err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	return string(body)
+}
+
+// sharePath pulls the customer link's path off the page it was shown on.
+func sharePath(t *testing.T, page string) string {
+	t.Helper()
+	i := strings.Index(page, "/i/")
+	if i < 0 {
+		t.Fatalf("no link on the page:\n%s", firstLines(page, 40))
+	}
+	rest := page[i:]
+	end := strings.IndexAny(rest, `"< `)
+	if end < 0 {
+		t.Fatal("the link does not end")
+	}
+	return rest[:end]
+}
+
+func firstLines(s string, n int) string {
+	lines := strings.Split(s, "\n")
+	if len(lines) > n {
+		lines = lines[:n]
+	}
+	return strings.Join(lines, "\n")
 }

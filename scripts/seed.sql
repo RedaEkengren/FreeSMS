@@ -135,24 +135,29 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- A checklist to run against a car.
+--
+-- In Swedish, because the seeded shop does business in Swedish. A template's
+-- labels are the shop's own words and are not translated by this system: they
+-- go straight onto the page the customer reads, so a Swedish shop writes them
+-- in Swedish and a Finnish one in Finnish.
 INSERT INTO inspection_templates (id, shop_id, name)
 VALUES ('dddddddd-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
-        'Service check')
+        'Servicekontroll')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO inspection_template_items (id, shop_id, template_id, position, label) VALUES
   ('dddddddd-0000-0000-0000-000000000011', '11111111-1111-1111-1111-111111111111',
-   'dddddddd-0000-0000-0000-000000000001', 1, 'Front brake pads and discs'),
+   'dddddddd-0000-0000-0000-000000000001', 1, 'Bromsbelägg och skivor fram'),
   ('dddddddd-0000-0000-0000-000000000012', '11111111-1111-1111-1111-111111111111',
-   'dddddddd-0000-0000-0000-000000000001', 2, 'Rear brake pads and discs'),
+   'dddddddd-0000-0000-0000-000000000001', 2, 'Bromsbelägg och skivor bak'),
   ('dddddddd-0000-0000-0000-000000000013', '11111111-1111-1111-1111-111111111111',
-   'dddddddd-0000-0000-0000-000000000001', 3, 'Tyres and pressures'),
+   'dddddddd-0000-0000-0000-000000000001', 3, 'Däck och lufttryck'),
   ('dddddddd-0000-0000-0000-000000000014', '11111111-1111-1111-1111-111111111111',
-   'dddddddd-0000-0000-0000-000000000001', 4, 'Steering and suspension'),
+   'dddddddd-0000-0000-0000-000000000001', 4, 'Styrning och fjädring'),
   ('dddddddd-0000-0000-0000-000000000015', '11111111-1111-1111-1111-111111111111',
-   'dddddddd-0000-0000-0000-000000000001', 5, 'Fluids and leaks'),
+   'dddddddd-0000-0000-0000-000000000001', 5, 'Vätskor och läckage'),
   ('dddddddd-0000-0000-0000-000000000016', '11111111-1111-1111-1111-111111111111',
-   'dddddddd-0000-0000-0000-000000000001', 6, 'Lights and wipers')
+   'dddddddd-0000-0000-0000-000000000001', 6, 'Belysning och torkare')
 ON CONFLICT (id) DO NOTHING;
 
 COMMIT;

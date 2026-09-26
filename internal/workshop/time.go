@@ -224,3 +224,15 @@ func ShopTimezone(ctx context.Context, pool *pgxpool.Pool, shopID string) (strin
 	})
 	return tz, err
 }
+
+// ShopLocale reads the shop's language, for a page with nobody signed in.
+func ShopLocale(ctx context.Context, pool *pgxpool.Pool, shopID string) (string, error) {
+	if shopID == "" {
+		return "", nil
+	}
+	var locale string
+	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT locale FROM shops WHERE id = $1`, shopID).Scan(&locale)
+	})
+	return locale, err
+}

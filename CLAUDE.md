@@ -111,12 +111,20 @@ not exist.
 
 - **The translation is partial.** The mechanism is in place and Swedish
   ships, but only the screens people stand in front of all day are converted:
-  sign-in, the technician's list and job, the counter board, the parts desk.
+  sign-in, the technician's list and job, the counter board, the parts desk,
+  and the customer's page.
   The administrative screens -- figures, stock, accounting, privacy, the time
   library -- still carry English literals. A page can therefore declare
   `lang="sv"` and show English, which is honest about the state and wrong for
   a screen reader. Converting the rest is mechanical; adding a string without
   a catalogue key is not acceptable in new work.
+
+  A shop's own words are never translated and must not be: inspection
+  template labels, part names, a technician's note. They go straight onto the
+  page the customer reads, so a Swedish shop writes them in Swedish. The
+  customer's page takes its language from the shop, because a customer has no
+  account and no setting -- and not from `Accept-Language`, because a workshop
+  writes to its customers in the language it does business in.
 
 - **Nothing is deployed yet, and there is no `deploy.yml`.** A workflow naming
   `DEPLOY_HOST` and `DEPLOY_SSH_KEY` when the repository has neither is dead

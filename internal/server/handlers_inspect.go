@@ -210,19 +210,22 @@ func (s *Server) handleSharedInspection(w http.ResponseWriter, r *http.Request) 
 		// One answer for wrong, expired and revoked. Whoever is holding a link
 		// that does not work does not need to be told which kind.
 		s.render(w, r, http.StatusNotFound, "shared", pageData{
-			Title: "This link is no longer open",
-			Error: "Ask the workshop for a new one.",
+			Locale: s.shopLocale(r),
+			Title:  "This link is no longer open",
+			Error:  "Ask the workshop for a new one.",
 		})
 		return
 	}
 	if err != nil {
 		s.log.Error("shared inspection", "error", err)
 		s.render(w, r, http.StatusInternalServerError, "shared", pageData{
-			Title: "Something went wrong", Error: "Try again shortly.",
+			Locale: s.shopLocale(r),
+			Title:  "Something went wrong", Error: "Try again shortly.",
 		})
 		return
 	}
 	s.render(w, r, http.StatusOK, "shared", pageData{
+		Locale:     s.shopLocale(r),
 		Title:      "Your vehicle",
 		Inspection: insp,
 		ShareToken: r.PathValue("token"),
@@ -240,7 +243,8 @@ func (s *Server) handleSharedDecision(w http.ResponseWriter, r *http.Request) {
 			status = http.StatusBadRequest
 		}
 		s.render(w, r, status, "shared", pageData{
-			Title: "That did not go through", Error: "Open the link again and try once more.",
+			Locale: s.shopLocale(r),
+			Title:  "That did not go through", Error: "Open the link again and try once more.",
 		})
 		return
 	}

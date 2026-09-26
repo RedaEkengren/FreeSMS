@@ -134,6 +134,54 @@
     },
     "It has arrived": {
       "other": "Den har kommit"
+    },
+    "checked by %s at %s": {
+      "other": "kontrollerad av %s hos %s"
+    },
+    "Everything checked was in order. Nothing needs doing.": {
+      "other": "Allt som kontrollerades var i ordning. Inget behöver göras."
+    },
+    "These need your decision. Approve what you want done.": {
+      "other": "De här behöver ditt besked. Godkänn det du vill ha gjort."
+    },
+    "needs doing": {
+      "other": "behöver göras"
+    },
+    "keep an eye on": {
+      "other": "håll ett öga på"
+    },
+    "You said yes to this. You can change it.": {
+      "other": "Du sa ja till det här. Du kan ändra dig."
+    },
+    "You said no to this. You can change it.": {
+      "other": "Du sa nej till det här. Du kan ändra dig."
+    },
+    "Yes, do it": {
+      "other": "Ja, gör det"
+    },
+    "No, leave it": {
+      "other": "Nej, låt den vara"
+    },
+    "This link is personal to your vehicle and stops working after a while. It shows no prices — the workshop will quote you for whatever you approve.": {
+      "other": "Den här länken hör till din bil och slutar fungera efter ett tag. Den visar inga priser — verkstaden lämnar pris på det du godkänner."
+    },
+    "This link is no longer open": {
+      "other": "Den här länken är inte öppen längre"
+    },
+    "Ask the workshop for a new one.": {
+      "other": "Be verkstaden om en ny."
+    },
+    "Something went wrong": {
+      "other": "Något gick fel"
+    },
+    "Try again shortly.": {
+      "other": "Försök igen om en stund."
+    },
+    "That did not go through": {
+      "other": "Det gick inte igenom"
+    },
+    "Open the link again and try once more.": {
+      "other": "Öppna länken igen och försök en gång till."
     }
   }
 }
