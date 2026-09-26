@@ -7,6 +7,12 @@
 
 {{if .Job.Complaint}}<p>{{.Job.Complaint}}</p>{{end}}
 
+{{/* Two columns once there is room for them, and one stacked column on a
+     phone. The order here is the order a phone reads them in, which is why
+     the clock and the state come first: the technician's screen is the
+     default and the desk is the exception. */}}
+<div class="split">
+<div class="side">
 <div id="clock">{{template "clock" .}}</div>
 {{if .Job.OthersRunning}}<p class="waiting">{{.Job.OthersRunning}} still has a clock running on this job.</p>{{end}}
 
@@ -92,6 +98,9 @@
 </ul>
 {{end}}
 
+</div>
+
+<div class="main">
 <h2>{{.T "Lines"}}</h2>
 {{if not .Lines}}
   <p class="empty">{{.T "Nothing on this order yet."}}</p>
@@ -249,6 +258,8 @@
   <button type="submit">Add the line</button>
 </form>
 {{end}}
+</div>
+</div>
 
 <p style="margin-top:2rem"><a href="/">{{.T "Back"}}</a></p>
 {{end}}

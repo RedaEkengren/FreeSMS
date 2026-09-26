@@ -248,11 +248,53 @@ form.scan input { font-family: ui-monospace, Menlo, monospace; font-size: 1.125r
 .document h1 { margin-bottom: 0.25rem; }
 .document ul.lines li .row span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+/* One breakpoint, and it is an exception rather than the design.
+   
+   Mobile first was the right call for the technician in a bay and the wrong
+   one for the three roles that work at a desk: the front desk on a 24-inch
+   screen got a 48rem column with sixty per cent of the display empty and
+   buttons sized for a gloved finger. This gives those screens the width and
+   changes nothing below it, so a phone is exactly as it was.
+   
+   --tap does not move. A tablet on a workbench is a wide screen with gloves in
+   front of it, and every tap target keeps its height. */
+@media (min-width: 60rem) {
+  main { max-width: 72rem; }
+
+  /* Cards side by side instead of a single tall stack. auto-fill rather than
+     a fixed count, so the board fills whatever screen the counter has. */
+  .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr)); gap: 0.75rem; align-items: start; }
+  .board .card { margin-bottom: 0; height: 100%; }
+
+  /* The job page: what the car is and where it has got to on the left, what
+     it costs on the right. align-items: start keeps the short column short
+     instead of stretching it to match the long one. */
+  .split { display: grid; grid-template-columns: minmax(16rem, 20rem) 1fr; gap: 2.5rem; align-items: start; }
+  /* The first h2 in each column would otherwise push one of them down. */
+  .split > * > h2:first-child { margin-top: 0; }
+
+  /* A button is full width because a thumb needs the target, not because the
+     page needs the ink. Once there is room, it takes what it needs -- except
+     inside a card or a suggestion, where full width is what lines the column
+     up. */
+  main > form > button, main > form > .button, main > button, .no-print > button {
+    width: auto;
+    min-width: 14rem;
+    padding: 0 1.5rem;
+  }
+  main > form > button.link, .no-print > button.link { min-width: 0; padding: 0; }
+
+  /* Figures and totals read as columns when the numbers line up. */
+  dl.totals dd, ul.lines .row span:last-child { font-variant-numeric: tabular-nums; }
+}
+
 @media print {
   header, .no-print, nav { display: none !important; }
   main { padding: 0; max-width: none; }
   /* The border and the fill are screen furniture; on paper they are toner. */
   .document { border: none; padding: 0; background: none; }
+  /* A printed page has one column whatever the screen was doing. */
+  .split, .board { display: block; }
   .label { break-inside: avoid; }
 }
 
