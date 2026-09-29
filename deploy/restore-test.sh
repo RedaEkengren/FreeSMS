@@ -16,8 +16,13 @@ cd "$(dirname "$0")/.."
 BACKUPS="$(mktemp -d)"
 trap 'rm -rf "$BACKUPS"; docker compose down -v --remove-orphans >/dev/null 2>&1 || true' EXIT
 
-export DB_CONTAINER=mechanic-db-1
-export ATTACHMENTS_VOLUME=mechanic_attachments
+# Compose names containers and volumes after the project, and the project
+# defaults to the directory name -- "mechanic" on the machine this was written
+# on, "FreeSMS" in CI. Guessing either is how a script passes locally and fails
+# on a checkout, which is exactly what happened. Pin it instead.
+export COMPOSE_PROJECT_NAME=freesms-restore-test
+export DB_CONTAINER="${COMPOSE_PROJECT_NAME}-db-1"
+export ATTACHMENTS_VOLUME="${COMPOSE_PROJECT_NAME}_attachments"
 
 say() { printf '\n== %s\n' "$1"; }
 
@@ -32,7 +37,7 @@ done
 curl -fsS http://localhost:8080/healthz >/dev/null
 
 say "putting something in it worth losing"
-docker exec -i mechanic-db-1 psql -U freesms -d freesms -v ON_ERROR_STOP=1 <<'SQL'
+docker exec -i "$DB_CONTAINER" psql -U freesms -d freesms -v ON_ERROR_STOP=1 <<'SQL'
 BEGIN;
 SET LOCAL app.current_shop = '11111111-1111-1111-1111-111111111111';
 INSERT INTO shops (id, name, locale) VALUES
@@ -67,12 +72,12 @@ COMMIT;
 SQL
 
 # A photograph, which is the thing that cannot be typed again.
-docker run --rm -v mechanic_attachments:/dst alpine \
+docker run --rm -v "$ATTACHMENTS_VOLUME":/dst alpine \
     sh -c 'mkdir -p /dst/ab && printf "not really a jpeg, but it is the bytes that matter" > /dst/ab/abcdef0123456789.jpg'
 
-BEFORE_GROSS="$(docker exec mechanic-db-1 psql -U freesms -d freesms -At \
+BEFORE_GROSS="$(docker exec "$DB_CONTAINER" psql -U freesms -d freesms -At \
     -c "SELECT gross_minor FROM invoices WHERE id = '66666666-0000-0000-0000-000000000001'")"
-BEFORE_PHOTO="$(docker run --rm -v mechanic_attachments:/src:ro alpine cat /src/ab/abcdef0123456789.jpg)"
+BEFORE_PHOTO="$(docker run --rm -v "$ATTACHMENTS_VOLUME":/src:ro alpine cat /src/ab/abcdef0123456789.jpg)"
 echo "invoice gross before: $BEFORE_GROSS"
 
 say "backing up"
@@ -85,11 +90,11 @@ PERM="$(stat -c '%a' "$BACKUPS/freesms-$STAMP.dump")"
 [ "$PERM" = "600" ] || { echo "the dump is mode $PERM, not 600" >&2; exit 1; }
 
 say "destroying both halves"
-docker exec mechanic-db-1 psql -U freesms -d freesms -v ON_ERROR_STOP=1 \
+docker exec "$DB_CONTAINER" psql -U freesms -d freesms -v ON_ERROR_STOP=1 \
     -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
-docker run --rm -v mechanic_attachments:/dst alpine sh -c 'rm -rf /dst/*'
+docker run --rm -v "$ATTACHMENTS_VOLUME":/dst alpine sh -c 'rm -rf /dst/*'
 
-if docker exec mechanic-db-1 psql -U freesms -d freesms -At -c 'SELECT 1 FROM invoices' 2>/dev/null; then
+if docker exec "$DB_CONTAINER" psql -U freesms -d freesms -At -c 'SELECT 1 FROM invoices' 2>/dev/null; then
     echo "the database survived being dropped; the test is not testing anything" >&2
     exit 1
 fi
@@ -98,11 +103,11 @@ say "restoring"
 ./deploy/restore.sh "$BACKUPS" "$STAMP"
 
 say "asking for the facts back"
-AFTER_GROSS="$(docker exec mechanic-db-1 psql -U freesms -d freesms -At \
+AFTER_GROSS="$(docker exec "$DB_CONTAINER" psql -U freesms -d freesms -At \
     -c "SELECT gross_minor FROM invoices WHERE id = '66666666-0000-0000-0000-000000000001'")"
-AFTER_NAME="$(docker exec mechanic-db-1 psql -U freesms -d freesms -At \
+AFTER_NAME="$(docker exec "$DB_CONTAINER" psql -U freesms -d freesms -At \
     -c "SELECT customer_name FROM invoices WHERE id = '66666666-0000-0000-0000-000000000001'")"
-AFTER_PHOTO="$(docker run --rm -v mechanic_attachments:/src:ro alpine cat /src/ab/abcdef0123456789.jpg)"
+AFTER_PHOTO="$(docker run --rm -v "$ATTACHMENTS_VOLUME":/src:ro alpine cat /src/ab/abcdef0123456789.jpg)"
 
 fail=0
 [ "$AFTER_GROSS" = "$BEFORE_GROSS" ] || { echo "gross: $AFTER_GROSS, want $BEFORE_GROSS" >&2; fail=1; }
@@ -112,7 +117,7 @@ fail=0
 # Row level security is part of the schema, not of the data. A restore that
 # brings the rows back without the policies hands every shop's data to every
 # other one.
-POLICIES="$(docker exec mechanic-db-1 psql -U freesms -d freesms -At \
+POLICIES="$(docker exec "$DB_CONTAINER" psql -U freesms -d freesms -At \
     -c "SELECT count(*) FROM pg_policies WHERE schemaname = 'public'")"
 [ "$POLICIES" -gt 0 ] || { echo "no row level security policies came back" >&2; fail=1; }
 echo "policies restored: $POLICIES"
