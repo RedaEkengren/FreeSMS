@@ -40,6 +40,27 @@ jobs:
       # read.
       test-db-env: FREESMS_TEST_DATABASE_URL
 
+  restore:
+    # A backup nobody has restored is not a backup. This takes a real backup of
+    # a real stack, destroys the database and the photographs, restores, and
+    # asks for facts back -- an invoice total, a customer's name, a file's
+    # bytes and the row level security policies.
+    #
+    # It is slow, because it builds an image and waits for a health check. That
+    # is the price of testing the actual scripts rather than an approximation
+    # of them, and the thing it guards against is losing a workshop's seven
+    # years of invoices.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Back up, destroy, restore, verify
+        env:
+          SESSION_SECRET: ci-only-not-a-real-secret-0000000000000000
+        run: ./deploy/restore-test.sh
+
   image:
     # The image is built but not pushed. There is nowhere to deploy it yet, and
     # publishing artefacts nothing consumes is how a registry fills with
