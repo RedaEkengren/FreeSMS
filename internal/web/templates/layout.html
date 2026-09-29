@@ -16,6 +16,7 @@
     {{if .Session.Scope.Role.SeesParts}}<a href="/parts" class="nav">{{.T "Parts"}}</a>
     <a href="/stock" class="nav">{{.T "Stock"}}</a>
     <a href="/scan" class="nav">{{.T "Scan"}}</a>{{end}}
+    {{if .Session.Scope.Role.RunsTheShop}}<a href="/shop" class="nav">{{.T "The workshop"}}</a>{{end}}
     {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/figures" class="nav">{{.T "Figures"}}</a>
     <a href="/accounting" class="nav">{{.T "Accounting"}}</a>
     <a href="/privacy" class="nav">{{.T "Privacy"}}</a>{{end}}

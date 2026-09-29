@@ -4,9 +4,23 @@
   <div class="row">
     <div>
       <h1>{{if .IsCreditNote}}{{$.T "Credit note"}}{{else}}{{$.T "Invoice"}}{{end}} {{.Reference}}</h1>
-      <div class="waiting">{{.ShopName}}</div>
+      {{/* The seller as it was when this was issued, not as the shop is
+           today. Left out entirely on a document issued before the snapshot
+           existed, rather than printed as labels with blanks after them. */}}
+      {{with .Seller}}
+      {{if .Known}}
+      <div>{{.Name}}</div>
+      {{if .Address}}<div class="waiting">{{.Address}}</div>{{end}}
+      {{if .OrgNumber}}<div class="waiting">{{$.T "Company number"}} {{.OrgNumber}}</div>{{end}}
+      {{if .VATNumber}}<div class="waiting">{{$.T "VAT number"}} {{.VATNumber}}</div>{{end}}
+      {{if or .Phone .Email}}<div class="waiting">{{$.Dot .Phone .Email}}</div>{{end}}
+      {{end}}
+      {{end}}
     </div>
-    <div class="waiting">{{.IssuedAt.Format "2 Jan 2006"}}</div>
+    <div class="waiting">
+      <div>{{.IssuedAt.Format "2 Jan 2006"}}</div>
+      {{if .Seller.Known}}<div>{{$.T "Due"}} {{.Due.Format "2 Jan 2006"}}</div>{{end}}
+    </div>
   </div>
 
   {{/* Both halves point at the other. A document that has been reversed and
@@ -41,6 +55,10 @@
     <dt class="grand">{{$.T "Total"}}</dt><dd class="grand">{{$.Money .GrossMinor}}</dd>
   </dl>
 
+  {{with .Seller}}
+  {{if .PaymentReference}}<p>{{$.T "Pay to %s" .PaymentReference}}{{if .PaymentTermsDays}}, {{$.N "%d day net" .PaymentTermsDays}}{{end}}</p>{{end}}
+  {{if .FTax}}<p class="waiting">{{$.T "Approved for F-tax"}}</p>{{end}}
+  {{end}}
   {{if .IssuedBy}}<p class="waiting">{{$.T "Issued by %s" .IssuedBy}}</p>{{end}}
 </article>
 

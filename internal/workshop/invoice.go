@@ -114,16 +114,29 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 			return err
 		}
 
+		// The seller as it is now, written onto the document rather than
+		// joined to when it is read.
+		sold, err := readSeller(ctx, tx, scope.ShopID)
+		if err != nil {
+			return err
+		}
+
 		const insert = `
 			INSERT INTO invoices
 			  (shop_id, series, number, work_order_id, issued_by,
 			   customer_name, customer_address, customer_org_number, customer_vat_number,
+			   seller_name, seller_address, seller_org_number, seller_vat_number,
+			   seller_phone, seller_email, seller_payment_reference,
+			   seller_payment_terms_days, seller_f_tax,
 			   net_minor, vat_minor, gross_minor)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
 			RETURNING id, issued_at`
 		if err := tx.QueryRow(ctx, insert,
 			scope.ShopID, DefaultSeries, number, workOrderID, scope.UserID,
 			*name, address, orgNumber, vatNumber,
+			sold.Name, sold.Address, sold.OrgNumber, sold.VATNumber,
+			sold.Phone, sold.Email, sold.PaymentReference,
+			sold.PaymentTermsDays, sold.FTax,
 			totals.NetMinor, totals.VATMinor, totals.GrossMinor,
 		).Scan(&inv.ID, &inv.IssuedAt); err != nil {
 			return fmt.Errorf("write invoice: %w", err)
@@ -223,16 +236,30 @@ func CreditNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, inv
 			return err
 		}
 
+		// The seller as it is at the moment the note is issued, which can
+		// differ from the invoice being credited. That is correct: the note is
+		// its own document, issued today by whoever the shop is today.
+		sold, err := readSeller(ctx, tx, scope.ShopID)
+		if err != nil {
+			return err
+		}
+
 		const insert = `
 			INSERT INTO invoices
 			  (shop_id, series, number, work_order_id, credit_of_id, issued_by,
 			   customer_name, customer_address, customer_org_number, customer_vat_number,
+			   seller_name, seller_address, seller_org_number, seller_vat_number,
+			   seller_phone, seller_email, seller_payment_reference,
+			   seller_payment_terms_days, seller_f_tax,
 			   net_minor, vat_minor, gross_minor)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
 			RETURNING id, issued_at`
 		if err := tx.QueryRow(ctx, insert,
 			scope.ShopID, original.Series, number, original.WorkOrderID, original.ID, scope.UserID,
 			original.CustomerName, address, orgNumber, vatNumber,
+			sold.Name, sold.Address, sold.OrgNumber, sold.VATNumber,
+			sold.Phone, sold.Email, sold.PaymentReference,
+			sold.PaymentTermsDays, sold.FTax,
 			-original.NetMinor, -original.VATMinor, -original.GrossMinor,
 		).Scan(&note.ID, &note.IssuedAt); err != nil {
 			return fmt.Errorf("write credit note: %w", err)
@@ -433,6 +460,58 @@ func writeInvoiceLines(ctx context.Context, tx pgx.Tx, shopID, invoiceID string,
 	return nil
 }
 
+// seller is the shop as it was when a document was issued.
+//
+// Read inside the issuing transaction and written onto the invoice, never
+// joined to at render time. A workshop that changes its name or moves premises
+// has not changed who issued last year's invoices, and a document that rewrites
+// itself is not a document.
+type Seller struct {
+	Name             string
+	Address          string
+	OrgNumber        string
+	VATNumber        string
+	Phone            string
+	Email            string
+	PaymentReference string
+	PaymentTermsDays int
+	FTax             bool
+}
+
+// readSeller assembles the address into the shape it is printed in, because
+// the document stores what it shows. Splitting it back into columns on the
+// invoice would mean the renderer decides how a Swedish address is laid out,
+// and that decision belongs where the shop's own details are entered.
+func readSeller(ctx context.Context, tx pgx.Tx, shopID string) (Seller, error) {
+	var s Seller
+	var line1, line2, postal, city, org, vat, phone, email, ref *string
+	err := tx.QueryRow(ctx, `
+		SELECT name, address_line1, address_line2, postal_code, city,
+		       org_number, vat_number, phone, email,
+		       payment_reference, payment_terms_days, f_tax
+		FROM shops WHERE id = $1`, shopID).
+		Scan(&s.Name, &line1, &line2, &postal, &city, &org, &vat, &phone, &email,
+			&ref, &s.PaymentTermsDays, &s.FTax)
+	if err != nil {
+		return Seller{}, fmt.Errorf("read seller: %w", err)
+	}
+
+	var parts []string
+	for _, p := range []*string{line1, line2} {
+		if p != nil && strings.TrimSpace(*p) != "" {
+			parts = append(parts, strings.TrimSpace(*p))
+		}
+	}
+	town := strings.TrimSpace(deref(postal) + " " + deref(city))
+	if town != "" {
+		parts = append(parts, town)
+	}
+	s.Address = strings.Join(parts, ", ")
+	s.OrgNumber, s.VATNumber = deref(org), deref(vat)
+	s.Phone, s.Email, s.PaymentReference = deref(phone), deref(email), deref(ref)
+	return s, nil
+}
+
 // Document is an issued invoice as it is read back: the frozen header, the
 // frozen lines, and the shop that issued it.
 //
@@ -444,9 +523,13 @@ func writeInvoiceLines(ctx context.Context, tx pgx.Tx, shopID, invoiceID string,
 type Document struct {
 	Invoice
 
-	// The shop's own details, as it is called today. Not frozen, because a
-	// workshop that changes its name has not changed who issued the invoice.
-	ShopName string
+	// The seller as it was when this document was issued. Frozen, because a
+	// workshop that changes its name or moves premises has not changed who
+	// issued last year's invoices.
+	//
+	// Empty on anything issued before the snapshot existed. The page renders
+	// nothing rather than a label with a blank after it.
+	Seller   Seller
 	Currency string
 
 	// The customer as they were when it was issued. An address typed over
@@ -466,6 +549,18 @@ type Document struct {
 	CreditedBy []string
 
 	Registration string
+}
+
+// Known reports whether this document carries a seller at all. Anything issued
+// before the snapshot existed does not, and the page leaves the block out
+// rather than printing labels with blanks after them.
+func (s Seller) Known() bool { return s.Name != "" }
+
+// Due is when the invoice falls due: the issue date plus the terms that were
+// frozen with it. Arithmetic on two frozen values, so opening the document in
+// March gives the same answer it gave in January.
+func (d Document) Due() time.Time {
+	return d.IssuedAt.AddDate(0, 0, d.Seller.PaymentTermsDays)
 }
 
 // DocumentLine is one frozen line.
@@ -500,15 +595,22 @@ func DocumentByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var creditOf *string
 		var issuedBy, address, org, vat *string
+		// No join to shops. The seller is read from the document's own
+		// columns, which is the whole point of freezing them.
+		var sName, sAddr, sOrg, sVat, sPhone, sEmail, sRef *string
+		var sTerms *int
+		var sFTax *bool
 		err := tx.QueryRow(ctx, `
 			SELECT i.id, i.series, i.number, i.work_order_id, i.credit_of_id, i.issued_at,
 			       i.customer_name, i.customer_address, i.customer_org_number,
 			       i.customer_vat_number, i.currency,
 			       i.net_minor, i.vat_minor, i.gross_minor,
-			       s.name, p.display_name,
-			       coalesce(r.registration, '')
+			       i.seller_name, i.seller_address, i.seller_org_number,
+			       i.seller_vat_number, i.seller_phone, i.seller_email,
+			       i.seller_payment_reference, i.seller_payment_terms_days,
+			       i.seller_f_tax,
+			       p.display_name, coalesce(r.registration, '')
 			FROM invoices i
-			JOIN shops s ON s.id = i.shop_id
 			LEFT JOIN users u ON u.id = i.issued_by
 			LEFT JOIN people p ON p.id = u.person_id
 			LEFT JOIN work_orders w ON w.id = i.work_order_id
@@ -518,7 +620,8 @@ func DocumentByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 			Scan(&d.ID, &d.Series, &d.Number, &d.WorkOrderID, &creditOf, &d.IssuedAt,
 				&d.CustomerName, &address, &org, &vat, &d.Currency,
 				&d.NetMinor, &d.VATMinor, &d.GrossMinor,
-				&d.ShopName, &issuedBy, &d.Registration)
+				&sName, &sAddr, &sOrg, &sVat, &sPhone, &sEmail, &sRef, &sTerms, &sFTax,
+				&issuedBy, &d.Registration)
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Not visible under this shop's policy is the same answer as not
 			// existing. A different answer tells the caller a document exists
@@ -529,6 +632,21 @@ func DocumentByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 			return fmt.Errorf("read invoice: %w", err)
 		}
 		d.CreditOfID = creditOf
+		d.Seller = Seller{
+			Name:             deref(sName),
+			Address:          deref(sAddr),
+			OrgNumber:        deref(sOrg),
+			VATNumber:        deref(sVat),
+			Phone:            deref(sPhone),
+			Email:            deref(sEmail),
+			PaymentReference: deref(sRef),
+		}
+		if sTerms != nil {
+			d.Seller.PaymentTermsDays = *sTerms
+		}
+		if sFTax != nil {
+			d.Seller.FTax = *sFTax
+		}
 		d.CustomerAddress = deref(address)
 		d.CustomerOrgNumber = deref(org)
 		d.CustomerVATNumber = deref(vat)

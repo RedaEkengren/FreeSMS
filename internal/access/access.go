@@ -69,6 +69,21 @@ func (r Role) SeesCustomerPersonalData() bool {
 	return false
 }
 
+// RunsTheShop reports whether this role may see and change the business's own
+// particulars: its organisation number, its VAT registration, its bank
+// details.
+//
+// Narrower than SeesCustomerPersonalData on purpose. A service advisor needs a
+// customer's address to invoice them; they do not need to be able to change
+// the account the money is paid into.
+func (r Role) RunsTheShop() bool {
+	switch r {
+	case RoleOwner, RoleAdmin:
+		return true
+	}
+	return false
+}
+
 // SeesParts reports whether this role has the parts desk's screen.
 //
 // The parts person in a small shop is the front desk, and the owner is

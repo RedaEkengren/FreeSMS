@@ -388,3 +388,124 @@ func TestATechnicianCannotReadAnInvoice(t *testing.T) {
 		t.Errorf("DocumentByID as a technician = %v, want ErrForbidden", err)
 	}
 }
+
+// The whole reason the seller is snapshotted. A workshop that changes its name
+// or moves premises has not changed who issued last year's invoices, and until
+// this the document joined to shops and rewrote itself.
+func TestTheSellerOnAnIssuedInvoiceDoesNotMove(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+
+	if err := workshop.SaveDetails(ctx, pool, owner(), workshop.ShopDetails{
+		Name: "Verkstaden AB", AddressLine1: "Verkstadsgatan 1",
+		PostalCode: "123 45", City: "Stockholm",
+		OrgNumber: "556677-8899", VATNumber: "SE556677889901",
+		PaymentReference: "Bankgiro 123-4567", PaymentTermsDays: 30, FTax: true,
+	}); err != nil {
+		t.Fatalf("SaveDetails: %v", err)
+	}
+
+	id := readyToInvoice(t, pool)
+	inv, err := workshop.Issue(ctx, pool, advisor(), id)
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+
+	before, err := workshop.DocumentByID(ctx, pool, advisor(), inv.ID)
+	if err != nil {
+		t.Fatalf("DocumentByID: %v", err)
+	}
+	if before.Seller.Name != "Verkstaden AB" {
+		t.Fatalf("seller name = %q, want the shop at the time of issue", before.Seller.Name)
+	}
+	if before.Seller.OrgNumber != "556677-8899" || before.Seller.VATNumber != "SE556677889901" {
+		t.Errorf("the registration numbers are missing from the document: %+v", before.Seller)
+	}
+	if before.Seller.Address != "Verkstadsgatan 1, 123 45 Stockholm" {
+		t.Errorf("address = %q, want it assembled the way it is printed", before.Seller.Address)
+	}
+
+	// The shop is sold, renamed and moved.
+	if err := workshop.SaveDetails(ctx, pool, owner(), workshop.ShopDetails{
+		Name: "Nya Bilservice AB", AddressLine1: "Industrivägen 9",
+		PostalCode: "987 65", City: "Uppsala",
+		OrgNumber: "559900-1122", PaymentTermsDays: 10,
+	}); err != nil {
+		t.Fatalf("SaveDetails: %v", err)
+	}
+
+	after, err := workshop.DocumentByID(ctx, pool, advisor(), inv.ID)
+	if err != nil {
+		t.Fatalf("DocumentByID: %v", err)
+	}
+	if after.Seller != before.Seller {
+		t.Errorf("the issued document's seller changed:\n before %+v\n after  %+v", before.Seller, after.Seller)
+	}
+	// And the due date with it, because it is arithmetic on two frozen values.
+	if !after.Due().Equal(before.Due()) {
+		t.Errorf("the due date moved from %s to %s", before.Due(), after.Due())
+	}
+}
+
+// A credit note is its own document, issued today by whoever the shop is
+// today. That it can differ from the invoice it credits is correct.
+func TestACreditNoteTakesTheSellerAsItIsWhenItIsIssued(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+
+	if err := workshop.SaveDetails(ctx, pool, owner(), workshop.ShopDetails{
+		Name: "Verkstaden AB", OrgNumber: "556677-8899", PaymentTermsDays: 30,
+	}); err != nil {
+		t.Fatalf("SaveDetails: %v", err)
+	}
+	id := readyToInvoice(t, pool)
+	inv, err := workshop.Issue(ctx, pool, advisor(), id)
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+
+	if err := workshop.SaveDetails(ctx, pool, owner(), workshop.ShopDetails{
+		Name: "Nya Bilservice AB", OrgNumber: "559900-1122", PaymentTermsDays: 30,
+	}); err != nil {
+		t.Fatalf("SaveDetails: %v", err)
+	}
+	note, err := workshop.CreditNote(ctx, pool, advisor(), inv.ID)
+	if err != nil {
+		t.Fatalf("CreditNote: %v", err)
+	}
+
+	doc, err := workshop.DocumentByID(ctx, pool, advisor(), note.ID)
+	if err != nil {
+		t.Fatalf("DocumentByID: %v", err)
+	}
+	if doc.Seller.Name != "Nya Bilservice AB" {
+		t.Errorf("the note's seller = %q, want the shop as it is today", doc.Seller.Name)
+	}
+	original, _ := workshop.DocumentByID(ctx, pool, advisor(), inv.ID)
+	if original.Seller.Name != "Verkstaden AB" {
+		t.Errorf("crediting rewrote the original's seller to %q", original.Seller.Name)
+	}
+}
+
+// The bank details and the organisation number are not a service advisor's to
+// change, even though they may see a customer's address to invoice them.
+func TestOnlyWhoeverRunsTheShopCanChangeItsDetails(t *testing.T) {
+	pool := setup(t)
+	addTechnician(t, pool)
+	ctx := context.Background()
+
+	for _, who := range []struct {
+		name  string
+		scope access.Scope
+	}{
+		{"a technician", technician()},
+		{"a service advisor", advisor()},
+	} {
+		if _, err := workshop.ShopDetailsFor(ctx, pool, who.scope); !errors.Is(err, access.ErrForbidden) {
+			t.Errorf("%s could read the shop's details: %v", who.name, err)
+		}
+		if err := workshop.SaveDetails(ctx, pool, who.scope, workshop.ShopDetails{Name: "Mine now"}); !errors.Is(err, access.ErrForbidden) {
+			t.Errorf("%s could change the shop's details: %v", who.name, err)
+		}
+	}
+}

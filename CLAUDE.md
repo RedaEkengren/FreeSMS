@@ -111,11 +111,13 @@ not exist.
   does not yet know that: it offers "Look the registration up" whether or not
   a provider is configured, and with none the button does nothing visible.
 
-- **An invoice does not carry the seller's registration details.** `shops` has
-  a name and nothing else -- no address, organisation number, VAT number,
-  payment terms or bank details -- so the rendered document is missing fields a
-  Swedish invoice is legally required to carry. The rendering is there; the
-  columns are not.
+- **Invoices issued before 0021 have no seller on them.** The seller is
+  snapshotted onto the document now, the way the buyer always was, and the
+  migration deliberately does not backfill: inventing a seller from today's
+  `shops` row would be a guess printed as fact on a document that is supposed
+  to be immutable. An empty seller block on an old invoice is the honest
+  answer, and there are no old invoices in production because nothing is
+  deployed.
 
 - **The translation is partial.** The mechanism is in place and Swedish
   ships. Converted: the navigation and the role in the header, every work

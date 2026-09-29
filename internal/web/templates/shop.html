@@ -1,0 +1,52 @@
+{{define "content"}}
+<h1>{{.T "The workshop"}}</h1>
+<p class="waiting">{{.T "What goes at the top of an invoice. Changing it changes the next invoice and nothing that has already been sent: an issued document carries its own copy."}}</p>
+
+<form method="post" action="/shop" data-keep="shop-details">
+  <label>
+    <span>{{.T "Name"}}</span>
+    <input name="name" value="{{.Shop.Name}}" required>
+  </label>
+
+  <label>
+    <span>{{.T "Address"}}</span>
+    <input name="address_line1" value="{{.Shop.AddressLine1}}">
+  </label>
+  <label>
+    <span>{{.T "Address, second line"}}</span>
+    <input name="address_line2" value="{{.Shop.AddressLine2}}">
+  </label>
+  <div class="pair">
+    <label><span>{{.T "Postal code"}}</span><input name="postal_code" value="{{.Shop.PostalCode}}"></label>
+    <label><span>{{.T "City"}}</span><input name="city" value="{{.Shop.City}}"></label>
+  </div>
+
+  {{/* Both are required on a Swedish invoice, and neither is guessable from
+       the other, so the page asks for both rather than deriving one. */}}
+  <div class="pair">
+    <label><span>{{.T "Company number"}}</span><input name="org_number" value="{{.Shop.OrgNumber}}" placeholder="556677-8899"></label>
+    <label><span>{{.T "VAT number"}}</span><input name="vat_number" value="{{.Shop.VATNumber}}" placeholder="SE556677889901"></label>
+  </div>
+
+  <div class="pair">
+    <label><span>{{.T "Telephone"}}</span><input name="phone" value="{{.Shop.Phone}}"></label>
+    <label><span>{{.T "Email"}}</span><input name="email" value="{{.Shop.Email}}"></label>
+  </div>
+
+  <div class="pair">
+    <label><span>{{.T "Pay to"}}</span><input name="payment_reference" value="{{.Shop.PaymentReference}}" placeholder="Bankgiro 123-4567"></label>
+    <label><span>{{.T "Payment terms, days"}}</span><input name="payment_terms_days" value="{{.Shop.PaymentTermsDays}}" inputmode="numeric"></label>
+  </div>
+
+  <label class="tick">
+    <input type="checkbox" name="f_tax" value="yes" {{if .Shop.FTax}}checked{{end}}>
+    <span>{{.T "Approved for F-tax"}}</span>
+  </label>
+
+  <button type="submit">{{.T "Save"}}</button>
+</form>
+
+{{if not .Shop.OrgNumber}}
+<p class="error">{{.T "Without a company number and a VAT number an invoice from this workshop is not a complete invoice."}}</p>
+{{end}}
+{{end}}

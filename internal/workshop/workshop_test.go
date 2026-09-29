@@ -24,6 +24,12 @@ func advisor() access.Scope {
 	return access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleServiceAdvisor}
 }
 
+// owner is the same person as far as the fixtures are concerned, with the role
+// that may change the business's own particulars.
+func owner() access.Scope {
+	return access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleOwner}
+}
+
 func setup(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	ctx := context.Background()

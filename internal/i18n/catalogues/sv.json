@@ -1,6 +1,10 @@
 {
   "locale": "sv",
   "messages": {
+    "%d day net": {
+      "one": "%d dag netto",
+      "other": "%d dagar netto"
+    },
     "%d finding": {
       "one": "%d fynd",
       "other": "%d fynd"
@@ -21,11 +25,20 @@
     "Add": {
       "other": "Lägg till"
     },
+    "Address": {
+      "other": "Adress"
+    },
+    "Address, second line": {
+      "other": "Adress, rad två"
+    },
     "Administrator": {
       "other": "Administratör"
     },
     "Amount": {
       "other": "Belopp"
+    },
+    "Approved for F-tax": {
+      "other": "Godkänd för F-skatt"
     },
     "Approved, not started": {
       "other": "Godkänd, inte påbörjad"
@@ -66,6 +79,9 @@
     "Cancelled": {
       "other": "Avbeställd"
     },
+    "City": {
+      "other": "Ort"
+    },
     "Close it": {
       "other": "Avsluta den"
     },
@@ -104,6 +120,9 @@
     },
     "Documents": {
       "other": "Dokument"
+    },
+    "Due": {
+      "other": "Förfaller"
     },
     "Email": {
       "other": "E-post"
@@ -189,6 +208,9 @@
     "My hours": {
       "other": "Mina timmar"
     },
+    "Name": {
+      "other": "Namn"
+    },
     "Net": {
       "other": "Netto"
     },
@@ -243,6 +265,18 @@
     "Password": {
       "other": "Lösenord"
     },
+    "Pay to": {
+      "other": "Betalas till"
+    },
+    "Pay to %s": {
+      "other": "Betalas till %s"
+    },
+    "Payment terms, days": {
+      "other": "Betalningsvillkor, dagar"
+    },
+    "Postal code": {
+      "other": "Postnummer"
+    },
     "Price it": {
       "other": "Prissätt den"
     },
@@ -269,6 +303,9 @@
     },
     "Record it": {
       "other": "Registrera"
+    },
+    "Save": {
+      "other": "Spara"
     },
     "Scan": {
       "other": "Skanna"
@@ -327,6 +364,9 @@
     "Technician": {
       "other": "Mekaniker"
     },
+    "Telephone": {
+      "other": "Telefon"
+    },
     "Tell the front desk": {
       "other": "Säg till framdisken"
     },
@@ -344,6 +384,9 @@
     },
     "The workshop": {
       "other": "Verkstaden"
+    },
+    "The workshop's own details belong to whoever runs it.": {
+      "other": "Verkstadens egna uppgifter hör till den som driver den."
     },
     "These need your decision. Approve what you want done.": {
       "other": "De här behöver ditt besked. Godkänn det du vill ha gjort."
@@ -401,11 +444,17 @@
     "What": {
       "other": "Vad"
     },
+    "What goes at the top of an invoice. Changing it changes the next invoice and nothing that has already been sent: an issued document carries its own copy.": {
+      "other": "Det som står överst på en faktura. Ändringen gäller nästa faktura och ingenting som redan skickats: ett utställt dokument bär sin egen kopia."
+    },
     "What happened": {
       "other": "Vad hände"
     },
     "Who pays": {
       "other": "Vem betalar"
+    },
+    "Without a company number and a VAT number an invoice from this workshop is not a complete invoice.": {
+      "other": "Utan organisationsnummer och momsregistreringsnummer är en faktura härifrån inte en fullständig faktura."
     },
     "Written off": {
       "other": "Avskrivet"
