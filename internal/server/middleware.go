@@ -47,6 +47,20 @@ func (s *Server) withSession(next http.Handler) http.Handler {
 func (s *Server) requireSession(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if sessionFrom(r.Context()).Scope.UserID == "" {
+			// A script is told plainly; a person is sent to sign in.
+			//
+			// The offline queue follows redirects, and the sign-in page answers
+			// 200 -- so a 303 to /login looked exactly like success, and the
+			// queue threw away work that had never been done. Anything that is
+			// not a person navigating gets a 401 it cannot mistake for anything
+			// else. htmx is told where to go as well, so a swap on a page whose
+			// session expired takes the person to sign in rather than doing
+			// nothing.
+			if r.Header.Get(IdempotencyHeader) != "" || r.Header.Get("HX-Request") != "" {
+				w.Header().Set("HX-Redirect", "/login")
+				http.Error(w, "sign in again", http.StatusUnauthorized)
+				return
+			}
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}

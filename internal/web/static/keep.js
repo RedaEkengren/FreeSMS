@@ -135,27 +135,96 @@
     return String(Date.now()) + "-" + Math.random().toString(36).slice(2, 12);
   }
 
+  // Who is signed in, from the page. Absent on the sign-in and setup pages,
+  // which is how the queue knows not to send anything from there.
+  function currentUser() {
+    var m = document.querySelector('meta[name="freesms-user"]');
+    return m ? m.getAttribute("content") : "";
+  }
+
   function hold(form) {
     var body = new URLSearchParams(new FormData(form)).toString();
     var items = queue();
-    items.push({ url: form.action, body: body, key: newKey(), at: Date.now() });
+    // The person who queued it is part of the item. Work held on a shared
+    // workshop tablet is sent as the person who did it, or not at all.
+    items.push({ url: form.action, body: body, key: newKey(), at: Date.now(), user: currentUser() });
     setQueue(items);
-    show(items.length);
+    show();
   }
 
-  function show(n) {
+  // Refused work is kept, not deleted. It used to be the only copy, and it
+  // was thrown away with an alert -- after which there was nothing to recover
+  // from. Now it waits for somebody to look at it and dismiss it on purpose.
+  var REFUSED = "freesms.refused";
+
+  function refused() {
+    try { return JSON.parse(store.get(REFUSED) || "[]"); } catch (e) { return []; }
+  }
+
+  // Set while the server says the session has gone. Nothing is sent until
+  // somebody signs in again; the queue is left exactly as it was.
+  var needsSignIn = false;
+
+  function show() {
     var bar = document.getElementById("held");
     if (!bar) return;
-    bar.hidden = n === 0;
-    bar.textContent = n === 0 ? "" :
-      n + (n === 1 ? " thing is waiting to be sent." : " things are waiting to be sent.");
+    var waiting = mine(queue()).length, bad = refused().length;
+    bar.textContent = "";
+    bar.hidden = waiting === 0 && bad === 0;
+    if (bar.hidden) return;
+
+    var parts = [];
+    if (waiting) {
+      parts.push(waiting + (waiting === 1 ? " thing is waiting to be sent" : " things are waiting to be sent") +
+                 (needsSignIn ? (waiting === 1 ? " -- sign in again to send it." : " -- sign in again to send them.") : "."));
+    }
+    if (bad) {
+      parts.push(bad + (bad === 1 ? " thing was refused by the server." : " things were refused by the server."));
+    }
+    bar.appendChild(document.createTextNode(parts.join(" ") + " "));
+
+    if (bad) {
+      var look = document.createElement("button");
+      look.type = "button";
+      look.className = "link";
+      look.textContent = "Show and dismiss";
+      look.addEventListener("click", function () {
+        var items = refused();
+        var text = items.map(function (it) {
+          return it.status + "  " + it.url + "\n" + decodeURIComponent(it.body.replace(/\+/g, " "));
+        }).join("\n\n");
+        // A confirm, not a silent delete: this is the last copy of what
+        // somebody typed, and they decide when it is gone.
+        if (window.confirm("Refused by the server:\n\n" + text + "\n\nDismiss these?")) {
+          store.remove(REFUSED);
+          show();
+        }
+      });
+      bar.appendChild(look);
+    }
+  }
+
+  // Only this person's work, and work queued before items carried a person,
+  // which can only have been theirs on this device.
+  function mine(items) {
+    var me = currentUser();
+    return items.filter(function (it) { return !it.user || it.user === me; });
+  }
+
+  function landedOn(resp, path) {
+    try { return new URL(resp.url).pathname === path; } catch (e) { return false; }
   }
 
   function flush() {
-    var items = queue();
-    if (items.length === 0) return;
+    // Nobody signed in -- the sign-in page, the setup page, an expired
+    // session -- means nothing is sent. It used to flush from the sign-in
+    // page too.
+    if (!currentUser() || needsSignIn) { show(); return; }
 
-    var next = items[0];
+    var all = queue();
+    var next = mine(all)[0];
+    if (!next) { show(); return; }
+
     fetch(next.url, {
       method: "POST",
       headers: {
@@ -167,20 +236,29 @@
       body: next.body,
       redirect: "follow"
     }).then(function (resp) {
-      if (resp.status >= 500) return; // Try again later.
-      if (resp.status >= 400) {
-        // The server will not take it -- the job moved on, most likely.
-        // Surfaced rather than dropped: somebody has to know it did not
-        // happen.
-        window.alert("Something that was waiting to be sent was refused. " +
-                     "Open the job and check it.");
+      // The session has gone. Stop, keep everything, and say why. A
+      // followed redirect to the sign-in page answers 200, which is how this
+      // used to be read as success and the work discarded.
+      if (resp.status === 401 || landedOn(resp, "/login") || landedOn(resp, "/setup")) {
+        needsSignIn = true;
+        show();
+        return;
       }
-      var rest = queue().slice(1);
+      if (resp.status >= 500) { show(); return; } // Try again later.
+
+      var rest = queue().filter(function (it) { return it.key !== next.key; });
+      if (!resp.ok) {
+        // Refused: kept, with what the server said, for a person to look at.
+        var bad = refused();
+        bad.push({ url: next.url, body: next.body, status: resp.status, at: Date.now() });
+        store.set(REFUSED, JSON.stringify(bad));
+      }
       setQueue(rest);
-      show(rest.length);
-      if (rest.length) flush();
+      show();
+      if (mine(rest).length) flush();
     }).catch(function () {
       // Still offline.
+      show();
     });
   }
 
@@ -198,7 +276,7 @@
   document.addEventListener("DOMContentLoaded", function () {
     Array.prototype.forEach.call(document.querySelectorAll("form[data-keep]"), watch);
     Array.prototype.forEach.call(document.querySelectorAll("form[method='post']"), guard);
-    show(queue().length);
+    show();
     flush();
 
     // The content security policy forbids inline handlers, deliberately, so

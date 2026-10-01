@@ -298,3 +298,43 @@ func TestSignOutEndsTheSession(t *testing.T) {
 		t.Errorf("after signing out, / returned %d, want a redirect to the sign-in page", resp.StatusCode)
 	}
 }
+
+// The offline queue follows redirects, and the sign-in page answers 200. A
+// 303 to /login therefore looked exactly like a successful submission, and the
+// queue deleted work that had never been done. A script has to be told plainly.
+func TestAnExpiredSessionIsUnmistakableToAScript(t *testing.T) {
+	ts, _ := testServer(t)
+	noRedirects := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+
+	post := func(headers map[string]string) *http.Response {
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/jobs/"+jobA+"/lines",
+			strings.NewReader("kind=labour&description=x&quantity=1&unit_price=1"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", ts.URL)
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		resp, err := noRedirects.Do(req)
+		if err != nil {
+			t.Fatalf("post: %v", err)
+		}
+		resp.Body.Close()
+		return resp
+	}
+
+	if got := post(map[string]string{"Idempotency-Key": "0123456789abcdef0123"}); got.StatusCode != http.StatusUnauthorized {
+		t.Errorf("the offline queue with no session got %d, want 401", got.StatusCode)
+	}
+	if got := post(map[string]string{"HX-Request": "true"}); got.StatusCode != http.StatusUnauthorized ||
+		got.Header.Get("HX-Redirect") != "/login" {
+		t.Errorf("htmx with no session got %d and HX-Redirect %q, want 401 and /login",
+			got.StatusCode, got.Header.Get("HX-Redirect"))
+	}
+	// A person posting a form is still sent somewhere useful.
+	if got := post(nil); got.StatusCode != http.StatusSeeOther || got.Header.Get("Location") != "/login" {
+		t.Errorf("a browser form with no session got %d to %q, want 303 to /login",
+			got.StatusCode, got.Header.Get("Location"))
+	}
+}
