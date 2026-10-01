@@ -582,3 +582,128 @@ func TestInvoicedIsNotOfferedAsAMove(t *testing.T) {
 		t.Error("declined can no longer reach invoiced at all")
 	}
 }
+
+// One order, several tills. The existing concurrency test gives each goroutine
+// its own work order and proves the numbering does not collide; it says nothing
+// about two people invoicing the same car, which is the ordinary accident --
+// a double click, a retried request, two advisors at two screens.
+func TestOneOrderYieldsOneInvoiceUnderConcurrency(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+
+	id := readyToInvoice(t, pool)
+
+	const n = 8
+	var wg sync.WaitGroup
+	var ready sync.WaitGroup
+	start := make(chan struct{})
+	errs := make([]error, n)
+	ready.Add(n)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			ready.Done()
+			// All of them go at the same moment, which is what makes the
+			// window between the check and the lock reachable at all.
+			<-start
+			_, errs[i] = workshop.Issue(ctx, pool, advisor(), id)
+		}(i)
+	}
+	ready.Wait()
+	close(start)
+	wg.Wait()
+
+	var issued, refused int
+	for i, err := range errs {
+		switch {
+		case err == nil:
+			issued++
+		case errors.Is(err, workshop.ErrAlreadyInvoiced):
+			refused++
+		default:
+			t.Errorf("call %d failed with something other than a refusal: %v", i, err)
+		}
+	}
+	if issued != 1 {
+		t.Errorf("%d of %d calls issued a document; exactly one must", issued, n)
+	}
+	if refused != n-1 {
+		t.Errorf("%d calls were refused, want %d", refused, n-1)
+	}
+
+	var invoices, lines int
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx,
+			`SELECT count(*) FROM invoices WHERE work_order_id = $1 AND credit_of_id IS NULL`,
+			id).Scan(&invoices); err != nil {
+			return err
+		}
+		// The parts leave the shelf in the same transaction. Issuing twice
+		// would take them twice.
+		return tx.QueryRow(ctx,
+			`SELECT count(*) FROM stock_movements WHERE work_order_id = $1 AND kind = 'consumed'`,
+			id).Scan(&lines)
+	}); err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if invoices != 1 {
+		t.Errorf("%d original invoices exist for one order", invoices)
+	}
+	if lines > 1 {
+		t.Errorf("%d consumption movements; the shelf was emptied more than once", lines)
+	}
+}
+
+// The same accident on the other side: crediting one invoice twice reverses it
+// twice, and the customer is owed money that was never charged.
+func TestOneInvoiceYieldsOneCreditNoteUnderConcurrency(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+
+	id := readyToInvoice(t, pool)
+	inv, err := workshop.Issue(ctx, pool, advisor(), id)
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+
+	const n = 6
+	var wg sync.WaitGroup
+	var ready sync.WaitGroup
+	start := make(chan struct{})
+	errs := make([]error, n)
+	ready.Add(n)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			ready.Done()
+			<-start
+			_, errs[i] = workshop.CreditNote(ctx, pool, advisor(), inv.ID)
+		}(i)
+	}
+	ready.Wait()
+	close(start)
+	wg.Wait()
+
+	var issued int
+	for _, err := range errs {
+		if err == nil {
+			issued++
+		}
+	}
+	if issued != 1 {
+		t.Errorf("%d of %d calls produced a credit note; exactly one must", issued, n)
+	}
+
+	var notes int
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx,
+			`SELECT count(*) FROM invoices WHERE credit_of_id = $1`, inv.ID).Scan(&notes)
+	}); err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if notes != 1 {
+		t.Errorf("%d credit notes reverse one invoice", notes)
+	}
+}

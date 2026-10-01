@@ -12,6 +12,7 @@ import (
 	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -24,6 +25,14 @@ const DefaultSeries = "A"
 
 // ErrAlreadyInvoiced is returned when a work order already has an invoice.
 var ErrAlreadyInvoiced = errors.New("workshop: this order has already been invoiced")
+
+// ErrAlreadyCredited is returned when an invoice has already been reversed in
+// full. A second note would refund money that was never charged.
+//
+// Wrapping ErrInvalid, because that is what the handler already turns into a
+// 409 with the message on it, and a second sentinel the handler does not know
+// about would arrive as a five hundred.
+var ErrAlreadyCredited = fmt.Errorf("%w: this invoice has already been credited", ErrInvalid)
 
 // ErrNothingToInvoice is returned for an order with no chargeable lines.
 var ErrNothingToInvoice = errors.New("workshop: there is nothing on this order to charge for")
@@ -63,6 +72,22 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 
 	var inv Invoice
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// The lock first, then the question.
+		//
+		// This used to ask whether an invoice existed and only afterwards take
+		// the lock, so several callers could all read nothing and all go on to
+		// write one. Eight at once produced eight invoices for one car. Taking
+		// the row lock first means the second caller reads what the first
+		// committed, rather than what was true before it started.
+		var locked string
+		switch err := tx.QueryRow(ctx,
+			`SELECT id FROM work_orders WHERE id = $1 FOR UPDATE`, workOrderID).Scan(&locked); {
+		case errors.Is(err, pgx.ErrNoRows):
+			return ErrNotFound
+		case err != nil:
+			return fmt.Errorf("lock the order: %w", err)
+		}
+
 		var exists bool
 		if err := tx.QueryRow(ctx,
 			`SELECT exists(SELECT 1 FROM invoices WHERE work_order_id = $1 AND credit_of_id IS NULL)`,
@@ -139,6 +164,9 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 			sold.PaymentTermsDays, sold.FTax,
 			totals.NetMinor, totals.VATMinor, totals.GrossMinor,
 		).Scan(&inv.ID, &inv.IssuedAt); err != nil {
+			if dup := alreadyThere(err, ErrAlreadyInvoiced); errors.Is(dup, ErrAlreadyInvoiced) {
+				return dup
+			}
 			return fmt.Errorf("write invoice: %w", err)
 		}
 
@@ -178,6 +206,18 @@ func CreditNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, inv
 
 	var note Invoice
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// Lock the invoice being credited before asking whether it has been
+		// credited already. The index refuses a second note either way; this
+		// turns a constraint violation into a wait and then a clean refusal.
+		var locked string
+		switch err := tx.QueryRow(ctx,
+			`SELECT id FROM invoices WHERE id = $1 FOR UPDATE`, invoiceID).Scan(&locked); {
+		case errors.Is(err, pgx.ErrNoRows):
+			return ErrNotFound
+		case err != nil:
+			return fmt.Errorf("lock the invoice: %w", err)
+		}
+
 		var original Invoice
 		var address, orgNumber, vatNumber *string
 		const read = `
@@ -202,7 +242,7 @@ func CreditNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, inv
 			return fmt.Errorf("check for an existing credit note: %w", err)
 		}
 		if credited {
-			return fmt.Errorf("%w: this invoice has already been credited", ErrInvalid)
+			return ErrAlreadyCredited
 		}
 
 		rows, err := tx.Query(ctx, `
@@ -262,6 +302,9 @@ func CreditNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, inv
 			sold.PaymentTermsDays, sold.FTax,
 			-original.NetMinor, -original.VATMinor, -original.GrossMinor,
 		).Scan(&note.ID, &note.IssuedAt); err != nil {
+			if dup := alreadyThere(err, ErrAlreadyCredited); errors.Is(dup, ErrAlreadyCredited) {
+				return dup
+			}
 			return fmt.Errorf("write credit note: %w", err)
 		}
 
@@ -510,6 +553,22 @@ func readSeller(ctx context.Context, tx pgx.Tx, shopID string) (Seller, error) {
 	s.OrgNumber, s.VATNumber = deref(org), deref(vat)
 	s.Phone, s.Email, s.PaymentReference = deref(phone), deref(email), deref(ref)
 	return s, nil
+}
+
+// alreadyThere translates the two unique indexes into the refusals they mean.
+//
+// They are a backstop: the locking above should mean neither ever fires. One
+// that does fire is still a correct refusal and must not reach a handler as a
+// five hundred, because the thing it is protecting is money.
+func alreadyThere(err error, duplicate error) error {
+	var pg *pgconn.PgError
+	if errors.As(err, &pg) && pg.Code == "23505" {
+		switch pg.ConstraintName {
+		case "invoices_one_original_per_order", "invoices_one_credit_per_invoice":
+			return duplicate
+		}
+	}
+	return err
 }
 
 // Document is an issued invoice as it is read back: the frozen header, the
