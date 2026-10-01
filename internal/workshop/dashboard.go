@@ -103,10 +103,24 @@ func Summary(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, from, 
 		// month and wrong for today -- and today is the period somebody
 		// actually looks at. The figure changes while you watch it, which is
 		// correct.
+		// Clipped to the period, not attributed to the one it started in.
+		//
+		// An entry that straddles midnight on the first of the month used to
+		// be counted in full against the month it began in, and not at all
+		// against the month most of it happened in. A night shift therefore
+		// put October's hours into September, and a clock still running at
+		// one in the morning on the first made October read zero. Found by a
+		// test that only fails on the first of a month, which is the worst
+		// kind of latent bug to have in a payroll figure.
+		//
+		// least/greatest over timestamptz, so the arithmetic is in UTC and the
+		// March change of hour neither gains nor loses an hour.
 		const hours = `
-			SELECT coalesce(sum(extract(epoch from (coalesce(t.ended_at, now()) - t.started_at)) / 3600), 0)
+			SELECT coalesce(sum(extract(epoch from (
+			           least(coalesce(t.ended_at, now()), $2) - greatest(t.started_at, $1)
+			       )) / 3600), 0)
 			FROM time_entries t
-			WHERE t.started_at >= $1 AND t.started_at < $2`
+			WHERE t.started_at < $2 AND coalesce(t.ended_at, now()) > $1`
 		if err := tx.QueryRow(ctx, hours, from, to).Scan(&d.HoursClocked); err != nil {
 			return fmt.Errorf("read clocked hours: %w", err)
 		}
@@ -141,18 +155,20 @@ func Summary(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, from, 
 		// comparable on absolutes, so these are hours and not a ranking.
 		const perTech = `
 			SELECT coalesce(p.display_name, 'unknown'),
-			       coalesce(sum(extract(epoch from (coalesce(t.ended_at, now()) - t.started_at)) / 3600), 0),
+			       coalesce(sum(extract(epoch from (
+			           least(coalesce(t.ended_at, now()), $2) - greatest(t.started_at, $1)
+			       )) / 3600), 0),
 			       coalesce((
 			           SELECT sum(l.quantity)
 			           FROM work_order_lines l
 			           JOIN time_entries t2 ON t2.line_id = l.id AND t2.user_id = t.user_id
 			           WHERE l.kind = 'labour'
-			             AND t2.started_at >= $1 AND t2.started_at < $2
+			             AND t2.started_at < $2 AND coalesce(t2.ended_at, now()) > $1
 			       ), 0)
 			FROM time_entries t
 			LEFT JOIN users u  ON u.id = t.user_id
 			LEFT JOIN people p ON p.id = u.person_id
-			WHERE t.started_at >= $1 AND t.started_at < $2
+			WHERE t.started_at < $2 AND coalesce(t.ended_at, now()) > $1
 			GROUP BY t.user_id, p.display_name
 			ORDER BY 2 DESC`
 		rows, err := tx.Query(ctx, perTech, from, to)

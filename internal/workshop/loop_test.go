@@ -249,9 +249,15 @@ func TestTheFiguresCountAClockThatIsStillRunning(t *testing.T) {
 		t.Fatalf("backdate: %v", err)
 	}
 
-	now := time.Now()
-	from := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	d, err := workshop.Summary(ctx, pool, advisor(), from, from.AddDate(0, 1, 0))
+	// A window that certainly contains the whole entry, rather than the
+	// current calendar month. This test is about a running clock counting up
+	// to now; asking for "this month" made it fail at one in the morning on
+	// the first, for a reason that had nothing to do with what it checks --
+	// and which turned out to be a real bug in its own right, now covered by
+	// TestHoursAreCountedInTheMonthTheyWereWorked.
+	now := time.Now().UTC()
+	from, to := now.Add(-24*time.Hour), now.Add(time.Hour)
+	d, err := workshop.Summary(ctx, pool, advisor(), from, to)
 	if err != nil {
 		t.Fatalf("Summary: %v", err)
 	}

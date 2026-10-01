@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
+	"github.com/jackc/pgx/v5"
 )
 
 func thisMonth() (time.Time, time.Time) {
@@ -162,5 +164,60 @@ func TestThePeriodIsRespected(t *testing.T) {
 	}
 	if d.Invoices != 0 {
 		t.Errorf("last month shows %d invoices from a job invoiced today", d.Invoices)
+	}
+}
+
+// A shift that crosses midnight on the first belongs to both months, in the
+// proportion it was actually worked.
+//
+// It used to be attributed in full to the month it started in, so a night
+// shift put October's hours into September and October read zero. The test
+// that found it only failed on the first of a month; this one fails on any
+// day, which is the difference between noticing and being lucky.
+func TestHoursAreCountedInTheMonthTheyWereWorked(t *testing.T) {
+	pool := setup(t)
+	addTechnician(t, pool)
+	ctx := context.Background()
+
+	job := newJob(t, pool)
+
+	// Fixed dates, so this does not depend on when it is run: eight in the
+	// evening on 30 September until four in the morning on 1 October. Two
+	// hours in September, four in October.
+	start := time.Date(2026, 9, 30, 20, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `
+			INSERT INTO time_entries (shop_id, work_order_id, user_id, started_at, ended_at)
+			VALUES ($1, $2, $3, $4, $5)`, shopID, job, techUserID, start, end)
+		return err
+	}); err != nil {
+		t.Fatalf("seed the shift: %v", err)
+	}
+
+	for _, c := range []struct {
+		month     string
+		from, to  time.Time
+		wantHours float64
+	}{
+		{"September", time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), 4},
+		{"October", time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), 4},
+	} {
+		d, err := workshop.Summary(ctx, pool, advisor(), c.from, c.to)
+		if err != nil {
+			t.Fatalf("Summary(%s): %v", c.month, err)
+		}
+		if d.HoursClocked < c.wantHours-0.01 || d.HoursClocked > c.wantHours+0.01 {
+			t.Errorf("%s: %.2f hours, want %.2f", c.month, d.HoursClocked, c.wantHours)
+		}
+		// The per-person figure is the same arithmetic and drifted apart from
+		// the total once already.
+		var perPerson float64
+		for _, p := range d.Technicians {
+			perPerson += p.Clocked
+		}
+		if perPerson < c.wantHours-0.01 || perPerson > c.wantHours+0.01 {
+			t.Errorf("%s: per person sums to %.2f, want %.2f", c.month, perPerson, c.wantHours)
+		}
 	}
 }
