@@ -27,6 +27,12 @@ func (s *Server) handleSetState(w http.ResponseWriter, r *http.Request) {
 
 	var illegal workshop.ErrIllegalTransition
 	switch {
+	// Not a 400: the request was well formed and the move is a legal one. It
+	// is the route that is wrong, and the message says which one is right.
+	case errors.Is(err, workshop.ErrNeedsDocument):
+		s.renderError(w, r, http.StatusConflict, "Not invoiced",
+			"An order becomes invoiced by issuing an invoice. Use the invoice button.")
+		return
 	case errors.Is(err, workshop.ErrNotFound):
 		s.renderError(w, r, http.StatusNotFound, "Not found", "No such job.")
 		return

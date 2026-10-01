@@ -91,6 +91,21 @@ func (e ErrIllegalTransition) Error() string {
 var ErrWouldLoseWork = errors.New(
 	"this order has work recorded on it, so it cannot be cancelled; decline it instead, which still produces an invoice")
 
+// ErrNeedsDocument is returned when somebody tries to move an order to
+// invoiced without issuing an invoice.
+//
+// The transition is legal -- ready and declined both lead to invoiced -- but
+// only one path may perform it, and that is Issue. Reached any other way the
+// order says it has been billed while no document exists, no number has been
+// allocated and the parts are still on the shelf: a car marked as paid for
+// with nothing to send and nothing taken out of stock.
+//
+// Found by walking the running application: the "Move it along" buttons on a
+// ready order included one that posted state=invoiced straight to the state
+// endpoint, and it worked.
+var ErrNeedsDocument = errors.New(
+	"an order becomes invoiced by issuing an invoice, not by changing its state")
+
 // ErrNoCustomer is returned when an order with nobody to bill reaches
 // invoicing.
 //
@@ -254,13 +269,16 @@ func NextStates(from State) []State { return transitions[from] }
 // what it is doing. The rule is the same one SetState enforces, applied in one
 // place so the two cannot drift.
 func AvailableStates(from State, hasWork bool) []State {
-	next := transitions[from]
-	if !hasWork {
-		return next
-	}
-	out := make([]State, 0, len(next))
-	for _, s := range next {
-		if s == StateCancelled {
+	out := make([]State, 0, len(transitions[from]))
+	for _, s := range transitions[from] {
+		// Offering a button that is always refused is worse than offering no
+		// button. Cancelling an order with work on it is refused, and so is
+		// invoicing by state change -- that one has its own button, which
+		// issues a document.
+		if s == StateInvoiced {
+			continue
+		}
+		if s == StateCancelled && hasWork {
 			continue
 		}
 		out = append(out, s)
@@ -282,6 +300,13 @@ func SetState(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID
 				return ErrNotFound
 			}
 			return fmt.Errorf("read state: %w", err)
+		}
+		// Invoicing is a document, not a state change. setStateTx is left
+		// alone: Issue reaches it from inside the transaction that writes the
+		// invoice, allocates the number and takes the parts off the shelf, and
+		// those four things commit together or not at all.
+		if to == StateInvoiced && from != StateInvoiced {
+			return ErrNeedsDocument
 		}
 		if from != to && !MayTransition(scope.Role, from, to) {
 			if CanTransition(from, to) {

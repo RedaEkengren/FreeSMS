@@ -509,3 +509,76 @@ func TestOnlyWhoeverRunsTheShopCanChangeItsDetails(t *testing.T) {
 		}
 	}
 }
+
+// Invoicing is a document, not a state change.
+//
+// The "Move it along" buttons on a ready order used to include one that posted
+// state=invoiced straight at the state endpoint, and it worked: the order read
+// as billed while no invoice existed, no number had been allocated and the
+// parts were still on the shelf. Reproduced against the running application
+// before this was written -- the order went to invoiced with zero invoices.
+func TestAnOrderCannotBecomeInvoicedWithoutADocument(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+
+	for _, from := range []workshop.State{workshop.StateReady, workshop.StateDeclined} {
+		id := newJob(t, pool)
+		if err := workshop.AddLine(ctx, pool, advisor(), id, workshop.NewLine{
+			Kind: "labour", Description: "Diagnosis", QuantityMilli: 1000,
+			UnitPriceMinor: 89500, VATRateBasis: 2500,
+		}); err != nil {
+			t.Fatalf("AddLine: %v", err)
+		}
+		switch from {
+		case workshop.StateReady:
+			move(t, pool, id, workshop.StateEstimated, workshop.StateAwaitingApproval,
+				workshop.StateApproved, workshop.StateInProgress, workshop.StateReady)
+		case workshop.StateDeclined:
+			move(t, pool, id, workshop.StateEstimated, workshop.StateAwaitingApproval,
+				workshop.StateDeclined)
+		}
+
+		if err := workshop.SetState(ctx, pool, advisor(), id, workshop.StateInvoiced); !errors.Is(err, workshop.ErrNeedsDocument) {
+			t.Errorf("from %s: SetState(invoiced) = %v, want ErrNeedsDocument", from, err)
+		}
+
+		var state string
+		var invoices int
+		if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+			if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1`, id).Scan(&state); err != nil {
+				return err
+			}
+			return tx.QueryRow(ctx, `SELECT count(*) FROM invoices WHERE work_order_id = $1`, id).Scan(&invoices)
+		}); err != nil {
+			t.Fatalf("read back: %v", err)
+		}
+		if state == string(workshop.StateInvoiced) && invoices == 0 {
+			t.Errorf("from %s: the order says invoiced and no document exists", from)
+		}
+
+		// And the way that does work still works.
+		if _, err := workshop.Issue(ctx, pool, advisor(), id); err != nil {
+			t.Errorf("from %s: Issue was refused: %v", from, err)
+		}
+	}
+}
+
+// A button that is always refused is worse than no button, so it is not shown.
+func TestInvoicedIsNotOfferedAsAMove(t *testing.T) {
+	for _, from := range []workshop.State{workshop.StateReady, workshop.StateDeclined} {
+		for _, hasWork := range []bool{false, true} {
+			for _, s := range workshop.AvailableStates(from, hasWork) {
+				if s == workshop.StateInvoiced {
+					t.Errorf("AvailableStates(%s, hasWork=%v) offers invoiced", from, hasWork)
+				}
+			}
+		}
+	}
+	// The transition itself is still legal; only the route is restricted.
+	if !workshop.CanTransition(workshop.StateReady, workshop.StateInvoiced) {
+		t.Error("ready can no longer reach invoiced at all; Issue needs that")
+	}
+	if !workshop.CanTransition(workshop.StateDeclined, workshop.StateInvoiced) {
+		t.Error("declined can no longer reach invoiced at all")
+	}
+}

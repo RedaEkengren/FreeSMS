@@ -93,7 +93,9 @@ func TestSetStateRefusesAnIllegalMove(t *testing.T) {
 	pool := setup(t)
 	id := newJob(t, pool)
 
-	err := workshop.SetState(context.Background(), pool, advisor(), id, workshop.StateInvoiced)
+	// Ready, not invoiced: invoicing is refused before the machine is asked,
+	// because it is a document rather than a move.
+	err := workshop.SetState(context.Background(), pool, advisor(), id, workshop.StateReady)
 	var illegal workshop.ErrIllegalTransition
 	if !errors.As(err, &illegal) {
 		t.Fatalf("SetState() = %v, want an illegal transition error", err)
@@ -157,7 +159,15 @@ func TestDeclinedAfterTeardownReachesAnInvoice(t *testing.T) {
 	if err := workshop.SetState(ctx, pool, advisor(), id, workshop.StateDeclined); err != nil {
 		t.Fatalf("declining a job in progress: %v", err)
 	}
-	if err := workshop.SetState(ctx, pool, advisor(), id, workshop.StateInvoiced); err != nil {
+	// Through Issue, which is the only way in: the diagnosis and the
+	// reassembly are still owed and still have to produce a document.
+	if err := workshop.AddLine(ctx, pool, advisor(), id, workshop.NewLine{
+		Kind: "labour", Description: "Diagnosis and reassembly", QuantityMilli: 1500,
+		UnitPriceMinor: 89500, VATRateBasis: 2500,
+	}); err != nil {
+		t.Fatalf("AddLine: %v", err)
+	}
+	if _, err := workshop.Issue(ctx, pool, advisor(), id); err != nil {
 		t.Fatalf("invoicing a declined job: %v", err)
 	}
 }
@@ -224,9 +234,17 @@ func TestNothingCanBeAddedToAnInvoicedOrder(t *testing.T) {
 	ctx := context.Background()
 	id := newJob(t, pool)
 
+	if err := workshop.AddLine(ctx, pool, advisor(), id, workshop.NewLine{
+		Kind: "labour", Description: "The work", QuantityMilli: 1000,
+		UnitPriceMinor: 89500, VATRateBasis: 2500,
+	}); err != nil {
+		t.Fatalf("AddLine: %v", err)
+	}
 	move(t, pool, id, workshop.StateEstimated, workshop.StateAwaitingApproval,
-		workshop.StateApproved, workshop.StateInProgress, workshop.StateReady,
-		workshop.StateInvoiced)
+		workshop.StateApproved, workshop.StateInProgress, workshop.StateReady)
+	if _, err := workshop.Issue(ctx, pool, advisor(), id); err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
 
 	err := workshop.AddLine(ctx, pool, advisor(), id, workshop.NewLine{
 		Kind: "fee", Description: "One more thing", QuantityMilli: 1000, VATRateBasis: 2500,
@@ -251,9 +269,9 @@ func TestAnOrderWithNoCustomerCannotBeInvoiced(t *testing.T) {
 	move(t, pool, id, workshop.StateEstimated, workshop.StateAwaitingApproval,
 		workshop.StateApproved, workshop.StateInProgress, workshop.StateReady)
 
-	err = workshop.SetState(ctx, pool, advisor(), id, workshop.StateInvoiced)
+	_, err = workshop.Issue(ctx, pool, advisor(), id)
 	if !errors.Is(err, workshop.ErrNoCustomer) {
-		t.Fatalf("SetState(invoiced) = %v, want ErrNoCustomer", err)
+		t.Fatalf("Issue() = %v, want ErrNoCustomer", err)
 	}
 }
 

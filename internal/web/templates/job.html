@@ -216,10 +216,13 @@
   </li>
   {{end}}
 </ul>
-{{else if eq .Job.State "ready"}}
+{{else if or (eq .Job.State "ready") (eq .Job.State "declined")}}
+  {{/* Declined as well as ready. A customer who says no with the car in
+       pieces still owes the diagnosis and the reassembly, so declined leads to
+       invoiced -- and this is the only button that gets it there. */}}
   {{if .Session.Scope.Role.SeesCustomerPersonalData}}
   <form method="post" action="/jobs/{{.Job.ID}}/invoice" style="margin:1rem 0">
-    <button type="submit">Invoice it</button>
+    <button type="submit">{{.T "Invoice it"}}</button>
   </form>
   {{end}}
 {{end}}
