@@ -27,9 +27,13 @@
 <div class="waiting">{{.Contact.Name}}</div>
 {{if .Contact.Phone}}<div><a href="tel:{{.Contact.Phone}}">{{.Contact.Phone}}</a></div>{{end}}
 {{if .Contact.Email}}<div class="waiting">{{.Contact.Email}}</div>{{end}}
+<div><a href="/jobs/{{.Job.ID}}/customer">{{.T "Change"}}</a></div>
 {{else if .Session.Scope.Role.SeesCustomerPersonalData}}
 <h2>{{.T "Customer"}}</h2>
+{{/* An order with nobody to bill cannot be invoiced, and this is the only
+     place that says so before somebody tries. */}}
 <p class="waiting">{{.T "No customer recorded yet"}}</p>
+<a class="button secondary" href="/jobs/{{.Job.ID}}/customer">{{.T "Say who is paying"}}</a>
 {{end}}
 
 {{if .Next}}

@@ -13,11 +13,21 @@
       "one": "%d sak upptäckt, inte prissatt",
       "other": "%d saker upptäckta, inte prissatta"
     },
+    "%d visit": {
+      "one": "%d besök",
+      "other": "%d besök"
+    },
     "%s is on it": {
       "other": "%s jobbar på den"
     },
     "%v reserved · %v available": {
       "other": "%v reserverade · %v tillgängliga"
+    },
+    "A company": {
+      "other": "Ett företag"
+    },
+    "A person": {
+      "other": "En person"
     },
     "Accounting": {
       "other": "Bokföring"
@@ -34,8 +44,14 @@
     "Administrator": {
       "other": "Administratör"
     },
+    "Also the owner of this vehicle, so the next visit fills itself in": {
+      "other": "Även ägare till fordonet, så nästa besök fyller i sig självt"
+    },
     "Amount": {
       "other": "Belopp"
+    },
+    "Anna Andersson, or Andersson Åkeri AB": {
+      "other": "Anna Andersson, eller Andersson Åkeri AB"
     },
     "Approved for F-tax": {
       "other": "Godkänd för F-skatt"
@@ -73,11 +89,17 @@
     "Billed to": {
       "other": "Faktureras till"
     },
+    "Billed to %s at the moment.": {
+      "other": "Faktureras till %s just nu."
+    },
     "Cancel it": {
       "other": "Avbeställ den"
     },
     "Cancelled": {
       "other": "Avbeställd"
+    },
+    "Change": {
+      "other": "Ändra"
     },
     "City": {
       "other": "Ort"
@@ -90,6 +112,9 @@
     },
     "Company number": {
       "other": "Organisationsnummer"
+    },
+    "Contact person, if a company": {
+      "other": "Kontaktperson, om företag"
     },
     "Copied": {
       "other": "Kopierad"
@@ -211,6 +236,9 @@
     "Name": {
       "other": "Namn"
     },
+    "Name, telephone or company number": {
+      "other": "Namn, telefon eller organisationsnummer"
+    },
     "Net": {
       "other": "Netto"
     },
@@ -307,6 +335,12 @@
     "Save": {
       "other": "Spara"
     },
+    "Save and use": {
+      "other": "Spara och använd"
+    },
+    "Say who is paying": {
+      "other": "Ange vem som betalar"
+    },
     "Scan": {
       "other": "Skanna"
     },
@@ -318,6 +352,12 @@
     },
     "Sign out": {
       "other": "Logga ut"
+    },
+    "Somebody new": {
+      "other": "Någon ny"
+    },
+    "Somebody we already have": {
+      "other": "Någon vi redan har"
     },
     "Something else needs doing": {
       "other": "Något mer behöver göras"
@@ -416,6 +456,9 @@
     "Unit price": {
       "other": "Á-pris"
     },
+    "Use": {
+      "other": "Använd"
+    },
     "VAT": {
       "other": "Moms"
     },
@@ -449,6 +492,12 @@
     },
     "What happened": {
       "other": "Vad hände"
+    },
+    "Who is paying": {
+      "other": "Vem betalar"
+    },
+    "Who is paying is a conversation at the counter.": {
+      "other": "Vem som betalar är ett samtal i disken."
     },
     "Who pays": {
       "other": "Vem betalar"

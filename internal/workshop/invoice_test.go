@@ -707,3 +707,143 @@ func TestOneInvoiceYieldsOneCreditNoteUnderConcurrency(t *testing.T) {
 		t.Errorf("%d credit notes reverse one invoice", notes)
 	}
 }
+
+// The whole loop on an empty installation, without touching the database by
+// hand.
+//
+// Until customers could be created there was no way through this at all:
+// setup made a shop and an owner, intake found a customer only if the vehicle
+// already had an ownership period, and Issue refuses an order with nobody to
+// bill. Every earlier end-to-end walk worked because the development seed
+// planted a customer. This one plants nothing.
+func TestAFreshInstallationCanReachAnInvoice(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+
+	// A car nobody has seen, so no ownership record follows it in.
+	id, err := workshop.TakeIn(ctx, pool, advisor(), "NEW 001", "Grinding at the front", nil)
+	if err != nil {
+		t.Fatalf("TakeIn: %v", err)
+	}
+	if err := workshop.AddLine(ctx, pool, advisor(), id, workshop.NewLine{
+		Kind: "labour", Description: "Brake pads, front", QuantityMilli: 1500,
+		UnitPriceMinor: 89500, VATRateBasis: 2500,
+	}); err != nil {
+		t.Fatalf("AddLine: %v", err)
+	}
+	move(t, pool, id, workshop.StateEstimated, workshop.StateAwaitingApproval,
+		workshop.StateApproved, workshop.StateInProgress, workshop.StateReady)
+
+	// Ready, priced, and nobody to send it to. This is where a fresh
+	// installation used to stop for good.
+	if _, err := workshop.Issue(ctx, pool, advisor(), id); !errors.Is(err, workshop.ErrNoCustomer) {
+		t.Fatalf("a ready job with no customer = %v, want ErrNoCustomer", err)
+	}
+
+	customer, err := workshop.CreateCustomer(ctx, pool, advisor(), workshop.NewCustomer{
+		Kind: "private", Name: "Anna Andersson",
+		Phone: "070-123 45 67", AddressLine1: "Storgatan 1",
+		PostalCode: "123 45", City: "Uppsala",
+	})
+	if err != nil {
+		t.Fatalf("CreateCustomer: %v", err)
+	}
+	if err := workshop.AssignCustomer(ctx, pool, advisor(), id, customer, true); err != nil {
+		t.Fatalf("AssignCustomer: %v", err)
+	}
+
+	inv, err := workshop.Issue(ctx, pool, advisor(), id)
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	doc, err := workshop.DocumentByID(ctx, pool, advisor(), inv.ID)
+	if err != nil {
+		t.Fatalf("DocumentByID: %v", err)
+	}
+	if doc.CustomerName != "Anna Andersson" {
+		t.Errorf("the invoice is addressed to %q", doc.CustomerName)
+	}
+	if doc.CustomerAddress == "" {
+		t.Error("the invoice has no address on it")
+	}
+
+	// And the next car in for the same owner fills itself in, which is what
+	// the ownership half was for.
+	second, err := workshop.TakeIn(ctx, pool, advisor(), "NEW 001", "Noise from the rear", nil)
+	if err != nil {
+		t.Fatalf("second TakeIn: %v", err)
+	}
+	contact, err := workshop.ContactFor(ctx, pool, advisor(), second)
+	if err != nil {
+		t.Fatalf("ContactFor: %v", err)
+	}
+	if contact.Name != "Anna Andersson" {
+		t.Errorf("the second visit does not know the owner: %+v", contact)
+	}
+}
+
+// A second Anna Andersson is how a customer list becomes useless, so the
+// search has to find the first one by the things somebody says on the
+// telephone -- a surname, or a number read aloud with different punctuation.
+func TestAnExistingCustomerCanBeFoundAgain(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+
+	if _, err := workshop.CreateCustomer(ctx, pool, advisor(), workshop.NewCustomer{
+		Kind: "private", Name: "Anna Andersson", Phone: "0701234567",
+	}); err != nil {
+		t.Fatalf("CreateCustomer: %v", err)
+	}
+	if _, err := workshop.CreateCustomer(ctx, pool, advisor(), workshop.NewCustomer{
+		Kind: "company", Name: "Andersson Åkeri AB", OrgNumber: "556677-8899",
+	}); err != nil {
+		t.Fatalf("CreateCustomer(company): %v", err)
+	}
+
+	for _, c := range []struct{ query, want string }{
+		{"andersson", ""}, // both
+		{"Anna", "Anna Andersson"},
+		{"070-123 45 67", "Anna Andersson"}, // punctuation differs from what is stored
+		{"5566", "Andersson Åkeri AB"},
+		{"Åkeri", "Andersson Åkeri AB"},
+	} {
+		found, err := workshop.FindCustomers(ctx, pool, advisor(), c.query)
+		if err != nil {
+			t.Fatalf("FindCustomers(%q): %v", c.query, err)
+		}
+		if len(found) == 0 {
+			t.Errorf("searching %q found nobody", c.query)
+			continue
+		}
+		if c.want != "" && found[0].Name != c.want {
+			t.Errorf("searching %q found %q first, want %q", c.query, found[0].Name, c.want)
+		}
+	}
+
+	// A technician does not get a customer list.
+	if _, err := workshop.FindCustomers(ctx, pool, technician(), "andersson"); !errors.Is(err, access.ErrForbidden) {
+		t.Errorf("a technician searched the customers: %v", err)
+	}
+}
+
+// An issued document says who it was addressed to. Moving the order's customer
+// afterwards would make the two disagree, and the document is the one that was
+// sent.
+func TestTheCustomerCannotBeChangedAfterInvoicing(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+
+	id := readyToInvoice(t, pool)
+	if _, err := workshop.Issue(ctx, pool, advisor(), id); err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	other, err := workshop.CreateCustomer(ctx, pool, advisor(), workshop.NewCustomer{
+		Kind: "private", Name: "Somebody Else",
+	})
+	if err != nil {
+		t.Fatalf("CreateCustomer: %v", err)
+	}
+	if err := workshop.AssignCustomer(ctx, pool, advisor(), id, other, false); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("AssignCustomer on an invoiced order = %v, want a refusal", err)
+	}
+}

@@ -33,18 +33,20 @@ type pageData struct {
 	Error   string
 	Email   string
 
-	Jobs     []workshop.Job
-	Job      workshop.Job
-	Lines    []workshop.Line
-	Board    []workshop.BoardEntry
-	Next     []workshop.State
-	Totals   money.Totals
-	Invoices []workshop.Invoice
-	Document workshop.Document
-	Contact  workshop.Contact
-	Shop     workshop.ShopDetails
-	Requests []workshop.PartRequest
-	Findings []workshop.Finding
+	Jobs          []workshop.Job
+	Job           workshop.Job
+	Lines         []workshop.Line
+	Board         []workshop.BoardEntry
+	Next          []workshop.State
+	Totals        money.Totals
+	Invoices      []workshop.Invoice
+	Document      workshop.Document
+	Contact       workshop.Contact
+	Shop          workshop.ShopDetails
+	Customers     []workshop.Customer
+	CustomerQuery string
+	Requests      []workshop.PartRequest
+	Findings      []workshop.Finding
 
 	Inspection  workshop.Inspection
 	Inspections []workshop.Inspection
@@ -179,7 +181,7 @@ func (d pageData) N(key string, count int, args ...any) string {
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "shop", "setup", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "shop", "customer", "setup", "error"}
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).Funcs(templateFuncs).ParseFS(web.Templates,

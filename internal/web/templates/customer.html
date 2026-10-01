@@ -1,0 +1,83 @@
+{{define "content"}}
+<div class="row">
+  <span class="plate">{{if .Job.Registration}}{{.Job.Registration}}{{else}}{{.T "no plate"}}{{end}}</span>
+  <span class="tag">#{{.Job.Number}}</span>
+</div>
+<h1>{{.T "Who is paying"}}</h1>
+{{if .Contact.Known}}
+<p class="waiting">{{.T "Billed to %s at the moment." .Contact.Name}}</p>
+{{end}}
+
+<h2>{{.T "Somebody we already have"}}</h2>
+{{/* Search before create, deliberately: a second Anna Andersson is how a
+     customer list becomes useless, and the count of previous orders beside
+     each result is what tells the two apart. */}}
+<label>
+  <span>{{.T "Name, telephone or company number"}}</span>
+  <input name="q" value="{{.CustomerQuery}}" autocomplete="off" autofocus
+         hx-get="/jobs/{{.Job.ID}}/customer" hx-target="#results" hx-swap="innerHTML"
+         hx-trigger="input changed delay:200ms, keyup[key=='Enter']">
+</label>
+<div id="results">{{template "results" .}}</div>
+
+<h2>{{.T "Somebody new"}}</h2>
+<form method="post" action="/jobs/{{.Job.ID}}/customer" data-keep="customer:{{.Job.ID}}">
+  <label>
+    <span>{{.T "Kind"}}</span>
+    <select name="kind">
+      <option value="private">{{.T "A person"}}</option>
+      <option value="company">{{.T "A company"}}</option>
+    </select>
+  </label>
+  <label>
+    <span>{{.T "Name"}}</span>
+    <input name="name" required placeholder="{{.T "Anna Andersson, or Andersson Åkeri AB"}}">
+  </label>
+  <label>
+    <span>{{.T "Contact person, if a company"}}</span>
+    <input name="contact_name">
+  </label>
+  <div class="pair">
+    <label><span>{{.T "Telephone"}}</span><input name="phone" inputmode="tel"></label>
+    <label><span>{{.T "Email"}}</span><input name="email" inputmode="email"></label>
+  </div>
+  <label>
+    <span>{{.T "Address"}}</span>
+    <input name="address_line1">
+  </label>
+  <div class="pair">
+    <label><span>{{.T "Postal code"}}</span><input name="postal_code"></label>
+    <label><span>{{.T "City"}}</span><input name="city"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "Company number"}}</span><input name="org_number"></label>
+    <label><span>{{.T "VAT number"}}</span><input name="vat_number"></label>
+  </div>
+  <label class="tick">
+    <input type="checkbox" name="also_owner" value="yes" checked>
+    <span>{{.T "Also the owner of this vehicle, so the next visit fills itself in"}}</span>
+  </label>
+  <button type="submit">{{.T "Save and use"}}</button>
+</form>
+
+<p style="margin-top:1.5rem"><a href="/jobs/{{.Job.ID}}">{{.T "Back to the job"}}</a></p>
+{{end}}
+
+{{define "results"}}
+{{if .CustomerQuery}}
+  {{if not .Customers}}
+    <p class="waiting">{{.T "Nothing matched."}}</p>
+  {{end}}
+  {{range .Customers}}
+  <form method="post" action="/jobs/{{$.Job.ID}}/customer" class="pick">
+    <input type="hidden" name="customer_id" value="{{.ID}}">
+    <input type="hidden" name="also_owner" value="yes">
+    <span class="what">{{.Name}}
+      <small>{{$.Dot .Phone .Email .OrgNumber .Address}}</small>
+    </span>
+    {{if gt .Orders 0}}<span class="tag">{{$.N "%d visit" .Orders}}</span>{{end}}
+    <button type="submit" class="secondary">{{$.T "Use"}}</button>
+  </form>
+  {{end}}
+{{end}}
+{{end}}

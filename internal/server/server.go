@@ -267,6 +267,8 @@ func (s *Server) routes() (http.Handler, error) {
 
 	mux.HandleFunc("GET /parts", s.requireSession(s.handleParts))
 	mux.HandleFunc("POST /parts/arrived", s.requireSession(s.handlePartArrived))
+	mux.HandleFunc("GET /jobs/{id}/customer", s.requireSession(s.handleCustomerForm))
+	mux.HandleFunc("POST /jobs/{id}/customer", s.requireSession(s.handleSaveCustomer))
 	mux.HandleFunc("GET /jobs/{id}/parts", s.requireSession(s.handleJobParts))
 	mux.HandleFunc("POST /jobs/{id}/parts", s.requireSession(s.handleRequestPart))
 	mux.HandleFunc("POST /jobs/{id}/findings", s.requireSession(s.handleReportFinding))
