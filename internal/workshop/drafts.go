@@ -35,36 +35,96 @@ type Replay struct {
 	Location string
 }
 
-// CheckIdempotency reports whether this request has already been carried out.
+// ErrInFlight is returned when another request with the same key is being
+// carried out right now. The answer is "ask again shortly", not "do it too".
+var ErrInFlight = errors.New("workshop: a request with that key is still being carried out")
+
+// ErrOutcomeUnknown is returned when a request with this key was started long
+// ago and never recorded an outcome.
 //
-// A flaky connection means the same request arrives twice: the phone gave up
-// waiting, the technician pressed again, the offline queue replayed. Without
-// this, each one opens a second job.
-func CheckIdempotency(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, key string, body []byte) (*Replay, error) {
-	if key == "" {
-		return nil, nil
+// That happens when the process stops between doing the work and writing down
+// that it did. Nobody can tell from here whether the work committed, so it is
+// neither replayed nor repeated: a person has to look. Doing a money operation
+// twice is worse than asking somebody to check a job.
+var ErrOutcomeUnknown = errors.New("workshop: a request with that key was started and its outcome is unknown")
+
+// pending marks a claimed key whose request has not finished. A real HTTP
+// status is never zero, so the column needs no second meaning.
+const pending = 0
+
+// stale is how long a claim may stay pending before it is treated as
+// abandoned. Far longer than any request takes; short enough that a queue
+// stuck behind a crash is noticed the same morning.
+const stale = 10 * time.Minute
+
+// Fingerprint is what makes two requests the same request.
+//
+// The body alone was not enough: the same form posted to a different job, or
+// by a different person, has the same body. The method, the path and the
+// person asking are part of what the request was.
+func Fingerprint(method, path, userID string, body []byte) []byte {
+	h := sha256.New()
+	for _, part := range [][]byte{[]byte(method), []byte(path), []byte(userID)} {
+		h.Write(part)
+		h.Write([]byte{0})
 	}
+	h.Write(body)
+	return h.Sum(nil)
+}
+
+// ClaimIdempotency takes a key before the work is done, rather than recording
+// it afterwards.
+//
+// It used to be the other way round: check in one transaction, let the handler
+// commit its work in another, record the key in a third. Two copies arriving
+// together both passed the check and both did the work, and a client that hung
+// up after the work committed left no record, so its retry did the work again.
+//
+// Now the key is claimed first, in a statement the unique index serialises:
+// exactly one caller inserts the row and owns the request. Everybody else
+// reads what that one left -- a finished answer to replay, a claim still in
+// progress, or one abandoned long enough ago that its outcome is unknown.
+//
+// A nil Replay and a nil error means the caller owns the key and must do the
+// work, then Complete or Release it.
+func ClaimIdempotency(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, key string, fingerprint []byte) (*Replay, error) {
 	if len(key) < 16 || len(key) > 128 {
 		return nil, fmt.Errorf("%w: an idempotency key is 16 to 128 characters", ErrInvalid)
 	}
-	hash := sha256.Sum256(body)
 
 	var replay *Replay
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var mine bool
+		err := tx.QueryRow(ctx, `
+			INSERT INTO idempotency_keys (shop_id, key, request_hash, status)
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT (shop_id, key) DO NOTHING
+			RETURNING true`, scope.ShopID, key, fingerprint, pending).Scan(&mine)
+		if err == nil {
+			return nil // ours
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("claim idempotency key: %w", err)
+		}
+
 		var stored []byte
 		var status int
 		var location *string
-		err := tx.QueryRow(ctx,
-			`SELECT request_hash, status, location FROM idempotency_keys WHERE key = $1`,
-			key).Scan(&stored, &status, &location)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
-		}
-		if err != nil {
+		var claimed time.Time
+		if err := tx.QueryRow(ctx, `
+			SELECT request_hash, status, location, created_at
+			FROM idempotency_keys WHERE key = $1`, key).
+			Scan(&stored, &status, &location, &claimed); err != nil {
 			return fmt.Errorf("read idempotency key: %w", err)
 		}
-		if string(stored) != string(hash[:]) {
+		if string(stored) != string(fingerprint) {
 			return ErrKeyReused
+		}
+		if status == pending {
+			if time.Since(claimed) > stale {
+				return ErrOutcomeUnknown
+			}
+			return ErrInFlight
 		}
 		replay = &Replay{Status: status}
 		if location != nil {
@@ -75,19 +135,23 @@ func CheckIdempotency(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 	return replay, err
 }
 
-// RecordIdempotency stores what a request did, so a repeat can be answered
-// without doing it again.
-func RecordIdempotency(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, key string, body []byte, status int, location string) error {
-	if key == "" {
-		return nil
-	}
-	hash := sha256.Sum256(body)
+// CompleteIdempotency records what a claimed request did, so a repeat is
+// answered with it.
+func CompleteIdempotency(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, key string, status int, location string) error {
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
-			INSERT INTO idempotency_keys (shop_id, key, request_hash, status, location)
-			VALUES ($1, $2, $3, $4, nullif($5, ''))
-			ON CONFLICT (shop_id, key) DO NOTHING`,
-			scope.ShopID, key, hash[:], status, location)
+			UPDATE idempotency_keys SET status = $2, location = nullif($3, '')
+			WHERE key = $1 AND status = $4`, key, status, location, pending)
+		return err
+	})
+}
+
+// ReleaseIdempotency gives a key back after a request that failed, so that
+// trying again is allowed to succeed.
+func ReleaseIdempotency(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, key string) error {
+	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx,
+			`DELETE FROM idempotency_keys WHERE key = $1 AND status = $2`, key, pending)
 		return err
 	})
 }

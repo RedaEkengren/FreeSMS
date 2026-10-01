@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -488,6 +489,70 @@ func TestNoScreenPrintsAnOrphanSeparator(t *testing.T) {
 				strings.Contains(line, "· ·") {
 				t.Errorf("%s prints a separator with nothing beside it: %q", path, line)
 			}
+		}
+	}
+}
+
+// The offline queue sends the same key on every attempt. Several copies of one
+// request through the real middleware must add one line, not several -- the
+// check-then-record design let every copy that arrived together through.
+func TestCopiesOfOneRequestAddOneLine(t *testing.T) {
+	ts, pool := testServer(t)
+	advisor := signIn(t, ts, advisorEmail)
+
+	const n = 6
+	const key = "fedcba98-7654-3210-fedc-ba9876543210"
+	form := url.Values{
+		"kind": {"labour"}, "description": {"Sent from a flaky phone"},
+		"quantity": {"1"}, "unit_price": {"895.00"}, "vat_rate": {"25"},
+	}.Encode()
+
+	var wg, ready sync.WaitGroup
+	start := make(chan struct{})
+	statuses := make([]int, n)
+	ready.Add(n)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			req, _ := http.NewRequest(http.MethodPost, ts.URL+"/jobs/"+jobA+"/lines", strings.NewReader(form))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Set("Origin", ts.URL)
+			req.Header.Set("Idempotency-Key", key)
+			ready.Done()
+			<-start
+			// Not following redirects: the status of this request is the
+			// thing under test, not the page it would lead to.
+			c := *advisor
+			c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+			resp, err := c.Do(req)
+			if err != nil {
+				t.Errorf("copy %d: %v", i, err)
+				return
+			}
+			resp.Body.Close()
+			statuses[i] = resp.StatusCode
+		}(i)
+	}
+	ready.Wait()
+	close(start)
+	wg.Wait()
+
+	var lines int
+	if err := database.InShop(context.Background(), pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx,
+			`SELECT count(*) FROM work_order_lines WHERE work_order_id = $1 AND description = 'Sent from a flaky phone'`,
+			jobA).Scan(&lines)
+	}); err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if lines != 1 {
+		t.Errorf("%d copies of one request added %d lines; statuses %v", n, lines, statuses)
+	}
+	// Every copy got an answer the queue understands: done, or ask again.
+	for i, s := range statuses {
+		if s != http.StatusSeeOther && s != http.StatusServiceUnavailable {
+			t.Errorf("copy %d answered %d", i, s)
 		}
 	}
 }
