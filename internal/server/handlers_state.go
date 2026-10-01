@@ -267,6 +267,9 @@ func (s *Server) handleJobParts(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, access.ErrForbidden):
 		s.renderError(w, r, http.StatusForbidden, "Not for your role", "")
 		return
+	case errors.Is(err, workshop.ErrNotFound):
+		http.NotFound(w, r)
+		return
 	case err != nil:
 		s.log.Error("search parts", "error", err)
 		http.Error(w, "could not search", http.StatusInternalServerError)

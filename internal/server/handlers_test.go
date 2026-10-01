@@ -25,6 +25,21 @@ const (
 	shopB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 	jobB  = "bbbbbbbb-0000-0000-0000-00000000000f"
 
+	// One row of each kind belonging to shop B, so the route sweep has a real
+	// identifier to ask for on every pattern.
+	personB     = "bbbbbbbb-0000-0000-0000-000000000001"
+	customerB   = "bbbbbbbb-0000-0000-0000-000000000002"
+	vehicleB    = "bbbbbbbb-0000-0000-0000-000000000003"
+	inspectionB = "bbbbbbbb-0000-0000-0000-000000000004"
+	invoiceB    = "bbbbbbbb-0000-0000-0000-000000000005"
+	partB       = "bbbbbbbb-0000-0000-0000-000000000006"
+	itemB       = "bbbbbbbb-0000-0000-0000-000000000007"
+	photoB      = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+	// A string that appears nowhere in shop A. If it reaches a response body,
+	// something leaked, whatever the status code said.
+	secretB = "Birgitta Hemlig"
+
 	techEmail    = "tech@shop-a.test"
 	advisorEmail = "advisor@shop-a.test"
 	techPass     = "a reasonable workshop password"
@@ -82,18 +97,38 @@ func testServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 		  'Grinding from the front')`,
 	})
 
-	// Shop B: a job that shop A's technician must never reach.
+	// Shop B: one of everything shop A's users must never reach. The route
+	// sweep substitutes these into every pattern that takes an identifier, so
+	// the fixture has to carry a real row for each kind -- a missing row would
+	// make the sweep pass because the object does not exist, which is not the
+	// thing being tested.
 	seedShop(t, pool, shopB, []string{
 		`INSERT INTO shops (id, name) VALUES ('` + shopB + `', 'Shop B')`,
 		`INSERT INTO people (id, shop_id, display_name) VALUES
-		 ('bbbbbbbb-0000-0000-0000-000000000001','` + shopB + `','B Person')`,
+		 ('` + personB + `','` + shopB + `','` + secretB + `')`,
+		`INSERT INTO users (id, shop_id, person_id, role, password_hash) VALUES
+		 ('bbbbbbbb-0000-0000-0000-0000000000bb','` + shopB + `','` + personB + `','technician','` + hash + `')`,
 		`INSERT INTO customers (id, shop_id, kind, person_id) VALUES
-		 ('bbbbbbbb-0000-0000-0000-000000000002','` + shopB + `','private','bbbbbbbb-0000-0000-0000-000000000001')`,
+		 ('` + customerB + `','` + shopB + `','private','` + personB + `')`,
 		`INSERT INTO vehicles (id, shop_id, make, model) VALUES
-		 ('bbbbbbbb-0000-0000-0000-000000000003','` + shopB + `','Toyota','Hilux')`,
+		 ('` + vehicleB + `','` + shopB + `','Toyota','Hilux')`,
 		`INSERT INTO work_orders (id, shop_id, number, vehicle_id, customer_id, complaint) VALUES
 		 ('` + jobB + `','` + shopB + `',1,
-		  'bbbbbbbb-0000-0000-0000-000000000003','bbbbbbbb-0000-0000-0000-000000000002','Secret complaint')`,
+		  '` + vehicleB + `','` + customerB + `','Secret complaint')`,
+		`INSERT INTO inspections (id, shop_id, work_order_id, template_name, performed_by) VALUES
+		 ('` + inspectionB + `','` + shopB + `','` + jobB + `','Secret check',
+		  'bbbbbbbb-0000-0000-0000-0000000000bb')`,
+		`INSERT INTO inspection_items (id, shop_id, inspection_id, position, label) VALUES
+		 ('` + itemB + `','` + shopB + `','` + inspectionB + `',1,'Secret item')`,
+		`INSERT INTO attachments (shop_id, storage_key, content_type, byte_size, inspection_item_id) VALUES
+		 ('` + shopB + `','` + photoB + `','image/jpeg',1,'` + itemB + `')`,
+		`INSERT INTO parts (id, shop_id, number, name) VALUES
+		 ('` + partB + `','` + shopB + `','SECRET-1','Secret part')`,
+		`INSERT INTO invoices
+		   (id, shop_id, series, number, work_order_id, customer_name,
+		    net_minor, vat_minor, gross_minor)
+		 VALUES ('` + invoiceB + `','` + shopB + `','B',1,'` + jobB + `','` + secretB + `',
+		         100000, 25000, 125000)`,
 	})
 
 	cfg := &config.Config{

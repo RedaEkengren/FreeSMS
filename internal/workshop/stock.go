@@ -551,6 +551,21 @@ func PartsForJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 	query = strings.TrimSpace(query)
 	var out []Part
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// The job has to exist in this shop before its shelf is listed.
+		//
+		// Without this the identifier is only used in an EXISTS that orders
+		// the results, so another shop's job id -- or a typo -- returned this
+		// shop's parts with a 200 and a row of buttons that post to an order
+		// that is not there. Found by the route sweep, which is what it is for.
+		var exists bool
+		if err := tx.QueryRow(ctx,
+			`SELECT EXISTS (SELECT 1 FROM work_orders WHERE id = $1)`, jobID).Scan(&exists); err != nil {
+			return fmt.Errorf("check job: %w", err)
+		}
+		if !exists {
+			return ErrNotFound
+		}
+
 		var rows pgx.Rows
 		var err error
 		if query == "" {
