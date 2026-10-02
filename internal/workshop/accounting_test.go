@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func period() (time.Time, time.Time) {
@@ -196,5 +200,142 @@ func TestTheExportIsNotForTechnicians(t *testing.T) {
 	from, to := period()
 	if _, _, err := workshop.ExportAccounting(context.Background(), pool, technician(), from, to, false); err == nil {
 		t.Error("a technician exported the books")
+	}
+}
+
+// postings reads every #TRANS line in a SIE file into account -> total, in
+// minor units, so a test can ask what each account received.
+func postings(t *testing.T, body []byte) map[int]int64 {
+	t.Helper()
+	out := map[int]int64{}
+	for _, line := range strings.Split(string(body), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "#TRANS ") {
+			continue
+		}
+		var account int
+		var amount string
+		if _, err := fmt.Sscanf(line, "#TRANS %d {} %s", &account, &amount); err != nil {
+			t.Fatalf("unreadable %q: %v", line, err)
+		}
+		neg := strings.HasPrefix(amount, "-")
+		whole, frac, _ := strings.Cut(strings.TrimPrefix(amount, "-"), ".")
+		w, _ := strconv.ParseInt(whole, 10, 64)
+		f, _ := strconv.ParseInt(frac, 10, 64)
+		v := w*100 + f
+		if neg {
+			v = -v
+		}
+		out[account] += v
+	}
+	return out
+}
+
+// mixedRates is a ready order carrying all four Swedish rates.
+func mixedRates(t *testing.T, pool *pgxpool.Pool) string {
+	t.Helper()
+	ctx := context.Background()
+	id := newJob(t, pool)
+	for _, l := range []workshop.NewLine{
+		{Kind: "labour", Description: "Work at 25", QuantityMilli: 1000, UnitPriceMinor: 100000, VATRateBasis: 2500},
+		{Kind: "part", Description: "Something at 12", QuantityMilli: 1000, UnitPriceMinor: 50000, VATRateBasis: 1200},
+		{Kind: "fee", Description: "Something at 6", QuantityMilli: 1000, UnitPriceMinor: 20000, VATRateBasis: 600},
+		{Kind: "sublet", Description: "Something zero-rated", QuantityMilli: 1000, UnitPriceMinor: 10000, VATRateBasis: 0},
+	} {
+		if err := workshop.AddLine(ctx, pool, advisor(), id, l); err != nil {
+			t.Fatalf("AddLine(%s): %v", l.Description, err)
+		}
+	}
+	move(t, pool, id, workshop.StateEstimated, workshop.StateAwaitingApproval,
+		workshop.StateApproved, workshop.StateInProgress, workshop.StateReady)
+	return id
+}
+
+// Output VAT goes to the account for its rate. All of it used to go to the
+// 25 per cent account: the verification balanced, and the VAT return was
+// wrong for every 12 and 6 per cent line.
+func TestEachVATRateReachesItsOwnAccount(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+
+	inv, err := workshop.Issue(ctx, pool, advisor(), mixedRates(t, pool))
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	from, to := period()
+	body, _, err := workshop.ExportAccounting(ctx, pool, advisor(), from, to, false)
+	if err != nil {
+		t.Fatalf("ExportAccounting: %v", err)
+	}
+
+	got := postings(t, body)
+	want := map[int]int64{
+		1510: 212200,  // the customer owes the gross
+		3010: -180000, // the sales, all four lines, net
+		2611: -25000,  // 25 per cent of 1 000,00
+		2621: -6000,   // 12 per cent of 500,00
+		2631: -1200,   // 6 per cent of 200,00
+	}
+	for account, amount := range want {
+		if got[account] != amount {
+			t.Errorf("account %d received %d, want %d (%s)", account, got[account], amount, inv.Reference())
+		}
+	}
+	var sum int64
+	for _, v := range got {
+		sum += v
+	}
+	if sum != 0 {
+		t.Errorf("the verification does not balance: off by %d", sum)
+	}
+}
+
+// A credit note reverses exactly what the original posted, rate by rate.
+func TestACreditNoteReversesEachRate(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+
+	inv, err := workshop.Issue(ctx, pool, advisor(), mixedRates(t, pool))
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	if _, err := workshop.CreditNote(ctx, pool, advisor(), inv.ID); err != nil {
+		t.Fatalf("CreditNote: %v", err)
+	}
+	from, to := period()
+	body, count, err := workshop.ExportAccounting(ctx, pool, advisor(), from, to, false)
+	if err != nil {
+		t.Fatalf("ExportAccounting: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("exported %d documents, want the invoice and its note", count)
+	}
+	for account, total := range postings(t, body) {
+		if total != 0 {
+			t.Errorf("account %d is left with %d after the invoice and its full credit note", account, total)
+		}
+	}
+}
+
+// A rate there is no account for is refused, not posted to 25 per cent.
+func TestAnUnknownVATRateIsRefusedNotGuessed(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+
+	id := newJob(t, pool)
+	if err := workshop.AddLine(ctx, pool, advisor(), id, workshop.NewLine{
+		Kind: "labour", Description: "At ten per cent", QuantityMilli: 1000,
+		UnitPriceMinor: 100000, VATRateBasis: 1000,
+	}); err != nil {
+		t.Skipf("AddLine refuses a ten per cent rate itself (%v), so the export never sees one", err)
+	}
+	move(t, pool, id, workshop.StateEstimated, workshop.StateAwaitingApproval,
+		workshop.StateApproved, workshop.StateInProgress, workshop.StateReady)
+	if _, err := workshop.Issue(ctx, pool, advisor(), id); err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	from, to := period()
+	if _, _, err := workshop.ExportAccounting(ctx, pool, advisor(), from, to, false); !errors.Is(err, workshop.ErrUnsupportedVATRate) {
+		t.Errorf("exporting a ten per cent line = %v, want ErrUnsupportedVATRate", err)
 	}
 }

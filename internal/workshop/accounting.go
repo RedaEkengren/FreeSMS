@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
@@ -30,6 +31,20 @@ var defaultAccounts = []struct {
 	{"vat_6", 2631, "Utgående moms 6%"},
 	{"rounding", 3740, "Öres- och kronutjämning"},
 }
+
+// vatAccounts maps a VAT rate, in basis points, to the purpose whose account
+// receives the output VAT at that rate. These are the Swedish rates. A line at
+// any other rate is refused rather than guessed at: posting 10 per cent VAT to
+// the 25 per cent account would balance and still be wrong in the VAT return.
+var vatAccounts = map[int]string{
+	2500: "vat_25",
+	1200: "vat_12",
+	600:  "vat_6",
+}
+
+// ErrUnsupportedVATRate is returned when an invoice carries a rate this
+// export has no account for.
+var ErrUnsupportedVATRate = errors.New("workshop: an invoice in this period has a VAT rate with no account")
 
 // ErrAlreadyExported is returned when a period has already gone to the
 // accountant.
@@ -114,6 +129,42 @@ func ExportAccounting(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			}
 		}
 
+		// VAT per rate, from the frozen lines. The invoice header carries one
+		// VAT total, and posting all of it to the 25 per cent account made a
+		// verification that balanced and still put 12 and 6 per cent VAT in
+		// the wrong place on the VAT return. The lines carry their own rate
+		// and their own rounded amount, so summing those is both the right
+		// split and exactly the figure the document printed.
+		vatByDoc := map[string]map[int]int64{}
+		ids := make([]string, 0, len(docs))
+		for _, d := range docs {
+			ids = append(ids, d.id)
+		}
+		vrows, err := tx.Query(ctx, `
+			SELECT invoice_id, vat_rate_bp, sum(vat_minor)
+			FROM invoice_lines WHERE invoice_id = ANY($1)
+			GROUP BY invoice_id, vat_rate_bp`, ids)
+		if err != nil {
+			return fmt.Errorf("read VAT per rate: %w", err)
+		}
+		for vrows.Next() {
+			var id string
+			var rate int
+			var amount int64
+			if err := vrows.Scan(&id, &rate, &amount); err != nil {
+				vrows.Close()
+				return fmt.Errorf("scan VAT per rate: %w", err)
+			}
+			if vatByDoc[id] == nil {
+				vatByDoc[id] = map[int]int64{}
+			}
+			vatByDoc[id][rate] += amount
+		}
+		vrows.Close()
+		if err := vrows.Err(); err != nil {
+			return err
+		}
+
 		file.Program, file.ProgramVer = "FreeSMS", "1"
 		file.Generated = time.Now()
 		file.YearFrom = time.Date(from.Year(), 1, 1, 0, 0, 0, 0, from.Location())
@@ -128,16 +179,46 @@ func ExportAccounting(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			// A credit note is its own verification, not a correction of the
 			// original. The pairing lives in the invoice data; the accounts
 			// see two entries.
+			entries := []sie.Entry{
+				{Account: accounts["receivable"], Minor: d.gross},
+				{Account: accounts["sales"], Minor: -d.net},
+			}
+			// In rate order, so the same document always produces the same
+			// file, and only for rates that carry VAT: a zero-rated line is in
+			// the sales figure and has nothing to post here.
+			rates := make([]int, 0, len(vatByDoc[d.id]))
+			for rate := range vatByDoc[d.id] {
+				rates = append(rates, rate)
+			}
+			sort.Sort(sort.Reverse(sort.IntSlice(rates)))
+			var posted int64
+			for _, rate := range rates {
+				amount := vatByDoc[d.id][rate]
+				if amount == 0 {
+					continue
+				}
+				purpose, ok := vatAccounts[rate]
+				if !ok {
+					return fmt.Errorf("%w: %s-%d has %d.%02d%%", ErrUnsupportedVATRate,
+						d.series, d.number, rate/100, rate%100)
+				}
+				entries = append(entries, sie.Entry{Account: accounts[purpose], Minor: -amount})
+				posted += amount
+			}
+			// The lines and the header were written by the same transaction
+			// and must agree. If they ever do not, the file is not written:
+			// an accountant importing an unbalanced verification is worse
+			// than no file.
+			if posted != d.vat {
+				return fmt.Errorf("workshop: %s-%d: VAT per line sums to %d and the document says %d",
+					d.series, d.number, posted, d.vat)
+			}
 			file.Verifications = append(file.Verifications, sie.Verification{
-				Series: d.series,
-				Number: fmt.Sprintf("%d", d.number),
-				Date:   d.issued,
-				Text:   text,
-				Entries: []sie.Entry{
-					{Account: accounts["receivable"], Minor: d.gross},
-					{Account: accounts["sales"], Minor: -d.net},
-					{Account: accounts["vat_25"], Minor: -d.vat},
-				},
+				Series:  d.series,
+				Number:  fmt.Sprintf("%d", d.number),
+				Date:    d.issued,
+				Text:    text,
+				Entries: entries,
 			})
 		}
 		count = len(docs)

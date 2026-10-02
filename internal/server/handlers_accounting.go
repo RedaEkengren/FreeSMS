@@ -59,6 +59,11 @@ func (s *Server) handleAccountingExport(w http.ResponseWriter, r *http.Request) 
 			"Documents in that period have gone to the accountant once. Importing the same "+
 				"file twice makes duplicate verifications. Tick the box to send it again anyway.")
 		return
+	case errors.Is(err, workshop.ErrUnsupportedVATRate):
+		// The message names the invoice and the rate, which is what somebody
+		// needs to go and look at it.
+		s.renderError(w, r, http.StatusConflict, "Not exported", err.Error())
+		return
 	case errors.Is(err, workshop.ErrNothingToExport):
 		s.renderError(w, r, http.StatusConflict, "Nothing in that period", "No invoices were issued.")
 		return
