@@ -77,7 +77,7 @@ not exist.
 - **Branch protection is set by hand.** The repository lives under
   `RedaEkengren`, not `Benbo-se`, so the organisation's Terraform
   `protected_repos` does not reach it. It is currently on: force pushes and
-  deletion refused, `go / test` and `image` required. Nothing keeps it that
+  deletion refused, `go / test`, `image`, `restore` and `barcode` required. Nothing keeps it that
   way except this paragraph, so check rather than assume:
 
   ```sh
