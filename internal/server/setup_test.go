@@ -12,6 +12,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/RedaEkengren/FreeSMS/internal/auth"
 	"github.com/RedaEkengren/FreeSMS/internal/config"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/testsupport"
@@ -251,5 +252,40 @@ func TestSetupRefusesAShortPassword(t *testing.T) {
 	}
 	if shops != 0 {
 		t.Errorf("a refused setup left %d shops behind", shops)
+	}
+}
+
+// A configured installation refuses setup without doing any password work.
+//
+// Setup is open to anybody who can reach the server, and it used to spend
+// 64 MiB of argon2 on every request before noticing there was already a shop.
+// Counted rather than timed: the number of argon2 computations the process has
+// run must not move.
+func TestSetupOnAConfiguredInstallationDoesNoPasswordWork(t *testing.T) {
+	ts, _ := testServer(t)
+
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	form := url.Values{
+		"shop_name": {"Someone Else's Garage"}, "owner_name": {"Mallory"},
+		"email": {"mallory@example.test"}, "password": {"a perfectly long password"},
+	}
+
+	before := auth.Checks()
+	for i := 0; i < 5; i++ {
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/setup", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", ts.URL)
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("post: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/login" {
+			t.Errorf("setup on a configured installation = %d to %q, want 303 to /login",
+				resp.StatusCode, resp.Header.Get("Location"))
+		}
+	}
+	if ran := auth.Checks() - before; ran != 0 {
+		t.Errorf("five refused setup requests ran %d password computations; want none", ran)
 	}
 }

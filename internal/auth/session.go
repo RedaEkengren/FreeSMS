@@ -67,6 +67,13 @@ func newToken() (token string, sum []byte, err error) {
 // time: when no user matches, a dummy verification still runs, so the absence
 // of an account cannot be detected by how quickly the answer comes back.
 func Login(ctx context.Context, pool *pgxpool.Pool, shopID, email, password, userAgent string) (token string, s Session, err error) {
+	// A slot first, before any connection is taken from the pool. See Admit.
+	release, err := Admit(ctx)
+	if err != nil {
+		return "", Session{}, err
+	}
+	defer release()
+
 	var ok bool
 
 	// The verification runs in its own transaction; the record of the attempt

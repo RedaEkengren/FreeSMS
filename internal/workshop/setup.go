@@ -63,7 +63,25 @@ func Setup(ctx context.Context, pool *pgxpool.Pool, shopName, ownerName, email, 
 			ErrInvalid, MinPasswordLength)
 	}
 
+	// Refused before the hash, not after it. Setup is open to anybody who can
+	// reach the server, and it used to spend 64 MiB of argon2 on every request
+	// before noticing the installation was already set up -- a free way to
+	// make the server work for nothing. This read is a cheap early answer; the
+	// locked check below is still what stops two first runs racing.
+	var configured bool
+	if err := pool.QueryRow(ctx, `SELECT exists(SELECT 1 FROM shops)`).Scan(&configured); err != nil {
+		return "", fmt.Errorf("check for a shop: %w", err)
+	}
+	if configured {
+		return "", ErrAlreadySetUp
+	}
+
+	release, err := auth.Admit(ctx)
+	if err != nil {
+		return "", err
+	}
 	hash, err := auth.HashPassword(password)
+	release()
 	if err != nil {
 		return "", err
 	}

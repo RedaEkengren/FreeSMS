@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"sync/atomic"
 
 	"golang.org/x/crypto/argon2"
 )
@@ -36,6 +37,15 @@ const (
 // indistinguishable to whoever is asking.
 var ErrMismatch = errors.New("auth: password does not match")
 
+// checks counts every argon2 computation this process has run. It is how a
+// test proves a refused request did no password work at all, which timing
+// cannot prove reliably, and it is the obvious thing to expose as a metric if
+// one is ever wanted.
+var checks atomic.Int64
+
+// Checks reports how many password hashes and verifications have run.
+func Checks() int64 { return checks.Load() }
+
 func threads() uint8 {
 	n := runtime.NumCPU()
 	if n > 4 {
@@ -59,6 +69,7 @@ func HashPassword(password string) (string, error) {
 		return "", fmt.Errorf("auth: read salt: %w", err)
 	}
 	p := threads()
+	checks.Add(1)
 	sum := argon2.IDKey([]byte(password), salt, argonTime, argonMemory, p, argonKeyLen)
 
 	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
@@ -100,6 +111,7 @@ func VerifyPassword(encoded, password string) error {
 		return fmt.Errorf("auth: unreadable digest")
 	}
 
+	checks.Add(1)
 	got := argon2.IDKey([]byte(password), salt, time, memory, parallelism, uint32(len(want)))
 	if subtle.ConstantTimeCompare(got, want) != 1 {
 		return ErrMismatch

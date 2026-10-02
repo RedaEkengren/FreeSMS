@@ -23,6 +23,17 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	token, session, err := auth.Login(r.Context(), s.pool, s.shop(), email, password, r.UserAgent())
 	switch {
+	case errors.Is(err, auth.ErrBusy):
+		// Not judged at all, and not this person's fault: a burst elsewhere
+		// has the password checks busy. 503 with a hint, and the address kept
+		// in the field so trying again is one press.
+		w.Header().Set("Retry-After", "3")
+		s.render(w, r, http.StatusServiceUnavailable, "login", pageData{
+			Title: "Sign in",
+			Email: email,
+			Error: "The server is busy. Try again in a moment.",
+		})
+		return
 	case errors.Is(err, auth.ErrThrottled):
 		// 429 rather than 401: the credentials were not judged at all, and a
 		// client that retries on 401 would hammer a door that is already shut.

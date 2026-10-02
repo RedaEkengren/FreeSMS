@@ -40,6 +40,12 @@ func (s *Server) handleSetupForm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
+	// Known in memory once a shop exists, so a configured installation answers
+	// without reading the form, touching the database or hashing anything.
+	if s.shop() != "" {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
 	form := setupForm{
 		ShopName:  r.FormValue("shop_name"),
 		OwnerName: r.FormValue("owner_name"),
@@ -54,6 +60,10 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		// the honest answer is that it is done.
 		s.setShop("")
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	case errors.Is(err, auth.ErrBusy):
+		w.Header().Set("Retry-After", "3")
+		s.renderError(w, r, http.StatusServiceUnavailable, "Busy", "Try again in a moment.")
 		return
 	case errors.Is(err, workshop.ErrInvalid):
 		s.render(w, r, http.StatusBadRequest, "setup", pageData{
