@@ -136,3 +136,38 @@ func TestNoCredentialFormCanBeHeldOffline(t *testing.T) {
 		t.Error("keep.js no longer checks data-offline; it may be holding every form again")
 	}
 }
+
+// On a shared counter browser, the next person to open a form used to be
+// handed the last person's half-typed draft, and queued work with nobody's
+// name on it was sent as whoever happened to be signed in.
+//
+// Checked by hand with two real users in one browser: drafts did not cross,
+// one user's queued line was not sent while the other was signed in and was
+// sent once when its owner returned, and an ownerless item was never sent.
+// These are the rules that rests on.
+func TestBrowserStorageBelongsToOnePerson(t *testing.T) {
+	keep, err := Static.ReadFile("static/keep.js")
+	if err != nil {
+		t.Fatalf("read keep.js: %v", err)
+	}
+	src := string(keep)
+	for rule, want := range map[string]string{
+		"drafts are keyed by the person":            `DRAFT + currentUser() + "." + name`,
+		"no drafts on a page with nobody signed in": `if (!name || !currentUser()) return;`,
+		"queued work is sent only as its owner":     `it.user && it.user === me`,
+		"signing out forgets this person's drafts":  `addEventListener("submit", forgetMyDrafts)`,
+		"nothing is sent from an anonymous page":    `if (!currentUser() || needsSignIn)`,
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("%s: keep.js no longer contains %q", rule, want)
+		}
+	}
+
+	layout, err := Templates.ReadFile("templates/layout.html")
+	if err != nil {
+		t.Fatalf("read layout: %v", err)
+	}
+	if !strings.Contains(string(layout), `{{if .Session.Scope.UserID}}<meta name="freesms-user"`) {
+		t.Error("the layout no longer says who is signed in only when somebody is")
+	}
+}

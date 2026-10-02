@@ -53,7 +53,13 @@
   // server shortly after, because a phone that is lost or swapped takes its
   // local storage with it.
 
-  function draftKey(name) { return "freesms.draft." + name; }
+  // Keyed by the person as well as the form. They used to be keyed by the
+  // form alone, so on a shared counter browser the next person to open the
+  // intake form was handed the last person's half-typed customer. A user id
+  // is a uuid and belongs to one shop, so it namespaces the shop as well.
+  var DRAFT = "freesms.draft.";
+
+  function draftKey(name) { return DRAFT + currentUser() + "." + name; }
 
   function restore(form, name) {
     var local = store.get(draftKey(name));
@@ -79,7 +85,9 @@
 
   function watch(form) {
     var name = form.getAttribute("data-keep");
-    if (!name) return;
+    // Nobody signed in -- sign-in, setup, the customer's page -- means no
+    // draft is restored and none is kept. There is nobody to keep it for.
+    if (!name || !currentUser()) return;
     restore(form, name);
 
     var timer = null;
@@ -177,6 +185,26 @@
   }
 
   function purge() {
+    // Queued work with nobody's name on it is kept for a person to look at,
+    // never sent: there is no honest way to say whose it was.
+    var held = queue(), owned = held.filter(function (it) { return it.user; });
+    if (owned.length !== held.length) {
+      var aside = refused();
+      held.filter(function (it) { return !it.user; }).forEach(function (it) {
+        aside.push({ url: it.url, body: it.body, status: "nobody's", at: it.at });
+      });
+      store.set(REFUSED, JSON.stringify(aside));
+      store.set(QUEUE, JSON.stringify(owned));
+    }
+
+    // Drafts from before they were keyed by person. Whose they were cannot be
+    // known, and the server holds its own copy per person, so the local one
+    // goes.
+    var uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\./i;
+    forEachStored(function (key) {
+      if (key.indexOf(DRAFT) === 0 && !uuid.test(key.slice(DRAFT.length))) store.remove(key);
+    });
+
     [QUEUE, REFUSED].forEach(function (key) {
       var items;
       try { items = JSON.parse(store.get(key) || "[]"); } catch (e) { return; }
@@ -237,11 +265,13 @@
     }
   }
 
-  // Only this person's work, and work queued before items carried a person,
-  // which can only have been theirs on this device.
+  // Only this person's work. An item queued before items carried a person
+  // used to be adopted by whoever happened to be signed in, which sent one
+  // person's work under another's name; those are set aside at start-up
+  // instead, by purge.
   function mine(items) {
     var me = currentUser();
-    return items.filter(function (it) { return !it.user || it.user === me; });
+    return items.filter(function (it) { return it.user && it.user === me; });
   }
 
   function landedOn(resp, path) {
@@ -316,11 +346,29 @@
     });
   }
 
+  function forEachStored(fn) {
+    var keys = [];
+    try {
+      for (var i = 0; i < window.localStorage.length; i++) keys.push(window.localStorage.key(i));
+    } catch (e) { return; }
+    keys.forEach(fn);
+  }
+
+  function forgetMyDrafts() {
+    var mineKey = DRAFT + currentUser() + ".";
+    forEachStored(function (key) {
+      if (key.indexOf(mineKey) === 0) store.remove(key);
+    });
+  }
+
   // ---- Wiring -------------------------------------------------------------
 
   document.addEventListener("DOMContentLoaded", function () {
     Array.prototype.forEach.call(document.querySelectorAll("form[data-keep]"), watch);
     purge();
+    Array.prototype.forEach.call(document.querySelectorAll("form[action='/logout']"), function (form) {
+      form.addEventListener("submit", forgetMyDrafts);
+    });
     Array.prototype.forEach.call(document.querySelectorAll("form[method='post']"), guard);
     show();
     flush();
