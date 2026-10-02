@@ -30,7 +30,7 @@ with several fields that lands wherever the focus happened to be.</p>
     {{.Part.Available}} available{{if ne .Part.Reserved 0.0}} &middot; {{.Part.Reserved}} reserved{{end}}
   </div>
 
-  <form method="post" action="/stock/move" style="margin-top:0.75rem">
+  <form method="post" action="/stock/move" style="margin-top:0.75rem" data-offline>
     <input type="hidden" name="part_id" value="{{.Part.ID}}">
     <div class="pair">
       <label><span>How many</span><input name="quantity" value="1" inputmode="decimal"></label>

@@ -37,7 +37,7 @@ wrongly ordered parts cost.</p>
 
   <details>
     <summary>{{$.T "Record a movement"}}</summary>
-    <form method="post" action="/stock/move" style="margin-top:0.75rem">
+    <form method="post" action="/stock/move" style="margin-top:0.75rem" data-offline>
       <input type="hidden" name="part_id" value="{{.ID}}">
       <div class="pair">
         <label><span>{{$.T "How many"}}</span><input name="quantity" value="1" inputmode="decimal"></label>

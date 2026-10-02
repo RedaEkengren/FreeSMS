@@ -83,3 +83,56 @@ func TestEveryFunctionKeepJSCallsIsDefined(t *testing.T) {
 		t.Errorf("keep.js calls %s() and never defines it; the start-up handler will throw there", name)
 	}
 }
+
+// Which forms may be held offline is an allowlist in the templates. The queue
+// used to hold every POST form, sign-in and setup included, and stored the
+// whole body -- password and all -- in plain text in localStorage.
+//
+// The browser half of this was checked by hand: an offline sign-in stores
+// nothing, old credential-bearing entries are purged without being sent, and a
+// line added in the pit is still held. That check cannot run in CI, so the
+// rule it rests on is pinned here instead.
+func TestNoCredentialFormCanBeHeldOffline(t *testing.T) {
+	entries, err := Templates.ReadDir("templates")
+	if err != nil {
+		t.Fatalf("read templates: %v", err)
+	}
+	formRe := regexp.MustCompile(`(?s)<form\b([^>]*)>(.*?)</form>`)
+
+	// Money documents and one-time links need somebody watching the result.
+	mustBeOnline := regexp.MustCompile(`action="/(login|setup|logout|shop)"|/invoice"|/credit"|/share"|/revoke"|/customer"`)
+
+	var offline int
+	for _, e := range entries {
+		raw, err := Templates.ReadFile("templates/" + e.Name())
+		if err != nil {
+			t.Fatalf("read %s: %v", e.Name(), err)
+		}
+		for _, m := range formRe.FindAllStringSubmatch(string(raw), -1) {
+			tag, inner := m[1], m[2]
+			if !strings.Contains(tag, "data-offline") {
+				continue
+			}
+			offline++
+			if strings.Contains(inner, `type="password"`) {
+				t.Errorf("%s: a form with a password field is marked data-offline", e.Name())
+			}
+			if mustBeOnline.MatchString(tag) {
+				t.Errorf("%s: %s is marked data-offline and must not be", e.Name(), strings.TrimSpace(tag))
+			}
+		}
+	}
+	// The allowlist being empty would pass every check above and quietly
+	// switch the offline queue off.
+	if offline < 5 {
+		t.Errorf("only %d forms are marked data-offline; the queue would be all but disabled", offline)
+	}
+
+	keep, err := Static.ReadFile("static/keep.js")
+	if err != nil {
+		t.Fatalf("read keep.js: %v", err)
+	}
+	if !strings.Contains(string(keep), `hasAttribute("data-offline")`) {
+		t.Error("keep.js no longer checks data-offline; it may be holding every form again")
+	}
+}

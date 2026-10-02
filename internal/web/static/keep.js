@@ -142,14 +142,47 @@
     return m ? m.getAttribute("content") : "";
   }
 
+  // Names that must never reach browser storage, whatever form they are in.
+  var SECRET = /pass|secret|token|credential/i;
+
+  function sensitive(name) { return SECRET.test(name); }
+
+  // Second line of defence, for a form marked offline by mistake: a form with
+  // a password field in it is never held at all, and any field whose name
+  // looks like a secret is dropped from what is stored.
   function hold(form) {
-    var body = new URLSearchParams(new FormData(form)).toString();
+    if (form.querySelector('input[type="password"]')) return false;
+    var data = new FormData(form);
+    Array.from(data.keys()).forEach(function (name) {
+      if (sensitive(name)) data.delete(name);
+    });
+    var body = new URLSearchParams(data).toString();
     var items = queue();
     // The person who queued it is part of the item. Work held on a shared
     // workshop tablet is sent as the person who did it, or not at all.
     items.push({ url: form.action, body: body, key: newKey(), at: Date.now(), user: currentUser() });
     setQueue(items);
     show();
+    return true;
+  }
+
+  // Anything already stored by the old queue that carries a credential, or
+  // was aimed at signing in or setting up, is removed without being sent.
+  // Replaying a stored sign-in is pointless; keeping the password is the harm.
+  function unsafe(it) {
+    var path = "";
+    try { path = new URL(it.url, location.origin).pathname; } catch (e) {}
+    if (path === "/login" || path === "/setup" || path === "/logout") return true;
+    return Array.from(new URLSearchParams(it.body || "").keys()).some(sensitive);
+  }
+
+  function purge() {
+    [QUEUE, REFUSED].forEach(function (key) {
+      var items;
+      try { items = JSON.parse(store.get(key) || "[]"); } catch (e) { return; }
+      var kept = items.filter(function (it) { return !unsafe(it); });
+      if (kept.length !== items.length) store.set(key, JSON.stringify(kept));
+    });
   }
 
   // Refused work is kept, not deleted. It used to be the only copy, and it
@@ -262,11 +295,23 @@
     });
   }
 
+  // Which forms may be held for later is an allowlist, marked in the
+  // template with data-offline, not a blocklist. Every POST form used to be
+  // held, including sign-in and setup, and the queue stored the whole body --
+  // password included -- in plain text in localStorage. A blocklist forgets
+  // the next form somebody adds; an allowlist forgets nothing it was not
+  // told about.
   function guard(form) {
+    var offline = form.hasAttribute("data-offline");
     form.addEventListener("submit", function (e) {
       if (navigator.onLine !== false) return;
       e.preventDefault();
-      hold(form);
+      if (!offline || !hold(form)) {
+        // Not something that can wait. The page stays as it is, so what
+        // was typed is still in front of the person.
+        window.alert("This needs a connection. Nothing has been sent and nothing has been stored.");
+        return;
+      }
       window.alert("No connection. This is being held and will be sent when there is one.");
     });
   }
@@ -275,6 +320,7 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     Array.prototype.forEach.call(document.querySelectorAll("form[data-keep]"), watch);
+    purge();
     Array.prototype.forEach.call(document.querySelectorAll("form[method='post']"), guard);
     show();
     flush();

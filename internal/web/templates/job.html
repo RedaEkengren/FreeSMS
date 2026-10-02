@@ -40,7 +40,7 @@
 <h2>{{.T "Move it along"}}</h2>
 <div class="actions">
   {{range .Next}}
-  <form method="post" action="/jobs/{{$.Job.ID}}/state" style="margin:0">
+  <form method="post" action="/jobs/{{$.Job.ID}}/state" style="margin:0" data-offline>
     <input type="hidden" name="state" value="{{.}}">
     <button type="submit" class="secondary">{{$.T .Action}}</button>
   </form>
@@ -137,7 +137,7 @@
      position. */}}
 {{if .Session.Scope.Role.SeesCustomerPersonalData}}
 <form id="add-line" method="post" action="/jobs/{{.Job.ID}}/lines"
-      data-keep="job-line:{{.Job.ID}}"></form>
+      data-keep="job-line:{{.Job.ID}}" data-offline></form>
 {{end}}
 
 <table class="lines-table">
@@ -233,14 +233,14 @@
 
 {{if not .Session.Scope.Role.SeesCustomerPersonalData}}
 <h2>{{.T "Hand it on"}}</h2>
-<form method="post" action="/jobs/{{.Job.ID}}/parts">
+<form method="post" action="/jobs/{{.Job.ID}}/parts" data-offline>
   <label>
     <span>{{.T "I need a part to carry on"}}</span>
     <input name="description" placeholder="Track rod end, left front">
   </label>
   <button type="submit" class="secondary">{{.T "Ask the parts desk"}}</button>
 </form>
-<form method="post" action="/jobs/{{.Job.ID}}/findings" style="margin-top:1rem">
+<form method="post" action="/jobs/{{.Job.ID}}/findings" style="margin-top:1rem" data-offline>
   <label>
     <span>{{.T "Something else needs doing"}}</span>
     <input name="note" placeholder="Other track rod end is going too">
@@ -256,7 +256,7 @@
 <div>
 <h2>{{.T "From the shop's time library"}}</h2>
 {{range .Suggestions}}
-<form method="post" action="/jobs/{{$.Job.ID}}/lines" class="pick">
+<form method="post" action="/jobs/{{$.Job.ID}}/lines" class="pick" data-offline>
   <input type="hidden" name="kind" value="labour">
   <input type="hidden" name="cost_bearer" value="customer">
   <input type="hidden" name="labour_time_id" value="{{.ID}}">
@@ -303,7 +303,7 @@
   <p class="waiting">{{.T "Nothing matched."}}</p>
 {{end}}
 {{range .Parts}}
-<form method="post" action="/jobs/{{$.Job.ID}}/lines" class="pick">
+<form method="post" action="/jobs/{{$.Job.ID}}/lines" class="pick" data-offline>
   <input type="hidden" name="kind" value="part">
   <input type="hidden" name="cost_bearer" value="customer">
   <input type="hidden" name="part_id" value="{{.ID}}">

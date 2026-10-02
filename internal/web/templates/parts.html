@@ -11,7 +11,7 @@
     <div class="vehicle">{{.Make}} {{.Model}}</div>
     <div class="complaint">{{.Description}}</div>
     <div class="waiting">Asked for by {{.RequestedBy}}</div>
-    <form method="post" action="/parts/arrived" style="margin-top:0.75rem">
+    <form method="post" action="/parts/arrived" style="margin-top:0.75rem" data-offline>
       <input type="hidden" name="request_id" value="{{.ID}}">
       <button type="submit">{{$.T "It has arrived"}}</button>
     </form>

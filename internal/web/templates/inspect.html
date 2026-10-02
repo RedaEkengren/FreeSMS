@@ -40,7 +40,7 @@
   {{end}}
 
   {{if not $.Inspection.Completed}}
-  <form method="post" action="/inspections/{{$.Inspection.ID}}/items/{{.ID}}">
+  <form method="post" action="/inspections/{{$.Inspection.ID}}/items/{{.ID}}" data-offline>
     <div class="actions">
       <button name="status" value="pass" class="secondary">Pass</button>
       <button name="status" value="attention" class="secondary">Attention</button>
@@ -64,7 +64,7 @@
 {{end}}
 
 {{if not .Inspection.Completed}}
-<form method="post" action="/inspections/{{.Inspection.ID}}/complete" style="margin-top:1.5rem">
+<form method="post" action="/inspections/{{.Inspection.ID}}/complete" style="margin-top:1.5rem" data-offline>
   <button type="submit">Finish the inspection</button>
 </form>
 {{else if .Session.Scope.Role.SeesCustomerPersonalData}}
