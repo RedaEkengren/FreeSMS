@@ -55,3 +55,43 @@ func TestEscapingInTheLabel(t *testing.T) {
 		t.Error("the escaped label is missing")
 	}
 }
+
+// Arithmetic every Code 128 symbol satisfies, whoever typed the table: a data
+// symbol is eleven modules of three bars and three spaces, its bars sum to an
+// even number and its spaces to an odd one, and no two are the same. The first
+// table broke all of these and nothing checked.
+func TestThePatternTableIsCode128(t *testing.T) {
+	seen := map[string]int{}
+	for i, p := range patterns {
+		if j, dup := seen[p]; dup {
+			t.Errorf("values %d and %d share the pattern %s", j, i, p)
+		}
+		seen[p] = i
+
+		w := make([]int, len(p))
+		total := 0
+		for k, c := range p {
+			w[k] = int(c - '0')
+			if w[k] < 1 || w[k] > 4 {
+				t.Errorf("value %d (%s): a width of %d is not a Code 128 width", i, p, w[k])
+			}
+			total += w[k]
+		}
+		if i == stop {
+			if len(p) != 7 || total != 13 {
+				t.Errorf("the stop symbol %s is not seven elements over thirteen modules", p)
+			}
+			continue
+		}
+		if len(p) != 6 || total != 11 {
+			t.Errorf("value %d (%s) is %d elements over %d modules, want 6 over 11", i, p, len(p), total)
+			continue
+		}
+		if (w[0]+w[2]+w[4])%2 != 0 {
+			t.Errorf("value %d (%s): bar widths sum to an odd number", i, p)
+		}
+		if (w[1]+w[3]+w[5])%2 != 1 {
+			t.Errorf("value %d (%s): space widths sum to an even number", i, p)
+		}
+	}
+}

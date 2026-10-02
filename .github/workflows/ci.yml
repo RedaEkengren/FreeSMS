@@ -61,6 +61,30 @@ jobs:
           SESSION_SECRET: ci-only-not-a-real-secret-0000000000000000
         run: ./deploy/restore-test.sh
 
+  barcode:
+    # The stock labels are decoded by a reader that shares no code with the
+    # encoder. The first Code 128 table had twenty-one of its hundred and seven
+    # entries wrong and not one label scanned; the tests then counted
+    # rectangles in the SVG, so everything passed.
+    #
+    # In the golang image rather than with setup-go, because zbar has to be
+    # installed next to the toolchain and this is the same image the Dockerfile
+    # builds with, so there is one version of Go in the repository, not two.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Labels decode with zbar
+        run: |
+          docker run --rm -v "$PWD":/src -w /src \
+            -e FREESMS_BARCODE_DECODER="zbarimg --raw -q" \
+            -e FREESMS_BARCODE_DECODER_REQUIRED=1 \
+            golang:1.27 sh -c '
+              apt-get update -qq && apt-get install -y -qq zbar-tools >/dev/null &&
+              go test ./internal/barcode -count=1 -v'
+
   image:
     # The image is built but not pushed. There is nowhere to deploy it yet, and
     # publishing artefacts nothing consumes is how a registry fills with
