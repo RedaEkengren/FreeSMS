@@ -79,5 +79,6 @@ func (s *Server) handleSaveShop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.submitted(w, r)
 	http.Redirect(w, r, "/shop", http.StatusSeeOther)
 }

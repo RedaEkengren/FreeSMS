@@ -90,6 +90,7 @@ func (s *Server) handleSaveCustomer(w http.ResponseWriter, r *http.Request) {
 	if s.customerError(w, r, err) {
 		return
 	}
+	s.submitted(w, r)
 	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
 }
 

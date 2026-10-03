@@ -90,6 +90,15 @@
     if (!name || !currentUser()) return;
     restore(form, name);
 
+    // The submission names its draft, so the server can say which one it
+    // saved. Hidden, so it is never itself kept as part of the draft, and
+    // inside the form, so a submission held offline carries it as well.
+    var tag = document.createElement("input");
+    tag.type = "hidden";
+    tag.name = "draft_form";
+    tag.value = name;
+    form.appendChild(tag);
+
     var timer = null;
     form.addEventListener("input", function () {
       var fields = fieldsOf(form);
@@ -112,8 +121,36 @@
       }, 1200);
     });
 
+    // Submitting is not saving. The draft used to be deleted here, on the
+    // press, before anybody knew whether the server took it -- so a refusal,
+    // a server error or a dropped connection left nothing to recover. It is
+    // now deleted when the server says it saved it; see acknowledge.
+    //
+    // What does have to stop here is the autosave waiting to fire, or it
+    // lands after the save and brings the submitted draft back.
     form.addEventListener("submit", function () {
+      window.clearTimeout(timer);
+    });
+  }
+
+  // The server's receipt. A handler that has saved a submission names its
+  // draft in a short-lived cookie; the next page, or the offline queue on a
+  // response, reads it and only then lets the draft go. Absent means not
+  // saved -- a refusal, an error page, a connection that dropped -- and the
+  // draft stays where it is.
+  var SAVED = "freesms_saved";
+
+  function acknowledge() {
+    var m = document.cookie.match(/(?:^|;\s*)freesms_saved=([^;]*)/);
+    if (!m) return;
+    document.cookie = SAVED + "=; Max-Age=0; Path=/; SameSite=Lax";
+    m[1].split(".").forEach(function (part) {
+      var name;
+      try { name = decodeURIComponent(part); } catch (e) { return; }
+      if (!name) return;
       store.remove(draftKey(name));
+      // The server dropped its copy when it saved; this is for an autosave
+      // that was already on its way and arrived after it.
       fetch("/drafts?form=" + encodeURIComponent(name), { method: "DELETE" }).catch(function () {});
     });
   }
@@ -309,6 +346,7 @@
       }
       if (resp.status >= 500) { show(); return; } // Try again later.
 
+      acknowledge();
       var rest = queue().filter(function (it) { return it.key !== next.key; });
       if (!resp.ok) {
         // Refused: kept, with what the server said, for a person to look at.
@@ -364,6 +402,7 @@
   // ---- Wiring -------------------------------------------------------------
 
   document.addEventListener("DOMContentLoaded", function () {
+    acknowledge();
     Array.prototype.forEach.call(document.querySelectorAll("form[data-keep]"), watch);
     purge();
     Array.prototype.forEach.call(document.querySelectorAll("form[action='/logout']"), function (form) {

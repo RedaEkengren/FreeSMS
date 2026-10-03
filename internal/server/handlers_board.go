@@ -122,5 +122,6 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.submitted(w, r)
 	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
 }

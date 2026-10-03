@@ -115,6 +115,7 @@ func (s *Server) handleAddLine(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
 		return
 	}
+	s.submitted(w, r)
 	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
 }
 

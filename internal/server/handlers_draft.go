@@ -1,8 +1,10 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
@@ -48,11 +50,60 @@ func (s *Server) handleLoadDraft(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(fields)
 }
 
-// handleDiscardDraft removes one, which is what submitting means.
+// handleDiscardDraft removes one. The browser calls it once the server has
+// acknowledged a submission, for an autosave that arrived after the save.
 func (s *Server) handleDiscardDraft(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	if err := workshop.DiscardDraft(r.Context(), s.pool, session.Scope, r.FormValue("form")); err != nil {
 		s.log.Error("discard draft", "error", err)
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// savedCookie carries the receipt for a submitted draft back to the browser.
+const savedCookie = "freesms_saved"
+
+// submitted is called by a handler that has saved a form, and only then.
+//
+// The browser used to delete its draft the moment the button was pressed,
+// before anybody knew whether the server took it. A validation refusal, an
+// error page or a dropped connection then left nothing to recover. Now the
+// server, having saved, drops its own copy and names the draft in a cookie
+// that lives for a minute; keep.js reads it on the next page and lets its copy
+// go. No receipt, no deletion.
+//
+// The name comes from the form itself, in a field keep.js adds, so this does
+// not need to know which forms keep drafts. It is the caller's own draft by
+// construction: drafts are scoped to the person signed in.
+func (s *Server) submitted(w http.ResponseWriter, r *http.Request) {
+	form := strings.TrimSpace(r.FormValue("draft_form"))
+	if form == "" || len(form) > 200 {
+		return
+	}
+	session := sessionFrom(r.Context())
+	// Detached: the work is saved, so the draft has to go whether or not the
+	// client is still waiting for the answer.
+	if err := workshop.DiscardDraft(context.WithoutCancel(r.Context()), s.pool, session.Scope, form); err != nil {
+		s.log.Error("discard submitted draft", "error", err)
+	}
+
+	// Appended to a receipt not yet read, so two submissions sent back to back
+	// by the offline queue each get theirs. Dot-separated, with the dots in a
+	// name escaped, because a comma or a space would make Go quote the value.
+	name := strings.ReplaceAll(url.QueryEscape(form), ".", "%2E")
+	value := name
+	if prev, err := r.Cookie(savedCookie); err == nil && prev.Value != "" && len(prev.Value) < 1000 {
+		value = prev.Value + "." + name
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:  savedCookie,
+		Value: value,
+		Path:  "/",
+		// Short: it is a message to the next page, not state.
+		MaxAge: 60,
+		// Not HttpOnly, because the script is who reads it. It says only which
+		// of the reader's own forms was saved.
+		SameSite: http.SameSiteLaxMode,
+		Secure:   s.secureCookies,
+	})
 }
