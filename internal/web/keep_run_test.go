@@ -132,3 +132,45 @@ func TestTheServersDraftFillsUntouchedFields(t *testing.T) {
 		t.Errorf("the server's copy overwrote a quantity the person had typed: %q", got.Typed.Quantity)
 	}
 }
+
+type heldOffline struct {
+	Prevented bool
+	Held      []string
+	Alerts    int
+}
+
+// The button pressed is part of what was said. Pass, attention and fail are
+// three buttons on one form, and the queue built its body from the form
+// alone -- so a "fail" pressed with no connection was sent later as no status.
+func TestAHeldSubmissionKeepsTheButtonPressed(t *testing.T) {
+	var got heldOffline
+	keepRun(t, "pressed", &got)
+	if len(got.Held) != 1 || got.Held[0] != "note=Worn+to+the+indicator&status=fail" {
+		t.Errorf("held %q, want the note and status=fail", got.Held)
+	}
+}
+
+// A browser that does not say which button was pressed cannot have the form
+// held: guessing the answer is worse than saying it needs a connection.
+func TestAFormAnsweredByItsButtonsIsNotHeldBlind(t *testing.T) {
+	var got heldOffline
+	keepRun(t, "unknownButton", &got)
+	if len(got.Held) != 0 {
+		t.Errorf("held %q without knowing which button was pressed", got.Held)
+	}
+	if !got.Prevented || got.Alerts != 1 {
+		t.Errorf("the person was not stopped and told (prevented %v, %d alerts)", got.Prevented, got.Alerts)
+	}
+}
+
+// A file cannot be put in a urlencoded body; it arrives as "[object File]".
+func TestAFileIsNeverHeldAsText(t *testing.T) {
+	var got heldOffline
+	keepRun(t, "photo", &got)
+	if len(got.Held) != 0 {
+		t.Errorf("a form carrying a file was held as %q", got.Held)
+	}
+	if !got.Prevented || got.Alerts != 1 {
+		t.Errorf("the person was not stopped and told (prevented %v, %d alerts)", got.Prevented, got.Alerts)
+	}
+}

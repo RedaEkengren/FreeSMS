@@ -289,3 +289,31 @@ func newJob2(t *testing.T, pool *pgxpool.Pool) string {
 	}
 	return id
 }
+
+// A submission without a status keeps the one recorded. It used to clear it,
+// and the offline queue sent exactly that: a "fail" held offline lost its
+// button, arrived as no status, was answered with success and wiped what had
+// been found.
+func TestAMissingStatusDoesNotEraseAFinding(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	_, inspectionID := startedInspection(t, pool)
+
+	insp, _ := workshop.InspectionsForID(ctx, pool, technician(), inspectionID)
+	itemID := insp.Items[0].ID
+	if err := workshop.SetItem(ctx, pool, technician(), itemID, "fail", ""); err != nil {
+		t.Fatalf("SetItem: %v", err)
+	}
+	if err := workshop.SetItem(ctx, pool, technician(), itemID, "", "Worn to the indicator"); err != nil {
+		t.Fatalf("SetItem without a status: %v", err)
+	}
+
+	insp, _ = workshop.InspectionsForID(ctx, pool, technician(), inspectionID)
+	got := insp.Items[0]
+	if got.Status != "fail" {
+		t.Errorf("status = %q, want the fail already recorded", got.Status)
+	}
+	if got.Note != "Worn to the indicator" {
+		t.Errorf("note = %q, want it saved", got.Note)
+	}
+}

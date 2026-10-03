@@ -219,9 +219,26 @@
   // Second line of defence, for a form marked offline by mistake: a form with
   // a password field in it is never held at all, and any field whose name
   // looks like a secret is dropped from what is stored.
-  function hold(form) {
+  //
+  // The queue stores a urlencoded body, so it can only hold what a urlencoded
+  // body can say. A file would arrive as the text "[object File]", so a form
+  // that carries one is never held: the person is told it needs a connection
+  // and the page, with the photograph still chosen, stays in front of them.
+  function hold(form, submitter) {
     if (form.querySelector('input[type="password"]')) return false;
+    if (form.querySelector('input[type="file"]') ||
+        /multipart/i.test(form.getAttribute("enctype") || "")) return false;
+
+    // Which button was pressed is part of what was said. Pass, attention and
+    // fail are three buttons on one form, and FormData built from the form
+    // alone leaves the pressed one out -- so a held "fail" was sent as no
+    // status at all. Without a submitter to read, a form whose buttons carry
+    // the answer cannot be held honestly.
+    var named = form.querySelector("button[name], input[type=submit][name]");
+    if (named && !(submitter && submitter.name)) return false;
+
     var data = new FormData(form);
+    if (submitter && submitter.name) data.append(submitter.name, submitter.value);
     Array.from(data.keys()).forEach(function (name) {
       if (sensitive(name)) data.delete(name);
     });
@@ -398,7 +415,7 @@
     form.addEventListener("submit", function (e) {
       if (navigator.onLine !== false) return;
       e.preventDefault();
-      if (!offline || !hold(form)) {
+      if (!offline || !hold(form, e.submitter)) {
         // Not something that can wait. The page stays as it is, so what
         // was typed is still in front of the person.
         window.alert("This needs a connection. Nothing has been sent and nothing has been stored.");

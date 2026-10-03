@@ -100,7 +100,9 @@ func TestNoCredentialFormCanBeHeldOffline(t *testing.T) {
 	formRe := regexp.MustCompile(`(?s)<form\b([^>]*)>(.*?)</form>`)
 
 	// Money documents and one-time links need somebody watching the result.
-	mustBeOnline := regexp.MustCompile(`action="/(login|setup|logout|shop)"|/invoice"|/credit"|/share"|/revoke"|/customer"`)
+	// The customer's decision on a shared link has nobody signed in to send
+	// it as, and the queue sends nothing without a person.
+	mustBeOnline := regexp.MustCompile(`action="/(login|setup|logout|shop)"|/invoice"|/credit"|/share"|/revoke"|/customer"|action="/i/`)
 
 	var offline int
 	for _, e := range entries {
@@ -116,6 +118,11 @@ func TestNoCredentialFormCanBeHeldOffline(t *testing.T) {
 			offline++
 			if strings.Contains(inner, `type="password"`) {
 				t.Errorf("%s: a form with a password field is marked data-offline", e.Name())
+			}
+			// The queue holds a urlencoded body. A file in one is the text
+			// "[object File]", so a form carrying a photograph is never held.
+			if strings.Contains(inner, `type="file"`) || strings.Contains(tag, "multipart") {
+				t.Errorf("%s: a form carrying a file is marked data-offline", e.Name())
 			}
 			if mustBeOnline.MatchString(tag) {
 				t.Errorf("%s: %s is marked data-offline and must not be", e.Name(), strings.TrimSpace(tag))

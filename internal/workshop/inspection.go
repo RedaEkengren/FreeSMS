@@ -153,6 +153,12 @@ func StartInspection(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 }
 
 // SetItem records what the technician found.
+//
+// An empty status leaves the one already recorded. It used to clear it: the
+// offline queue dropped the pressed button from what it held, so a "fail"
+// sent later arrived as no status, was answered with success, and wiped what
+// had been found. Nothing in the interface clears a status on purpose, so
+// absent means unsaid, not "none".
 func SetItem(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, itemID, status, note string) error {
 	switch status {
 	case "pass", "attention", "fail", "":
@@ -165,7 +171,7 @@ func SetItem(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, itemID
 			s = status
 		}
 		tag, err := tx.Exec(ctx,
-			`UPDATE inspection_items SET status = $1, note = nullif($2, '') WHERE id = $3`,
+			`UPDATE inspection_items SET status = coalesce($1, status), note = nullif($2, '') WHERE id = $3`,
 			s, strings.TrimSpace(note), itemID)
 		if err != nil {
 			return fmt.Errorf("set item: %w", err)

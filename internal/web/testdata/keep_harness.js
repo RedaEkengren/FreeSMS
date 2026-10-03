@@ -110,9 +110,84 @@ function page({ cookie = "", storage = {}, form = "intake", value = "", server =
   };
 }
 
+
+// A form submitted with no connection, and what the queue made of it.
+//
+// The inspection item's answer is the button pressed; the photograph's is a
+// file. FormData here does what the browser's does: the form's own controls,
+// never the button that submitted it.
+function offline({ named = true, file = false, submitter }) {
+  const listeners = {};
+  const local = new Map();
+  const alerts = [];
+  const note = { name: "note", type: "text", value: "Worn to the indicator" };
+  const photo = { name: "photo", type: "file", value: "C:\\fakepath\\brake.jpg" };
+  const controls = file ? [note, photo] : [note];
+  const formEl = {
+    action: "http://localhost/inspections/i/items/1",
+    elements: controls,
+    listeners: {},
+    getAttribute: (n) => (n === "method" ? "post" : n === "enctype" && file ? "multipart/form-data" : null),
+    hasAttribute: (n) => n === "data-offline",
+    querySelector: (sel) =>
+      sel.includes("file") ? (file ? photo : null) :
+      sel.includes("button[name]") ? (named ? {} : null) : null,
+    addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); },
+  };
+  const document = {
+    cookie: "",
+    addEventListener: (type, fn) => { (listeners[type] ||= []).push(fn); },
+    querySelector: (sel) =>
+      sel === 'meta[name="freesms-user"]' ? { getAttribute: () => USER } : null,
+    querySelectorAll: (sel) => (sel === "form[method='post']" ? [formEl] : []),
+    getElementById: () => null,
+    createElement: () => ({}),
+  };
+  const window = {
+    localStorage: {
+      getItem: (k) => (local.has(k) ? local.get(k) : null),
+      setItem: (k, v) => local.set(k, String(v)),
+      removeItem: (k) => local.delete(k),
+      key: (i) => Array.from(local.keys())[i],
+      get length() { return local.size; },
+    },
+    setTimeout() {}, clearTimeout() {}, addEventListener() {},
+    alert: (m) => alerts.push(m),
+    crypto: { randomUUID: () => "k" },
+  };
+  class FakeFormData {
+    constructor(form) { this.pairs = form.elements.map((el) => [el.name, el.type === "file" ? "[object File]" : el.value]); }
+    append(k, v) { this.pairs.push([k, v]); }
+    delete(k) { this.pairs = this.pairs.filter(([n]) => n !== k); }
+    keys() { return this.pairs.map(([k]) => k)[Symbol.iterator](); }
+    [Symbol.iterator]() { return this.pairs[Symbol.iterator](); }
+  }
+  const sandbox = {
+    window, document, console, URL, URLSearchParams,
+    navigator: { onLine: false },
+    location: { origin: "http://localhost" },
+    FormData: FakeFormData,
+    fetch: () => Promise.reject(new Error("offline")),
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(process.argv[3], "utf8"), sandbox);
+  (listeners.DOMContentLoaded || []).forEach((fn) => fn());
+
+  let prevented = false;
+  (formEl.listeners.submit || []).forEach((fn) => fn({ submitter, preventDefault() { prevented = true; } }));
+  const queue = JSON.parse(window.localStorage.getItem("freesms.queue") || "[]");
+  return { prevented, held: queue.map((it) => it.body), alerts: alerts.length };
+}
+
 const writes = (p, method) => p.fetches.filter((f) => f.method === method && f.url.startsWith("/drafts"));
 
 const scenarios = {
+  // Pressing "fail" with no connection.
+  pressed: () => offline({ submitter: { name: "status", value: "fail" } }),
+  // The same form where the browser does not say which button was pressed.
+  unknownButton: () => offline({ submitter: undefined }),
+  // A photograph with no connection.
+  photo: () => offline({ named: false, file: true, submitter: { name: "", value: "" } }),
   // The server's copy arriving on a page with nothing local: it fills what
   // still holds what the page came with, and nothing the person has changed.
   async fromServer() {
