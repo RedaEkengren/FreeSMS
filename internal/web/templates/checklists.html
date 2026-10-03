@@ -1,0 +1,59 @@
+{{define "content"}}
+<h1>{{.T "Inspection checklists"}}</h1>
+<p class="waiting">{{.T "What a technician goes through when they inspect a vehicle. The lines are your own words and the customer reads them as written."}}</p>
+
+<div class="split">
+{{/* The list in the narrow rail and the form in the wide column, the
+     way the job page has its facts beside its lines. */}}
+<div class="side">
+<h2>{{.T "The workshop's checklists"}}</h2>
+{{if not .Checklists}}
+  <p class="empty">{{.T "None yet. Until there is one, there is nothing to start an inspection from."}}</p>
+{{else}}
+<ul class="lines">
+  {{range .Checklists}}
+  <li>
+    <div class="row">
+      <a href="/checklists/{{.ID}}">{{.Name}}</a>
+      {{if not .Active}}<span class="tag">{{$.T "retired"}}</span>{{end}}
+    </div>
+    <div class="waiting">{{$.N "%d checkpoint" (len .Checkpoints)}}{{if .Used}} &middot; {{$.N "used %d time" .Used}}{{end}}</div>
+    <form method="post" action="/checklists/{{.ID}}/active" style="margin-top:0.5rem">
+      {{if .Active}}
+      <input type="hidden" name="active" value="no">
+      <button type="submit" class="link">{{$.T "Retire it"}}</button>
+      {{else}}
+      <input type="hidden" name="active" value="yes">
+      <button type="submit" class="link">{{$.T "Use it again"}}</button>
+      {{end}}
+    </form>
+  </li>
+  {{end}}
+</ul>
+{{end}}
+</div>
+<div class="main">
+{{if .Checklist.ID}}<h2>{{.T "Change a checklist"}}</h2>{{else}}<h2>{{.T "Make a checklist"}}</h2>{{end}}
+{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+{{/* The draft is kept per checklist, so a half-typed new one and a
+     half-edited old one do not overwrite each other. */}}
+<form method="post" action="/checklists{{if .Checklist.ID}}/{{.Checklist.ID}}{{end}}"
+      data-keep="checklist:{{if .Checklist.ID}}{{.Checklist.ID}}{{else}}new{{end}}">
+  <label>
+    <span>{{.T "Name"}}</span>
+    <input name="name" value="{{.Checklist.Name}}" required placeholder="{{.T "Spring service"}}">
+  </label>
+  <label>
+    <span>{{.T "What to check, one per line"}}</span>
+    <textarea name="checkpoints" rows="10" required>{{.Checklist.CheckpointText}}</textarea>
+  </label>
+  {{if .Checklist.Used}}
+  <p class="waiting">{{.N "Used in %d inspection. Those keep the list they were made with." .Checklist.Used}}</p>
+  {{end}}
+  <button type="submit">{{if .Checklist.ID}}{{.T "Save the checklist"}}{{else}}{{.T "Make the checklist"}}{{end}}</button>
+  {{if .Checklist.ID}}<p><a href="/checklists">{{.T "Make a new one instead"}}</a></p>{{end}}
+</form>
+</div>
+
+</div>
+{{end}}

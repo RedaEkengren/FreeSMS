@@ -1,6 +1,7 @@
 {{define "content"}}
 <h1>{{.T "The workshop"}}</h1>
 <p class="waiting">{{.T "What goes at the top of an invoice. Changing it changes the next invoice and nothing that has already been sent: an issued document carries its own copy."}}</p>
+<p><a href="/checklists">{{.T "Inspection checklists"}}</a></p>
 
 <form method="post" action="/shop" data-keep="shop-details">
   <label>

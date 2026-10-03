@@ -169,6 +169,20 @@ input {
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
+/* A textarea is a text field that takes lines: the same box, room to type. */
+textarea {
+  display: block;
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  resize: vertical;
+}
 /* A checkbox is not a text field. The rule above gives every input a full
    width, a tall minimum, a border and padding, which turns a checkbox into an
    empty rounded box with its label stranded underneath. */
@@ -189,7 +203,7 @@ input[type="checkbox"], input[type="radio"] {
 label.tick { display: flex; align-items: center; gap: 0.625rem; min-height: var(--tap); }
 label.tick span { display: inline; margin: 0; font-size: 1rem; color: var(--text); }
 
-input:focus-visible, button:focus-visible, .card:focus-visible {
+input:focus-visible, textarea:focus-visible, button:focus-visible, .card:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }

@@ -48,7 +48,7 @@ var swept = map[string]string{
 	"POST /drafts": "", "GET /drafts": "", "DELETE /drafts": "",
 	"GET /search": "", "GET /scan": "", "GET /labels": "", "GET /stock": "",
 	"POST /stock/move": "", "POST /stock/bands": "", "GET /parts": "",
-	"POST /parts/arrived": "",
+	"POST /parts/arrived": "", "GET /checklists": "", "POST /checklists": "",
 
 	// The customer's link. Not a shop identifier: it is an unguessable token,
 	// and asking for it with a uuid is a different test -- the share tests
@@ -83,6 +83,9 @@ var swept = map[string]string{
 	"GET /people/{id}/export":                     "sweep",
 	"POST /people/{id}/erase":                     "sweep",
 	"GET /vehicles/{id}":                          "sweep",
+	"GET /checklists/{id}":                        "sweep",
+	"POST /checklists/{id}":                       "sweep",
+	"POST /checklists/{id}/active":                "sweep",
 }
 
 // fill substitutes shop B's identifiers into a pattern.
@@ -94,6 +97,7 @@ func fill(pattern string) (method, path string) {
 		"/inspections/{id}": "/inspections/" + inspectionB,
 		"/people/{id}":      "/people/" + personB,
 		"/vehicles/{id}":    "/vehicles/" + vehicleB,
+		"/checklists/{id}":  "/checklists/" + checklistB,
 		"{itemID}":          itemB,
 		"{key}":             photoB,
 	} {
@@ -117,6 +121,7 @@ func TestNoRouteServesAnotherShopsRow(t *testing.T) {
 	clients := map[string]*http.Client{
 		"technician": signIn(t, ts, techEmail),
 		"advisor":    signIn(t, ts, advisorEmail),
+		"owner":      signIn(t, ts, ownerEmail),
 	}
 
 	var sweptCount int

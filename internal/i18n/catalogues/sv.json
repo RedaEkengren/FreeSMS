@@ -591,6 +591,75 @@
     },
     "warranty: %s": {
       "other": "garanti: %s"
+    },
+    "Inspection checklists": {
+      "other": "Inspektionslistor"
+    },
+    "What a technician goes through when they inspect a vehicle. The lines are your own words and the customer reads them as written.": {
+      "other": "Det en tekniker går igenom vid en inspektion. Raderna är era egna ord, och kunden läser dem precis som de står."
+    },
+    "Change a checklist": {
+      "other": "Ändra en lista"
+    },
+    "Make a checklist": {
+      "other": "Gör en lista"
+    },
+    "Spring service": {
+      "other": "Vårservice"
+    },
+    "What to check, one per line": {
+      "other": "Vad som ska kontrolleras, en sak per rad"
+    },
+    "Used in %d inspection. Those keep the list they were made with.": {
+      "one": "Använd i %d inspektion. Den behåller listan den gjordes med.",
+      "other": "Använd i %d inspektioner. De behåller listan de gjordes med."
+    },
+    "Save the checklist": {
+      "other": "Spara listan"
+    },
+    "Make the checklist": {
+      "other": "Gör listan"
+    },
+    "Make a new one instead": {
+      "other": "Gör en ny i stället"
+    },
+    "The workshop's checklists": {
+      "other": "Verkstadens listor"
+    },
+    "None yet. Until there is one, there is nothing to start an inspection from.": {
+      "other": "Inga än. Innan det finns en går det inte att starta någon inspektion."
+    },
+    "retired": {
+      "other": "ur bruk"
+    },
+    "%d checkpoint": {
+      "one": "%d kontrollpunkt",
+      "other": "%d kontrollpunkter"
+    },
+    "used %d time": {
+      "one": "använd %d gång",
+      "other": "använd %d gånger"
+    },
+    "Retire it": {
+      "other": "Ta ur bruk"
+    },
+    "Use it again": {
+      "other": "Använd igen"
+    },
+    "There is no inspection checklist yet.": {
+      "other": "Det finns ingen inspektionslista än."
+    },
+    "Make one": {
+      "other": "Gör en"
+    },
+    "Whoever runs the workshop makes them.": {
+      "other": "Den som driver verkstaden gör dem."
+    },
+    "Checklists are kept by whoever runs the workshop.": {
+      "other": "Listorna sköts av den som driver verkstaden."
+    },
+    "No such checklist.": {
+      "other": "Listan finns inte."
     }
   },
   "name": "Svenska"

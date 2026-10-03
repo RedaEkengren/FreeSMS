@@ -72,6 +72,11 @@
   </label>
   <button type="submit" class="secondary">{{.T "Start it"}}</button>
 </form>
+{{else}}
+{{/* Said rather than left blank. A technician looking for the inspection
+     and finding nothing cannot tell "not set up" from "broken". */}}
+<p class="empty">{{.T "There is no inspection checklist yet."}}
+  {{if .Session.Scope.Role.RunsTheShop}}<a href="/checklists">{{.T "Make one"}}</a>{{else}}{{.T "Whoever runs the workshop makes them."}}{{end}}</p>
 {{end}}
 
 {{if .Requests}}

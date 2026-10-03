@@ -98,6 +98,11 @@ func (r Role) SeesParts() bool {
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
+// IsUUID reports whether s is shaped like an identifier. A path segment that
+// is not one cannot name a row, and asking Postgres to cast it is an error
+// rather than "not found".
+func IsUUID(s string) bool { return uuidPattern.MatchString(s) }
+
 // ErrNoScope is returned when a query is attempted without a shop.
 //
 // It exists so that the mistake surfaces as an error rather than as an empty

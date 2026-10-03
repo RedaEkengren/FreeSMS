@@ -35,6 +35,7 @@ const (
 	partB       = "bbbbbbbb-0000-0000-0000-000000000006"
 	itemB       = "bbbbbbbb-0000-0000-0000-000000000007"
 	photoB      = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	checklistB  = "bbbbbbbb-0000-0000-0000-000000000008"
 
 	// A string that appears nowhere in shop A. If it reaches a response body,
 	// something leaked, whatever the status code said.
@@ -42,6 +43,7 @@ const (
 
 	techEmail    = "tech@shop-a.test"
 	advisorEmail = "advisor@shop-a.test"
+	ownerEmail   = "owner@shop-a.test"
 	techPass     = "a reasonable workshop password"
 )
 
@@ -84,6 +86,14 @@ func testServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 		`INSERT INTO users (id, shop_id, person_id, role, password_hash) VALUES
 		 ('aaaaaaaa-0000-0000-0000-00000000000b','` + shopA + `',
 		  'aaaaaaaa-0000-0000-0000-00000000000a','service_advisor','` + hash + `')`,
+		// The owner, so the sweep reaches the routes only the people who run
+		// the shop get past -- refused at the door, a technician and an
+		// advisor never put a foreign identifier to the test there.
+		`INSERT INTO people (id, shop_id, display_name, email) VALUES
+		 ('aaaaaaaa-0000-0000-0000-000000000010','` + shopA + `','An Owner','` + ownerEmail + `')`,
+		`INSERT INTO users (id, shop_id, person_id, role, password_hash) VALUES
+		 ('aaaaaaaa-0000-0000-0000-000000000011','` + shopA + `',
+		  'aaaaaaaa-0000-0000-0000-000000000010','owner','` + hash + `')`,
 		`INSERT INTO people (id, shop_id, display_name, phone) VALUES
 		 ('aaaaaaaa-0000-0000-0000-000000000003','` + shopA + `','` + customerName + `','` + customerPhone + `')`,
 		`INSERT INTO customers (id, shop_id, kind, person_id, address_line1) VALUES
@@ -124,6 +134,10 @@ func testServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 		 ('` + shopB + `','` + photoB + `','image/jpeg',1,'` + itemB + `')`,
 		`INSERT INTO parts (id, shop_id, number, name) VALUES
 		 ('` + partB + `','` + shopB + `','SECRET-1','Secret part')`,
+		`INSERT INTO inspection_templates (id, shop_id, name) VALUES
+		 ('` + checklistB + `','` + shopB + `','` + secretB + `')`,
+		`INSERT INTO inspection_template_items (shop_id, template_id, position, label) VALUES
+		 ('` + shopB + `','` + checklistB + `',1,'` + secretB + `')`,
 		`INSERT INTO invoices
 		   (id, shop_id, series, number, work_order_id, customer_name,
 		    net_minor, vat_minor, gross_minor)
