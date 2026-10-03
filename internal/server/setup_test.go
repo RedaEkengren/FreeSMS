@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/auth"
 	"github.com/RedaEkengren/FreeSMS/internal/config"
@@ -23,6 +24,14 @@ import (
 
 // emptyServer is a fresh installation: migrated, and with no shop at all.
 func emptyServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
+	t.Helper()
+	ts, pool, _ := emptyInstallation(t)
+	return ts, pool
+}
+
+// emptyInstallation is emptyServer with the Server itself, for what runs
+// beside the handlers.
+func emptyInstallation(t *testing.T) (*httptest.Server, *pgxpool.Pool, *Server) {
 	t.Helper()
 	pool := testsupport.FreshPool(t)
 	if err := database.Migrate(context.Background(), pool, migrations.FS); err != nil {
@@ -46,7 +55,7 @@ func emptyServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 	}
 	ts := httptest.NewServer(handler)
 	t.Cleanup(ts.Close)
-	return ts, pool
+	return ts, pool, srv
 }
 
 func noRedirects() *http.Client {
@@ -287,5 +296,56 @@ func TestSetupOnAConfiguredInstallationDoesNoPasswordWork(t *testing.T) {
 	}
 	if ran := auth.Checks() - before; ran != 0 {
 		t.Errorf("five refused setup requests ran %d password computations; want none", ran)
+	}
+}
+
+// Setup tells the background work there is now a shop. The retention sweep
+// used to be handed the shop once, at start-up -- empty on a new
+// installation -- and never learned of the one setup made.
+func TestSetupWakesWhatWasWaitingForAShop(t *testing.T) {
+	ts, pool, srv := emptyInstallation(t)
+
+	select {
+	case <-srv.ShopSet():
+		t.Fatal("an empty installation announced a shop before setup")
+	default:
+	}
+	if srv.Shop() != "" {
+		t.Fatalf("Shop() = %q before setup", srv.Shop())
+	}
+
+	resp := submitSetup(t, ts, noRedirects(), "a reasonable workshop password")
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("setup answered %d", resp.StatusCode)
+	}
+
+	select {
+	case <-srv.ShopSet():
+	case <-time.After(2 * time.Second):
+		t.Fatal("setup made a shop and did not say so")
+	}
+	var made string
+	if err := pool.QueryRow(context.Background(), `SELECT id::text FROM shops`).Scan(&made); err != nil {
+		t.Fatalf("read shop: %v", err)
+	}
+	if srv.Shop() != made {
+		t.Errorf("Shop() = %q, want the shop setup made, %q", srv.Shop(), made)
+	}
+}
+
+// A shop known at start-up is not announced: the sweep runs once when it
+// starts anyway, and a stale signal would run it twice.
+func TestAShopKnownAtStartIsNotNews(t *testing.T) {
+	_, pool := testServer(t)
+	srv, err := New(pool, slog.New(slog.NewTextHandler(io.Discard, nil)),
+		&config.Config{BaseURL: "http://localhost", DefaultLocale: "en", AttachmentsDir: t.TempDir()}, shopA)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	select {
+	case <-srv.ShopSet():
+		t.Error("a shop known at start-up was announced as new")
+	default:
 	}
 }

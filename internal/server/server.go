@@ -55,6 +55,11 @@ type Server struct {
 	// per page: that would be a query on every render for a value that only
 	// setup can change.
 	resolvedCurrency string
+
+	// Signalled when the shop is set after start-up, for whatever runs in the
+	// background and needs to know -- the retention sweep. Buffered by one
+	// and never blocked on: a signal nobody has read yet already says it.
+	shopSet chan struct{}
 }
 
 // newLookup returns whatever the configuration asks for, or nothing.
@@ -119,10 +124,21 @@ func (s *Server) currency() string {
 	return s.resolvedCurrency
 }
 
+// Shop is the shop this process serves, or empty before setup. The one
+// source of it: background work asks here rather than keeping a copy.
+func (s *Server) Shop() string { return s.shop() }
+
+// ShopSet fires when setup has made the shop.
+func (s *Server) ShopSet() <-chan struct{} { return s.shopSet }
+
 func (s *Server) setShop(id string) {
 	s.mu.Lock()
 	s.resolved = id
 	s.mu.Unlock()
+	select {
+	case s.shopSet <- struct{}{}:
+	default:
+	}
 
 	// Best effort, and on its own connection: a shop that cannot be read is
 	// already failing louder elsewhere, and a page with no currency symbol is
@@ -169,12 +185,19 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 		// installation that terminates TLS elsewhere. BASE_URL is what the
 		// operator says the service is reached as, so it is the honest source.
 		secureCookies: strings.HasPrefix(cfg.BaseURL, "https://"),
+		shopSet:       make(chan struct{}, 1),
 	}
 
 	// Through setShop, not by assigning the field: the currency is read at the
 	// same moment, and a second way to resolve a shop is a second way to
 	// forget something that goes with it.
 	srv.setShop(shopID)
+	// The shop known at start-up is not news: the sweep runs once when it
+	// starts anyway. Only a shop set later, by setup, should wake it.
+	select {
+	case <-srv.shopSet:
+	default:
+	}
 	return srv, nil
 }
 
