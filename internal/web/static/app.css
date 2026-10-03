@@ -71,6 +71,11 @@ body {
   overflow-x: hidden;
 }
 
+/* The hidden attribute means hidden. Any rule here that sets display -- every
+   button is display: block -- otherwise wins over it, which once put a black
+   bar on the inspection page where an invisible button was meant to be. */
+[hidden] { display: none !important; }
+
 header {
   display: flex;
   align-items: center;
@@ -427,4 +432,3 @@ table.lines-table .tag { margin-left: 0.375rem; }
 /* Work held because there was no connection. Visible without being alarming:
    nothing is lost, it just has not gone yet. */
 .held { background: var(--attention); color: var(--bg); padding: 0.5rem 1rem; font-size: 0.9375rem; text-align: center; }
-.held[hidden] { display: none; }

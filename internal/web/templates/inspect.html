@@ -41,6 +41,11 @@
 
   {{if not $.Inspection.Completed}}
   <form method="post" action="/inspections/{{$.Inspection.ID}}/items/{{.ID}}" data-offline>
+    {{/* Enter in the note submits as the first submit button, and that was
+         Pass: "should be replaced" and Enter recorded the item as fine. A
+         disabled default button makes Enter do nothing, so the status is only
+         ever the one pressed. */}}
+    <button type="submit" disabled hidden aria-hidden="true" tabindex="-1"></button>
     <div class="actions">
       <button name="status" value="pass" class="secondary">Pass</button>
       <button name="status" value="attention" class="secondary">Attention</button>

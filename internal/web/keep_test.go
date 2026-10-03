@@ -178,3 +178,53 @@ func TestBrowserStorageBelongsToOnePerson(t *testing.T) {
 		t.Error("the layout no longer says who is signed in only when somebody is")
 	}
 }
+
+// A form answered by which button is pressed, with a text field in it, has a
+// disabled default button first.
+//
+// Enter in a text field submits as the form's first submit button. On an
+// inspection item that was Pass, so a note saying the tyres should be
+// replaced, ended with Enter, recorded them as fine.
+func TestEnterCannotChooseAnAnswer(t *testing.T) {
+	entries, err := Templates.ReadDir("templates")
+	if err != nil {
+		t.Fatalf("read templates: %v", err)
+	}
+	formRe := regexp.MustCompile(`(?s)<form\b[^>]*>(.*?)</form>`)
+	buttonRe := regexp.MustCompile(`<button\b[^>]*>`)
+	namedRe := regexp.MustCompile(`\sname="`)
+	textRe := regexp.MustCompile(`<textarea\b|<input\b[^>]*\sname="`)
+	var checked int
+	for _, e := range entries {
+		raw, _ := Templates.ReadFile("templates/" + e.Name())
+		for _, m := range formRe.FindAllStringSubmatch(string(raw), -1) {
+			inner := m[1]
+			// Only buttons that submit: type="button" is not pressed by Enter.
+			var submits []string
+			for _, b := range buttonRe.FindAllString(inner, -1) {
+				if !strings.Contains(b, `type="button"`) {
+					submits = append(submits, b)
+				}
+			}
+			answered := false
+			for _, b := range submits {
+				answered = answered || namedRe.MatchString(b)
+			}
+			// A field somebody types in: not hidden, not a file.
+			typed := false
+			for _, in := range textRe.FindAllString(inner, -1) {
+				typed = typed || !regexp.MustCompile(`type="(hidden|file|checkbox|radio)"`).MatchString(in)
+			}
+			if !answered || !typed {
+				continue
+			}
+			checked++
+			if !strings.Contains(submits[0], "disabled") {
+				t.Errorf("%s: a form answered by its buttons has a text field, and Enter in it presses %s", e.Name(), submits[0])
+			}
+		}
+	}
+	if checked == 0 {
+		t.Error("found no form answered by its buttons; the inspection item form has stopped matching")
+	}
+}
