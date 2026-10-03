@@ -200,7 +200,7 @@ func (s *Server) routes() (http.Handler, error) {
 		return nil, fmt.Errorf("static files: %w", err)
 	}
 	mux.Handle("GET /static/", http.StripPrefix("/static/",
-		cacheForever(http.FileServer(http.FS(staticFS)))))
+		versioned(http.FileServer(http.FS(staticFS)))))
 
 	mux.HandleFunc("GET /setup", s.handleSetupForm)
 	mux.HandleFunc("POST /setup", s.handleSetup)
@@ -284,11 +284,24 @@ func (s *Server) routes() (http.Handler, error) {
 	return s.securityHeaders(s.checkOrigin(s.requireSetup(s.withSession(s.idempotent(mux))))), nil
 }
 
-// cacheForever is safe here because everything under /static is embedded in
-// the binary and changes only when the binary does.
-func cacheForever(next http.Handler) http.Handler {
+// versioned sets how long a static file may be kept.
+//
+// Asked for with the version the page names, the bytes behind that URL never
+// change, so it is kept for a year without asking again. Asked for without
+// one, or with a version that is no longer current -- a page loaded before an
+// update -- it is revalidated every time, which with the ETag is a 304 and no
+// body when nothing changed. The file served is always the current one.
+func versioned(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "public, max-age=3600")
+		current := web.Version(r.URL.Path)
+		if current != "" {
+			w.Header().Set("ETag", `"`+current+`"`)
+		}
+		if current != "" && r.URL.Query().Get("v") == current {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
 		next.ServeHTTP(w, r)
 	})
 }

@@ -228,3 +228,25 @@ func TestEnterCannotChooseAnAnswer(t *testing.T) {
 		t.Error("found no form answered by its buttons; the inspection item form has stopped matching")
 	}
 }
+
+// Every static file a template loads is loaded through asset, so its URL
+// carries its version. A bare /static/ path is cached under one name across
+// every release.
+func TestTemplatesLoadStaticFilesByVersion(t *testing.T) {
+	entries, _ := Templates.ReadDir("templates")
+	bare := regexp.MustCompile(`(?:src|href)="/static/`)
+	var found int
+	for _, e := range entries {
+		raw, _ := Templates.ReadFile("templates/" + e.Name())
+		if bare.Match(raw) {
+			t.Errorf("%s loads a static file by a fixed path; use {{asset \"name\"}}", e.Name())
+		}
+		found += strings.Count(string(raw), "{{asset ")
+	}
+	if found < 3 {
+		t.Errorf("only %d static files are loaded through asset; the layout has stopped using it", found)
+	}
+	if Version("keep.js") == "" || Asset("keep.js") == "/static/keep.js" {
+		t.Error("keep.js has no version")
+	}
+}

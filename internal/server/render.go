@@ -118,12 +118,13 @@ type intakeForm struct {
 // setupForm is intakeForm under a name that says which page it belongs to.
 type setupForm = intakeForm
 
-// templateFuncs are the two things a template genuinely cannot do itself.
+// templateFuncs are the few things a template genuinely cannot do itself.
 // Anything more belongs in Go, where it can be tested.
 var templateFuncs = template.FuncMap{
 	"fmt":    money.Format,
 	"divide": func(a, b int) int { return a / b },
 	"date":   func(t time.Time) string { return t.Format("2006-01-02") },
+	"asset":  web.Asset,
 }
 
 // T renders a message in the reader's language.
