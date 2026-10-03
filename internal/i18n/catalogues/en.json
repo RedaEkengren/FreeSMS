@@ -1,5 +1,42 @@
 {
   "locale": "en",
   "name": "English",
-  "messages": {}
+  "messages": {
+    "%d day net": {
+      "one": "%d day net",
+      "other": "%d days net"
+    },
+    "%d finding": {
+      "one": "%d finding",
+      "other": "%d findings"
+    },
+    "%d thing noticed, not priced": {
+      "one": "%d thing noticed, not priced",
+      "other": "%d things noticed, not priced"
+    },
+    "%d visit": {
+      "one": "%d visit",
+      "other": "%d visits"
+    },
+    "Uncollected for %d day": {
+      "one": "Uncollected for %d day",
+      "other": "Uncollected for %d days"
+    },
+    "Waiting for %d part": {
+      "one": "Waiting for %d part",
+      "other": "Waiting for %d parts"
+    },
+    "Used in %d inspection. Those keep the list they were made with.": {
+      "one": "Used in %d inspection. Those keep the list they were made with.",
+      "other": "Used in %d inspections. Those keep the list they were made with."
+    },
+    "%d checkpoint": {
+      "one": "%d checkpoint",
+      "other": "%d checkpoints"
+    },
+    "used %d time": {
+      "one": "used %d time",
+      "other": "used %d times"
+    }
+  }
 }

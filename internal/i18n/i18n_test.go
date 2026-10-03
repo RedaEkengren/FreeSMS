@@ -1,6 +1,7 @@
 package i18n
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -101,5 +102,41 @@ func TestSwedishCharactersSurvive(t *testing.T) {
 	}
 	if got := sv.T("Nothing open."); !strings.Contains(got, "ö") {
 		t.Errorf("T = %q", got)
+	}
+}
+
+// Every message with a plural form has an English plural too.
+//
+// The keys are English singular, so English needs a catalogue entry only
+// where a count is involved -- and the English catalogue was empty, so every
+// counted phrase read "Waiting for 2 part" and "3 checkpoint" in English
+// while Swedish had both forms.
+func TestEveryPluralHasAnEnglishPlural(t *testing.T) {
+	read := func(name string) map[string]map[string]string {
+		raw, err := files.ReadFile("catalogues/" + name)
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		var c struct {
+			Messages map[string]map[string]string `json:"messages"`
+		}
+		if err := json.Unmarshal(raw, &c); err != nil {
+			t.Fatalf("parse %s: %v", name, err)
+		}
+		return c.Messages
+	}
+	en := read("en.json")
+	for key, forms := range read("sv.json") {
+		if forms["one"] == "" {
+			continue
+		}
+		e := en[key]
+		if e["other"] == "" || e["other"] == key {
+			t.Errorf("%q is counted in Swedish and has no English plural", key)
+		}
+	}
+
+	if got := load(t, false).For("en").N("Waiting for %d part", 2); got != "Waiting for 2 parts" {
+		t.Errorf("English N(2) = %q", got)
 	}
 }
