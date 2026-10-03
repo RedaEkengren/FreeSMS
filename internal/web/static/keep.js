@@ -66,21 +66,35 @@
     if (local) {
       try { apply(form, JSON.parse(local)); } catch (e) {}
     }
-    // The server's copy arrives later and only fills what is still empty, so
-    // it cannot overwrite something the person has already started typing.
+    // The server's copy arrives later and only fills what is still as the page
+    // arrived, so it cannot overwrite something the person has already typed.
     fetch("/drafts?form=" + encodeURIComponent(name), { headers: { Accept: "application/json" } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (fields) { if (fields) apply(form, fields, true); })
       .catch(function () {});
   }
 
-  function apply(form, fields, onlyEmpty) {
+  function apply(form, fields, onlyUntouched) {
     Object.keys(fields || {}).forEach(function (name) {
       var el = form.elements[name];
       if (!el || typeof el.value !== "string") return;
-      if (onlyEmpty && el.value.trim() !== "") return;
+      if (onlyUntouched && !untouched(el)) return;
       el.value = fields[name];
     });
+  }
+
+  // Whether a control still holds what the page arrived with. The server's
+  // copy used to fill only empty fields, and a quantity that starts at 1, a
+  // price at 0 and every select are never empty -- so a job line restored
+  // from the server came back as its description alone.
+  function untouched(el) {
+    if (el.options) {
+      for (var i = 0; i < el.options.length; i++) {
+        if (el.options[i].defaultSelected) return el.selectedIndex === i;
+      }
+      return el.selectedIndex <= 0;
+    }
+    return el.value === el.defaultValue;
   }
 
   function watch(form) {
@@ -100,7 +114,15 @@
     form.appendChild(tag);
 
     var timer = null;
-    form.addEventListener("input", function () {
+    // Listened for on the document, not on the form. A control joined to a
+    // form by its form attribute -- the job line, whose fields sit in the
+    // table because a form cannot -- sends its events up through where it
+    // is, not to the form it belongs to, so a listener on the form heard
+    // nothing and a job line was never kept. Asking each control which form
+    // it belongs to covers both kinds. Change as well as input, because that
+    // is what a select is sure to send.
+    function edited(e) {
+      if (!e.target || e.target.form !== form) return;
       var fields = fieldsOf(form);
       // Immediately, locally. This is the copy that survives a crash.
       store.set(draftKey(name), JSON.stringify(fields));
@@ -119,7 +141,9 @@
           // again, so there is nothing to tell anybody.
         });
       }, 1200);
-    });
+    }
+    document.addEventListener("input", edited);
+    document.addEventListener("change", edited);
 
     // Submitting is not saving. The draft used to be deleted here, on the
     // press, before anybody knew whether the server took it -- so a refusal,
