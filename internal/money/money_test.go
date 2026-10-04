@@ -255,3 +255,23 @@ func TestFormatStaysAPlainDecimal(t *testing.T) {
 		}
 	}
 }
+
+// A markup is money, rounded the way every amount here is: half away from
+// zero. 3.33 with 45% is 1.4985 of markup, which is 1.50, not the 1.49 that
+// integer division gave.
+func TestAMarkupRoundsLikeEveryOtherAmount(t *testing.T) {
+	for _, c := range []struct {
+		cost int64
+		bp   int
+		want int64
+	}{
+		{333, 4500, 483},
+		{40000, 5000, 60000},
+		{100, 0, 100},
+		{1, 5000, 2}, // 0.5 öre of markup rounds up
+	} {
+		if got := WithMarkup(c.cost, c.bp); got != c.want {
+			t.Errorf("WithMarkup(%d, %d) = %d, want %d", c.cost, c.bp, got, c.want)
+		}
+	}
+}

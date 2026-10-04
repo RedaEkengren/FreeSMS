@@ -2,6 +2,7 @@ package workshop
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -47,6 +48,10 @@ type Part struct {
 
 	CostMinor  *int64
 	PriceMinor *int64
+
+	// What it sells for on a job: its own price, or its cost with the markup
+	// bands, or nil when it has neither. Filled where a part is offered.
+	OfferedMinor *int64
 
 	// Derived from the ledger, never stored.
 	OnHand   float64
@@ -427,30 +432,68 @@ func releaseReservations(ctx context.Context, tx pgx.Tx, scope access.Scope, job
 // Bands rather than one percentage, because a five-krona clip and a
 // five-thousand-krona turbo do not carry the same markup and every workshop
 // knows it. The narrowest band whose ceiling the cost is under wins; the open
-// top band catches everything above.
+// top band catches everything above. No bands means no markup: the cost is
+// the price, and the shop can see it has not set any rather than being
+// quietly given one.
 func PriceFromCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, costMinor int64) (int64, error) {
-	if costMinor <= 0 {
-		return 0, nil
-	}
-	var markup int
+	var bands []PriceBand
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		err := tx.QueryRow(ctx, `
-			SELECT markup_basis FROM price_bands
-			WHERE up_to_minor IS NULL OR up_to_minor > $1
-			ORDER BY up_to_minor NULLS LAST
-			LIMIT 1`, costMinor).Scan(&markup)
-		if err == pgx.ErrNoRows {
-			// No bands configured: the cost is the price, and the shop can see
-			// that it has not set any rather than being quietly given one.
-			markup = 0
-			return nil
-		}
+		var err error
+		bands, err = bandsTx(ctx, tx)
 		return err
 	})
 	if err != nil {
-		return 0, fmt.Errorf("read price bands: %w", err)
+		return 0, err
 	}
-	return costMinor + costMinor*int64(markup)/10000, nil
+	return priceWithBands(bands, costMinor), nil
+}
+
+// priceWithBands is the one place a cost becomes a price. The shelf on a job
+// shows what it returns and the line added from it stores what it returns, so
+// the two cannot disagree.
+func priceWithBands(bands []PriceBand, costMinor int64) int64 {
+	if costMinor <= 0 {
+		return 0
+	}
+	// Bands come ordered by ceiling, open band last.
+	for _, b := range bands {
+		if b.UpToMinor == nil || costMinor < *b.UpToMinor {
+			return money.WithMarkup(costMinor, b.MarkupBasis)
+		}
+	}
+	return costMinor
+}
+
+// offeredPrice is what a part sells for: its own price if it has one, even
+// zero, because setting it is a decision; otherwise its cost with the markup;
+// otherwise nothing -- and nothing is not zero.
+func offeredPrice(bands []PriceBand, price, cost *int64) *int64 {
+	if price != nil {
+		return price
+	}
+	if cost != nil {
+		v := priceWithBands(bands, *cost)
+		return &v
+	}
+	return nil
+}
+
+func bandsTx(ctx context.Context, tx pgx.Tx) ([]PriceBand, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT id, up_to_minor, markup_basis FROM price_bands ORDER BY up_to_minor NULLS LAST`)
+	if err != nil {
+		return nil, fmt.Errorf("read price bands: %w", err)
+	}
+	defer rows.Close()
+	var out []PriceBand
+	for rows.Next() {
+		var b PriceBand
+		if err := rows.Scan(&b.ID, &b.UpToMinor, &b.MarkupBasis); err != nil {
+			return nil, fmt.Errorf("scan price band: %w", err)
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
 }
 
 // PriceBand is one cost band and its markup.
@@ -484,21 +527,9 @@ func PriceBands(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]
 	}
 	var out []PriceBand
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		rows, err := tx.Query(ctx,
-			`SELECT id, up_to_minor, markup_basis FROM price_bands
-			 ORDER BY up_to_minor NULLS LAST`)
-		if err != nil {
-			return fmt.Errorf("list bands: %w", err)
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var b PriceBand
-			if err := rows.Scan(&b.ID, &b.UpToMinor, &b.MarkupBasis); err != nil {
-				return fmt.Errorf("scan band: %w", err)
-			}
-			out = append(out, b)
-		}
-		return rows.Err()
+		var err error
+		out, err = bandsTx(ctx, tx)
+		return err
 	})
 	return out, err
 }
@@ -607,9 +638,39 @@ func PartsForJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 			}
 			out = append(out, p)
 		}
-		return rows.Err()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		rows.Close()
+		bands, err := bandsTx(ctx, tx)
+		if err != nil {
+			return err
+		}
+		for i := range out {
+			out[i].OfferedMinor = offeredPrice(bands, out[i].PriceMinor, out[i].CostMinor)
+		}
+		return nil
 	})
 	return out, err
+}
+
+// partPriceTx is what a part sells for right now, read inside the
+// transaction that puts it on a job.
+func partPriceTx(ctx context.Context, tx pgx.Tx, partID string) (*int64, string, error) {
+	var price, cost *int64
+	var number string
+	if err := tx.QueryRow(ctx, `SELECT price_minor, cost_minor, number FROM parts WHERE id = $1 AND active`,
+		partID).Scan(&price, &cost, &number); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, "", ErrNotFound
+		}
+		return nil, "", fmt.Errorf("read part price: %w", err)
+	}
+	bands, err := bandsTx(ctx, tx)
+	if err != nil {
+		return nil, "", err
+	}
+	return offeredPrice(bands, price, cost), number, nil
 }
 
 // Stocktake records what is on the shelf, as a counted movement of the

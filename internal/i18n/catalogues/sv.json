@@ -747,6 +747,9 @@
     },
     "hour": {
       "other": "timme"
+    },
+    "No price yet": {
+      "other": "Inget pris än"
     }
   },
   "name": "Svenska"

@@ -25,6 +25,13 @@ type NewLine struct {
 	// sold and never leaves stock.
 	PartID string
 
+	// Set when the price is the part's, worked out in the same transaction
+	// that adds the line, rather than a number the browser sent. The shelf
+	// used to send the part's price in a hidden field -- empty for a part
+	// priced from its cost, and empty parsed as zero, so a costed part went
+	// onto the job for nothing and the markup bands were never asked.
+	PriceFromPart bool
+
 	// Set when the line came from the shop's own time library, so that what
 	// was actually clocked can be compared with what was expected. Without it
 	// the library never learns and a wrong entry poisons every future
@@ -72,6 +79,22 @@ func AddLine(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 		switch state {
 		case StateInvoiced, StateClosed, StateCancelled:
 			return fmt.Errorf("%w: nothing can be added to a %s order", ErrInvalid, state)
+		}
+
+		if line.PriceFromPart && line.CostBearer == "customer" {
+			if line.PartID == "" {
+				return fmt.Errorf("%w: a price from the part needs a part", ErrInvalid)
+			}
+			price, number, err := partPriceTx(ctx, tx, line.PartID)
+			if err != nil {
+				return err
+			}
+			if price == nil {
+				// Nothing is not zero. Selling a part for nothing is something
+				// somebody decides, by setting its price to 0.
+				return fmt.Errorf("%w: %s has no price and no cost; give it one on the stock page", ErrInvalid, number)
+			}
+			line.UnitPriceMinor = *price
 		}
 
 		// Before approval, the line is part of the quote. After it, it is not.

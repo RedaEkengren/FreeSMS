@@ -85,10 +85,16 @@ func (s *Server) handleAddLine(w http.ResponseWriter, r *http.Request) {
 	// Parsing to a float and multiplying would introduce exactly the rounding
 	// error the schema avoids by storing integers, so the text is split
 	// instead.
-	price, err := parseMinorUnits(r.FormValue("unit_price"))
-	if err != nil {
-		s.renderError(w, r, http.StatusBadRequest, "That price did not parse", err.Error())
-		return
+	// A part from the shelf is priced from the part, by the server, unless a
+	// price was typed. An empty field used to be read as zero.
+	fromPart := r.FormValue("kind") == "part" && strings.TrimSpace(r.FormValue("part_id")) != "" &&
+		strings.TrimSpace(r.FormValue("unit_price")) == ""
+	var price int64
+	if !fromPart {
+		if price, err = parseMinorUnits(r.FormValue("unit_price")); err != nil {
+			s.renderError(w, r, http.StatusBadRequest, "That price did not parse", err.Error())
+			return
+		}
 	}
 
 	line := workshop.NewLine{
@@ -100,6 +106,7 @@ func (s *Server) handleAddLine(w http.ResponseWriter, r *http.Request) {
 		CostBearer:     r.FormValue("cost_bearer"),
 		LabourTimeID:   strings.TrimSpace(r.FormValue("labour_time_id")),
 		PartID:         strings.TrimSpace(r.FormValue("part_id")),
+		PriceFromPart:  fromPart,
 	}
 
 	err = workshop.AddLine(r.Context(), s.pool, session.Scope, id, line)

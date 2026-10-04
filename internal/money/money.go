@@ -63,6 +63,14 @@ func VAT(netMinor int64, rateBasisPoints int) int64 {
 	return divRound(netMinor*int64(rateBasisPoints), 10000)
 }
 
+// WithMarkup is a cost plus a markup in basis points (4500 = 45%), rounded
+// half away from zero like every other amount here. Truncating instead loses
+// an öre on half the parts in the catalogue, always in the customer's favour,
+// and does it differently from the invoice it ends up on.
+func WithMarkup(costMinor int64, basisPoints int) int64 {
+	return costMinor + divRound(costMinor*int64(basisPoints), 10000)
+}
+
 // Line is one priced line, as the totals care about it.
 type Line struct {
 	QuantityMilli     int64

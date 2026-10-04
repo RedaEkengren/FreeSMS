@@ -313,14 +313,20 @@
   <input type="hidden" name="cost_bearer" value="customer">
   <input type="hidden" name="part_id" value="{{.ID}}">
   <input type="hidden" name="description" value="{{.Name}} ({{.Number}})">
-  <input type="hidden" name="unit_price" value="{{.Price}}">
+  {{/* No price in the form: the server prices a part from the part, so the
+       shelf and the line cannot disagree, and a part with no price is not
+       quietly sold for nothing. */}}
   <span class="what">{{.Number}} &middot; {{.Name}}
-    <small>{{$.Dot .Location ($.MoneyOrBlank .PriceMinor) ($.T .ShortfallNote)}}</small>
+    <small>{{$.Dot .Location ($.MoneyOrBlank .OfferedMinor) ($.T .ShortfallNote)}}</small>
   </span>
   <span class="tag{{if .Negative}} late{{else if .Short}} warranty{{end}}">{{.Available}} {{.Unit}}</span>
+  {{if .OfferedMinor}}
   <input name="quantity" value="1" inputmode="decimal" class="qty"
          aria-label="{{$.T "How many"}}">
   <button type="submit" class="secondary">{{$.T "Add"}}</button>
+  {{else}}
+  <a href="/stock/parts/{{.ID}}">{{$.T "No price yet"}}</a>
+  {{end}}
 </form>
 {{end}}
 {{end}}
