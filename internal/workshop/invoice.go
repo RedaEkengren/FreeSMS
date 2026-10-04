@@ -397,6 +397,9 @@ func consumeForInvoice(ctx context.Context, tx pgx.Tx, scope access.Scope, workO
 	if err := releaseReservationsForOrder(ctx, tx, workOrderID); err != nil {
 		return err
 	}
+	// In part order, so two transactions that lock several parts each take
+	// the locks in the same order and cannot wait on each other in a circle.
+	sort.Slice(used, func(i, j int) bool { return used[i].part < used[j].part })
 	for _, u := range used {
 		// Nothing here refuses because the shelf would go negative. The car
 		// has left; a negative figure is a symptom to be seen, not a reason to

@@ -83,10 +83,10 @@ func (s *Server) handleStockMove(w http.ResponseWriter, r *http.Request) {
 	case "consumed", "returned", "written_off":
 		m.Quantity = -qty
 		m.Reason = r.FormValue("reason")
-	case "counted":
-		// A stocktake says what is there, so the movement is the difference.
-		m.Quantity = qty
 	default:
+		// Including counted: a stocktake is a count, at /stock/count, and the
+		// difference is worked out there. A signless "difference" typed here
+		// could only ever go up.
 		s.renderError(w, r, http.StatusBadRequest, "Unknown movement", "")
 		return
 	}
@@ -134,4 +134,28 @@ func partUrgency(p workshop.Part) int {
 	default:
 		return 2
 	}
+}
+
+// handleStocktake records what is on the shelf; the ledger gets the difference.
+func (s *Server) handleStocktake(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	// Empty is not zero. parseScaled reads a blank field as 0, and a count of
+	// 0 books the whole shelf out -- so a form sent without the number in it
+	// would have emptied the stock of that part.
+	if strings.TrimSpace(r.FormValue("counted")) == "" {
+		s.renderError(w, r, http.StatusBadRequest, "No count",
+			"Write what is on the shelf, 0 included if it is empty.")
+		return
+	}
+	counted, err := parseScaled(r.FormValue("counted"), 3)
+	if err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "That count did not parse",
+			"Write what is on the shelf: 8, or 2,5 for part of a pack.")
+		return
+	}
+	if _, err := workshop.Stocktake(r.Context(), s.pool, session.Scope,
+		r.FormValue("part_id"), counted, r.FormValue("note")); s.handoverError(w, r, err) {
+		return
+	}
+	http.Redirect(w, r, "/stock", http.StatusSeeOther)
 }

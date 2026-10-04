@@ -47,7 +47,7 @@ var swept = map[string]string{
 	"POST /labour/rate": "", "GET /time": "", "POST /time/correct": "",
 	"POST /drafts": "", "GET /drafts": "", "DELETE /drafts": "",
 	"GET /search": "", "GET /scan": "", "GET /labels": "", "GET /stock": "",
-	"POST /stock/move": "", "POST /stock/bands": "", "GET /parts": "",
+	"POST /stock/move": "", "POST /stock/count": "", "POST /stock/bands": "", "GET /parts": "",
 	"POST /parts/arrived": "", "GET /checklists": "", "POST /checklists": "",
 
 	// The customer's link. Not a shop identifier: it is an unguessable token,

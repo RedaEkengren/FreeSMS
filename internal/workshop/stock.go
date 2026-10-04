@@ -228,16 +228,21 @@ func Move(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, m Movemen
 func moveTx(ctx context.Context, tx pgx.Tx, scope access.Scope, m Movement, partID, workOrderID, lineID string) error {
 	// The cost at the moment it moved, taken from the part when the caller did
 	// not say. A valuation that reprices history is one nobody can reconcile.
+	//
+	// The part's row is locked whatever the caller said, so movements on one
+	// part happen one at a time. A stocktake reads the ledger and writes the
+	// difference, and a consumption landing between the two would make the
+	// difference wrong by exactly that consumption.
+	var current *int64
+	if err := tx.QueryRow(ctx, `SELECT cost_minor FROM parts WHERE id = $1 FOR UPDATE`, partID).Scan(&current); err != nil {
+		if err == pgx.ErrNoRows {
+			return ErrNotFound
+		}
+		return fmt.Errorf("read cost: %w", err)
+	}
 	cost := m.CostMinor
 	if cost == nil {
-		var c *int64
-		if err := tx.QueryRow(ctx, `SELECT cost_minor FROM parts WHERE id = $1`, partID).Scan(&c); err != nil {
-			if err == pgx.ErrNoRows {
-				return ErrNotFound
-			}
-			return fmt.Errorf("read cost: %w", err)
-		}
-		cost = c
+		cost = current
 	}
 
 	_, err := tx.Exec(ctx, `
@@ -605,4 +610,48 @@ func PartsForJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		return rows.Err()
 	})
 	return out, err
+}
+
+// Stocktake records what is on the shelf, as a counted movement of the
+// difference from the ledger.
+//
+// The form used to ask for the difference, and refused a negative number --
+// so ten in the books and eight on the shelf could not be recorded except by
+// calling the missing two a write-off or a return, which they were not. A
+// count is a count: the person says what they see, and the arithmetic is
+// done here, under the part's lock, so nothing booked in between makes it
+// stale.
+//
+// A count that matches records nothing, and says so.
+func Stocktake(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, partID string, countedMilli int64, note string) (differenceMilli int64, err error) {
+	if !scope.Role.SeesParts() {
+		return 0, access.ErrForbidden
+	}
+	if !looksLikeUUID(partID) {
+		return 0, ErrNotFound
+	}
+	if countedMilli < 0 {
+		return 0, fmt.Errorf("%w: a shelf cannot hold fewer than none", ErrInvalid)
+	}
+	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `SELECT 1 FROM parts WHERE id = $1 FOR UPDATE`, partID); err != nil {
+			return fmt.Errorf("lock part: %w", err)
+		}
+		// In thousandths, as numeric, so 0,1 of a litre is not a float.
+		if err := tx.QueryRow(ctx, `
+			SELECT ($2::numeric / 1000 - coalesce(sum(quantity), 0)) * 1000
+			FROM stock_movements
+			WHERE part_id = $1
+			  AND kind IN ('received', 'consumed', 'returned', 'written_off', 'counted')`,
+			partID, countedMilli).Scan(&differenceMilli); err != nil {
+			return fmt.Errorf("read on hand: %w", err)
+		}
+		if differenceMilli == 0 {
+			return nil
+		}
+		return moveTx(ctx, tx, scope, Movement{
+			Kind: "counted", Quantity: float64(differenceMilli) / 1000, Note: note,
+		}, partID, "", "")
+	})
+	return differenceMilli, err
 }

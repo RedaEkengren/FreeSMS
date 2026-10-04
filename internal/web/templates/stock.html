@@ -47,7 +47,6 @@ wrongly ordered parts cost.</p>
             <option value="received">{{$.T "Arrived"}}</option>
             <option value="returned">{{$.T "Went back"}}</option>
             <option value="written_off">{{$.T "Written off"}}</option>
-            <option value="counted">{{$.T "Stocktake difference"}}</option>
           </select>
         </label>
       </div>
@@ -59,6 +58,27 @@ wrongly ordered parts cost.</p>
         </select>
       </label>
       <button type="submit" class="secondary">{{$.T "Record it"}}</button>
+    </form>
+  </details>
+
+  {{/* What is on the shelf, not the difference. Somebody counting says what
+       they see; the difference is worked out against the books at the moment
+       it is saved. Not held offline: a count sent an hour later would be
+       compared with an hour's more movements. */}}
+  <details>
+    <summary>{{$.T "Count it"}}</summary>
+    <form method="post" action="/stock/count" style="margin-top:0.75rem">
+      <input type="hidden" name="part_id" value="{{.ID}}">
+      <label>
+        <span>{{$.T "On the shelf now"}}</span>
+        <input name="counted" inputmode="decimal" required>
+      </label>
+      <p class="waiting">{{$.T "The books say %v." .OnHand}}</p>
+      <label>
+        <span>{{$.T "Note"}}</span>
+        <input name="note">
+      </label>
+      <button type="submit" class="secondary">{{$.T "Record the count"}}</button>
     </form>
   </details>
 </div>

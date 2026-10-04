@@ -669,6 +669,21 @@
     },
     "Sold is the labour on the jobs invoiced this period, shared by how long each person clocked on each job.": {
       "other": "Sålt är arbetet på jobben som fakturerats under perioden, fördelat efter hur länge var och en stämplade på varje jobb."
+    },
+    "Count it": {
+      "other": "Inventera"
+    },
+    "On the shelf now": {
+      "other": "På hyllan nu"
+    },
+    "The books say %v.": {
+      "other": "Enligt böckerna: %v."
+    },
+    "Record the count": {
+      "other": "Spara räkningen"
+    },
+    "Note": {
+      "other": "Anteckning"
     }
   },
   "name": "Svenska"

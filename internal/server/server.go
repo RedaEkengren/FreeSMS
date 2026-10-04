@@ -322,6 +322,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /labels", s.requireSession(s.handleLabels))
 	mux.HandleFunc("GET /stock", s.requireSession(s.handleStock))
 	mux.HandleFunc("POST /stock/move", s.requireSession(s.handleStockMove))
+	mux.HandleFunc("POST /stock/count", s.requireSession(s.handleStocktake))
 	mux.HandleFunc("POST /stock/bands", s.requireSession(s.handleSavePriceBand))
 
 	mux.HandleFunc("GET /parts", s.requireSession(s.handleParts))
