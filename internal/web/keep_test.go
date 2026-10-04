@@ -250,3 +250,35 @@ func TestTemplatesLoadStaticFilesByVersion(t *testing.T) {
 		t.Error("keep.js has no version")
 	}
 }
+
+// Every instant a template prints goes through $.Local, into the shop's zone.
+//
+// Formatted directly, an instant prints the server's wall clock -- UTC in the
+// container. The hours page showed 05:30 for a technician who started at 07:30
+// in Stockholm, and read the correction back as Stockholm, so saving it
+// unchanged moved the entry two hours.
+//
+// The exceptions are values that are a date and nothing else, listed here so
+// that adding one is a decision.
+func TestTemplatesPrintInstantsInTheShopsZone(t *testing.T) {
+	onlyADate := map[string]bool{
+		".PeriodFrom": true, ".PeriodTo": true, // built in the shop's zone in Go
+		".Dashboard.From": true,              // likewise
+		".From":           true, ".To": true, // accounting export periods: date columns
+	}
+	direct := regexp.MustCompile(`\{\{\s*((?:\$)?\.[A-Za-z.]+)\.Format\b`)
+	entries, _ := Templates.ReadDir("templates")
+	var local int
+	for _, e := range entries {
+		raw, _ := Templates.ReadFile("templates/" + e.Name())
+		for _, m := range direct.FindAllStringSubmatch(string(raw), -1) {
+			if !onlyADate[m[1]] {
+				t.Errorf("%s formats %s directly; an instant goes through ($.Local %s)", e.Name(), m[1], m[1])
+			}
+		}
+		local += strings.Count(string(raw), "$.Local ")
+	}
+	if local < 10 {
+		t.Errorf("only %d times go through $.Local; the pattern has stopped matching", local)
+	}
+}

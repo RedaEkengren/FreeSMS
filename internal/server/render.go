@@ -29,6 +29,13 @@ type pageData struct {
 	// How this page writes money: the reader's language decides the
 	// separators, the shop's currency decides the symbol.
 	display money.Display
+
+	// Where the reader is standing, for times: the shop's zone. Times are
+	// stored as instants and read as wall clocks, and a page that formats an
+	// instant directly prints the server's wall clock -- UTC in a container,
+	// an hour or two off in Stockholm, and the day before at half past
+	// midnight.
+	zone    *time.Location
 	Session auth.Session
 	Error   string
 	Email   string
@@ -155,6 +162,44 @@ func (d pageData) MoneyOrBlank(minor *int64) string {
 	return d.display.Amount(*minor)
 }
 
+// Local is a stored instant as the shop's wall clock. Every instant a
+// template prints goes through here; a date that is only a date -- an export
+// period -- does not, because moving midnight UTC west of Greenwich is the
+// day before.
+func (d pageData) Local(t any) time.Time {
+	zone := d.zone
+	if zone == nil {
+		zone = time.UTC
+	}
+	switch v := t.(type) {
+	case time.Time:
+		return v.In(zone)
+	case *time.Time:
+		if v != nil {
+			return v.In(zone)
+		}
+	}
+	return time.Time{}
+}
+
+// Instant is an instant in RFC 3339, for a form to send back unchanged.
+func (d pageData) Instant(t any) string {
+	switch v := t.(type) {
+	case time.Time:
+		return v.UTC().Format(time.RFC3339)
+	case *time.Time:
+		if v != nil {
+			return v.UTC().Format(time.RFC3339)
+		}
+	}
+	return ""
+}
+
+// Due is a document's due date, counted in days on the shop's calendar.
+func (d pageData) Due(doc workshop.Document) time.Time {
+	return doc.DueIn(d.Local(doc.IssuedAt).Location())
+}
+
 // Dot joins the parts that are there, separated, and leaves out the ones that
 // are not.
 //
@@ -217,6 +262,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 	}
 	data.printer = s.catalogues.For(data.Locale)
 	data.display = money.DisplayFor(data.Locale, s.currency())
+	data.zone = s.zone()
 
 	buf := newBuffer()
 	defer releaseBuffer(buf)
@@ -244,6 +290,7 @@ func (s *Server) renderPartial(w http.ResponseWriter, r *http.Request, page, blo
 	}
 	data.printer = s.catalogues.For(data.Locale)
 	data.display = money.DisplayFor(data.Locale, s.currency())
+	data.zone = s.zone()
 	buf := newBuffer()
 	defer releaseBuffer(buf)
 

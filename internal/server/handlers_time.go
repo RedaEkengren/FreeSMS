@@ -1,7 +1,10 @@
 package server
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
@@ -46,16 +49,14 @@ func (s *Server) handleCorrectTime(w http.ResponseWriter, r *http.Request) {
 	// in -- reading it as UTC would move every correction by an hour or two
 	// depending on the season.
 	loc := s.shopLocation(r)
-	const layout = "2006-01-02T15:04"
-
-	started, err := time.ParseInLocation(layout, r.FormValue("started_at"), loc)
+	started, err := parseWallClock(r.FormValue("started_at"), loc, r.FormValue("started_was"))
 	if err != nil {
-		s.renderError(w, r, http.StatusBadRequest, "That start time did not parse", "Use the picker.")
+		s.renderError(w, r, http.StatusBadRequest, "That start time will not do", err.Error())
 		return
 	}
-	ended, err := time.ParseInLocation(layout, r.FormValue("ended_at"), loc)
+	ended, err := parseWallClock(r.FormValue("ended_at"), loc, r.FormValue("ended_was"))
 	if err != nil {
-		s.renderError(w, r, http.StatusBadRequest, "That end time did not parse", "Use the picker.")
+		s.renderError(w, r, http.StatusBadRequest, "That end time will not do", err.Error())
 		return
 	}
 
@@ -68,21 +69,41 @@ func (s *Server) handleCorrectTime(w http.ResponseWriter, r *http.Request) {
 }
 
 // shopLocation returns the shop's timezone, falling back to UTC.
+func (s *Server) shopLocation(*http.Request) *time.Location { return s.zone() }
+
+// wallClockLayout is what a datetime-local control sends and is given.
+const wallClockLayout = "2006-01-02T15:04"
+
+// parseWallClock reads a time a person typed, as a wall clock in the shop's
+// zone -- never the browser's: a datetime-local control has no zone at all,
+// and the page writes the shop's wall clock into it.
 //
-// Stored times are UTC; this is only for reading what a person typed and for
-// showing it back. A shop whose timezone is misconfigured gets UTC rather
-// than an error, because a wrong offset is better than a page that will not
-// load.
-func (s *Server) shopLocation(r *http.Request) *time.Location {
-	name, err := workshop.ShopTimezone(r.Context(), s.pool, s.shop())
-	if err != nil {
-		s.log.Warn("read shop timezone", "error", err)
-		return time.UTC
+// was is the instant the control was filled with, as RFC 3339. A field sent
+// back unchanged keeps exactly that instant. Without it the second 02:30 on
+// the night the clocks go back could not be saved without moving an hour,
+// because the wall clock alone does not say which 02:30 it was.
+//
+// Otherwise, at the two hours a year a wall clock is not one instant:
+//   - a time that does not exist -- 02:30 the night the clocks go forward --
+//     is refused, rather than quietly becoming 03:30 or 01:30;
+//   - a time that exists twice -- 02:30 the night they go back -- is the
+//     earlier of the two.
+func parseWallClock(value string, loc *time.Location, was string) (time.Time, error) {
+	if prev, err := time.Parse(time.RFC3339, was); err == nil && prev.In(loc).Format(wallClockLayout) == value {
+		return prev, nil
 	}
-	loc, err := time.LoadLocation(name)
+	t, err := time.ParseInLocation(wallClockLayout, value, loc)
 	if err != nil {
-		s.log.Warn("unknown timezone", "timezone", name, "error", err)
-		return time.UTC
+		return time.Time{}, errors.New("use the picker: a date and a time")
 	}
-	return loc
+	if t.In(loc).Format(wallClockLayout) != value {
+		return time.Time{}, fmt.Errorf("%s does not exist here: the clocks went forward that night", strings.Replace(value, "T", " ", 1))
+	}
+	// The same wall clock an hour either side means it happened twice.
+	for _, other := range []time.Time{t.Add(-time.Hour), t.Add(time.Hour)} {
+		if other.In(loc).Format(wallClockLayout) == value && other.Before(t) {
+			t = other
+		}
+	}
+	return t, nil
 }

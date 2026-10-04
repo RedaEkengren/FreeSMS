@@ -166,7 +166,12 @@ func ExportAccounting(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 		}
 
 		file.Program, file.ProgramVer = "FreeSMS", "1"
-		file.Generated = time.Now()
+		// Dates in the file are the shop's calendar, which from is in. An
+		// instant formatted as it comes from the database is UTC: an invoice
+		// issued at half past midnight on the first was booked on the last
+		// day of the month before, in the wrong period of the accounts.
+		books := from.Location()
+		file.Generated = time.Now().In(books)
 		file.YearFrom = time.Date(from.Year(), 1, 1, 0, 0, 0, 0, from.Location())
 		file.YearTo = time.Date(from.Year(), 12, 31, 0, 0, 0, 0, from.Location())
 		file.Accounts = names
@@ -216,7 +221,7 @@ func ExportAccounting(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			file.Verifications = append(file.Verifications, sie.Verification{
 				Series:  d.series,
 				Number:  fmt.Sprintf("%d", d.number),
-				Date:    d.issued,
+				Date:    d.issued.In(books),
 				Text:    text,
 				Entries: entries,
 			})

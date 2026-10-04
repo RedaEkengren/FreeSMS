@@ -56,6 +56,11 @@ type Server struct {
 	// setup can change.
 	resolvedCurrency string
 
+	// The shop's timezone, read with the currency and for the same reason.
+	// Every time a person reads or types is a wall clock in this zone; every
+	// time stored is an instant. Nil until a shop resolves, which is UTC.
+	resolvedZone *time.Location
+
 	// Signalled when the shop is set after start-up, for whatever runs in the
 	// background and needs to know -- the retention sweep. Buffered by one
 	// and never blocked on: a signal nobody has read yet already says it.
@@ -143,6 +148,21 @@ func (s *Server) setShop(id string) {
 	// Best effort, and on its own connection: a shop that cannot be read is
 	// already failing louder elsewhere, and a page with no currency symbol is
 	// better than no page.
+	if id == "" {
+		return
+	}
+	zone := time.UTC
+	if name, err := workshop.ShopTimezone(context.Background(), s.pool, id); err != nil {
+		s.log.Warn("read shop timezone", "error", err)
+	} else if loc, err := time.LoadLocation(name); err != nil {
+		s.log.Warn("unknown timezone", "timezone", name, "error", err)
+	} else {
+		zone = loc
+	}
+	s.mu.Lock()
+	s.resolvedZone = zone
+	s.mu.Unlock()
+
 	currency, err := workshop.ShopCurrency(context.Background(), s.pool, id)
 	if err != nil {
 		s.log.Warn("read shop currency", "error", err)
@@ -151,6 +171,17 @@ func (s *Server) setShop(id string) {
 	s.mu.Lock()
 	s.resolvedCurrency = currency
 	s.mu.Unlock()
+}
+
+// zone is the shop's timezone, or UTC before there is a shop or when it
+// cannot be read: a wrong offset is better than a page that will not load.
+func (s *Server) zone() *time.Location {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.resolvedZone == nil {
+		return time.UTC
+	}
+	return s.resolvedZone
 }
 
 // New returns a Server. It does not listen; that is Run's job.

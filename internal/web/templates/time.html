@@ -12,18 +12,20 @@ been.</p>
     <a href="/jobs/{{.WorkOrderID}}">#{{.Number}} {{.Registration}}</a>
     <span class="tag late">{{.Hours}} h</span>
   </div>
-  <div class="waiting">{{.UserName}} &middot; {{.StartedAt.Format "2 Jan 15:04"}}</div>
+  <div class="waiting">{{.UserName}} &middot; {{($.Local .StartedAt).Format "2 Jan 15:04"}}</div>
   {{if .Note}}<div class="waiting">{{.Note}}</div>{{end}}
   <form method="post" action="/time/correct" style="margin-top:0.75rem">
     <input type="hidden" name="entry_id" value="{{.ID}}">
     <div class="pair">
       <label>
         <span>Started</span>
-        <input type="datetime-local" name="started_at" value="{{.StartedAt.Format "2006-01-02T15:04"}}" required>
+        <input type="datetime-local" name="started_at" value="{{($.Local .StartedAt).Format "2006-01-02T15:04"}}" required>
+        <input type="hidden" name="started_was" value="{{$.Instant .StartedAt}}">
       </label>
       <label>
         <span>Ended</span>
-        <input type="datetime-local" name="ended_at" value="{{if .EndedAt}}{{.EndedAt.Format "2006-01-02T15:04"}}{{end}}" required>
+        <input type="datetime-local" name="ended_at" value="{{if .EndedAt}}{{($.Local .EndedAt).Format "2006-01-02T15:04"}}{{end}}" required>
+        <input type="hidden" name="ended_was" value="{{$.Instant .EndedAt}}">
       </label>
     </div>
     <label>
@@ -49,10 +51,10 @@ been.</p>
         {{if .Running}}running{{else}}{{.Hours}} h{{end}}
       </span>
     </div>
-    <div class="waiting">{{.StartedAt.Format "Mon 2 Jan 15:04"}}</div>
+    <div class="waiting">{{($.Local .StartedAt).Format "Mon 2 Jan 15:04"}}</div>
     {{if .Corrected}}
       <div class="waiting">Corrected by {{.CorrectedBy}} — was
-      {{.OriginalStart.Format "15:04"}}{{if .OriginalEnd}}–{{.OriginalEnd.Format "15:04"}}{{end}}</div>
+      {{($.Local .OriginalStart).Format "15:04"}}{{if .OriginalEnd}}–{{($.Local .OriginalEnd).Format "15:04"}}{{end}}</div>
     {{end}}
     {{if .Note}}<div class="waiting">{{.Note}}</div>{{end}}
   </li>

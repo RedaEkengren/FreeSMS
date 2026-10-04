@@ -18,8 +18,8 @@
       {{end}}
     </div>
     <div class="waiting">
-      <div>{{.IssuedAt.Format "2 Jan 2006"}}</div>
-      {{if .Seller.Known}}<div>{{$.T "Due"}} {{.Due.Format "2 Jan 2006"}}</div>{{end}}
+      <div>{{($.Local .IssuedAt).Format "2 Jan 2006"}}</div>
+      {{if .Seller.Known}}<div>{{$.T "Due"}} {{($.Due .).Format "2 Jan 2006"}}</div>{{end}}
     </div>
   </div>
 

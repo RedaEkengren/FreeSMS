@@ -339,3 +339,47 @@ func TestAnUnknownVATRateIsRefusedNotGuessed(t *testing.T) {
 		t.Errorf("exporting a ten per cent line = %v, want ErrUnsupportedVATRate", err)
 	}
 }
+
+// A voucher is dated on the shop's calendar. An invoice issued at half past
+// midnight on 1 November in Stockholm is 23:30 on 31 October in UTC, and it
+// was booked on the 31st: in the November file, dated October, in the wrong
+// period of the accounts.
+func TestAVoucherIsDatedOnTheShopsCalendar(t *testing.T) {
+	// The server runs in UTC; a developer's machine in Stockholm would hide
+	// this, because the database driver hands times back in the process's
+	// zone. Not parallel, and put back after.
+	was := time.Local
+	time.Local = time.UTC
+	t.Cleanup(func() { time.Local = was })
+
+	pool := setup(t)
+	addTechnician(t, pool)
+	ctx := context.Background()
+
+	inv, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	// An issued invoice cannot be changed, by trigger. This test database is
+	// thrown away, so the trigger steps aside long enough to put the invoice
+	// at the edge of the month.
+	if _, err := pool.Exec(ctx, `
+		ALTER TABLE invoices DISABLE TRIGGER invoices_immutable;
+		UPDATE invoices SET issued_at = '2026-10-31T23:30:00Z';
+		ALTER TABLE invoices ENABLE TRIGGER invoices_immutable;`); err != nil {
+		t.Fatalf("move the invoice: %v", err)
+	}
+
+	stockholm, _ := time.LoadLocation("Europe/Stockholm")
+	from := time.Date(2026, 11, 1, 0, 0, 0, 0, stockholm)
+	body, count, err := workshop.ExportAccounting(ctx, pool, advisor(), from, from.AddDate(0, 1, 0), false)
+	if err != nil {
+		t.Fatalf("ExportAccounting: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("exported %d documents, want the one issued just after midnight on 1 November", count)
+	}
+	if !bytes.Contains(body, []byte(`#VER "A" "1" 20261101`)) {
+		t.Errorf("%s is not dated 1 November:\n%s", inv.Reference(), body)
+	}
+}

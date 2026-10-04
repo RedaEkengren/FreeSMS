@@ -618,8 +618,13 @@ func (s Seller) Known() bool { return s.Name != "" }
 // Due is when the invoice falls due: the issue date plus the terms that were
 // frozen with it. Arithmetic on two frozen values, so opening the document in
 // March gives the same answer it gave in January.
-func (d Document) Due() time.Time {
-	return d.IssuedAt.AddDate(0, 0, d.Seller.PaymentTermsDays)
+func (d Document) Due() time.Time { return d.DueIn(time.UTC) }
+
+// DueIn counts the payment terms in days on the calendar of loc. Added to the
+// issue time in UTC, a fortnight across the night the clocks change lands an
+// hour off, which near midnight is a different date on the invoice.
+func (d Document) DueIn(loc *time.Location) time.Time {
+	return d.IssuedAt.In(loc).AddDate(0, 0, d.Seller.PaymentTermsDays)
 }
 
 // DocumentLine is one frozen line.

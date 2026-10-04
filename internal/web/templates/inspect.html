@@ -84,7 +84,7 @@
   {{range .Shares}}
   <li>
     <div class="row">
-      <span>Made {{.CreatedAt.Format "2 Jan 15:04"}}</span>
+      <span>Made {{($.Local .CreatedAt).Format "2 Jan 15:04"}}</span>
       {{if .Usable}}<span class="tag pass">open</span>{{else}}<span class="tag">closed</span>{{end}}
     </div>
     {{if .Usable}}
