@@ -1,0 +1,48 @@
+{{define "content"}}
+<p><a href="/stock">{{.T "Back to stock"}}</a></p>
+{{if .Catalogue.ID}}<h1>{{.Catalogue.Number}} &middot; {{.Catalogue.Name}}</h1>{{else}}<h1>{{.T "Add a part"}}</h1>{{end}}
+{{if not .Catalogue.Active}}<p class="error">{{.T "Retired: not listed, not offered on a job, not found by the scanner."}}</p>{{end}}
+{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+
+<form method="post" action="/stock/parts{{if .Catalogue.ID}}/{{.Catalogue.ID}}{{end}}"
+      data-keep="part:{{if .Catalogue.ID}}{{.Catalogue.ID}}{{else}}new{{end}}">
+  <div class="pair">
+    <label><span>{{.T "Number"}}</span><input name="number" value="{{.Catalogue.Number}}" required></label>
+    <label><span>{{.T "Name"}}</span><input name="name" value="{{.Catalogue.Name}}" required></label>
+  </div>
+  <div class="pair">
+    <label>
+      <span>{{.T "Counted in"}}</span>
+      <select name="unit">
+        {{range .Units}}<option value="{{.}}"{{if eq . $.Catalogue.Unit}} selected{{end}}>{{$.T .}}</option>{{end}}
+      </select>
+    </label>
+    <label><span>{{.T "Shelf"}}</span><input name="location" value="{{.Catalogue.Location}}" placeholder="A2"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "Cost, excluding VAT"}}</span><input name="cost" value="{{with .Catalogue.CostMinor}}{{fmt .}}{{end}}" inputmode="decimal"></label>
+    <label><span>{{.T "Price, excluding VAT"}}</span><input name="price" value="{{with .Catalogue.PriceMinor}}{{fmt .}}{{end}}" inputmode="decimal"></label>
+  </div>
+  <p class="waiting">{{.T "A blank price is worked out from the cost and the markup bands."}}</p>
+  <label><span>{{.T "Order more at"}}</span><input name="minimum" value="{{.Catalogue.Minimum}}" inputmode="decimal"></label>
+  <label>
+    <span>{{.T "Barcodes and other numbers, one per line"}}</span>
+    <textarea name="codes" rows="4">{{.Catalogue.CodesText}}</textarea>
+  </label>
+  <p class="waiting">{{.T "The scanner finds the part by its number or by any of these."}}</p>
+  <button type="submit">{{if .Catalogue.ID}}{{.T "Save the part"}}{{else}}{{.T "Add the part"}}{{end}}</button>
+</form>
+
+{{if .Catalogue.ID}}
+<form method="post" action="/stock/parts/{{.Catalogue.ID}}/active" style="margin-top:1.5rem">
+  {{if .Catalogue.Active}}
+  <input type="hidden" name="active" value="no">
+  <button type="submit" class="secondary">{{.T "Retire it"}}</button>
+  <p class="waiting">{{.T "Retired, not deleted: its movements and the jobs it was on keep pointing at it."}}</p>
+  {{else}}
+  <input type="hidden" name="active" value="yes">
+  <button type="submit" class="secondary">{{.T "Use it again"}}</button>
+  {{end}}
+</form>
+{{end}}
+{{end}}

@@ -684,6 +684,69 @@
     },
     "Note": {
       "other": "Anteckning"
+    },
+    "Back to stock": {
+      "other": "Tillbaka till lagret"
+    },
+    "Add a part": {
+      "other": "Lägg upp en artikel"
+    },
+    "Retired: not listed, not offered on a job, not found by the scanner.": {
+      "other": "Ur bruk: visas inte, erbjuds inte på jobb och hittas inte av skannern."
+    },
+    "Number": {
+      "other": "Nummer"
+    },
+    "Counted in": {
+      "other": "Räknas i"
+    },
+    "Shelf": {
+      "other": "Hylla"
+    },
+    "Cost, excluding VAT": {
+      "other": "Inköpspris, exkl. moms"
+    },
+    "Price, excluding VAT": {
+      "other": "Pris, exkl. moms"
+    },
+    "A blank price is worked out from the cost and the markup bands.": {
+      "other": "Lämnas priset tomt räknas det fram ur inköpspriset och påslagen."
+    },
+    "Order more at": {
+      "other": "Beställ mer vid"
+    },
+    "Barcodes and other numbers, one per line": {
+      "other": "Streckkoder och andra nummer, ett per rad"
+    },
+    "The scanner finds the part by its number or by any of these.": {
+      "other": "Skannern hittar artikeln på numret eller på någon av dessa."
+    },
+    "Save the part": {
+      "other": "Spara artikeln"
+    },
+    "Add the part": {
+      "other": "Lägg upp artikeln"
+    },
+    "Retired, not deleted: its movements and the jobs it was on keep pointing at it.": {
+      "other": "Tas ur bruk, raderas inte: dess rörelser och jobben den användes på pekar fortfarande på den."
+    },
+    "Retired": {
+      "other": "Ur bruk"
+    },
+    "each": {
+      "other": "styck"
+    },
+    "litre": {
+      "other": "liter"
+    },
+    "metre": {
+      "other": "meter"
+    },
+    "kilogram": {
+      "other": "kilo"
+    },
+    "hour": {
+      "other": "timme"
     }
   },
   "name": "Svenska"

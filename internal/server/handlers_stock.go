@@ -24,6 +24,10 @@ func (s *Server) handleStock(w http.ResponseWriter, r *http.Request) {
 	sort.SliceStable(parts, func(i, j int) bool {
 		return partUrgency(parts[i]) < partUrgency(parts[j])
 	})
+	retired, err := workshop.RetiredParts(r.Context(), s.pool, session.Scope)
+	if err != nil {
+		s.log.Error("retired parts", "error", err)
+	}
 	bands, err := workshop.PriceBands(r.Context(), s.pool, session.Scope)
 	if err != nil {
 		s.log.Error("price bands", "error", err)
@@ -44,12 +48,13 @@ func (s *Server) handleStock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, r, http.StatusOK, "stock", pageData{
-		Title:      "Stock",
-		Session:    session,
-		Parts:      parts,
-		PriceBands: bands,
-		WriteOffs:  writeOffs,
-		Reasons:    workshop.WriteOffReasons(),
+		Title:        "Stock",
+		Session:      session,
+		Parts:        parts,
+		PriceBands:   bands,
+		RetiredParts: retired,
+		WriteOffs:    writeOffs,
+		Reasons:      workshop.WriteOffReasons(),
 	})
 }
 

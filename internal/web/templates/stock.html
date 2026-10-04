@@ -15,6 +15,7 @@ wrongly ordered parts cost.</p>
 {{end}}
 
 <h2>Parts</h2>
+<p><a href="/stock/parts/new">{{.T "Add a part"}}</a></p>
 {{if not .Parts}}
   <p class="empty">Nothing stocked yet.</p>
 {{else}}
@@ -26,7 +27,7 @@ wrongly ordered parts cost.</p>
 {{range .Parts}}
 <div class="card">
   <div class="row">
-    <span>{{.Number}} &middot; {{.Name}}</span>
+    <a href="/stock/parts/{{.ID}}">{{.Number}} &middot; {{.Name}}</a>
     <span class="tag{{if .Negative}} late{{else if .Short}} warranty{{end}}">
       {{.OnHand}} {{.Unit}}
     </span>
@@ -83,6 +84,13 @@ wrongly ordered parts cost.</p>
   </details>
 </div>
 {{end}}
+{{end}}
+
+{{if .RetiredParts}}
+<h2>{{.T "Retired"}}</h2>
+<ul class="lines">
+  {{range .RetiredParts}}<li><a href="/stock/parts/{{.ID}}">{{.Number}} &middot; {{.Name}}</a></li>{{end}}
+</ul>
 {{end}}
 
 <h2>Markup</h2>

@@ -47,7 +47,7 @@ var swept = map[string]string{
 	"POST /labour/rate": "", "GET /time": "", "POST /time/correct": "",
 	"POST /drafts": "", "GET /drafts": "", "DELETE /drafts": "",
 	"GET /search": "", "GET /scan": "", "GET /labels": "", "GET /stock": "",
-	"POST /stock/move": "", "POST /stock/count": "", "POST /stock/bands": "", "GET /parts": "",
+	"POST /stock/move": "", "POST /stock/count": "", "GET /stock/parts/new": "", "POST /stock/parts": "", "POST /stock/bands": "", "GET /parts": "",
 	"POST /parts/arrived": "", "GET /checklists": "", "POST /checklists": "",
 
 	// The customer's link. Not a shop identifier: it is an unguessable token,
@@ -84,6 +84,9 @@ var swept = map[string]string{
 	"POST /people/{id}/erase":                     "sweep",
 	"GET /vehicles/{id}":                          "sweep",
 	"GET /checklists/{id}":                        "sweep",
+	"GET /stock/parts/{id}":                       "sweep",
+	"POST /stock/parts/{id}":                      "sweep",
+	"POST /stock/parts/{id}/active":               "sweep",
 	"POST /checklists/{id}":                       "sweep",
 	"POST /checklists/{id}/active":                "sweep",
 }
@@ -98,6 +101,7 @@ func fill(pattern string) (method, path string) {
 		"/people/{id}":      "/people/" + personB,
 		"/vehicles/{id}":    "/vehicles/" + vehicleB,
 		"/checklists/{id}":  "/checklists/" + checklistB,
+		"/stock/parts/{id}": "/stock/parts/" + partB,
 		"{itemID}":          itemB,
 		"{key}":             photoB,
 	} {

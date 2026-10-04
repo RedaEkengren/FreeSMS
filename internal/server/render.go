@@ -63,7 +63,12 @@ type pageData struct {
 	// The shop's checklists, and the one in the edit form: empty for a new
 	// one, or what was typed when a save is sent back.
 	Checklists []workshop.ChecklistTemplate
-	Checklist  workshop.ChecklistTemplate
+
+	// The part being added or changed, and the units it can be counted in.
+	Catalogue    workshop.CatalogueEntry
+	Units        []string
+	RetiredParts []workshop.CatalogueEntry
+	Checklist    workshop.ChecklistTemplate
 
 	// Shown once, straight after a link is made. The token is not stored, so
 	// there is nowhere to look it up again -- make a new link instead.
@@ -232,7 +237,7 @@ func (d pageData) N(key string, count int, args ...any) string {
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "shop", "customer", "checklists", "setup", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "shop", "customer", "checklists", "part", "setup", "error"}
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).Funcs(templateFuncs).ParseFS(web.Templates,

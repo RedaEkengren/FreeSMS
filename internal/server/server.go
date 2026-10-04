@@ -323,6 +323,11 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /stock", s.requireSession(s.handleStock))
 	mux.HandleFunc("POST /stock/move", s.requireSession(s.handleStockMove))
 	mux.HandleFunc("POST /stock/count", s.requireSession(s.handleStocktake))
+	mux.HandleFunc("GET /stock/parts/new", s.requireSession(s.handlePartForm))
+	mux.HandleFunc("POST /stock/parts", s.requireSession(s.handleSavePart))
+	mux.HandleFunc("GET /stock/parts/{id}", s.requireSession(s.handlePartForm))
+	mux.HandleFunc("POST /stock/parts/{id}", s.requireSession(s.handleSavePart))
+	mux.HandleFunc("POST /stock/parts/{id}/active", s.requireSession(s.handlePartActive))
 	mux.HandleFunc("POST /stock/bands", s.requireSession(s.handleSavePriceBand))
 
 	mux.HandleFunc("GET /parts", s.requireSession(s.handleParts))
