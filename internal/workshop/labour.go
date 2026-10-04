@@ -176,18 +176,40 @@ func SuggestFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, veh
 }
 
 // actualsFor reads what the shop really took against a stored time.
+//
+// Time is clocked against the job, not against a line: a technician presses
+// one button with a dirty hand, and the job often has no priced lines yet
+// when the work starts. It used to read time_entries.line_id, which nothing
+// ever set, so every figure here came from tests that wrote the link by hand.
+//
+// So a job counts towards an operation only when it says something about
+// that operation alone:
+//   - the operation is the job's only labour line -- a job that also had its
+//     brakes done cannot say how long the cambelt took;
+//   - the work is finished -- ready, invoiced or closed. Not "invoiced": a
+//     cambelt replaced under warranty has nothing to charge and is never
+//     invoiced, and it took as long as one the customer paid for;
+//   - no clock on it is still running.
+//
+// Every technician's time on such a job counts: two people on one cambelt
+// took the sum of their hours.
 func actualsFor(ctx context.Context, tx pgx.Tx, labourTimeID string) (ActualSpread, error) {
 	const q = `
 		SELECT count(*),
 		       coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY minutes), 0),
 		       coalesce(min(minutes), 0), coalesce(max(minutes), 0)
 		FROM (
-		    SELECT l.id,
+		    SELECT w.id,
 		           sum(extract(epoch from (t.ended_at - t.started_at)) / 60) AS minutes
-		    FROM work_order_lines l
-		    JOIN time_entries t ON t.line_id = l.id AND t.ended_at IS NOT NULL
-		    WHERE l.labour_time_id = $1
-		    GROUP BY l.id
+		    FROM work_orders w
+		    JOIN work_order_lines l ON l.work_order_id = w.id AND l.labour_time_id = $1
+		    JOIN time_entries t ON t.work_order_id = w.id
+		    WHERE (SELECT count(*) FROM work_order_lines o
+		           WHERE o.work_order_id = w.id AND o.kind = 'labour') = 1
+		      AND w.state IN ('ready', 'invoiced', 'closed')
+		      AND NOT EXISTS (SELECT 1 FROM time_entries r
+		                      WHERE r.work_order_id = w.id AND r.ended_at IS NULL)
+		    GROUP BY w.id
 		) per_job`
 	var a ActualSpread
 	var median, fastest, slowest float64

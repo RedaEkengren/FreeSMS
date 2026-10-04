@@ -660,6 +660,15 @@
     },
     "No such checklist.": {
       "other": "Listan finns inte."
+    },
+    "Nobody clocked": {
+      "other": "Ingen stämplade"
+    },
+    "sold": {
+      "other": "sålt"
+    },
+    "Sold is the labour on the jobs invoiced this period, shared by how long each person clocked on each job.": {
+      "other": "Sålt är arbetet på jobben som fakturerats under perioden, fördelat efter hur länge var och en stämplade på varje jobb."
     }
   },
   "name": "Svenska"

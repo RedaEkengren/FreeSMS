@@ -32,6 +32,10 @@ type Dashboard struct {
 	FindingsApproved int
 
 	Technicians []TechnicianTime
+
+	// Labour sold in the period on jobs nobody clocked any time on. It
+	// belongs to nobody, and is shown rather than shared out.
+	Unattributed float64
 }
 
 // Money renderers.
@@ -153,24 +157,64 @@ func Summary(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, from, 
 
 		// Per person. A part-time technician and a full-time one are not
 		// comparable on absolutes, so these are hours and not a ranking.
+		//
+		// Clocked is each person's time in the period. Billed is the labour
+		// sold on the jobs invoiced in the period -- the same hours as the
+		// shop's total -- shared out in proportion to who clocked how long on
+		// each job. Two people on one job split its hours; one person on it
+		// three times over the day is still one person.
+		//
+		// It used to join sold lines to time_entries.line_id, which nothing
+		// set, so the figure was always zero; and joined once per clocked
+		// session, so had it been set, a job clocked three times would have
+		// been sold three times.
+		//
+		// Hours sold on jobs nobody clocked belong to nobody, and are
+		// reported as that rather than spread over whoever is on the list.
+		// Like the total, only labour the customer pays for is billed:
+		// warranty and goodwill are not this shop's sale to a customer.
 		const perTech = `
+			WITH clocked AS (
+			    SELECT t.user_id,
+			           sum(extract(epoch from (
+			               least(coalesce(t.ended_at, now()), $2) - greatest(t.started_at, $1)
+			           )) / 3600) AS hours
+			    FROM time_entries t
+			    WHERE t.started_at < $2 AND coalesce(t.ended_at, now()) > $1
+			    GROUP BY t.user_id
+			), sold AS (
+			    SELECT l.work_order_id, sum(l.quantity) AS hours
+			    FROM work_order_lines l
+			    JOIN invoices i ON i.work_order_id = l.work_order_id AND i.credit_of_id IS NULL
+			    WHERE l.kind = 'labour' AND l.cost_bearer = 'customer'
+			      AND i.issued_at >= $1 AND i.issued_at < $2
+			    GROUP BY l.work_order_id
+			), worked AS (
+			    SELECT t.work_order_id, t.user_id,
+			           sum(extract(epoch from (t.ended_at - t.started_at))) AS seconds
+			    FROM time_entries t
+			    JOIN sold s ON s.work_order_id = t.work_order_id
+			    WHERE t.ended_at IS NOT NULL
+			    GROUP BY t.work_order_id, t.user_id
+			), billed AS (
+			    SELECT w.user_id,
+			           sum(s.hours * w.seconds / nullif(total.seconds, 0)) AS hours
+			    FROM worked w
+			    JOIN sold s ON s.work_order_id = w.work_order_id
+			    JOIN (SELECT work_order_id, sum(seconds) AS seconds
+			          FROM worked GROUP BY work_order_id) total
+			      ON total.work_order_id = w.work_order_id
+			    GROUP BY w.user_id
+			)
 			SELECT coalesce(p.display_name, 'unknown'),
-			       coalesce(sum(extract(epoch from (
-			           least(coalesce(t.ended_at, now()), $2) - greatest(t.started_at, $1)
-			       )) / 3600), 0),
-			       coalesce((
-			           SELECT sum(l.quantity)
-			           FROM work_order_lines l
-			           JOIN time_entries t2 ON t2.line_id = l.id AND t2.user_id = t.user_id
-			           WHERE l.kind = 'labour'
-			             AND t2.started_at < $2 AND coalesce(t2.ended_at, now()) > $1
-			       ), 0)
-			FROM time_entries t
-			LEFT JOIN users u  ON u.id = t.user_id
-			LEFT JOIN people p ON p.id = u.person_id
-			WHERE t.started_at < $2 AND coalesce(t.ended_at, now()) > $1
-			GROUP BY t.user_id, p.display_name
+			       coalesce(c.hours, 0), coalesce(b.hours, 0)
+			FROM (SELECT user_id FROM clocked UNION SELECT user_id FROM billed) who
+			LEFT JOIN clocked c ON c.user_id = who.user_id
+			LEFT JOIN billed b  ON b.user_id = who.user_id
+			LEFT JOIN users u   ON u.id = who.user_id
+			LEFT JOIN people p  ON p.id = u.person_id
 			ORDER BY 2 DESC`
+		var attributed float64
 		rows, err := tx.Query(ctx, perTech, from, to)
 		if err != nil {
 			return fmt.Errorf("read per-technician hours: %w", err)
@@ -182,6 +226,12 @@ func Summary(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, from, 
 				return fmt.Errorf("scan technician: %w", err)
 			}
 			d.Technicians = append(d.Technicians, tt)
+			attributed += tt.Billed
+		}
+		// What was sold on jobs with no clocked time. Rounded away below a
+		// minute, which is float arithmetic and not a job.
+		if u := d.HoursBilled - attributed; u > 1.0/60 {
+			d.Unattributed = u
 		}
 		return rows.Err()
 	})

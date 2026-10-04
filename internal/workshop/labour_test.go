@@ -4,9 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -86,19 +84,9 @@ func TestTheLibraryShowsWhatTheJobsReallyTook(t *testing.T) {
 		t.Error("a brand new entry already claims to know what jobs took")
 	}
 
-	// Put it on a job, clock against that line, and look again.
-	job := working(t, pool)
-	if err := workshop.AddLine(ctx, pool, advisor(), job, workshop.NewLine{
-		Kind: "labour", Description: "Front brakes", QuantityMilli: 1000,
-		UnitPriceMinor: 89500, VATRateBasis: 2500, LabourTimeID: timeID,
-	}); err != nil {
-		t.Fatalf("AddLine: %v", err)
-	}
-
-	// Two hours clocked against that line: the stored hour was optimistic.
-	if err := clockAgainstTheLine(t, pool, job, 120); err != nil {
-		t.Fatalf("clock: %v", err)
-	}
+	// Put it on a job, do the job through the ordinary screens -- two hours,
+	// the stored hour was optimistic -- and look again.
+	doneJob(t, pool, timeID, 1, "customer", []session{{technician(), 120}})
 
 	times, err := workshop.LabourTimes(ctx, pool, advisor())
 	if err != nil {
@@ -162,24 +150,4 @@ func TestTheShopsAdjustmentIsKeptApart(t *testing.T) {
 	if l.TotalMinutes() != 75 {
 		t.Errorf("total = %d, want 75", l.TotalMinutes())
 	}
-}
-
-// clockAgainstTheLine records a finished stretch of work on the job's only
-// labour line.
-func clockAgainstTheLine(t *testing.T, pool *pgxpool.Pool, jobID string, minutes int) error {
-	t.Helper()
-	ctx := context.Background()
-	return database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
-		var lineID string
-		if err := tx.QueryRow(ctx,
-			`SELECT id FROM work_order_lines WHERE work_order_id = $1 AND labour_time_id IS NOT NULL LIMIT 1`,
-			jobID).Scan(&lineID); err != nil {
-			return err
-		}
-		_, err := tx.Exec(ctx, `
-			INSERT INTO time_entries (shop_id, work_order_id, line_id, user_id, started_at, ended_at)
-			VALUES ($1, $2, $3, $4, now() - make_interval(mins => $5), now())`,
-			shopID, jobID, lineID, techUserID, minutes)
-		return err
-	})
 }
