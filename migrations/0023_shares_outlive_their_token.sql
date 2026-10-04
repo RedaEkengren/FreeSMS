@@ -1,0 +1,15 @@
+-- A customer link's token can be forgotten while the link is remembered.
+--
+-- The retention sweep deleted expired shares. A decision the customer made
+-- through a link points at the share with ON DELETE SET NULL, and a decision
+-- must name a share or a user -- a customer is not a user -- so deleting a
+-- share with a decision on it broke the check. The sweep ran in one
+-- transaction, so old login attempts, drafts and keys were rolled back with
+-- it, and every sweep after failed on the same row for good.
+--
+-- The row is the provenance: "approved through the link sent on 3 May by the
+-- front desk". The token's hash is the authority, and that is what has to
+-- go. Nullable now, so the sweep can drop the hash and keep the row. Every
+-- lookup is token_sha256 = $1, which a null never satisfies, and UNIQUE
+-- allows any number of nulls.
+ALTER TABLE inspection_shares ALTER COLUMN token_sha256 DROP NOT NULL;

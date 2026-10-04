@@ -3,6 +3,7 @@ package workshop
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -441,36 +442,64 @@ func (s SweepResult) Empty() bool { return s.LoginAttempts == 0 && s.Shares == 0
 // vehicle rather than to a person.
 func Sweep(ctx context.Context, pool *pgxpool.Pool, shopID string) (SweepResult, error) {
 	var r SweepResult
-	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx,
-			`DELETE FROM login_attempts WHERE attempted_at < now() - $1::interval`,
-			fmt.Sprintf("%d seconds", int(loginAttemptRetention.Seconds())))
-		if err != nil {
-			return fmt.Errorf("sweep login attempts: %w", err)
+	seconds := func(d time.Duration) string { return fmt.Sprintf("%d seconds", int(d.Seconds())) }
+
+	// One transaction per kind of thing, not one for all of them. A single
+	// row that would not go -- an expired link with a customer's decision on
+	// it, once -- used to roll back every other deletion with it, every day.
+	// Each step is complete on its own, so nothing is gained by tying them.
+	step := func(what string, fn func(ctx context.Context, tx pgx.Tx) error) error {
+		if err := database.InShop(ctx, pool, shopID, fn); err != nil {
+			return fmt.Errorf("sweep %s: %w", what, err)
 		}
-		r.LoginAttempts = tag.RowsAffected()
+		return nil
+	}
+
+	errs := []error{
+		step("login attempts", func(ctx context.Context, tx pgx.Tx) error {
+			tag, err := tx.Exec(ctx,
+				`DELETE FROM login_attempts WHERE attempted_at < now() - $1::interval`,
+				seconds(loginAttemptRetention))
+			r.LoginAttempts = tag.RowsAffected()
+			return err
+		}),
 
 		// Idempotency keys and drafts exist to survive a bad minute, not to be
 		// a record. Keeping them is keeping a log of what somebody was typing.
-		if _, err := tx.Exec(ctx,
-			`DELETE FROM idempotency_keys WHERE created_at < now() - $1::interval`,
-			fmt.Sprintf("%d seconds", int(idempotencyRetention.Seconds()))); err != nil {
-			return fmt.Errorf("sweep idempotency keys: %w", err)
-		}
-		if _, err := tx.Exec(ctx,
-			`DELETE FROM drafts WHERE updated_at < now() - $1::interval`,
-			fmt.Sprintf("%d seconds", int(draftRetention.Seconds()))); err != nil {
-			return fmt.Errorf("sweep drafts: %w", err)
-		}
+		step("idempotency keys", func(ctx context.Context, tx pgx.Tx) error {
+			_, err := tx.Exec(ctx,
+				`DELETE FROM idempotency_keys WHERE created_at < now() - $1::interval`,
+				seconds(idempotencyRetention))
+			return err
+		}),
+		step("drafts", func(ctx context.Context, tx pgx.Tx) error {
+			_, err := tx.Exec(ctx,
+				`DELETE FROM drafts WHERE updated_at < now() - $1::interval`,
+				seconds(draftRetention))
+			return err
+		}),
 
-		tag, err = tx.Exec(ctx,
-			`DELETE FROM inspection_shares WHERE expires_at < now() - $1::interval`,
-			fmt.Sprintf("%d seconds", int(expiredShareRetention.Seconds())))
-		if err != nil {
-			return fmt.Errorf("sweep shares: %w", err)
-		}
-		r.Shares = tag.RowsAffected()
-		return nil
-	})
-	return r, err
+		// An expired link is deleted, unless the customer decided something
+		// through it. Then the row is what says the decision came from the
+		// link, sent when and by whom, and only its token goes: the hash is
+		// the authority, the row is the record.
+		step("shares", func(ctx context.Context, tx pgx.Tx) error {
+			tag, err := tx.Exec(ctx, `
+				DELETE FROM inspection_shares s
+				WHERE s.expires_at < now() - $1::interval
+				  AND NOT EXISTS (SELECT 1 FROM inspection_decisions d WHERE d.share_id = s.id)`,
+				seconds(expiredShareRetention))
+			if err != nil {
+				return err
+			}
+			r.Shares = tag.RowsAffected()
+			tag, err = tx.Exec(ctx, `
+				UPDATE inspection_shares SET token_sha256 = NULL
+				WHERE expires_at < now() - $1::interval AND token_sha256 IS NOT NULL`,
+				seconds(expiredShareRetention))
+			r.Shares += tag.RowsAffected()
+			return err
+		}),
+	}
+	return r, errors.Join(errs...)
 }

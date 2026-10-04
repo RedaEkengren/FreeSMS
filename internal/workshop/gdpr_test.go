@@ -247,3 +247,91 @@ func (r *recordingRemover) Remove(key string) error {
 	r.removed = append(r.removed, key)
 	return nil
 }
+
+// An expired customer link that carries the customer's decision is
+// retired without losing the decision -- and without taking the rest of the
+// sweep down with it.
+//
+// The share was deleted, which set the decision's share_id to null, which a
+// customer's decision -- no user behind it -- may not have. The whole sweep
+// ran in one transaction, so the old login attempts, drafts and keys were
+// rolled back with it, and every sweep after that failed on the same row.
+func TestASweepSurvivesAnExpiredLinkWithADecision(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	_, token, itemID := shared(t, pool)
+
+	if err := workshop.RecordDecision(ctx, pool, shopID, token, itemID, "approved"); err != nil {
+		t.Fatalf("RecordDecision: %v", err)
+	}
+	oldAttempt(t, pool, shopID)
+
+	// Past its retention.
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `
+			UPDATE inspection_shares
+			SET created_at = now() - interval '400 days', expires_at = now() - interval '380 days'`)
+		return err
+	}); err != nil {
+		t.Fatalf("age the share: %v", err)
+	}
+
+	if _, err := workshop.Sweep(ctx, pool, shopID); err != nil {
+		t.Fatalf("Sweep: %v", err)
+	}
+	if n := attempts(t, pool, shopID); n != 0 {
+		t.Errorf("%d old login attempts left; the sweep's other work was lost", n)
+	}
+
+	// The decision is still there, and still says it came through a link.
+	var decision string
+	var viaLink bool
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `
+			SELECT decision, share_id IS NOT NULL FROM inspection_decisions WHERE item_id = $1`,
+			itemID).Scan(&decision, &viaLink)
+	}); err != nil {
+		t.Fatalf("read decision: %v", err)
+	}
+	if decision != "approved" || !viaLink {
+		t.Errorf("decision = %q, via a link %v; want the approval, from the link", decision, viaLink)
+	}
+
+	// And the link itself opens nothing.
+	if err := workshop.RecordDecision(ctx, pool, shopID, token, itemID, "declined"); err == nil {
+		t.Error("an expired, swept link still accepted a decision")
+	}
+}
+
+// One kind of row that will not go does not keep the others.
+//
+// Forced here with a trigger that refuses to delete drafts. The sweep reports
+// the failure, and the login attempts -- a different step -- are gone anyway.
+func TestOneStuckStepDoesNotHoldBackTheRestOfTheSweep(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	oldAttempt(t, pool, shopID)
+
+	if _, err := pool.Exec(ctx, `
+		CREATE FUNCTION refuse() RETURNS trigger LANGUAGE plpgsql AS
+		  $$ BEGIN RAISE EXCEPTION 'stuck'; END $$;
+		CREATE TRIGGER stuck BEFORE DELETE ON drafts FOR EACH ROW EXECUTE FUNCTION refuse();`); err != nil {
+		t.Fatalf("install the trigger: %v", err)
+	}
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `
+			INSERT INTO drafts (shop_id, user_id, form, fields, updated_at)
+			SELECT $1, id, 'intake', '{}', now() - interval '400 days' FROM users LIMIT 1`, shopID)
+		return err
+	}); err != nil {
+		t.Fatalf("seed a draft: %v", err)
+	}
+
+	_, err := workshop.Sweep(ctx, pool, shopID)
+	if err == nil || !strings.Contains(err.Error(), "drafts") {
+		t.Errorf("Sweep = %v, want the stuck step reported", err)
+	}
+	if n := attempts(t, pool, shopID); n != 0 {
+		t.Errorf("%d old login attempts left; a stuck step held back another", n)
+	}
+}
