@@ -44,8 +44,29 @@ func encode(s string) []byte {
 }
 
 // quote wraps a field in the quotes SIE uses, escaping what would end it.
+//
+// SIE 4B, 5.7: a quotation mark inside a field is preceded by a backslash,
+// and a text may hold no control characters, ASCII 0-31 and 127. So:
+//
+//   - a quotation mark is written \" as the specification says;
+//   - a control character -- a tab or line break pasted into a customer's
+//     name -- becomes a space. Written as it was, it ended the field: jsiSIE
+//     read "Faktura Anna<newline>Andersson" as "Faktura Anna" and said
+//     nothing, and a stricter reader drops the voucher;
+//   - a backslash becomes a slash. The specification gives it no escape, so
+//     the \\ this used to write was this project's own invention, and a
+//     backslash left as it is ends a field that finishes with one, read as
+//     the \" that opens a quotation mark.
 func quote(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.Map(func(r rune) rune {
+		switch {
+		case r < 32 || r == 127:
+			return ' '
+		case r == '\\':
+			return '/'
+		}
+		return r
+	}, s)
 	s = strings.ReplaceAll(s, `"`, `\"`)
 	return `"` + s + `"`
 }

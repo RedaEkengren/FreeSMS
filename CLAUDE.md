@@ -151,6 +151,13 @@ not exist.
   account and no setting -- and not from `Accept-Language`, because a workshop
   writes to its customers in the language it does business in.
 
+- **jsiSIE drops quotation marks inside SIE text fields.** The export writes
+  them as SIE 4B 5.7 says, `\"`, and `deploy/sie-interop.sh` checks every
+  other fact of a real export against jsiSIE -- dates, accounts, amounts,
+  Swedish characters. A customer named `"Bilen" AB` reaches an accountant
+  using a jsiSIE-based import as `Bilen AB`. It has not been checked against
+  a commercial package's import, which is the evidence still missing.
+
 - **Nothing is deployed yet, and there is no `deploy.yml`.** A workflow naming
   `DEPLOY_HOST` and `DEPLOY_SSH_KEY` when the repository has neither is dead
   code that answers "is deployment automated?" with yes. `DEPLOY.md` describes

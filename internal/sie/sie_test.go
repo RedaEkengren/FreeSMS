@@ -124,3 +124,28 @@ func TestQuotesAreEscaped(t *testing.T) {
 		t.Error("quotes inside a field were not escaped")
 	}
 }
+
+// SIE 4B, 5.7, exactly: a quotation mark is escaped with a backslash, a
+// control character never reaches the file, and a backslash -- which the
+// specification gives no escape -- is written as a slash rather than as an
+// escape of our own invention. Found by reading our export with jsiSIE: a
+// line break in a customer's name cut the voucher text off there, silently.
+func TestATextFieldHoldsOnlyWhatSIEAllows(t *testing.T) {
+	f := sample()
+	f.CompanyName = "Anna\tAndersson\r\n\"Bilen\" C:\\verkstad\\"
+	out, err := Write(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `#FNAMN "Anna Andersson  \"Bilen\" C:/verkstad/"`
+	if !bytes.Contains(out, []byte(want+"\r\n")) {
+		t.Errorf("the company line is not %s:\n%s", want, out)
+	}
+	for _, line := range bytes.Split(out, []byte("\r\n")) {
+		for _, c := range line {
+			if c < 32 || c == 127 {
+				t.Fatalf("a control character %d is in the file: %q", c, line)
+			}
+		}
+	}
+}

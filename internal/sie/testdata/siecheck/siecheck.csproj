@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Reads a SIE file with jsiSIE, a parser this project did not write, and
+       prints what it understood as JSON. internal/sie's interop test compares
+       that with what was meant. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="jsisie" Version="2.8.0" />
+  </ItemGroup>
+</Project>

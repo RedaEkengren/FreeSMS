@@ -79,7 +79,7 @@ jobs:
     # installed next to the toolchain and this is the same image the Dockerfile
     # builds with, so there is one version of Go in the repository, not two.
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -92,6 +92,14 @@ jobs:
             golang:1.27 sh -c '
               apt-get update -qq && apt-get install -y -qq zbar-tools >/dev/null &&
               go test ./internal/barcode -count=1 -v'
+
+      # The same idea for the accounts: a real SIE export -- issued, credited,
+      # exported through the application -- read by jsiSIE, a parser this
+      # project did not write, and compared with what was meant. Here because
+      # this job is where the independent readers live, which keeps the
+      # required checks to the names branch protection knows.
+      - name: SIE exports read with jsiSIE
+        run: ./deploy/sie-interop.sh
 
   image:
     # The image is built but not pushed. There is nowhere to deploy it yet, and

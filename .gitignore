@@ -19,3 +19,6 @@
 *.swp
 .idea/
 .vscode/
+# Built by deploy/sie-interop.sh inside a container, never committed.
+internal/sie/testdata/siecheck/bin/
+internal/sie/testdata/siecheck/obj/
