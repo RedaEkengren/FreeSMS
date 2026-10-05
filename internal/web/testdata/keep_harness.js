@@ -124,6 +124,7 @@ function offline({ named = true, file = false, submitter }) {
   const photo = { name: "photo", type: "file", value: "C:\\fakepath\\brake.jpg" };
   const controls = file ? [note, photo] : [note];
   const formEl = {
+    tagName: "FORM",
     action: "http://localhost/inspections/i/items/1",
     elements: controls,
     listeners: {},
@@ -139,7 +140,7 @@ function offline({ named = true, file = false, submitter }) {
     addEventListener: (type, fn) => { (listeners[type] ||= []).push(fn); },
     querySelector: (sel) =>
       sel === 'meta[name="freesms-user"]' ? { getAttribute: () => USER } : null,
-    querySelectorAll: (sel) => (sel === "form[method='post']" ? [formEl] : []),
+    querySelectorAll: () => [],
     getElementById: () => null,
     createElement: () => ({}),
   };
@@ -174,7 +175,11 @@ function offline({ named = true, file = false, submitter }) {
   (listeners.DOMContentLoaded || []).forEach((fn) => fn());
 
   let prevented = false;
-  (formEl.listeners.submit || []).forEach((fn) => fn({ submitter, preventDefault() { prevented = true; } }));
+  // The submission reaches the form's own listeners and then, bubbling, the
+  // document's, as a browser sends it.
+  const e = { target: formEl, submitter, preventDefault() { prevented = true; } };
+  (formEl.listeners.submit || []).forEach((fn) => fn(e));
+  (listeners.submit || []).forEach((fn) => fn(e));
   const queue = JSON.parse(window.localStorage.getItem("freesms.queue") || "[]");
   return { prevented, held: queue.map((it) => it.body), alerts: alerts.length };
 }

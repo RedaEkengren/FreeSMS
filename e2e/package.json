@@ -1,0 +1,8 @@
+{
+  "name": "freesms-e2e",
+  "private": true,
+  "description": "Browser tests: a real browser against a real server and an empty database. Run with deploy/browser-test.sh.",
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

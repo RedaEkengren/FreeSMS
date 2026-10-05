@@ -22,3 +22,7 @@
 # Built by deploy/sie-interop.sh inside a container, never committed.
 internal/sie/testdata/siecheck/bin/
 internal/sie/testdata/siecheck/obj/
+
+# Browser test runs leave these behind for inspection.
+e2e/node_modules/
+e2e/test-results/

@@ -410,19 +410,26 @@
   // password included -- in plain text in localStorage. A blocklist forgets
   // the next form somebody adds; an allowlist forgets nothing it was not
   // told about.
-  function guard(form) {
-    var offline = form.hasAttribute("data-offline");
-    form.addEventListener("submit", function (e) {
-      if (navigator.onLine !== false) return;
-      e.preventDefault();
-      if (!offline || !hold(form, e.submitter)) {
-        // Not something that can wait. The page stays as it is, so what
-        // was typed is still in front of the person.
-        window.alert("This needs a connection. Nothing has been sent and nothing has been stored.");
-        return;
-      }
-      window.alert("No connection. This is being held and will be sent when there is one.");
-    });
+  //
+  // Listened for on the document, not on each form. The forms that were on
+  // the page when it loaded used to get a listener each, and a form htmx
+  // swapped in later -- the shelf's search results on a job -- got none: with
+  // no connection its submission went to the browser, which showed its own
+  // offline page, and the part never reached the queue. Found by a browser
+  // test that waited for the swap; one that did not passed on the form the
+  // page started with.
+  function guard(e) {
+    var form = e.target;
+    if (!form || form.tagName !== "FORM" || (form.getAttribute("method") || "").toLowerCase() !== "post") return;
+    if (navigator.onLine !== false) return;
+    e.preventDefault();
+    if (!form.hasAttribute("data-offline") || !hold(form, e.submitter)) {
+      // Not something that can wait. The page stays as it is, so what
+      // was typed is still in front of the person.
+      window.alert("This needs a connection. Nothing has been sent and nothing has been stored.");
+      return;
+    }
+    window.alert("No connection. This is being held and will be sent when there is one.");
   }
 
   function forEachStored(fn) {
@@ -449,7 +456,7 @@
     Array.prototype.forEach.call(document.querySelectorAll("form[action='/logout']"), function (form) {
       form.addEventListener("submit", forgetMyDrafts);
     });
-    Array.prototype.forEach.call(document.querySelectorAll("form[method='post']"), guard);
+    document.addEventListener("submit", guard);
     show();
     flush();
 

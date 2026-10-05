@@ -69,6 +69,14 @@ jobs:
       - name: Roll back by image, and by dump
         run: ./deploy/rollback-test.sh
 
+      # A real browser against a real server on an empty database: setup to
+      # invoice through the forms, the offline queue, an expired session,
+      # two people on one browser, a form htmx swapped in, simultaneous
+      # invoices. The Go suite proves the parts; this proves they join up for
+      # somebody holding a browser. Here because it needs what this job has.
+      - name: Browser tests
+        run: ./deploy/browser-test.sh
+
   barcode:
     # The stock labels are decoded by a reader that shares no code with the
     # encoder. The first Code 128 table had twenty-one of its hundred and seven
