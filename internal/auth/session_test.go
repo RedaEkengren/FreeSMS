@@ -18,6 +18,10 @@ const (
 	userID = "33333333-3333-3333-3333-333333333333"
 	email  = "tech@example.test"
 	pass   = "a reasonable workshop password"
+
+	// Somebody else, doing the managing: switching yourself off is refused,
+	// so the one switching off is never the one switched off.
+	anOwner = "77777777-7777-7777-7777-777777777777"
 )
 
 // Skipped unless REDASMS_TEST_DATABASE_URL points at a database that may be
@@ -139,7 +143,7 @@ func TestDeactivationEndsSessionsImmediately(t *testing.T) {
 		t.Fatalf("the session was not usable before deactivation: %v", err)
 	}
 
-	owner := access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleOwner}
+	owner := access.Scope{ShopID: shopID, UserID: anOwner, Role: access.RoleOwner}
 	if err := Deactivate(ctx, pool, owner, userID); err != nil {
 		t.Fatalf("Deactivate() = %v", err)
 	}
@@ -271,7 +275,7 @@ func TestOnlyThoseWhoRunTheShopDeactivateAUser(t *testing.T) {
 		t.Fatalf("Login: %v", err)
 	}
 	for _, role := range []access.Role{access.RoleTechnician, access.RoleParts, access.RoleServiceAdvisor} {
-		err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: userID, Role: role}, userID)
+		err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: anOwner, Role: role}, userID)
 		if !errors.Is(err, access.ErrForbidden) {
 			t.Errorf("Deactivate as %s: %v, want forbidden", role, err)
 		}
@@ -279,10 +283,58 @@ func TestOnlyThoseWhoRunTheShopDeactivateAUser(t *testing.T) {
 	if _, err := Authenticate(ctx, pool, shopID, token); err != nil {
 		t.Errorf("a refused deactivation ended the session anyway: %v", err)
 	}
-	if err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleOwner}, userID); err != nil {
+	if err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: anOwner, Role: access.RoleOwner}, userID); err != nil {
 		t.Fatalf("Deactivate as owner: %v", err)
 	}
 	if _, err := Authenticate(ctx, pool, shopID, token); !errors.Is(err, ErrNoSession) {
 		t.Errorf("deactivated by the owner, still signed in: %v", err)
+	}
+}
+
+// Changing your own password needs the current one, keeps the session it is
+// done from and ends every other -- a password changed because a phone went
+// missing signs the phone out.
+func TestChangingYourPasswordKeepsThisSessionAndEndsTheRest(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	here, s, err := Login(ctx, pool, shopID, email, pass, "this browser")
+	if err != nil {
+		t.Fatal(err)
+	}
+	phone, _, _ := Login(ctx, pool, shopID, email, pass, "the lost phone")
+
+	if err := ChangePassword(ctx, pool, s.Scope, here, "not the password", "a new one, long enough"); !errors.Is(err, ErrRefused) {
+		t.Errorf("a wrong current password: %v, want refused", err)
+	}
+	if err := ChangePassword(ctx, pool, s.Scope, here, pass, "short"); !errors.Is(err, ErrRefused) {
+		t.Errorf("a short new password: %v, want refused", err)
+	}
+	if err := ChangePassword(ctx, pool, s.Scope, here, pass, "a new one, long enough"); err != nil {
+		t.Fatalf("ChangePassword: %v", err)
+	}
+	if _, err := Authenticate(ctx, pool, shopID, here); err != nil {
+		t.Errorf("the session it was changed from ended: %v", err)
+	}
+	if _, err := Authenticate(ctx, pool, shopID, phone); !errors.Is(err, ErrNoSession) {
+		t.Errorf("the other session survived: %v", err)
+	}
+	if _, _, err := Login(ctx, pool, shopID, email, pass, "x"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Errorf("the old password still signs in: %v", err)
+	}
+	if _, _, err := Login(ctx, pool, shopID, email, "a new one, long enough", "x"); err != nil {
+		t.Errorf("the new password does not sign in: %v", err)
+	}
+}
+
+// Nobody switches themselves off.
+func TestYouCannotSwitchYourselfOff(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleOwner}, userID)
+	if !errors.Is(err, ErrRefused) {
+		t.Errorf("switching yourself off: %v, want refused", err)
+	}
+	if _, _, err := Login(ctx, pool, shopID, email, pass, "x"); err != nil {
+		t.Errorf("a refused switch-off locked the user out: %v", err)
 	}
 }

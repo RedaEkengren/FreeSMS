@@ -28,7 +28,7 @@ var ErrAlreadySetUp = errors.New("workshop: this installation already has a shop
 // people towards Workshop1! and towards writing it on the wall by the coffee
 // machine, which is worse than a long ordinary phrase. Current guidance is to
 // require length and check nothing else.
-const MinPasswordLength = 10
+const MinPasswordLength = auth.MinPasswordLength
 
 // NeedsSetup reports whether this installation has no shop yet.
 func NeedsSetup(ctx context.Context, pool *pgxpool.Pool) (bool, error) {

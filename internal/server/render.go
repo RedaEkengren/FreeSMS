@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/auth"
 	"github.com/RedaEkengren/FreeSMS/internal/i18n"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
@@ -108,8 +109,14 @@ type pageData struct {
 	CanLookUp bool
 	Form      intakeForm
 
-	// Setup only.
+	// Setup, staff and the account page.
 	MinPassword int
+
+	// The staff page, and the account page's answer.
+	Staff     []workshop.StaffMember
+	StaffForm staffForm
+	Roles     []access.Role
+	Changed   bool
 }
 
 // intakeForm keeps what was typed when a submission is sent back with an
@@ -237,7 +244,7 @@ func (d pageData) N(key string, count int, args ...any) string {
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "shop", "customer", "checklists", "part", "setup", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "shop", "customer", "checklists", "part", "staff", "account", "setup", "error"}
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).Funcs(templateFuncs).ParseFS(web.Templates,

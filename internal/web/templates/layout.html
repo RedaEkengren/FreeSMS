@@ -17,7 +17,8 @@
     {{if .Session.Scope.Role.SeesParts}}<a href="/parts" class="nav">{{.T "Parts"}}</a>
     <a href="/stock" class="nav">{{.T "Stock"}}</a>
     <a href="/scan" class="nav">{{.T "Scan"}}</a>{{end}}
-    {{if .Session.Scope.Role.RunsTheShop}}<a href="/shop" class="nav">{{.T "The workshop"}}</a>{{end}}
+    {{if .Session.Scope.Role.RunsTheShop}}<a href="/shop" class="nav">{{.T "The workshop"}}</a>
+    <a href="/staff" class="nav">{{.T "Staff"}}</a>{{end}}
     {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/figures" class="nav">{{.T "Figures"}}</a>
     <a href="/accounting" class="nav">{{.T "Accounting"}}</a>
     <a href="/privacy" class="nav">{{.T "Privacy"}}</a>{{end}}
@@ -28,7 +29,9 @@
     <a href="/search" class="nav">{{.T "Search"}}</a>
   </nav>
   <form method="post" action="/logout" style="margin:0">
-    <span class="who">{{.T .Session.Scope.Role.Label}}</span>
+    {{/* The role, and the way to one's own account: changing the password
+         the owner typed in is the first thing anybody new should do. */}}
+    <a href="/account" class="who">{{.T .Session.Scope.Role.Label}}</a>
     <button class="link" type="submit">{{.T "Sign out"}}</button>
   </form>
 </header>

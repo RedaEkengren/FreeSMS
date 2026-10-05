@@ -276,6 +276,12 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /invoices/{id}", s.requireSession(s.handleInvoiceDocument))
 
 	mux.HandleFunc("POST /jobs/{id}/inspect", s.requireSession(s.handleStartInspection))
+	mux.HandleFunc("GET /staff", s.requireSession(s.handleStaff))
+	mux.HandleFunc("POST /staff", s.requireSession(s.handleAddStaff))
+	mux.HandleFunc("POST /staff/{id}/active", s.requireSession(s.handleStaffActive))
+	mux.HandleFunc("POST /staff/{id}/password", s.requireSession(s.handleStaffPassword))
+	mux.HandleFunc("GET /account", s.requireSession(s.handleAccount))
+	mux.HandleFunc("POST /account/password", s.requireSession(s.handleChangePassword))
 	mux.HandleFunc("GET /checklists", s.requireSession(s.handleChecklists))
 	mux.HandleFunc("POST /checklists", s.requireSession(s.handleSaveChecklist))
 	mux.HandleFunc("GET /checklists/{id}", s.requireSession(s.handleChecklists))

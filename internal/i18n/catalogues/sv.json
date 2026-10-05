@@ -750,6 +750,72 @@
     },
     "No price yet": {
       "other": "Inget pris än"
+    },
+    "Staff": {
+      "other": "Personal"
+    },
+    "Everybody who signs in, and what they can see. A technician sees the vehicle and the job; customers' details are the front desk's.": {
+      "other": "Alla som loggar in, och vad de ser. En tekniker ser bilen och jobbet; kunduppgifterna är receptionens."
+    },
+    "Who signs in": {
+      "other": "Vem som loggar in"
+    },
+    "you": {
+      "other": "du"
+    },
+    "switched off": {
+      "other": "avstängd"
+    },
+    "A new password to hand over": {
+      "other": "Ett nytt lösenord att lämna över"
+    },
+    "Set the password": {
+      "other": "Sätt lösenordet"
+    },
+    "Switch off": {
+      "other": "Stäng av"
+    },
+    "Switch back on": {
+      "other": "Slå på igen"
+    },
+    "Add somebody": {
+      "other": "Lägg till någon"
+    },
+    "Email, which they sign in with": {
+      "other": "E-post, som de loggar in med"
+    },
+    "Role": {
+      "other": "Roll"
+    },
+    "A first password to hand over": {
+      "other": "Ett första lösenord att lämna över"
+    },
+    "They change it on their own page once they have signed in.": {
+      "other": "De byter det på sin egen sida när de har loggat in."
+    },
+    "Add them": {
+      "other": "Lägg till"
+    },
+    "Your account": {
+      "other": "Ditt konto"
+    },
+    "Changed. You are still signed in here; everywhere else you were signed in has been signed out.": {
+      "other": "Bytt. Du är fortfarande inloggad här; överallt annars har du loggats ut."
+    },
+    "Change your password": {
+      "other": "Byt lösenord"
+    },
+    "Your current password": {
+      "other": "Ditt nuvarande lösenord"
+    },
+    "A new one": {
+      "other": "Ett nytt"
+    },
+    "Change it": {
+      "other": "Byt det"
+    },
+    "Account": {
+      "other": "Konto"
     }
   },
   "name": "Svenska"

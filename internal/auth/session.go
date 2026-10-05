@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"unicode/utf8"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
@@ -261,7 +262,33 @@ func Deactivate(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, use
 	if !scope.Role.RunsTheShop() {
 		return access.ErrForbidden
 	}
+	if userID == scope.UserID {
+		return fmt.Errorf("%w: you cannot switch yourself off", ErrRefused)
+	}
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// The owners are locked while this is decided, so two owners switching
+		// each other off at once cannot both succeed and leave nobody.
+		var role string
+		if err := tx.QueryRow(ctx, `SELECT role FROM users WHERE id = $1`, userID).Scan(&role); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrNoSuchUser
+			}
+			return fmt.Errorf("read user: %w", err)
+		}
+		if role == string(access.RoleOwner) {
+			var others int
+			if err := tx.QueryRow(ctx, `
+				SELECT count(*) FROM (
+				    SELECT id FROM users WHERE role = 'owner' AND active AND id <> $1 FOR UPDATE
+				) o`, userID).Scan(&others); err != nil {
+				return fmt.Errorf("count owners: %w", err)
+			}
+			if others == 0 {
+				// A workshop with no owner who can sign in cannot add one back:
+				// managing staff is the owner's.
+				return fmt.Errorf("%w: that is the last owner who can sign in", ErrRefused)
+			}
+		}
 		const off = `UPDATE users SET active = false, deactivated_at = now() WHERE id = $1`
 		if _, err := tx.Exec(ctx, off, userID); err != nil {
 			return fmt.Errorf("deactivate user: %w", err)
@@ -316,4 +343,93 @@ func RevokeAll(ctx context.Context, pool *pgxpool.Pool) (int64, error) {
 		}
 	}
 	return ended, nil
+}
+
+// MinPasswordLength is the shortest password accepted anywhere: setup, a new
+// colleague, a changed password. One number, here, so the three cannot drift.
+const MinPasswordLength = 10
+
+// ErrRefused is a request that is understood and will not be done, with the
+// reason in the message.
+var ErrRefused = errors.New("auth: refused")
+
+// ErrNoSuchUser is a user that is not in this shop.
+var ErrNoSuchUser = errors.New("auth: no such user")
+
+// SetPassword gives a colleague a new password, for whoever runs the shop --
+// somebody forgot theirs. Their sessions end: a new password is often the
+// answer to "somebody else knows it".
+func SetPassword(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, userID, password string) error {
+	if !scope.Role.RunsTheShop() {
+		return access.ErrForbidden
+	}
+	hash, err := admittedHash(ctx, password)
+	if err != nil {
+		return err
+	}
+	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `UPDATE users SET password_hash = $2 WHERE id = $1`, userID, hash)
+		if err != nil {
+			return fmt.Errorf("set password: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			return ErrNoSuchUser
+		}
+		_, err = tx.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, userID)
+		return err
+	})
+}
+
+// ChangePassword is anybody changing their own, which needs the current one.
+// The session it is done from stays; every other one ends, so a password
+// changed because a phone went missing also signs the phone out.
+func ChangePassword(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, token, current, next string) error {
+	if err := scope.Validate(); err != nil {
+		return err
+	}
+	var stored string
+	if err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT password_hash FROM users WHERE id = $1`, scope.UserID).Scan(&stored)
+	}); err != nil {
+		return fmt.Errorf("read password: %w", err)
+	}
+	release, err := Admit(ctx)
+	if err != nil {
+		return err
+	}
+	verifyErr := VerifyPassword(stored, current)
+	release()
+	if verifyErr != nil {
+		return fmt.Errorf("%w: that is not your current password", ErrRefused)
+	}
+	hash, err := admittedHash(ctx, next)
+	if err != nil {
+		return err
+	}
+	keep := sha256.Sum256([]byte(token))
+	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `UPDATE users SET password_hash = $2 WHERE id = $1`, scope.UserID, hash); err != nil {
+			return fmt.Errorf("change password: %w", err)
+		}
+		_, err := tx.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1 AND token_sha256 <> $2`, scope.UserID, keep[:])
+		return err
+	})
+}
+
+// HashNew checks a new password and hashes it under admission control, for
+// whoever creates a user.
+func HashNew(ctx context.Context, password string) (string, error) {
+	return admittedHash(ctx, password)
+}
+
+func admittedHash(ctx context.Context, password string) (string, error) {
+	if utf8.RuneCountInString(password) < MinPasswordLength {
+		return "", fmt.Errorf("%w: a password needs at least %d characters", ErrRefused, MinPasswordLength)
+	}
+	release, err := Admit(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer release()
+	return HashPassword(password)
 }

@@ -25,7 +25,8 @@ var everyRole = map[string]string{
 	"CompleteIdempotency": "the caller's own request key",
 	"ReleaseIdempotency":  "the caller's own request key",
 	"ClockIn":             "the caller's own clock", "ClockOut": "the caller's own clock",
-	"MyTime": "the caller's own hours",
+	"MyTime":         "the caller's own hours",
+	"ChangePassword": "the caller's own password, checked against the current one",
 
 	// The job as the person holding the spanner sees it. Job carries the
 	// vehicle and the work, and no customer field exists on it to leak.

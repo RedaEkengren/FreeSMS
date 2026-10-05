@@ -1,0 +1,59 @@
+{{define "content"}}
+<h1>{{.T "Staff"}}</h1>
+<p class="waiting">{{.T "Everybody who signs in, and what they can see. A technician sees the vehicle and the job; customers' details are the front desk's."}}</p>
+{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+
+<div class="split">
+<div class="side">
+<h2>{{.T "Who signs in"}}</h2>
+<ul class="lines">
+  {{range .Staff}}
+  <li>
+    <div class="row">
+      <span>{{.Name}}{{if .You}} ({{$.T "you"}}){{end}}</span>
+      <span class="tag">{{$.T .Role.Label}}</span>
+    </div>
+    <div class="waiting">{{.Email}}{{if not .Active}} &middot; {{$.T "switched off"}}{{end}}</div>
+    {{if not .You}}
+    <details style="margin-top:0.5rem">
+      <summary>{{$.T "Change"}}</summary>
+      <form method="post" action="/staff/{{.UserID}}/password" style="margin-top:0.5rem">
+        <label><span>{{$.T "A new password to hand over"}}</span>
+          <input type="password" name="password" autocomplete="new-password" minlength="{{$.MinPassword}}" required></label>
+        <button type="submit" class="secondary">{{$.T "Set the password"}}</button>
+      </form>
+      <form method="post" action="/staff/{{.UserID}}/active" style="margin-top:0.5rem">
+        {{if .Active}}
+        <input type="hidden" name="active" value="no">
+        <button type="submit" class="secondary">{{$.T "Switch off"}}</button>
+        {{else}}
+        <input type="hidden" name="active" value="yes">
+        <button type="submit" class="secondary">{{$.T "Switch back on"}}</button>
+        {{end}}
+      </form>
+    </details>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+</div>
+
+<div class="main">
+<h2>{{.T "Add somebody"}}</h2>
+<form method="post" action="/staff">
+  <label><span>{{.T "Name"}}</span><input name="name" value="{{.StaffForm.Name}}" required></label>
+  <label><span>{{.T "Email, which they sign in with"}}</span><input type="email" name="email" value="{{.StaffForm.Email}}" autocomplete="off" required></label>
+  <label>
+    <span>{{.T "Role"}}</span>
+    <select name="role">
+      {{range .Roles}}<option value="{{.}}"{{if eq (print .) $.StaffForm.Role}} selected{{end}}>{{$.T .Label}}</option>{{end}}
+    </select>
+  </label>
+  <label><span>{{.T "A first password to hand over"}}</span>
+    <input type="password" name="password" autocomplete="new-password" minlength="{{.MinPassword}}" required></label>
+  <p class="waiting">{{.T "They change it on their own page once they have signed in."}}</p>
+  <button type="submit">{{.T "Add them"}}</button>
+</form>
+</div>
+</div>
+{{end}}

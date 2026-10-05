@@ -1,0 +1,13 @@
+{{define "content"}}
+<h1>{{.T "Your account"}}</h1>
+{{if .Changed}}<p class="waiting">{{.T "Changed. You are still signed in here; everywhere else you were signed in has been signed out."}}</p>{{end}}
+{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+<h2>{{.T "Change your password"}}</h2>
+<form method="post" action="/account/password">
+  <label><span>{{.T "Your current password"}}</span>
+    <input type="password" name="current" autocomplete="current-password" required></label>
+  <label><span>{{.T "A new one"}}</span>
+    <input type="password" name="password" autocomplete="new-password" minlength="{{.MinPassword}}" required></label>
+  <button type="submit">{{.T "Change it"}}</button>
+</form>
+{{end}}
