@@ -164,6 +164,11 @@ not exist.
 - **A green deploy is not a live service.** The deploy ends by fetching a
   health endpoint that touches the database, not by trusting that the container
   started.
+- **Every migration from `0024` on starts with `-- rollback: safe` or
+  `-- rollback: restore`.** Safe means the previous release runs correctly
+  against the schema it leaves; the loader refuses one that does not say.
+  Prefer safe -- split a rename across releases -- because restore means the
+  pre-deploy dump and losing what was written since. See DEPLOY.md.
 - **Timestamps are `timestamptz` in UTC.** A technician clocking hours across
   the March DST change must not gain or lose an hour.
 

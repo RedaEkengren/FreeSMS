@@ -51,13 +51,23 @@ jobs:
     # of them, and the thing it guards against is losing a workshop's seven
     # years of invoices.
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Three image builds for the rollback test on top of the restore.
+    timeout-minutes: 30
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Back up, destroy, restore, verify
         run: ./deploy/restore-test.sh
+
+      # The rollback DEPLOY.md describes, with real images: a release that
+      # applied a migration, a failed health check, and the way back -- the
+      # previous image for a migration marked safe, the pre-deploy dump for
+      # one that is not. In this job because it needs what this job has, a
+      # Docker daemon and the backup scripts, and it keeps the required checks
+      # to the names branch protection knows.
+      - name: Roll back by image, and by dump
+        run: ./deploy/rollback-test.sh
 
   barcode:
     # The stock labels are decoded by a reader that shares no code with the

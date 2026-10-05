@@ -32,7 +32,9 @@ GitHub-hosted runner instead, following `Benbo-se/ArgusmetricsSH`.
      the `if`;
    - pulls the SHA-tagged image and starts it;
    - polls the health endpoint, which runs `SELECT 1`, until it reports healthy;
-   - rolls back to the previous tag automatically if it does not;
+   - rolls back to the previous tag automatically if it does not -- by image
+     when every new migration is marked safe, otherwise by the dump just
+     taken (see Rollback);
    - records the deployed tag only after the health check passes;
    - tags the commit `PROD-YYYY-MM-DD[-N]`.
 
@@ -41,10 +43,45 @@ halfway is worse than a deploy that waits.
 
 ## Rollback
 
-Re-run the deploy with the previous `PROD-` tag. The images are SHA-tagged, so
-the previous one is still pullable — provided image pruning keeps enough
-history. Pruning to the newest seven is fine for a moving `latest` and a trap
-two months later when production is pinned to a SHA that gets deleted.
+A release that applied a migration cannot always be undone by putting the
+previous image back: the previous release finds a schema version it has no
+file for. Every migration from `0024` on says, in its first lines, which way
+back it allows, and the database records it when it runs, so the older
+release -- which never had the file -- can read it.
+
+- **`-- rollback: safe`** -- the previous release runs correctly against the
+  schema this leaves: a new table, a new nullable column, a constraint
+  relaxed. Put the previous image back. It starts, logs that it is running
+  under migrations from a newer release, and nothing written since the deploy
+  is lost. Deploying the newer release again is the way back to normal.
+- **`-- rollback: restore`** -- the previous release would misread the
+  schema: a column renamed or dropped, a meaning changed. The previous image
+  refuses to start and says so. Either roll forward with a fix, or stop the
+  service, restore the pre-deploy dump with `deploy/restore.sh`, and start the
+  previous image. **Everything written between the deploy and the restore is
+  lost**, and attachments uploaded in that window stay on disk with no row
+  pointing at them. Prefer rolling forward; and prefer writing migrations
+  that are safe, splitting a rename into add-copy-switch-drop across releases
+  so that only the last step needs a restore.
+
+The loader refuses a migration from `0024` on that does not say which. A
+missing version inside a release's own range is still refused as a migration
+deleted after it ran, and checksums are checked as before: rolling back is
+not a way round either.
+
+`deploy/rollback-test.sh` proves both paths with real images on every push:
+the previous release over a safe migration with the writes since the deploy
+intact, and over a restore migration refusing, then healthy after the
+pre-deploy dump, with the writes since gone. The dump is the one `backup.sh`
+takes and `restore-test.sh` proves restorable
+([#46](https://github.com/RedaEkengren/FreeSMS/issues/46)); the automated
+deploy that would take it before each release is
+[#5](https://github.com/RedaEkengren/FreeSMS/issues/5).
+
+The images are SHA-tagged, so the previous one is still pullable -- provided
+image pruning keeps enough history. Pruning to the newest seven is fine for a
+moving `latest` and a trap two months later when production is pinned to a
+SHA that gets deleted.
 
 ## Rebuilding on a bare machine
 

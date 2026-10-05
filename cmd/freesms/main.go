@@ -88,10 +88,18 @@ func run() error {
 	// Migrations run before the server listens. Serving against a schema the
 	// code does not expect produces errors that look like bugs, so failing
 	// here is both cheaper and clearer.
-	if err := database.Migrate(ctx, pool, migrations.FS); err != nil {
+	migrated, err := database.MigrateWith(ctx, pool, migrations.FS)
+	if err != nil {
 		return err
 	}
 	log.Info("migrations up to date")
+	if len(migrated.Ahead) > 0 {
+		// A rollback: an older release put back over a newer schema, which
+		// every newer migration said it may run under. Worth saying, because
+		// the next deploy of the newer release is the way back to normal.
+		log.Warn("running under migrations from a newer release, all marked safe for this one",
+			"versions", migrated.Ahead)
+	}
 	for _, n := range cfg.Notices {
 		log.Warn(n)
 	}

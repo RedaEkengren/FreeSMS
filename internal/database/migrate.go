@@ -31,6 +31,28 @@ type migration struct {
 	name     string
 	body     string
 	checksum string
+
+	// What the release before may do against the schema this leaves:
+	// "safe" -- start and run, because the change is one it never notices --
+	// or "restore" -- not start, because it would misread the schema. Empty
+	// for the migrations from before this was asked.
+	rollback string
+}
+
+// firstDeclaredRollback is the first version that must say its rollback.
+// The ones before cannot: their text is checksummed as applied, and adding a
+// line to them would read as a migration changed after it ran.
+const firstDeclaredRollback = 24
+
+// rollbackLine is how a migration says it: in its opening comments, so it is
+// read with the change it describes.
+var rollbackLine = regexp.MustCompile(`(?m)^--\s*rollback:\s*(\S+)\s*$`)
+
+// Result is what Migrate found beyond what it did.
+type Result struct {
+	// Versions applied by a newer release than this one, all marked safe for
+	// it to run under. Empty except after a rollback.
+	Ahead []int64
 }
 
 // Migrate applies every migration that has not been applied yet, in order.
@@ -41,21 +63,37 @@ type migration struct {
 // migration edited after it ran means the database and the repository disagree
 // about the schema, and every later assumption is built on that disagreement.
 func Migrate(ctx context.Context, pool *pgxpool.Pool, files fs.FS) error {
+	_, err := MigrateWith(ctx, pool, files)
+	return err
+}
+
+// MigrateWith is Migrate, reporting what it found as well.
+//
+// A version recorded in the database that this release has no file for is
+// one of two things. Inside this release's own range it is a migration that
+// was deleted after it ran, and that is refused as it always was. Above it,
+// it was applied by a newer release -- which is what a rollback to the
+// previous image looks like -- and the release starts only if every such
+// version declared, when it ran, that the release before may run under it.
+// Otherwise it refuses, and says the two ways out: roll forward, or restore
+// the dump taken before the deploy.
+func MigrateWith(ctx context.Context, pool *pgxpool.Pool, files fs.FS) (Result, error) {
+	var res Result
 	migrations, err := load(files)
 	if err != nil {
-		return err
+		return res, err
 	}
 
 	// The lock must be taken on one connection and held, so acquire a
 	// connection from the pool rather than using the pool directly.
 	conn, err := pool.Acquire(ctx)
 	if err != nil {
-		return fmt.Errorf("acquire connection: %w", err)
+		return res, fmt.Errorf("acquire connection: %w", err)
 	}
 	defer conn.Release()
 
 	if _, err := conn.Exec(ctx, `SELECT pg_advisory_lock($1)`, advisoryLockKey); err != nil {
-		return fmt.Errorf("take migration lock: %w", err)
+		return res, fmt.Errorf("take migration lock: %w", err)
 	}
 	defer func() {
 		// Best effort: if this fails the session is ending anyway, and
@@ -73,22 +111,27 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, files fs.FS) error {
 			applied_at timestamptz NOT NULL DEFAULT now()
 		)`
 	if _, err := conn.Exec(ctx, createTracking); err != nil {
-		return fmt.Errorf("create schema_migrations: %w", err)
+		return res, fmt.Errorf("create schema_migrations: %w", err)
+	}
+	// Recorded with each migration, because the release that needs to read
+	// it is the older one, which does not have the file.
+	if _, err := conn.Exec(ctx, `ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS rollback text`); err != nil {
+		return res, fmt.Errorf("extend schema_migrations: %w", err)
 	}
 
 	applied, err := appliedVersions(ctx, conn)
 	if err != nil {
-		return err
+		return res, err
 	}
 
 	for _, m := range migrations {
 		if prev, ok := applied[m.version]; ok {
-			if prev != m.checksum {
-				return fmt.Errorf(
+			if prev.checksum != m.checksum {
+				return res, fmt.Errorf(
 					"migration %04d_%s.sql has changed since it was applied "+
 						"(recorded %s, file %s); the database and this repository "+
 						"disagree about the schema",
-					m.version, m.name, short(prev), short(m.checksum))
+					m.version, m.name, short(prev.checksum), short(m.checksum))
 			}
 			continue
 		}
@@ -98,43 +141,64 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, files fs.FS) error {
 		// half-applied schema.
 		tx, err := conn.Begin(ctx)
 		if err != nil {
-			return fmt.Errorf("begin %04d: %w", m.version, err)
+			return res, fmt.Errorf("begin %04d: %w", m.version, err)
 		}
 		if _, err := tx.Exec(ctx, m.body); err != nil {
 			_ = tx.Rollback(ctx)
-			return fmt.Errorf("apply %04d_%s.sql: %w", m.version, m.name, err)
+			return res, fmt.Errorf("apply %04d_%s.sql: %w", m.version, m.name, err)
 		}
-		const record = `INSERT INTO schema_migrations (version, name, checksum) VALUES ($1, $2, $3)`
-		if _, err := tx.Exec(ctx, record, m.version, m.name, m.checksum); err != nil {
+		const record = `INSERT INTO schema_migrations (version, name, checksum, rollback) VALUES ($1, $2, $3, nullif($4, ''))`
+		if _, err := tx.Exec(ctx, record, m.version, m.name, m.checksum, m.rollback); err != nil {
 			_ = tx.Rollback(ctx)
-			return fmt.Errorf("record %04d: %w", m.version, err)
+			return res, fmt.Errorf("record %04d: %w", m.version, err)
 		}
 		if err := tx.Commit(ctx); err != nil {
-			return fmt.Errorf("commit %04d: %w", m.version, err)
+			return res, fmt.Errorf("commit %04d: %w", m.version, err)
 		}
 	}
 
-	// A version in the database with no file left in the repository means a
-	// migration was deleted after it ran. Refuse, for the same reason as a
-	// changed checksum.
 	known := make(map[int64]bool, len(migrations))
+	var highest int64
 	for _, m := range migrations {
 		known[m.version] = true
-	}
-	var orphans []string
-	for v := range applied {
-		if !known[v] {
-			orphans = append(orphans, strconv.FormatInt(v, 10))
+		if m.version > highest {
+			highest = m.version
 		}
 	}
-	if len(orphans) > 0 {
-		sort.Strings(orphans)
-		return fmt.Errorf(
-			"versions %s are recorded as applied but have no migration file; "+
-				"a migration was deleted after it ran", strings.Join(orphans, ", "))
+	var deleted, ahead, unsafe []int64
+	for v, a := range applied {
+		switch {
+		case known[v]:
+		case v < highest:
+			deleted = append(deleted, v)
+		default:
+			ahead = append(ahead, v)
+			if a.rollback != "safe" {
+				unsafe = append(unsafe, v)
+			}
+		}
 	}
+	sortVersions(deleted)
+	sortVersions(ahead)
+	sortVersions(unsafe)
 
-	return nil
+	// A version with no file inside this release's own range means a
+	// migration was deleted after it ran. Refuse, for the same reason as a
+	// changed checksum.
+	if len(deleted) > 0 {
+		return res, fmt.Errorf(
+			"versions %s are recorded as applied but have no migration file; "+
+				"a migration was deleted after it ran", versionList(deleted))
+	}
+	if len(unsafe) > 0 {
+		return res, fmt.Errorf(
+			"versions %s were applied by a newer release and are not marked safe for "+
+				"this one to run under; roll forward to the release that applied them, or "+
+				"restore the database dump taken before that deploy", versionList(unsafe))
+	}
+	res.Ahead = ahead
+
+	return res, nil
 }
 
 // load reads and validates the migration files without touching a database, so
@@ -171,12 +235,26 @@ func load(files fs.FS) ([]migration, error) {
 		if strings.TrimSpace(string(body)) == "" {
 			return nil, fmt.Errorf("migration %q is empty", name)
 		}
+		var rollback string
+		if m := rollbackLine.FindStringSubmatch(string(body)); m != nil {
+			rollback = m[1]
+		}
+		switch {
+		case rollback != "" && rollback != "safe" && rollback != "restore":
+			return nil, fmt.Errorf("migration %q: rollback %q is neither safe nor restore", name, rollback)
+		case rollback == "" && version >= firstDeclaredRollback:
+			return nil, fmt.Errorf(
+				"migration %q does not say its rollback; start it with "+
+					"\"-- rollback: safe\" if the release before can run against the "+
+					"schema it leaves, or \"-- rollback: restore\" if it cannot (see DEPLOY.md)", name)
+		}
 		sum := sha256.Sum256(body)
 		out = append(out, migration{
 			version:  version,
 			name:     match[2],
 			body:     string(body),
 			checksum: hex.EncodeToString(sum[:]),
+			rollback: rollback,
 		})
 	}
 
@@ -191,23 +269,38 @@ func short(checksum string) string {
 	return checksum
 }
 
-// appliedVersions returns the checksum of every migration already recorded,
-// keyed by version.
-func appliedVersions(ctx context.Context, conn *pgxpool.Conn) (map[int64]string, error) {
-	rows, err := conn.Query(ctx, `SELECT version, checksum FROM schema_migrations`)
+type appliedMigration struct {
+	checksum string
+	rollback string
+}
+
+// appliedVersions returns what is recorded for every migration already
+// applied, keyed by version.
+func appliedVersions(ctx context.Context, conn *pgxpool.Conn) (map[int64]appliedMigration, error) {
+	rows, err := conn.Query(ctx, `SELECT version, checksum, coalesce(rollback, '') FROM schema_migrations`)
 	if err != nil {
 		return nil, fmt.Errorf("read schema_migrations: %w", err)
 	}
 	defer rows.Close()
 
-	applied := make(map[int64]string)
+	applied := make(map[int64]appliedMigration)
 	for rows.Next() {
 		var version int64
-		var checksum string
-		if err := rows.Scan(&version, &checksum); err != nil {
+		var a appliedMigration
+		if err := rows.Scan(&version, &a.checksum, &a.rollback); err != nil {
 			return nil, fmt.Errorf("scan schema_migrations: %w", err)
 		}
-		applied[version] = checksum
+		applied[version] = a
 	}
 	return applied, rows.Err()
+}
+
+func sortVersions(v []int64) { sort.Slice(v, func(i, j int) bool { return v[i] < v[j] }) }
+
+func versionList(v []int64) string {
+	out := make([]string, len(v))
+	for i, n := range v {
+		out[i] = fmt.Sprintf("%04d", n)
+	}
+	return strings.Join(out, ", ")
 }
