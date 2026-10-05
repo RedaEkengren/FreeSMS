@@ -110,6 +110,10 @@ type Suggestion struct {
 // SuggestFor returns the stored times that apply to a vehicle, narrowest match
 // per operation.
 func SuggestFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, vehicleID string) ([]Suggestion, error) {
+	// Suggestions are priced times, for the front desk.
+	if !scope.Role.SeesCustomerPersonalData() {
+		return nil, access.ErrForbidden
+	}
 	var out []Suggestion
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var make, model, engine string
@@ -222,6 +226,10 @@ func actualsFor(ctx context.Context, tx pgx.Tx, labourTimeID string) (ActualSpre
 
 // LabourTimes lists the whole library.
 func LabourTimes(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]LabourTime, error) {
+	// The time library is what the front desk prices from.
+	if !scope.Role.SeesCustomerPersonalData() {
+		return nil, access.ErrForbidden
+	}
 	var out []LabourTime
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
@@ -290,6 +298,10 @@ func SaveLabourTime(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 // LabourRate reads the shop's hourly rate in minor units. Zero means it has
 // not been set.
 func LabourRate(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (int64, error) {
+	// A price.
+	if !scope.Role.SeesCustomerPersonalData() {
+		return 0, access.ErrForbidden
+	}
 	var rate int64
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `SELECT labour_rate_minor FROM shops WHERE id = $1`, scope.ShopID).Scan(&rate)

@@ -47,6 +47,11 @@ type NewLine struct {
 // the invoice -- the alternative is quietly including work nobody agreed to,
 // which is the complaint that ends up on a review site.
 func AddLine(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string, line NewLine) error {
+	// Pricing is a conversation with the customer, so the front desk's. The
+	// handler refused other roles; this did not, and the next caller would not.
+	if !scope.Role.SeesCustomerPersonalData() {
+		return access.ErrForbidden
+	}
 	switch {
 	case strings.TrimSpace(line.Description) == "":
 		return fmt.Errorf("%w: the line needs a description", ErrInvalid)

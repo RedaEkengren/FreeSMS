@@ -332,6 +332,10 @@ func CreditNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, inv
 // InvoicesFor returns every document issued against a work order, oldest
 // first: the invoice, then any credit note.
 func InvoicesFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrderID string) ([]Invoice, error) {
+	// Documents carry the customer's name and address.
+	if !scope.Role.SeesCustomerPersonalData() {
+		return nil, access.ErrForbidden
+	}
 	var out []Invoice
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `

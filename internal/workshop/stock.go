@@ -177,6 +177,10 @@ func Parts(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Part,
 // One part is one thing under several supplier numbers, and the barcode
 // belongs to the packaging. Codes map many to one onto a part.
 func PartByCode(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, code string) (Part, error) {
+	// A part carries its cost and price.
+	if !scope.Role.SeesParts() {
+		return Part{}, access.ErrForbidden
+	}
 	code = strings.TrimSpace(code)
 	if code == "" {
 		return Part{}, ErrNotFound
@@ -351,6 +355,10 @@ func WriteOffs(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, from
 // the fact that it happened, and then a part that comes back has to be
 // explained rather than simply released.
 func ReserveForJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID, partID string, quantity float64) error {
+	// Stock is the parts desk's.
+	if !scope.Role.SeesParts() {
+		return access.ErrForbidden
+	}
 	if quantity <= 0 {
 		return fmt.Errorf("%w: reserve a positive quantity", ErrInvalid)
 	}
@@ -436,6 +444,10 @@ func releaseReservations(ctx context.Context, tx pgx.Tx, scope access.Scope, job
 // the price, and the shop can see it has not set any rather than being
 // quietly given one.
 func PriceFromCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, costMinor int64) (int64, error) {
+	// The markup is the shop's pricing.
+	if !scope.Role.SeesParts() {
+		return 0, access.ErrForbidden
+	}
 	var bands []PriceBand
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error

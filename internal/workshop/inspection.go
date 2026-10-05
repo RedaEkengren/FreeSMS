@@ -427,6 +427,10 @@ func (s Share) Usable() bool { return s.RevokedAt == nil && time.Now().Before(s.
 
 // SharesFor lists the links made for an inspection.
 func SharesFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, inspectionID string) ([]Share, error) {
+	// Links sent to a customer are the front desk's.
+	if !scope.Role.SeesCustomerPersonalData() {
+		return nil, access.ErrForbidden
+	}
 	var out []Share
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
@@ -539,6 +543,10 @@ func RecordDecision(ctx context.Context, pool *pgxpool.Pool, shopID, token, item
 // ApprovedFindings lists the items a customer has said yes to that have not
 // been turned into lines yet, so the front desk can price them in one action.
 func ApprovedFindings(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, inspectionID string) ([]InspectionItem, error) {
+	// What the customer said yes to, for the front desk to price.
+	if !scope.Role.SeesCustomerPersonalData() {
+		return nil, access.ErrForbidden
+	}
 	items, err := itemsFor(ctx, pool, scope, inspectionID)
 	if err != nil {
 		return nil, err

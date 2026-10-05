@@ -258,3 +258,31 @@ func TestRevokeAllSignsEverybodyOut(t *testing.T) {
 		t.Errorf("a new session after revocation does not work: %v", err)
 	}
 }
+
+// Only whoever runs the shop switches a colleague off. Deactivate checked the
+// scope's shop and not its role, so any signed-in user handed to it could
+// switch off anybody in the same shop. A refusal changes nothing: the user
+// stays active and signed in.
+func TestOnlyThoseWhoRunTheShopDeactivateAUser(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	token, _, err := Login(ctx, pool, shopID, email, pass, "test")
+	if err != nil {
+		t.Fatalf("Login: %v", err)
+	}
+	for _, role := range []access.Role{access.RoleTechnician, access.RoleParts, access.RoleServiceAdvisor} {
+		err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: userID, Role: role}, userID)
+		if !errors.Is(err, access.ErrForbidden) {
+			t.Errorf("Deactivate as %s: %v, want forbidden", role, err)
+		}
+	}
+	if _, err := Authenticate(ctx, pool, shopID, token); err != nil {
+		t.Errorf("a refused deactivation ended the session anyway: %v", err)
+	}
+	if err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleOwner}, userID); err != nil {
+		t.Fatalf("Deactivate as owner: %v", err)
+	}
+	if _, err := Authenticate(ctx, pool, shopID, token); !errors.Is(err, ErrNoSession) {
+		t.Errorf("deactivated by the owner, still signed in: %v", err)
+	}
+}

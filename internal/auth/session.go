@@ -255,6 +255,12 @@ func Logout(ctx context.Context, pool *pgxpool.Pool, shopID, token string) error
 // Both, together. Clearing the flag alone leaves whoever is signed in working
 // until their session expires, which is the gap this is meant to close.
 func Deactivate(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, userID string) error {
+	// Turning a colleague off is for whoever runs the shop. The scope used to
+	// be checked for its shop and not its role, so any signed-in user handed
+	// to this could switch off anybody in the same shop.
+	if !scope.Role.RunsTheShop() {
+		return access.ErrForbidden
+	}
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		const off = `UPDATE users SET active = false, deactivated_at = now() WHERE id = $1`
 		if _, err := tx.Exec(ctx, off, userID); err != nil {

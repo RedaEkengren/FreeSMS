@@ -68,6 +68,13 @@ numbers, home addresses — because permissions had been designed as something t
 add afterwards and never were. The same system carried a drivers-licence tab
 populated for employees who do not drive.
 
+Roles are checked the same way, in the business operation and not only in
+the handler that calls it today. Every exported function that takes an
+`access.Scope` checks its role, or is listed in `everyRole` in
+`internal/workshop/roles_test.go` with the reason any role may call it; the
+test reads the code and fails on anything else. `TestTheRoleMatrix` calls
+the privileged operations directly as each role.
+
 So: a technician's default payload is the vehicle and the job. Customer
 personal data is opt-in per field, with a purpose. A field with no purpose does
 not exist.
