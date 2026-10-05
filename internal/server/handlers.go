@@ -106,6 +106,11 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	progress, err := workshop.ProgressFor(r.Context(), s.pool, session.Scope, id)
+	if err != nil {
+		s.log.Error("read progress", "error", err)
+	}
+
 	requests, err := workshop.PartRequestsFor(r.Context(), s.pool, session.Scope, id)
 	if err != nil {
 		s.log.Error("read part requests", "error", err)
@@ -173,6 +178,7 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		Title:       "Job",
 		Session:     session,
 		Job:         job,
+		Progress:    progress,
 		Lines:       lines,
 		Next:        stateChoices(session.Scope.Role, workshop.State(job.State), job.HasWork),
 		Totals:      workshop.TotalsFor(lines),

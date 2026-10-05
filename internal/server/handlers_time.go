@@ -107,3 +107,23 @@ func parseWallClock(value string, loc *time.Location, was string) (time.Time, er
 	}
 	return t, nil
 }
+
+// handlePromise records when the customer was told the car will be ready, as
+// a wall clock in the shop's zone; an empty field clears it.
+func (s *Server) handlePromise(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id := r.PathValue("id")
+	var at *time.Time
+	if v := strings.TrimSpace(r.FormValue("promised_at")); v != "" {
+		t, err := parseWallClock(v, s.shopLocation(r), r.FormValue("promised_was"))
+		if err != nil {
+			s.renderError(w, r, http.StatusBadRequest, "That time will not do", err.Error())
+			return
+		}
+		at = &t
+	}
+	if err := workshop.SetPromise(r.Context(), s.pool, session.Scope, id, at); s.handoverError(w, r, err) {
+		return
+	}
+	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
+}

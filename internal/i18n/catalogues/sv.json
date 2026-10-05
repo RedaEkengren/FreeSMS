@@ -816,6 +816,48 @@
     },
     "Account": {
       "other": "Konto"
+    },
+    "When it will be ready": {
+      "other": "När den blir klar"
+    },
+    "Promised": {
+      "other": "Utlovad"
+    },
+    "at risk": {
+      "other": "i farozonen"
+    },
+    "on time": {
+      "other": "i tid"
+    },
+    "Clocked": {
+      "other": "Stämplat"
+    },
+    "%s of %s h": {
+      "other": "%s av %s h"
+    },
+    "Left": {
+      "other": "Kvar"
+    },
+    "Clocked against the estimate": {
+      "other": "Stämplat mot uppskattningen"
+    },
+    "More clocked than was sold.": {
+      "other": "Mer stämplat än vad som sålts."
+    },
+    "No estimate: there is no labour line on the job yet.": {
+      "other": "Ingen uppskattning: jobbet har ingen arbetsrad än."
+    },
+    "As of %s, with a clock running.": {
+      "other": "Per klockan %s, med en klocka igång."
+    },
+    "Promise it for": {
+      "other": "Lova den till"
+    },
+    "Save the promise": {
+      "other": "Spara löftet"
+    },
+    "promised %s": {
+      "other": "utlovad %s"
     }
   },
   "name": "Svenska"

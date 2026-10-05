@@ -46,6 +46,9 @@ type BoardEntry struct {
 	// Reported from under the car and not yet priced. The front desk's cue
 	// that somebody is waiting on them.
 	OpenFindings int
+
+	// Promised, sold and clocked, put together.
+	Progress Progress
 }
 
 // Waiting says what the vehicle is waiting for, in words a person at a counter
@@ -136,7 +139,7 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 			           WHERE t.work_order_id = w.id AND t.ended_at IS NULL
 			           LIMIT 1), ''),
 			       (SELECT count(*) FROM findings f
-			         WHERE f.work_order_id = w.id AND f.handled_at IS NULL)
+			         WHERE f.work_order_id = w.id AND f.handled_at IS NULL),` + progressColumns + `
 			FROM work_orders w
 			JOIN vehicles v  ON v.id = w.vehicle_id
 			-- Left, not inner. A work order is allowed to have no customer --
@@ -166,10 +169,11 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 		defer rows.Close()
 		for rows.Next() {
 			var b BoardEntry
-			if err := rows.Scan(&b.ID, &b.Number, &b.State,
+			targets := append([]any{&b.ID, &b.Number, &b.State,
 				&b.Registration, &b.Make, &b.Model, &b.Complaint,
 				&b.CustomerName, &b.HasCustomer, &b.OpenedAt, &b.PromisedAt, &b.ReadyAt,
-				&b.WorkingNow, &b.OpenFindings); err != nil {
+				&b.WorkingNow, &b.OpenFindings}, b.Progress.scanTargets()...)
+			if err := rows.Scan(targets...); err != nil {
 				return fmt.Errorf("scan board entry: %w", err)
 			}
 			out = append(out, b)

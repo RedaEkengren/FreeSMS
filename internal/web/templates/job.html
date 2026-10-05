@@ -22,6 +22,40 @@
   {{if .Job.AssignedTo}}<dt>{{.T "On it"}}</dt><dd>{{.Job.AssignedTo}}</dd>{{end}}
 </dl>
 
+{{/* When will it be ready: the promise, the hours sold and the time
+     clocked, together. Not clamped past the estimate -- an order at 140
+     per cent is the one somebody needs to look at. */}}
+<h2>{{.T "When it will be ready"}}</h2>
+{{with .Progress}}
+<dl>
+  {{if .PromisedAt}}<dt>{{$.T "Promised"}}</dt><dd>{{($.Local .PromisedAt).Format "Mon 2 Jan 15:04"}}
+    {{if eq .Verdict "late"}}<span class="tag late">{{$.T "late"}}</span>
+    {{else if eq .Verdict "at risk"}}<span class="tag warranty">{{$.T "at risk"}}</span>
+    {{else if eq .Verdict "on time"}}<span class="tag">{{$.T "on time"}}</span>{{end}}</dd>{{end}}
+  {{if .Known}}
+  <dt>{{$.T "Clocked"}}</dt>
+  <dd>{{$.T "%s of %s h" .ClockedHours .EstimateHours}} &middot; {{.Percent}} %</dd>
+  {{if not .Over}}<dt>{{$.T "Left"}}</dt><dd>{{.LeftHours}} h</dd>{{end}}
+  {{end}}
+</dl>
+{{if .Known}}
+<meter class="progress" min="0" max="{{.MeterMax}}" value="{{.ClockedMinutes}}" low="0" high="{{.EstimateMinutes}}" optimum="0"
+       aria-label="{{$.T "Clocked against the estimate"}}">{{.Percent}} %</meter>
+{{if .Over}}<p class="waiting">{{$.T "More clocked than was sold."}}</p>{{end}}
+{{else}}
+<p class="waiting">{{$.T "No estimate: there is no labour line on the job yet."}}</p>
+{{end}}
+{{if .Running}}<p class="waiting">{{$.T "As of %s, with a clock running." (($.Local .AsOf).Format "15:04")}}</p>{{end}}
+{{end}}
+{{if and .Session.Scope.Role.SeesCustomerPersonalData (not .Progress.Finished)}}
+<form method="post" action="/jobs/{{.Job.ID}}/promise">
+  <label><span>{{.T "Promise it for"}}</span>
+    <input type="datetime-local" name="promised_at" value="{{with .Progress.PromisedAt}}{{($.Local .).Format "2006-01-02T15:04"}}{{end}}">
+    <input type="hidden" name="promised_was" value="{{$.Instant .Progress.PromisedAt}}"></label>
+  <button type="submit" class="secondary">{{.T "Save the promise"}}</button>
+</form>
+{{end}}
+
 {{if .Contact.Known}}
 <h2>{{.T "Customer"}}</h2>
 <div class="waiting">{{.Contact.Name}}</div>

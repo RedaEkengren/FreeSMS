@@ -43,6 +43,7 @@ type pageData struct {
 
 	Jobs          []workshop.Job
 	Job           workshop.Job
+	Progress      workshop.Progress
 	Lines         []workshop.Line
 	Board         []workshop.BoardEntry
 	Next          []workshop.State

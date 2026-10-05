@@ -26,6 +26,7 @@ var everyRole = map[string]string{
 	"ReleaseIdempotency":  "the caller's own request key",
 	"ClockIn":             "the caller's own clock", "ClockOut": "the caller's own clock",
 	"MyTime":         "the caller's own hours",
+	"ProgressFor":    "hours and a time on a job, no customer data",
 	"ChangePassword": "the caller's own password, checked against the current one",
 
 	// The job as the person holding the spanner sees it. Job carries the
