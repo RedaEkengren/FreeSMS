@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/base64"
 	"strings"
 	"testing"
 )
@@ -10,7 +9,7 @@ func valid(t *testing.T) {
 	t.Helper()
 	t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/freesms")
 	t.Setenv("BASE_URL", "http://localhost:8080")
-	t.Setenv("SESSION_SECRET", "0123456789abcdef0123456789abcdef")
+	t.Setenv("SESSION_SECRET", "")
 }
 
 func TestLoadDefaults(t *testing.T) {
@@ -32,58 +31,39 @@ func TestLoadDefaults(t *testing.T) {
 func TestLoadReportsEveryProblemAtOnce(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
 	t.Setenv("BASE_URL", "")
-	t.Setenv("SESSION_SECRET", "")
 	t.Setenv("LOG_LEVEL", "chatty")
 
 	_, err := Load()
 	if err == nil {
 		t.Fatal("Load() = nil, want error")
 	}
-	for _, want := range []string{"DATABASE_URL", "BASE_URL", "SESSION_SECRET", "LOG_LEVEL"} {
+	for _, want := range []string{"DATABASE_URL", "BASE_URL", "LOG_LEVEL"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error does not mention %s:\n%v", want, err)
 		}
 	}
 }
 
-func TestLoadRejectsShortSecret(t *testing.T) {
+// SESSION_SECRET was required and documented as the way to sign everybody
+// out, and nothing read it. It is not required now, and an installation that
+// still sets it starts and is told what does that job.
+func TestSessionSecretIsNoLongerRequiredAndSaysSo(t *testing.T) {
 	valid(t)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() without SESSION_SECRET = %v, want nil", err)
+	}
+	if len(cfg.Notices) != 0 {
+		t.Errorf("notices without SESSION_SECRET: %v", cfg.Notices)
+	}
+
 	t.Setenv("SESSION_SECRET", "short")
-	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "SESSION_SECRET") {
-		t.Fatalf("Load() = %v, want a complaint about SESSION_SECRET", err)
-	}
-}
-
-// A secret that is not base64 is a formatting mistake, not a security one.
-func TestLoadAcceptsRawSecret(t *testing.T) {
-	valid(t)
-	raw := "this-is-not-base64-but-is-long-enough-anyway"
-	t.Setenv("SESSION_SECRET", raw)
-	cfg, err := Load()
+	cfg, err = Load()
 	if err != nil {
-		t.Fatalf("Load() = %v, want nil", err)
+		t.Fatalf("Load() with an old SESSION_SECRET = %v; an old .env must still start", err)
 	}
-	if string(cfg.SessionSecret) != raw {
-		t.Errorf("SessionSecret = %q, want the raw value", cfg.SessionSecret)
-	}
-}
-
-// Thirty-two random hex characters are 32 bytes of key material, and are also
-// legal base64 that decodes to 24. Decoding blindly would reject this with a
-// complaint about a length the operator never typed.
-func TestLoadAcceptsHexSecretThatIsAlsoValidBase64(t *testing.T) {
-	valid(t)
-	hexSecret := "0123456789abcdef0123456789abcdef"
-	if _, err := base64.StdEncoding.DecodeString(hexSecret); err != nil {
-		t.Fatalf("fixture is no longer valid base64, the case it guards is gone: %v", err)
-	}
-	t.Setenv("SESSION_SECRET", hexSecret)
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load() = %v, want nil", err)
-	}
-	if string(cfg.SessionSecret) != hexSecret {
-		t.Errorf("SessionSecret = %q, want the raw 32 characters", cfg.SessionSecret)
+	if len(cfg.Notices) != 1 || !strings.Contains(cfg.Notices[0], "-revoke-sessions") {
+		t.Errorf("notices = %v, want one pointing at -revoke-sessions", cfg.Notices)
 	}
 }
 

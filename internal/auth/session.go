@@ -266,3 +266,48 @@ func Deactivate(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, use
 		return nil
 	})
 }
+
+// RevokeAll ends every session in the database, in every shop, and reports
+// how many it ended.
+//
+// This is the "sign everybody out" an operator reaches for after a leak.
+// SESSION_SECRET was documented as that -- rotate it and everyone is signed
+// out -- and nothing ever read it: a session is a random token whose hash is
+// stored, and no key is involved in checking one. Rotating it changed
+// nothing, which is the worst kind of emergency procedure.
+//
+// One shop at a time. The table enforces row level security even on its
+// owner, so a single unscoped DELETE run by anything less than a superuser
+// would delete nothing and report success.
+func RevokeAll(ctx context.Context, pool *pgxpool.Pool) (int64, error) {
+	rows, err := pool.Query(ctx, `SELECT id FROM shops`)
+	if err != nil {
+		return 0, fmt.Errorf("list shops: %w", err)
+	}
+	var shops []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return 0, fmt.Errorf("scan shop: %w", err)
+		}
+		shops = append(shops, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+
+	var ended int64
+	for _, shop := range shops {
+		err := database.InShop(ctx, pool, shop, func(ctx context.Context, tx pgx.Tx) error {
+			tag, err := tx.Exec(ctx, `DELETE FROM sessions`)
+			ended += tag.RowsAffected()
+			return err
+		})
+		if err != nil {
+			return ended, fmt.Errorf("end sessions in %s: %w", shop, err)
+		}
+	}
+	return ended, nil
+}

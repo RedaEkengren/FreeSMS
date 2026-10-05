@@ -7,12 +7,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/RedaEkengren/FreeSMS/internal/auth"
 	"github.com/RedaEkengren/FreeSMS/internal/config"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/server"
@@ -34,6 +36,20 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "-healthcheck" {
 		if err := healthcheck(); err != nil {
 			os.Stderr.WriteString("freesms: unhealthy: " + err.Error() + "\n")
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Signs everybody out, in every shop. The operator's answer to a leaked
+	// session or a lost device, run beside the service:
+	//
+	//   docker compose exec app /freesms -revoke-sessions
+	//
+	// The sessions are rows, so this survives a restart and needs none.
+	if len(os.Args) > 1 && os.Args[1] == "-revoke-sessions" {
+		if err := revokeSessions(); err != nil {
+			os.Stderr.WriteString("freesms: " + err.Error() + "\n")
 			os.Exit(1)
 		}
 		return
@@ -76,6 +92,9 @@ func run() error {
 		return err
 	}
 	log.Info("migrations up to date")
+	for _, n := range cfg.Notices {
+		log.Warn(n)
+	}
 
 	// A fresh installation has no shop, and that is not a reason to refuse to
 	// start. It used to be: `docker compose up` against an empty database
@@ -116,4 +135,24 @@ func logLevel(name string) slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+// revokeSessions ends every session and says how many.
+func revokeSessions() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+	pool, err := database.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	ended, err := auth.RevokeAll(ctx, pool)
+	if err != nil {
+		return err
+	}
+	os.Stdout.WriteString(fmt.Sprintf("signed out %d session(s); everybody signs in again\n", ended))
+	return nil
 }

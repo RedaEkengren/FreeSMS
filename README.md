@@ -79,7 +79,6 @@ Docker and nothing else.
 
 ```sh
 cp .env.example .env
-sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -base64 32)|" .env
 docker compose up
 ```
 
@@ -97,6 +96,20 @@ process is alive, so a green check means the service can actually do its job.
 Open <http://localhost:8080>. The database starts empty, so the first thing
 served is a setup page: name the workshop, create your account, and it stops
 working from then on.
+
+### Signing everybody out
+
+A lost tablet, a cookie that should not have left the building: end every
+session at once, in every workshop the database holds.
+
+```sh
+docker compose exec app /freesms -revoke-sessions
+# signed out 3 session(s); everybody signs in again
+```
+
+Sessions are rows, so this takes effect immediately and needs no restart.
+There is no session secret to rotate; an older `.env` that sets
+`SESSION_SECRET` still starts, and the log says it does nothing.
 
 ### Demonstration data
 

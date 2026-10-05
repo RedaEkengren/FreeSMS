@@ -6,7 +6,6 @@
 package config
 
 import (
-	"encoding/base64"
 	"fmt"
 	"net/url"
 	"os"
@@ -20,7 +19,6 @@ type Config struct {
 	DatabaseURL    string
 	HTTPAddr       string
 	BaseURL        string
-	SessionSecret  []byte
 	AttachmentsDir string
 	DefaultLocale  string
 	LogLevel       string
@@ -36,11 +34,11 @@ type Config struct {
 	// that is the shop's to hold.
 	VehicleLookupURL   string
 	VehicleLookupToken string
-}
 
-// minSecretBytes is the decoded length a session secret must reach. Below
-// this the signing key is the weak link regardless of how it is used.
-const minSecretBytes = 32
+	// Things worth telling the operator that are not reasons to refuse to
+	// start, logged once the logger exists.
+	Notices []string
+}
 
 // Load reads the configuration and reports every problem it finds at once.
 //
@@ -86,27 +84,13 @@ func Load() (*Config, error) {
 		}
 	}
 
-	secret := os.Getenv("SESSION_SECRET")
-	switch {
-	case secret == "":
-		problems = append(problems, "SESSION_SECRET is required (generate: openssl rand -base64 32)")
-	default:
-		// The secret may arrive base64-encoded or as raw characters, and the
-		// two interpretations can both be valid for the same string. Thirty-two
-		// random hex characters are 32 bytes of material and also happen to be
-		// legal base64 that decodes to 24 -- so decoding blindly rejects a
-		// perfectly good secret with a message about a length the operator
-		// never typed. Take whichever reading yields more key material.
-		key := []byte(secret)
-		if decoded, err := base64.StdEncoding.DecodeString(secret); err == nil && len(decoded) > len(key) {
-			key = decoded
-		}
-		if len(key) < minSecretBytes {
-			problems = append(problems, fmt.Sprintf(
-				"SESSION_SECRET gives %d bytes of key material, need at least %d "+
-					"(generate: openssl rand -base64 32)", len(key), minSecretBytes))
-		}
-		cfg.SessionSecret = key
+	// Gone, and said so rather than silently ignored. It was required and
+	// documented as the way to sign everybody out, and nothing ever read it.
+	// An installation that still sets it starts normally and is told what
+	// does the job instead.
+	if os.Getenv("SESSION_SECRET") != "" {
+		cfg.Notices = append(cfg.Notices,
+			"SESSION_SECRET is no longer used and can be removed; to sign everybody out, run: freesms -revoke-sessions")
 	}
 
 	// A URL with nowhere to put the registration would silently look up the

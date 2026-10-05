@@ -191,3 +191,70 @@ func TestTheTokenIsNotStored(t *testing.T) {
 		t.Error("the session token is stored in the database in a recoverable form")
 	}
 }
+
+// Signing everybody out ends every session, in every shop, so a cookie that
+// worked a moment ago no longer does -- for a process started afterwards as
+// much as for this one -- and signing in again works.
+//
+// The documented way used to be rotating SESSION_SECRET, which nothing read:
+// every session survived it.
+func TestRevokeAllSignsEverybodyOut(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+
+	const otherShop, otherUser = "44444444-4444-4444-4444-444444444444", "55555555-5555-5555-5555-555555555555"
+	hash, _ := HashPassword(pass)
+	if err := database.InShop(ctx, pool, otherShop, func(ctx context.Context, tx pgx.Tx) error {
+		for _, q := range []string{
+			`INSERT INTO shops (id, name) VALUES ('` + otherShop + `', 'Another Verkstad')`,
+			`INSERT INTO people (id, shop_id, display_name, email) VALUES
+			 ('66666666-6666-6666-6666-666666666666', '` + otherShop + `', 'Someone Else', 'other@example.test')`,
+			`INSERT INTO users (id, shop_id, person_id, role, password_hash) VALUES
+			 ('` + otherUser + `', '` + otherShop + `', '66666666-6666-6666-6666-666666666666', 'owner', '` + hash + `')`,
+		} {
+			if _, err := tx.Exec(ctx, q); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("seed another shop: %v", err)
+	}
+
+	here, _, err := Login(ctx, pool, shopID, email, pass, "test")
+	if err != nil {
+		t.Fatalf("Login: %v", err)
+	}
+	there, _, err := Login(ctx, pool, otherShop, "other@example.test", pass, "test")
+	if err != nil {
+		t.Fatalf("Login in the other shop: %v", err)
+	}
+
+	ended, err := RevokeAll(ctx, pool)
+	if err != nil {
+		t.Fatalf("RevokeAll: %v", err)
+	}
+	if ended != 2 {
+		t.Errorf("ended %d sessions, want both", ended)
+	}
+
+	// A process started afterwards: a new pool, nothing carried over in memory.
+	restarted, err := pgxpool.New(ctx, pool.Config().ConnString())
+	if err != nil {
+		t.Fatalf("new pool: %v", err)
+	}
+	defer restarted.Close()
+	for shop, token := range map[string]string{shopID: here, otherShop: there} {
+		if _, err := Authenticate(ctx, restarted, shop, token); !errors.Is(err, ErrNoSession) {
+			t.Errorf("a revoked session in %s still authenticates: %v", shop, err)
+		}
+	}
+
+	again, _, err := Login(ctx, restarted, shopID, email, pass, "test")
+	if err != nil {
+		t.Fatalf("signing in after revocation: %v", err)
+	}
+	if _, err := Authenticate(ctx, restarted, shopID, again); err != nil {
+		t.Errorf("a new session after revocation does not work: %v", err)
+	}
+}
