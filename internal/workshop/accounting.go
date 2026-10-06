@@ -26,6 +26,9 @@ var defaultAccounts = []struct {
 }{
 	{"receivable", 1510, "Kundfordringar"},
 	{"sales", 3010, "Försäljning"},
+	{"sublet", 3011, "Försäljning, främmande arbete"},
+	{"consumables", 3590, "Övriga fakturerade kostnader"},
+	{"invoice_fee", 3540, "Faktureringsavgifter"},
 	{"vat_25", 2611, "Utgående moms 25%"},
 	{"vat_12", 2621, "Utgående moms 12%"},
 	{"vat_6", 2631, "Utgående moms 6%"},
@@ -40,6 +43,18 @@ var vatAccounts = map[int]string{
 	2500: "vat_25",
 	1200: "vat_12",
 	600:  "vat_6",
+}
+
+// salesAccounts maps a line's kind to the purpose whose account receives its
+// net. One lump on 3010 was what the bookkeeper used to get: a figure with
+// the work, the parts, the subcontracted work, the consumables and the fees
+// in it, which could not be reconciled against anything.
+var salesAccounts = map[string]string{
+	"labour":      "sales",
+	"part":        "sales",
+	"sublet":      "sublet",
+	"consumables": "consumables",
+	"fee":         "invoice_fee",
 }
 
 // ErrUnsupportedVATRate is returned when an invoice carries a rate this
@@ -165,6 +180,37 @@ func ExportAccounting(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			return err
 		}
 
+		// The net per kind of line, for the sales side.
+		netByDoc := map[string]map[string]int64{}
+		nrows, err := tx.Query(ctx, `
+			SELECT invoice_id, kind, sum(net_minor)
+			FROM invoice_lines WHERE invoice_id = ANY($1)
+			GROUP BY invoice_id, kind`, ids)
+		if err != nil {
+			return fmt.Errorf("read net per kind: %w", err)
+		}
+		for nrows.Next() {
+			var id, kind string
+			var amount int64
+			if err := nrows.Scan(&id, &kind, &amount); err != nil {
+				nrows.Close()
+				return fmt.Errorf("scan net per kind: %w", err)
+			}
+			purpose, ok := salesAccounts[kind]
+			if !ok {
+				nrows.Close()
+				return fmt.Errorf("workshop: a line of kind %q has no account", kind)
+			}
+			if netByDoc[id] == nil {
+				netByDoc[id] = map[string]int64{}
+			}
+			netByDoc[id][purpose] += amount
+		}
+		nrows.Close()
+		if err := nrows.Err(); err != nil {
+			return err
+		}
+
 		file.Program, file.ProgramVer = "FreeSMS", "1"
 		// Dates in the file are the shop's calendar, which from is in. An
 		// instant formatted as it comes from the database is UTC: an invoice
@@ -184,9 +230,19 @@ func ExportAccounting(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			// A credit note is its own verification, not a correction of the
 			// original. The pairing lives in the invoice data; the accounts
 			// see two entries.
-			entries := []sie.Entry{
-				{Account: accounts["receivable"], Minor: d.gross},
-				{Account: accounts["sales"], Minor: -d.net},
+			entries := []sie.Entry{{Account: accounts["receivable"], Minor: d.gross}}
+			// Each kind of sale on its own account, in a fixed order so the
+			// same document always produces the same file.
+			var sold int64
+			for _, purpose := range []string{"sales", "sublet", "consumables", "invoice_fee"} {
+				if amount := netByDoc[d.id][purpose]; amount != 0 {
+					entries = append(entries, sie.Entry{Account: accounts[purpose], Minor: -amount})
+					sold += amount
+				}
+			}
+			if sold != d.net {
+				return fmt.Errorf("workshop: %s-%d: the lines sum to %d net and the document says %d",
+					d.series, d.number, sold, d.net)
 			}
 			// In rate order, so the same document always produces the same
 			// file, and only for rates that carry VAT: a zero-rated line is in
@@ -280,15 +336,20 @@ func ledgerAccounts(ctx context.Context, tx pgx.Tx, shopID string) (map[string]i
 		return nil, nil, err
 	}
 
-	if len(accounts) == 0 {
-		for _, d := range defaultAccounts {
-			if _, err := tx.Exec(ctx,
-				`INSERT INTO ledger_accounts (shop_id, purpose, account) VALUES ($1, $2, $3)
-				 ON CONFLICT DO NOTHING`, shopID, d.Purpose, d.Account); err != nil {
-				return nil, nil, fmt.Errorf("seed accounts: %w", err)
-			}
-			accounts[d.Purpose] = d.Account
+	// Any purpose the shop has no account for yet gets the default: on the
+	// first export, and for a purpose added later -- the surcharges -- in a
+	// shop whose chart was seeded before it existed. An account the shop
+	// changed is never touched.
+	for _, d := range defaultAccounts {
+		if _, ok := accounts[d.Purpose]; ok {
+			continue
 		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO ledger_accounts (shop_id, purpose, account) VALUES ($1, $2, $3)
+			 ON CONFLICT DO NOTHING`, shopID, d.Purpose, d.Account); err != nil {
+			return nil, nil, fmt.Errorf("seed accounts: %w", err)
+		}
+		accounts[d.Purpose] = d.Account
 	}
 
 	for _, d := range defaultAccounts {

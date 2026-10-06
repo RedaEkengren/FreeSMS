@@ -858,6 +858,27 @@
     },
     "promised %s": {
       "other": "utlovad %s"
+    },
+    "Consumables, %s%% of the labour": {
+      "other": "Förbrukningsmaterial, %s %% av arbetet"
+    },
+    "Invoicing fee": {
+      "other": "Faktureringsavgift"
+    },
+    "What an invoice adds": {
+      "other": "Vad en faktura lägger till"
+    },
+    "At most, per invoice": {
+      "other": "Högst, per faktura"
+    },
+    "no ceiling": {
+      "other": "inget tak"
+    },
+    "Consumables, per cent of the labour": {
+      "other": "Förbrukningsmaterial, procent av arbetet"
+    },
+    "Consumables are a share of the labour the customer pays for, never of the parts, at the labour's VAT. The invoicing fee is charged once per invoice, never on a credit note. An invoice keeps what it was charged; changing these changes the next one.": {
+      "other": "Förbrukningsmaterial är en andel av det arbete kunden betalar, aldrig av delarna, med arbetets moms. Faktureringsavgiften tas en gång per faktura, aldrig på en kreditfaktura. En faktura behåller det den debiterades; ändras detta gäller det nästa faktura."
     }
   },
   "name": "Svenska"

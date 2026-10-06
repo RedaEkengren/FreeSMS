@@ -27,11 +27,44 @@ func (s *Server) handleShop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	charges, err := workshop.SurchargesFor(r.Context(), s.pool, session.Scope)
+	if err != nil {
+		s.log.Error("read surcharges", "error", err)
+	}
 	s.render(w, r, http.StatusOK, "shop", pageData{
 		Title:   "The workshop",
 		Session: session,
 		Shop:    details,
+		Charges: charges,
 	})
+}
+
+// handleSaveSurcharges sets förbrukningsmaterial and the invoicing fee.
+// Typed as a person writes them: "5" or "5,0" per cent, amounts in kronor.
+func (s *Server) handleSaveSurcharges(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	pct, err := parseScaled(r.FormValue("consumables_percent"), 2)
+	if err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "That percentage did not parse", "Write it as 5 or 5,5.")
+		return
+	}
+	charges := workshop.Surcharges{ConsumablesBasis: int(pct)}
+	if v := strings.TrimSpace(r.FormValue("consumables_cap")); v != "" {
+		cap, err := parseMinorUnits(v)
+		if err != nil {
+			s.renderError(w, r, http.StatusBadRequest, "That ceiling did not parse", err.Error())
+			return
+		}
+		charges.ConsumablesCapMinor = &cap
+	}
+	if charges.InvoiceFeeMinor, err = parseMinorUnits(r.FormValue("invoice_fee")); err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "That fee did not parse", err.Error())
+		return
+	}
+	if err := workshop.SaveSurcharges(r.Context(), s.pool, session.Scope, charges); s.handoverError(w, r, err) {
+		return
+	}
+	http.Redirect(w, r, "/shop", http.StatusSeeOther)
 }
 
 func (s *Server) handleSaveShop(w http.ResponseWriter, r *http.Request) {

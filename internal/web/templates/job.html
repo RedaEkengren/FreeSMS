@@ -157,6 +157,11 @@
      everything else. On a phone the rail is simply the top of the page, so it
      reads in the same order it always did. */}}
 <dl class="totals">
+  {{/* What the invoice will add, at the shop's settings now. On the invoice
+       they are frozen; here they move with the lines. */}}
+  {{range .Surcharges}}
+  <dt>{{.Description}}</dt><dd>{{$.Money .NetMinor}}</dd>
+  {{end}}
   {{range .Totals.Bands}}
   <dt>{{$.T "VAT"}} {{divide .RateBasisPoints 100}}%</dt><dd>{{$.Money .VATMinor}}</dd>
   {{end}}

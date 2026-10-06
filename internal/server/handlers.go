@@ -161,7 +161,13 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 	// and they carry the customer's name.
 	var invoices []workshop.Invoice
 	var contact workshop.Contact
+	var surcharges []workshop.SurchargeLine
 	if session.Scope.Role.SeesCustomerPersonalData() {
+		// What the invoice would add, shown with the total so the figure
+		// read out on the telephone is the one the invoice prints.
+		if surcharges, err = workshop.PreviewSurcharges(r.Context(), s.pool, session.Scope, id); err != nil {
+			s.log.Error("preview surcharges", "error", err)
+		}
 		invoices, err = workshop.InvoicesFor(r.Context(), s.pool, session.Scope, id)
 		if err != nil {
 			s.log.Error("read invoices", "error", err)
@@ -181,7 +187,8 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		Progress:    progress,
 		Lines:       lines,
 		Next:        stateChoices(session.Scope.Role, workshop.State(job.State), job.HasWork),
-		Totals:      workshop.TotalsFor(lines),
+		Totals:      workshop.TotalsWith(lines, surcharges),
+		Surcharges:  surcharges,
 		Invoices:    invoices,
 		Contact:     contact,
 		Requests:    requests,

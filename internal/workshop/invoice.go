@@ -132,6 +132,16 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 		if len(lines) == 0 {
 			return ErrNothingToInvoice
 		}
+		// Förbrukningsmaterial and the invoicing fee, as lines of their own
+		// on the document, at the shop's settings as they are now. Frozen
+		// with the rest: changing a setting never reaches an issued invoice.
+		// Worked out after the check above, so a fee alone does not make an
+		// order with nothing on it invoiceable.
+		charges, locale, err := readSurcharges(ctx, tx)
+		if err != nil {
+			return err
+		}
+		lines = append(lines, surchargeLines(charges, locale, lines, true)...)
 		totals := money.Compute(toMoneyLines(lines))
 
 		number, err := nextNumber(ctx, tx, scope.ShopID, DefaultSeries)

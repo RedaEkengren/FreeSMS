@@ -271,7 +271,9 @@ func TestEachVATRateReachesItsOwnAccount(t *testing.T) {
 	got := postings(t, body)
 	want := map[int]int64{
 		1510: 212200,  // the customer owes the gross
-		3010: -180000, // the sales, all four lines, net
+		3010: -150000, // the work and the parts, net
+		3540: -20000,  // the fee line, on the invoicing fees account
+		3011: -10000,  // the subcontracted work, on its own account
 		2611: -25000,  // 25 per cent of 1 000,00
 		2621: -6000,   // 12 per cent of 500,00
 		2631: -1200,   // 6 per cent of 200,00

@@ -44,6 +44,8 @@ type pageData struct {
 	Jobs          []workshop.Job
 	Job           workshop.Job
 	Progress      workshop.Progress
+	Surcharges    []workshop.SurchargeLine
+	Charges       workshop.Surcharges
 	Lines         []workshop.Line
 	Board         []workshop.BoardEntry
 	Next          []workshop.State

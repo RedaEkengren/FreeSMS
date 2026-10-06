@@ -63,6 +63,16 @@ func VAT(netMinor int64, rateBasisPoints int) int64 {
 	return divRound(netMinor*int64(rateBasisPoints), 10000)
 }
 
+// Share is a share of an amount in basis points (500 = 5%), rounded half
+// away from zero like every other amount here.
+func Share(minor int64, basisPoints int) int64 {
+	return divRound(minor*int64(basisPoints), 10000)
+}
+
+// Scale is amount * numerator / denominator, rounded half away from zero:
+// one part of a whole that is being cut down to a ceiling.
+func Scale(minor, numerator, denominator int64) int64 { return divRound(minor*numerator, denominator) }
+
 // WithMarkup is a cost plus a markup in basis points (4500 = 45%), rounded
 // half away from zero like every other amount here. Truncating instead loses
 // an öre on half the parts in the catalogue, always in the customer's favour,

@@ -47,6 +47,20 @@
   <button type="submit">{{.T "Save"}}</button>
 </form>
 
+<h2>{{.T "What an invoice adds"}}</h2>
+<p class="waiting">{{.T "Consumables are a share of the labour the customer pays for, never of the parts, at the labour's VAT. The invoicing fee is charged once per invoice, never on a credit note. An invoice keeps what it was charged; changing these changes the next one."}}</p>
+<form method="post" action="/shop/charges">
+  <div class="pair">
+    <label><span>{{.T "Consumables, per cent of the labour"}}</span>
+      <input name="consumables_percent" value="{{.Charges.ConsumablesPercent}}" inputmode="decimal"></label>
+    <label><span>{{.T "At most, per invoice"}}</span>
+      <input name="consumables_cap" value="{{with .Charges.ConsumablesCapMinor}}{{fmt .}}{{end}}" inputmode="decimal" placeholder="{{.T "no ceiling"}}"></label>
+  </div>
+  <label><span>{{.T "Invoicing fee"}}</span>
+    <input name="invoice_fee" value="{{fmt .Charges.InvoiceFeeMinor}}" inputmode="decimal"></label>
+  <button type="submit" class="secondary">{{.T "Save"}}</button>
+</form>
+
 {{if not .Shop.OrgNumber}}
 <p class="error">{{.T "Without a company number and a VAT number an invoice from this workshop is not a complete invoice."}}</p>
 {{end}}
