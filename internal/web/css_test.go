@@ -1,6 +1,7 @@
 package web
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -134,6 +135,24 @@ func TestRedIsReservedForUrgency(t *testing.T) {
 		}
 		if strings.Contains(css, "--danger: "+strings.TrimSuffix(strings.TrimPrefix(l, "--accent: "), ";")) {
 			t.Errorf("the accent and the danger colour are the same value: %q", l)
+		}
+	}
+}
+
+// No template carries a style attribute. The page's content security policy
+// -- style-src 'self', rightly without 'unsafe-inline' -- makes the browser
+// drop them, so a style attribute is a style that silently never applies.
+// There were thirty-five, and none had ever applied.
+func TestNoTemplateCarriesAStyleAttribute(t *testing.T) {
+	entries, err := Templates.ReadDir("templates")
+	if err != nil {
+		t.Fatal(err)
+	}
+	attr := regexp.MustCompile(`<[a-zA-Z][^<>]*\sstyle\s*=`)
+	for _, e := range entries {
+		raw, _ := Templates.ReadFile("templates/" + e.Name())
+		if m := attr.Find(raw); m != nil {
+			t.Errorf("%s: %s -- the policy drops it; use a class in app.css", e.Name(), m)
 		}
 	}
 }

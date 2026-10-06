@@ -51,29 +51,29 @@
       <button name="status" value="attention" class="secondary">Attention</button>
       <button name="status" value="fail" class="secondary">Fail</button>
     </div>
-    <label style="margin-top:0.75rem">
+    <label class="mt-m">
       <span>Note</span>
       <input name="note" value="{{.Note}}" placeholder="Worn to the wear indicator">
     </label>
   </form>
 
-  <form method="post" action="/inspections/{{$.Inspection.ID}}/items/{{.ID}}/photo"
-        enctype="multipart/form-data" style="margin-top:0.5rem">
+  <form class="mt-s" method="post" action="/inspections/{{$.Inspection.ID}}/items/{{.ID}}/photo"
+        enctype="multipart/form-data">
     <!-- capture sends a phone straight to the camera rather than the gallery,
          which is one tap fewer with a dirty hand. -->
     <input type="file" name="photo" accept="image/*" capture="environment" required>
-    <button type="submit" class="secondary" style="margin-top:0.5rem">Add the photograph</button>
+    <button type="submit" class="secondary mt-s">Add the photograph</button>
   </form>
   {{end}}
 </div>
 {{end}}
 
 {{if not .Inspection.Completed}}
-<form method="post" action="/inspections/{{.Inspection.ID}}/complete" style="margin-top:1.5rem" data-offline>
+<form class="mt-l" method="post" action="/inspections/{{.Inspection.ID}}/complete" data-offline>
   <button type="submit">Finish the inspection</button>
 </form>
 {{else if .Session.Scope.Role.SeesCustomerPersonalData}}
-<form method="post" action="/inspections/{{.Inspection.ID}}/share" style="margin-top:1.5rem">
+<form class="mt-l" method="post" action="/inspections/{{.Inspection.ID}}/share">
   <button type="submit">Make a link for the customer</button>
 </form>
 {{end}}
@@ -88,7 +88,7 @@
       {{if .Usable}}<span class="tag pass">open</span>{{else}}<span class="tag">closed</span>{{end}}
     </div>
     {{if .Usable}}
-    <form method="post" action="/inspections/{{$.Inspection.ID}}/revoke" style="margin-top:0.5rem">
+    <form class="mt-s" method="post" action="/inspections/{{$.Inspection.ID}}/revoke">
       <input type="hidden" name="share_id" value="{{.ID}}">
       <button type="submit" class="secondary">Close this link</button>
     </form>
@@ -98,5 +98,5 @@
 </ul>
 {{end}}
 
-<p style="margin-top:2rem"><a href="/jobs/{{.Inspection.WorkOrderID}}">Back to the job</a></p>
+<p class="mt-xl"><a href="/jobs/{{.Inspection.WorkOrderID}}">Back to the job</a></p>
 {{end}}

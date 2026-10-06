@@ -74,7 +74,7 @@
 <h2>{{.T "Move it along"}}</h2>
 <div class="actions">
   {{range .Next}}
-  <form method="post" action="/jobs/{{$.Job.ID}}/state" style="margin:0" data-offline>
+  <form class="m-0" method="post" action="/jobs/{{$.Job.ID}}/state" data-offline>
     <input type="hidden" name="state" value="{{.}}">
     <button type="submit" class="secondary">{{$.T .Action}}</button>
   </form>
@@ -97,7 +97,7 @@
 </ul>
 {{end}}
 {{if .Templates}}
-<form method="post" action="/jobs/{{.Job.ID}}/inspect" style="margin-top:0.5rem">
+<form class="mt-s" method="post" action="/jobs/{{.Job.ID}}/inspect">
   <label>
     <span>{{.T "Start a check"}}</span>
     <select name="template_id">
@@ -141,7 +141,7 @@
     </div>
     <div class="waiting">{{.ReportedBy}}</div>
     {{if and (not .Handled) $.Session.Scope.Role.SeesCustomerPersonalData}}
-    <form method="post" action="/jobs/{{$.Job.ID}}/findings/handled" style="margin-top:0.5rem">
+    <form class="mt-s" method="post" action="/jobs/{{$.Job.ID}}/findings/handled">
       <input type="hidden" name="finding_id" value="{{.ID}}">
       <button type="submit" class="secondary">Dealt with</button>
     </form>
@@ -251,7 +251,7 @@
       <span>{{$.Money .GrossMinor}}</span>
     </div>
     {{if not .IsCreditNote}}
-    <form method="post" action="/jobs/{{$.Job.ID}}/credit" style="margin-top:0.5rem">
+    <form class="mt-s" method="post" action="/jobs/{{$.Job.ID}}/credit">
       <input type="hidden" name="invoice_id" value="{{.ID}}">
       <button type="submit" class="secondary">{{$.T "Credit it"}}</button>
     </form>
@@ -264,7 +264,7 @@
        pieces still owes the diagnosis and the reassembly, so declined leads to
        invoiced -- and this is the only button that gets it there. */}}
   {{if .Session.Scope.Role.SeesCustomerPersonalData}}
-  <form method="post" action="/jobs/{{.Job.ID}}/invoice" style="margin:1rem 0">
+  <form class="my" method="post" action="/jobs/{{.Job.ID}}/invoice">
     <button type="submit">{{.T "Invoice it"}}</button>
   </form>
   {{end}}
@@ -279,7 +279,7 @@
   </label>
   <button type="submit" class="secondary">{{.T "Ask the parts desk"}}</button>
 </form>
-<form method="post" action="/jobs/{{.Job.ID}}/findings" style="margin-top:1rem" data-offline>
+<form class="mt" method="post" action="/jobs/{{.Job.ID}}/findings" data-offline>
   <label>
     <span>{{.T "Something else needs doing"}}</span>
     <input name="note" placeholder="Other track rod end is going too">
@@ -334,7 +334,7 @@
 </div>
 </div>
 
-<p style="margin-top:2rem"><a href="/">{{.T "Back"}}</a></p>
+<p class="mt-xl"><a href="/">{{.T "Back"}}</a></p>
 {{end}}
 
 {{define "shelf"}}

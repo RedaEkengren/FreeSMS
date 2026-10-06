@@ -13,7 +13,7 @@
 {{if .Session.Scope.UserID}}
 <header>
   <nav>
-    <a href="/" style="font-weight:600;text-decoration:none;color:inherit">FreeSMS</a>
+    <a class="brand" href="/">FreeSMS</a>
     {{if .Session.Scope.Role.SeesParts}}<a href="/parts" class="nav">{{.T "Parts"}}</a>
     <a href="/stock" class="nav">{{.T "Stock"}}</a>
     <a href="/scan" class="nav">{{.T "Scan"}}</a>{{end}}
@@ -28,7 +28,7 @@
     {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/labour" class="nav">{{.T "Labour times"}}</a>{{end}}
     <a href="/search" class="nav">{{.T "Search"}}</a>
   </nav>
-  <form method="post" action="/logout" style="margin:0">
+  <form class="m-0" method="post" action="/logout">
     {{/* The role, and the way to one's own account: changing the password
          the owner typed in is the first thing anybody new should do. */}}
     <a href="/account" class="who">{{.T .Session.Scope.Role.Label}}</a>

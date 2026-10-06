@@ -14,7 +14,7 @@ been.</p>
   </div>
   <div class="waiting">{{.UserName}} &middot; {{($.Local .StartedAt).Format "2 Jan 15:04"}}</div>
   {{if .Note}}<div class="waiting">{{.Note}}</div>{{end}}
-  <form method="post" action="/time/correct" style="margin-top:0.75rem">
+  <form class="mt-m" method="post" action="/time/correct">
     <input type="hidden" name="entry_id" value="{{.ID}}">
     <div class="pair">
       <label>

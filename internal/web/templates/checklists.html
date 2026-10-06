@@ -18,7 +18,7 @@
       {{if not .Active}}<span class="tag">{{$.T "retired"}}</span>{{end}}
     </div>
     <div class="waiting">{{$.N "%d checkpoint" (len .Checkpoints)}}{{if .Used}} &middot; {{$.N "used %d time" .Used}}{{end}}</div>
-    <form method="post" action="/checklists/{{.ID}}/active" style="margin-top:0.5rem">
+    <form class="mt-s" method="post" action="/checklists/{{.ID}}/active">
       {{if .Active}}
       <input type="hidden" name="active" value="no">
       <button type="submit" class="link">{{$.T "Retire it"}}</button>

@@ -34,7 +34,7 @@
 </form>
 
 {{if .Catalogue.ID}}
-<form method="post" action="/stock/parts/{{.Catalogue.ID}}/active" style="margin-top:1.5rem">
+<form class="mt-l" method="post" action="/stock/parts/{{.Catalogue.ID}}/active">
   {{if .Catalogue.Active}}
   <input type="hidden" name="active" value="no">
   <button type="submit" class="secondary">{{.T "Retire it"}}</button>

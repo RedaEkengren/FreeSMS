@@ -15,14 +15,14 @@
     </div>
     <div class="waiting">{{.Email}}{{if not .Active}} &middot; {{$.T "switched off"}}{{end}}</div>
     {{if not .You}}
-    <details style="margin-top:0.5rem">
+    <details class="mt-s">
       <summary>{{$.T "Change"}}</summary>
-      <form method="post" action="/staff/{{.UserID}}/password" style="margin-top:0.5rem">
+      <form class="mt-s" method="post" action="/staff/{{.UserID}}/password">
         <label><span>{{$.T "A new password to hand over"}}</span>
           <input type="password" name="password" autocomplete="new-password" minlength="{{$.MinPassword}}" required></label>
         <button type="submit" class="secondary">{{$.T "Set the password"}}</button>
       </form>
-      <form method="post" action="/staff/{{.UserID}}/active" style="margin-top:0.5rem">
+      <form class="mt-s" method="post" action="/staff/{{.UserID}}/active">
         {{if .Active}}
         <input type="hidden" name="active" value="no">
         <button type="submit" class="secondary">{{$.T "Switch off"}}</button>

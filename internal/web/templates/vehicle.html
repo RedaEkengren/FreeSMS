@@ -15,7 +15,7 @@
   {{range .Vehicle.Registrations}}
   <li>
     <div class="row">
-      <span class="plate" style="font-size:1rem">{{.Registration}}</span>
+      <span class="plate plate-small">{{.Registration}}</span>
       {{if .Current}}<span class="tag pass">now</span>
       {{else}}<span class="tag">until {{($.Local .ValidTo).Format "2 Jan 2006"}}</span>{{end}}
     </div>
@@ -36,7 +36,7 @@
     </div>
     {{if .Complaint}}<div class="complaint">{{.Complaint}}</div>{{end}}
     {{if .Lines}}
-      <ul class="lines" style="margin-top:0.5rem">
+      <ul class="lines mt-s">
         {{range .Lines}}<li>{{.}}</li>{{end}}
       </ul>
     {{end}}

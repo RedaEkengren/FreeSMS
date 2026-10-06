@@ -38,7 +38,7 @@ wrongly ordered parts cost.</p>
 
   <details>
     <summary>{{$.T "Record a movement"}}</summary>
-    <form method="post" action="/stock/move" style="margin-top:0.75rem" data-offline>
+    <form class="mt-m" method="post" action="/stock/move" data-offline>
       <input type="hidden" name="part_id" value="{{.ID}}">
       <div class="pair">
         <label><span>{{$.T "How many"}}</span><input name="quantity" value="1" inputmode="decimal"></label>
@@ -68,7 +68,7 @@ wrongly ordered parts cost.</p>
        compared with an hour's more movements. */}}
   <details>
     <summary>{{$.T "Count it"}}</summary>
-    <form method="post" action="/stock/count" style="margin-top:0.75rem">
+    <form class="mt-m" method="post" action="/stock/count">
       <input type="hidden" name="part_id" value="{{.ID}}">
       <label>
         <span>{{$.T "On the shelf now"}}</span>
