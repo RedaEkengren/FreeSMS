@@ -41,6 +41,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# The next release's migration takes the next free number. It was written as
+# 0024, which was free until a real 0024 arrived and the test collided with
+# the code it was testing.
+LAST=$(ls migrations/*.sql | sed -E 's|.*/([0-9]{4})_.*|\1|' | sort -n | tail -1)
+NEXT=$(printf '%04d' $((10#$LAST + 1)))
+
 say() { printf '\n== %s\n' "$1"; }
 fail() { echo "ROLLBACK TEST FAILED: $1" >&2; docker logs "$APP" 2>&1 | tail -20 >&2 || true; exit 1; }
 sql() { docker exec "$DB_CONTAINER" psql -U freesms -d freesms -At -v ON_ERROR_STOP=1 -c "$1"; }
@@ -84,11 +90,11 @@ fresh_database() {
 
 say "building previous (this tree) and two next releases"
 docker build -q -t freesms-rollback:previous . >/dev/null 2>&1
-build_next next-safe 0024_rollback_probe.sql \
+build_next next-safe "${NEXT}_rollback_probe.sql" \
 '-- rollback: safe
 -- A nullable column the previous release never asks for.
 ALTER TABLE shops ADD COLUMN rollback_probe text;'
-build_next next-restore 0024_rollback_probe.sql \
+build_next next-restore "${NEXT}_rollback_probe.sql" \
 '-- rollback: restore
 -- The previous release reads this column by its old name.
 ALTER TABLE work_orders RENAME COLUMN complaint TO complaint_text;'
@@ -106,7 +112,7 @@ for kind in safe restore; do
     STAMP="$(ls "$WORK"/backups/freesms-*.dump | head -1 | sed 's/.*freesms-\(.*\)\.dump/\1/')"
     run "next-$kind"
     healthy || fail "the next release did not start"
-    [ "$(sql "SELECT count(*) FROM schema_migrations WHERE version = 24")" = 1 ] || fail "0024 was not applied"
+    [ "$(sql "SELECT count(*) FROM schema_migrations WHERE version = $((10#$NEXT))")" = 1 ] || fail "$NEXT was not applied"
     sql "SET app.current_shop = '22222222-2222-2222-2222-222222222222';
          INSERT INTO shops (id, name) VALUES ('22222222-2222-2222-2222-222222222222', 'After the deploy');" >/dev/null
 
@@ -116,7 +122,7 @@ for kind in safe restore; do
         healthy || fail "the previous release refused a schema marked safe for it"
         docker logs "$APP" 2>&1 | grep -q 'newer release' || fail "the rollback was not logged"
         [ "$(sql "SELECT count(*) FROM shops")" = 2 ] || fail "writes made after the deploy were lost"
-        echo "previous release healthy over 0024; nothing written since the deploy was lost"
+        echo "previous release healthy over $NEXT; nothing written since the deploy was lost"
         continue
     fi
 
@@ -129,7 +135,7 @@ for kind in safe restore; do
     ./deploy/restore.sh "$WORK/backups" "$STAMP" >/dev/null
     run previous
     healthy || fail "the previous release did not start after the restore"
-    [ "$(sql "SELECT count(*) FROM schema_migrations WHERE version = 24")" = 0 ] || fail "0024 survived the restore"
+    [ "$(sql "SELECT count(*) FROM schema_migrations WHERE version = $((10#$NEXT))")" = 0 ] || fail "$NEXT survived the restore"
     [ "$(sql "SELECT count(*) FROM shops")" = 1 ] || fail "the restore did not go back to before the deploy"
     echo "previous release healthy after the restore; the shop written after the deploy is gone, as documented"
 done
