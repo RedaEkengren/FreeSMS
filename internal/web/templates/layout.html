@@ -20,6 +20,7 @@
     {{if .Session.Scope.Role.RunsTheShop}}<a href="/shop" class="nav">{{.T "The workshop"}}</a>
     <a href="/staff" class="nav">{{.T "Staff"}}</a>{{end}}
     {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/figures" class="nav">{{.T "Figures"}}</a>
+    <a href="/receivables" class="nav">{{.T "Owed"}}</a>
     <a href="/accounting" class="nav">{{.T "Accounting"}}</a>
     <a href="/privacy" class="nav">{{.T "Privacy"}}</a>{{end}}
     {{/* "Hours" and "Times" were two words apart and meant opposite things:

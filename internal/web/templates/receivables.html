@@ -1,0 +1,19 @@
+{{define "content"}}
+<h1>{{.T "Owed"}}</h1>
+<p class="waiting">{{.T "Every invoice with something owed either way, overdue first. Money owed back to a customer is listed too."}}</p>
+{{if not .Receivables}}
+  <p class="empty">{{.T "Nothing is owed."}}</p>
+{{else}}
+<ul class="lines">
+  {{range .Receivables}}
+  <li>
+    <div class="row">
+      <a href="/invoices/{{.InvoiceID}}">{{.Reference}} &middot; {{.CustomerName}}</a>
+      <span>{{$.Money .OutstandingMinor}}{{if .Overdue}} <span class="tag late">{{$.T "overdue"}}</span>{{end}}</span>
+    </div>
+    <div class="waiting">{{if lt .OutstandingMinor 0}}{{$.T "Owed back to the customer"}}{{else}}{{$.T "Due %s" (($.Local .Due).Format "2 Jan 2006")}}{{end}}</div>
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{end}}

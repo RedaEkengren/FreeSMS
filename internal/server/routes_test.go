@@ -48,7 +48,7 @@ var swept = map[string]string{
 	"POST /drafts": "", "GET /drafts": "", "DELETE /drafts": "",
 	"GET /search": "", "GET /scan": "", "GET /labels": "", "GET /stock": "",
 	"POST /stock/move": "", "POST /stock/count": "", "GET /stock/parts/new": "", "POST /stock/parts": "",
-	"GET /staff": "", "POST /staff": "", "GET /account": "", "POST /account/password": "", "POST /stock/bands": "", "GET /parts": "",
+	"GET /staff": "", "GET /receivables": "", "POST /staff": "", "GET /account": "", "POST /account/password": "", "POST /stock/bands": "", "GET /parts": "",
 	"POST /parts/arrived": "", "GET /checklists": "", "POST /checklists": "",
 
 	// The customer's link. Not a shop identifier: it is an unguessable token,
@@ -75,6 +75,8 @@ var swept = map[string]string{
 	"POST /jobs/{id}/clock-in":                    "sweep",
 	"POST /jobs/{id}/clock-out":                   "sweep",
 	"GET /invoices/{id}":                          "sweep",
+	"POST /invoices/{id}/payments":                "sweep",
+	"POST /payments/{id}/reverse":                 "sweep",
 	"GET /inspections/{id}":                       "sweep",
 	"POST /inspections/{id}/items/{itemID}":       "sweep",
 	"POST /inspections/{id}/items/{itemID}/photo": "sweep",
@@ -101,6 +103,7 @@ func fill(pattern string) (method, path string) {
 	for from, to := range map[string]string{
 		"/jobs/{id}":        "/jobs/" + jobB,
 		"/invoices/{id}":    "/invoices/" + invoiceB,
+		"/payments/{id}":    "/payments/" + paymentB,
 		"/inspections/{id}": "/inspections/" + inspectionB,
 		"/people/{id}":      "/people/" + personB,
 		"/vehicles/{id}":    "/vehicles/" + vehicleB,

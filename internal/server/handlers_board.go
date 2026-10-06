@@ -38,6 +38,22 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// An invoiced car still on the board with its invoice overdue says so:
+	// the counter is where the customer collecting it is standing.
+	if owed, err := workshop.Receivables(r.Context(), s.pool, session.Scope); err != nil {
+		s.log.Error("receivables", "error", err)
+	} else {
+		overdue := map[string]bool{}
+		for _, b := range owed {
+			if b.Overdue() {
+				overdue[b.WorkOrderID] = true
+			}
+		}
+		for i := range entries {
+			entries[i].Overdue = overdue[entries[i].ID]
+		}
+	}
+
 	s.render(w, r, http.StatusOK, "board", pageData{
 		Title:   "In the shop",
 		Session: session,

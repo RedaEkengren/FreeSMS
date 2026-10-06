@@ -90,6 +90,7 @@ test.describe.serial('a morning, from an empty database', () => {
     await page.getByRole('link', { name: /A-1/ }).first().click();
     await expect(page.getByText('Karin Kund')).toBeVisible();
     await expect(page.getByText('Byte av bromsskivor fram')).toBeVisible();
-    await expect(page.getByText(/1[\s\u00a0,]?678[.,]13/)).toBeVisible();
+    // On the document itself; the balance below repeats the figure.
+    await expect(page.locator('article').getByText(/1[\s\u00a0,]?678[.,]13/)).toBeVisible();
   });
 });

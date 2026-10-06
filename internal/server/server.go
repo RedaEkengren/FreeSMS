@@ -274,6 +274,9 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/invoice", s.requireSession(s.handleInvoice))
 	mux.HandleFunc("POST /jobs/{id}/credit", s.requireSession(s.handleCreditNote))
 	mux.HandleFunc("GET /invoices/{id}", s.requireSession(s.handleInvoiceDocument))
+	mux.HandleFunc("POST /invoices/{id}/payments", s.requireSession(s.handleRecordPayment))
+	mux.HandleFunc("POST /payments/{id}/reverse", s.requireSession(s.handleReversePayment))
+	mux.HandleFunc("GET /receivables", s.requireSession(s.handleReceivables))
 
 	mux.HandleFunc("POST /jobs/{id}/inspect", s.requireSession(s.handleStartInspection))
 	mux.HandleFunc("POST /jobs/{id}/promise", s.requireSession(s.handlePromise))

@@ -29,6 +29,8 @@ var defaultAccounts = []struct {
 	{"sublet", 3011, "Försäljning, främmande arbete"},
 	{"consumables", 3590, "Övriga fakturerade kostnader"},
 	{"invoice_fee", 3540, "Faktureringsavgifter"},
+	{"cash", 1910, "Kassa"},
+	{"bank", 1930, "Företagskonto"},
 	{"vat_25", 2611, "Utgående moms 25%"},
 	{"vat_12", 2621, "Utgående moms 12%"},
 	{"vat_6", 2631, "Utgående moms 6%"},
@@ -135,11 +137,52 @@ func ExportAccounting(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			return err
 		}
 
-		if len(docs) == 0 {
+		// Payments that arrived in the period, by the day they arrived. A
+		// bookkeeper given revenue with no settlement against it has a
+		// receivable that never clears.
+		type pay struct {
+			id, invoiceID, method, invoiceRef, customer string
+			number                                      int64
+			amount, rounding                            int64
+			paidOn                                      time.Time
+			reverses, exported                          bool
+		}
+		var pays []pay
+		prows, err := tx.Query(ctx, `
+			SELECT p.id, p.invoice_id, p.method, i.series || '-' || i.number, i.customer_name,
+			       p.number, p.amount_minor, p.rounding_minor, p.paid_on,
+			       p.reverses_id IS NOT NULL, p.accounting_export_id IS NOT NULL
+			FROM invoice_payments p JOIN invoices i ON i.id = p.invoice_id
+			WHERE p.paid_on >= $1::date AND p.paid_on < $2::date
+			ORDER BY p.series, p.number
+			FOR UPDATE OF p`, from.Format("2006-01-02"), to.Format("2006-01-02"))
+		if err != nil {
+			return fmt.Errorf("read payments: %w", err)
+		}
+		for prows.Next() {
+			var p pay
+			if err := prows.Scan(&p.id, &p.invoiceID, &p.method, &p.invoiceRef, &p.customer,
+				&p.number, &p.amount, &p.rounding, &p.paidOn, &p.reverses, &p.exported); err != nil {
+				prows.Close()
+				return fmt.Errorf("scan payment: %w", err)
+			}
+			pays = append(pays, p)
+		}
+		prows.Close()
+		if err := prows.Err(); err != nil {
+			return err
+		}
+
+		if len(docs) == 0 && len(pays) == 0 {
 			return ErrNothingToExport
 		}
 		for _, d := range docs {
 			if d.exported && !again {
+				return ErrAlreadyExported
+			}
+		}
+		for _, p := range pays {
+			if p.exported && !again {
 				return ErrAlreadyExported
 			}
 		}
@@ -282,7 +325,33 @@ func ExportAccounting(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 				Entries: entries,
 			})
 		}
-		count = len(docs)
+
+		// Each payment its own voucher in its own series, dated the day the
+		// money came: into the till or the bank, out of the receivable, with
+		// any öre rounded at the counter on the rounding account.
+		for _, p := range pays {
+			into := accounts["bank"]
+			if p.method == "cash" {
+				into = accounts["cash"]
+			}
+			entries := []sie.Entry{{Account: into, Minor: p.amount}}
+			if p.rounding != 0 {
+				entries = append(entries, sie.Entry{Account: accounts["rounding"], Minor: p.rounding})
+			}
+			entries = append(entries, sie.Entry{Account: accounts["receivable"], Minor: -(p.amount + p.rounding)})
+			text := fmt.Sprintf("Betalning %s %s", p.invoiceRef, p.customer)
+			if p.reverses {
+				text = fmt.Sprintf("Rättelse av betalning %s %s", p.invoiceRef, p.customer)
+			}
+			file.Verifications = append(file.Verifications, sie.Verification{
+				Series:  PaymentSeries,
+				Number:  fmt.Sprintf("%d", p.number),
+				Date:    p.paidOn,
+				Text:    text,
+				Entries: entries,
+			})
+		}
+		count = len(docs) + len(pays)
 
 		var exportID string
 		if err := tx.QueryRow(ctx, `
@@ -290,6 +359,13 @@ func ExportAccounting(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			VALUES ($1, $2, $3, $4, $5) RETURNING id`,
 			scope.ShopID, from, to.AddDate(0, 0, -1), scope.UserID, count).Scan(&exportID); err != nil {
 			return fmt.Errorf("record the export: %w", err)
+		}
+
+		if _, err := tx.Exec(ctx, `
+			UPDATE invoice_payments SET accounting_export_id = $1
+			WHERE paid_on >= $2::date AND paid_on < $3::date AND accounting_export_id IS NULL`,
+			exportID, from.Format("2006-01-02"), to.Format("2006-01-02")); err != nil {
+			return fmt.Errorf("mark payments as exported: %w", err)
 		}
 
 		// Only documents not already handed over get marked, so a deliberate

@@ -104,12 +104,19 @@ func TestAnIndependentReaderReadsTheExportAsMeant(t *testing.T) {
 	if _, err := workshop.CreditNote(ctx, pool, advisor(), inv.ID); err != nil {
 		t.Fatalf("CreditNote: %v", err)
 	}
+	// And money that came in for it anyway, in cash, before the credit:
+	// a voucher in series B, rounded at the counter.
+	paid, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: func() *int64 { v := int64(256300); return &v }(), Method: "cash", PaidOn: time.Now()})
+	if err != nil {
+		t.Fatalf("RecordPayment: %v", err)
+	}
 
 	stockholm, _ := time.LoadLocation("Europe/Stockholm")
 	today := time.Now().In(stockholm)
 	from := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, stockholm)
 	body, count, err := workshop.ExportAccounting(ctx, pool, advisor(), from, from.AddDate(0, 1, 0), false)
-	if err != nil || count != 2 {
+	if err != nil || count != 3 {
 		t.Fatalf("ExportAccounting: %d documents, %v", count, err)
 	}
 
@@ -120,9 +127,21 @@ func TestAnIndependentReaderReadsTheExportAsMeant(t *testing.T) {
 	if r.Company != "Verkstaden" {
 		t.Errorf("company read as %q", r.Company)
 	}
-	if len(r.Vouchers) != 2 {
-		t.Fatalf("read %d vouchers, want the invoice and its credit note", len(r.Vouchers))
+	if len(r.Vouchers) != 3 {
+		t.Fatalf("read %d vouchers, want the invoice, its credit note and the payment", len(r.Vouchers))
 	}
+	// The payment, read by jsiSIE as its own series, into the till and out
+	// of the receivable.
+	pv := r.Vouchers[2]
+	payRows := map[string]string{}
+	for _, row := range pv.Rows {
+		payRows[row.Account] = row.Amount
+	}
+	if pv.Series != "B" || payRows["1910"] != "2563.00" || payRows["1510"] != "-2563.00" {
+		t.Errorf("payment voucher read as %s %s %v, want B into 1910 and out of 1510", pv.Series, pv.Number, payRows)
+	}
+	_ = paid
+	r.Vouchers = r.Vouchers[:2]
 
 	// Net: 1 342,50 + 90,93 + 500,01 + 200,00 = 2 133,44.
 	// VAT:   25% of 1 433,43 = 358,36; 12% of 500,01 = 60,00; 6% of 200,00 = 12,00.

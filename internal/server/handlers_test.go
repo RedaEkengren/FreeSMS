@@ -36,6 +36,7 @@ const (
 	itemB       = "bbbbbbbb-0000-0000-0000-000000000007"
 	photoB      = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	checklistB  = "bbbbbbbb-0000-0000-0000-000000000008"
+	paymentB    = "bbbbbbbb-0000-0000-0000-000000000009"
 
 	// A string that appears nowhere in shop A. If it reaches a response body,
 	// something leaked, whatever the status code said.
@@ -143,6 +144,9 @@ func testServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 		    net_minor, vat_minor, gross_minor)
 		 VALUES ('` + invoiceB + `','` + shopB + `','B',1,'` + jobB + `','` + secretB + `',
 		         100000, 25000, 125000)`,
+		`INSERT INTO invoice_payments (id, shop_id, invoice_id, series, number, amount_minor, method, paid_on, recorded_by)
+		 VALUES ('` + paymentB + `','` + shopB + `','` + invoiceB + `','B',1,1000,'bank',current_date,
+		         'bbbbbbbb-0000-0000-0000-0000000000bb')`,
 	})
 
 	cfg := &config.Config{

@@ -49,6 +49,10 @@ type BoardEntry struct {
 
 	// Promised, sold and clocked, put together.
 	Progress Progress
+
+	// Invoiced and not paid past its due date. Set by whoever has the
+	// receivables at hand; the board's own query does not read payments.
+	Overdue bool
 }
 
 // Waiting says what the vehicle is waiting for, in words a person at a counter

@@ -265,6 +265,7 @@ func TestTemplatesPrintInstantsInTheShopsZone(t *testing.T) {
 		".PeriodFrom": true, ".PeriodTo": true, // built in the shop's zone in Go
 		".Dashboard.From": true,              // likewise
 		".From":           true, ".To": true, // accounting export periods: date columns
+		".PaidOn": true, // the day a payment arrived: a date column
 	}
 	direct := regexp.MustCompile(`\{\{\s*((?:\$)?\.[A-Za-z.]+)\.Format\b`)
 	entries, _ := Templates.ReadDir("templates")

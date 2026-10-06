@@ -52,6 +52,6 @@ test.describe.serial('what an invoice adds', () => {
     await page.getByRole('link', { name: /A-\d+/ }).first().click();
     await expect(page.getByText('Consumables, 5.0% of the labour')).toBeVisible();
     await expect(page.getByText('Invoicing fee')).toBeVisible();
-    await expect(page.getByText(/1,823\.29/)).toBeVisible();
+    await expect(page.locator('article').getByText(/1,823\.29/)).toBeVisible();
   });
 });

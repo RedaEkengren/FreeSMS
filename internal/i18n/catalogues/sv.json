@@ -879,6 +879,84 @@
     },
     "Consumables are a share of the labour the customer pays for, never of the parts, at the labour's VAT. The invoicing fee is charged once per invoice, never on a credit note. An invoice keeps what it was charged; changing these changes the next one.": {
       "other": "Förbrukningsmaterial är en andel av det arbete kunden betalar, aldrig av delarna, med arbetets moms. Faktureringsavgiften tas en gång per faktura, aldrig på en kreditfaktura. En faktura behåller det den debiterades; ändras detta gäller det nästa faktura."
+    },
+    "Paid": {
+      "other": "Betalt"
+    },
+    "Credited": {
+      "other": "Krediterat"
+    },
+    "Owed back to the customer": {
+      "other": "Att betala tillbaka till kunden"
+    },
+    "Outstanding": {
+      "other": "Kvar att betala"
+    },
+    "overdue": {
+      "other": "förfallen"
+    },
+    "settled": {
+      "other": "betald"
+    },
+    "rounding": {
+      "other": "öresavrundning"
+    },
+    "Recorded by %s, %s": {
+      "other": "Registrerad av %s, %s"
+    },
+    "reverses a payment recorded in error": {
+      "other": "rättar en felregistrerad betalning"
+    },
+    "Recorded in error: reverse it": {
+      "other": "Felregistrerad: rätta den"
+    },
+    "all of it": {
+      "other": "hela beloppet"
+    },
+    "Arrived on": {
+      "other": "Betaldag"
+    },
+    "How": {
+      "other": "Hur"
+    },
+    "Reference": {
+      "other": "Referens"
+    },
+    "Left empty, the amount is whatever is owed; in cash it is rounded to the krona and the difference kept apart.": {
+      "other": "Lämnas beloppet tomt betalas det som är kvar; kontant avrundas det till hel krona och skillnaden hålls isär."
+    },
+    "Record the payment": {
+      "other": "Registrera betalningen"
+    },
+    "Owed": {
+      "other": "Obetalt"
+    },
+    "Every invoice with something owed either way, overdue first. Money owed back to a customer is listed too.": {
+      "other": "Alla fakturor med något kvar åt endera hållet, förfallna först. Pengar att betala tillbaka till en kund visas också."
+    },
+    "Nothing is owed.": {
+      "other": "Inget är obetalt."
+    },
+    "Due %s": {
+      "other": "Förfaller %s"
+    },
+    "bank": {
+      "other": "bank"
+    },
+    "cash": {
+      "other": "kontant"
+    },
+    "card": {
+      "other": "kort"
+    },
+    "swish": {
+      "other": "Swish"
+    },
+    "other": {
+      "other": "annat"
+    },
+    "unpaid, overdue": {
+      "other": "obetald, förfallen"
     }
   },
   "name": "Svenska"

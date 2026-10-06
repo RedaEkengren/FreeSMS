@@ -9,6 +9,7 @@
     <div class="row">
       <span class="plate">{{if .Registration}}{{.Registration}}{{else}}{{$.T "no plate"}}{{end}}</span>
       {{if .Late}}<span class="tag late">{{$.T "late"}}</span>{{end}}
+      {{if .Overdue}}<span class="tag late">{{$.T "unpaid, overdue"}}</span>{{end}}
     </div>
     <div class="vehicle">{{$.Dot (printf "#%d" .Number) (printf "%s %s" .Make .Model) .CustomerName}}</div>
     {{if not .HasCustomer}}<div class="waiting">{{$.T "No customer recorded yet"}}</div>{{end}}

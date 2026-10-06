@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
@@ -259,10 +260,17 @@ func (s *Server) handleInvoiceDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	balance, err := workshop.BalanceFor(r.Context(), s.pool, session.Scope, doc.ID)
+	if err != nil {
+		s.log.Error("read balance", "error", err)
+	}
 	s.render(w, r, http.StatusOK, "invoice", pageData{
 		Title:    doc.Reference(),
 		Session:  session,
 		Document: doc,
+		Balance:  balance,
+		Methods:  workshop.PaymentMethods,
+		Today:    time.Now().In(s.shopLocation(r)).Format("2006-01-02"),
 	})
 }
 

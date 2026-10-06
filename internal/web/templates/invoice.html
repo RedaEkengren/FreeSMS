@@ -62,6 +62,59 @@
   {{if .IssuedBy}}<p class="waiting">{{$.T "Issued by %s" .IssuedBy}}</p>{{end}}
 </article>
 
+{{/* What is owed: the invoice, its credit notes and what has been paid.
+     Not printed: the document is what was sent, the balance is today's. */}}
+{{if $.Balance.InvoiceID}}
+<section class="no-print mt-l">
+<h2>{{$.T "Paid"}}</h2>
+{{with $.Balance}}
+<dl>
+  <dt>{{$.T "Invoiced"}}</dt><dd>{{$.Money .GrossMinor}}</dd>
+  {{if .CreditedMinor}}<dt>{{$.T "Credited"}}</dt><dd>{{$.Money .CreditedMinor}}</dd>{{end}}
+  <dt>{{$.T "Paid"}}</dt><dd>{{$.Money .PaidMinor}}</dd>
+  <dt class="grand">{{if lt .OutstandingMinor 0}}{{$.T "Owed back to the customer"}}{{else}}{{$.T "Outstanding"}}{{end}}</dt>
+  <dd class="grand">{{$.Money .OutstandingMinor}}
+    {{if .Overdue}}<span class="tag late">{{$.T "overdue"}}</span>{{else if .Settled}}<span class="tag">{{$.T "settled"}}</span>{{end}}</dd>
+  <dt>{{$.T "Due"}}</dt><dd>{{($.Local .Due).Format "2 Jan 2006"}}</dd>
+</dl>
+{{if .Payments}}
+<ul class="lines">
+  {{range .Payments}}
+  <li>
+    <div class="row">
+      <span>{{.Series}}-{{.Number}} &middot; {{.PaidOn.Format "2 Jan 2006"}} &middot; {{$.T .Method}}{{if .Reference}} &middot; {{.Reference}}{{end}}</span>
+      <span>{{$.Money .AmountMinor}}{{if .RoundingMinor}} + {{$.Money .RoundingMinor}} {{$.T "rounding"}}{{end}}</span>
+    </div>
+    <div class="waiting">{{$.T "Recorded by %s, %s" .RecordedBy (($.Local .RecordedAt).Format "2 Jan 15:04")}}{{if .Reverses}} &middot; {{$.T "reverses a payment recorded in error"}}{{end}}</div>
+    {{if and (not .Reversed) (not .Reverses)}}
+    <form method="post" action="/payments/{{.ID}}/reverse">
+      <input type="hidden" name="invoice" value="/invoices/{{$.Balance.InvoiceID}}">
+      <button type="submit" class="link">{{$.T "Recorded in error: reverse it"}}</button>
+    </form>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{end}}
+<form method="post" action="/invoices/{{$.Balance.InvoiceID}}/payments" data-keep="payment:{{$.Balance.InvoiceID}}">
+  <div class="pair">
+    <label><span>{{$.T "Amount"}}</span>
+      <input name="amount" inputmode="decimal" placeholder="{{$.T "all of it"}}"></label>
+    <label><span>{{$.T "Arrived on"}}</span>
+      <input type="date" name="paid_on" value="{{$.Today}}" required></label>
+  </div>
+  <div class="pair">
+    <label><span>{{$.T "How"}}</span>
+      <select name="method">{{range $.Methods}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+    <label><span>{{$.T "Reference"}}</span><input name="reference" placeholder="OCR"></label>
+  </div>
+  <p class="waiting">{{$.T "Left empty, the amount is whatever is owed; in cash it is rounded to the krona and the difference kept apart."}}</p>
+  <button type="submit">{{$.T "Record the payment"}}</button>
+</form>
+</section>
+{{end}}
+
 <div class="no-print">
   <button type="button" class="secondary" data-print>{{$.T "Print"}}</button>
   <p class="mt-l"><a href="/jobs/{{.WorkOrderID}}">{{$.T "Back to the job"}}</a></p>

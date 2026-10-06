@@ -1,6 +1,7 @@
 package database
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -90,5 +91,22 @@ func TestLoadIgnoresNonSQLFiles(t *testing.T) {
 	}
 	if len(got) != 1 {
 		t.Fatalf("load() returned %d migrations, want 1", len(got))
+	}
+}
+
+// The application role was renamed to freesms_app in 0018. A later migration
+// naming the old one works on a cluster that still has it from before -- a
+// developer's, where it was found to pass -- and fails on every fresh one,
+// which is every new installation. Found when the SIE check, which starts
+// from an empty cluster, could not apply 0025.
+func TestNoMigrationAfterTheRenameNamesTheOldRole(t *testing.T) {
+	migrations, err := load(os.DirFS("../../migrations"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range migrations {
+		if m.version > 18 && strings.Contains(m.body, "redasms_app") {
+			t.Errorf("%04d_%s.sql names redasms_app, which was renamed to freesms_app in 0018", m.version, m.name)
+		}
 	}
 }

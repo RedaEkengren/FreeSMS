@@ -52,6 +52,10 @@ type pageData struct {
 	Totals        money.Totals
 	Invoices      []workshop.Invoice
 	Document      workshop.Document
+	Balance       workshop.Balance
+	Receivables   []workshop.Balance
+	Methods       []string
+	Today         string
 	Contact       workshop.Contact
 	Shop          workshop.ShopDetails
 	Customers     []workshop.Customer
@@ -247,7 +251,7 @@ func (d pageData) N(key string, count int, args ...any) string {
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "shop", "customer", "checklists", "part", "staff", "account", "setup", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "shop", "customer", "checklists", "part", "staff", "account", "receivables", "setup", "error"}
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).Funcs(templateFuncs).ParseFS(web.Templates,
