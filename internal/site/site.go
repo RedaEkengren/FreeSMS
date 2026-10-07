@@ -194,6 +194,8 @@ func Generate(root string) ([]byte, error) {
 		// Whether a role is given a customer's personal data, as the
 		// product decides it where the data is read.
 		"sees": func(role string) bool { return access.Role(role).SeesCustomerPersonalData() },
+		// The languages that shipped, named in themselves.
+		"languages": workshop.Languages,
 		// A role as the header names it.
 		"role": func(role string) (string, error) {
 			label := access.Role(role).Label()

@@ -1,17 +1,129 @@
 /* The FreeSMS site. Static, no build step, no third-party anything: the same
-   promises the product makes. System fonts and the product's own palette. */
-:root { color-scheme: light; --bg: #f4f5f7; --text: #14171c; --muted: #5b6270; --accent: #1f2328; }
+   promises the product makes. System fonts and the product's own palette --
+   graphite and white, amber for the one thing to look at. */
+:root {
+  color-scheme: light;
+  --bg: #f6f7f9; --card: #fff; --line: #e3e6eb; --text: #14171c; --muted: #5b6270;
+  --ink: #1f2328; --amber: #8a5a00; --amber-soft: #fff4d6; --amber-line: #f0d58a; --ok: #0a7d37;
+  --radius: 16px; --shadow: 0 1px 2px rgba(20,23,28,.04), 0 8px 24px rgba(20,23,28,.06);
+}
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text);
-  font: 1.0625rem/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow-x: hidden; }
-main { max-width: 64rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
-header.top { display: flex; justify-content: space-between; align-items: center; max-width: 64rem; margin: 0 auto; padding: 1rem; }
-header.top b { font-size: 1.125rem; letter-spacing: .01em; }
-header.top a { color: var(--text); }
-.hero h1 { font-size: clamp(1.9rem, 5vw, 3rem); line-height: 1.1; margin: 1.5rem 0 .75rem; letter-spacing: -.02em; }
-.hero p { font-size: 1.15rem; color: var(--muted); max-width: 40rem; margin: 0 0 2rem; }
-.scene { margin: 2.5rem 0 1rem; }
-.scene h2 { font-size: 1.4rem; margin: 0 0 .25rem; }
-.scene .lede { color: var(--muted); margin: 0 0 1rem; max-width: 42rem; }
-.scene .truth { font-size: .875rem; color: var(--muted); font-style: italic; margin-top: .6rem; }
-footer { max-width: 64rem; margin: 0 auto; padding: 2rem 1rem; color: var(--muted); font-size: .9rem; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--bg); color: var(--text); overflow-x: hidden;
+  font: 1.0625rem/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+main { max-width: 68rem; margin: 0 auto; padding: 0 1rem 2rem; }
+section { margin: 0 auto; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2rem); font-weight: 800; letter-spacing: -.02em; line-height: 1.15; text-align: center; margin: 0 0 .5rem; }
+.sub { color: var(--muted); text-align: center; max-width: 40rem; margin: 0 auto 1.75rem; }
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+header.top { display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  max-width: 68rem; margin: 0 auto; padding: 1.1rem 1rem; border-bottom: 1px solid var(--line); }
+.brand { display: inline-flex; align-items: center; gap: .6rem; text-decoration: none;
+  font-weight: 700; letter-spacing: .18em; font-size: .95rem; color: var(--muted); }
+.logo { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 10px;
+  background: var(--ink); color: #fff; }
+.logo svg { width: 1.25rem; height: 1.25rem; }
+header nav { display: flex; align-items: center; gap: 1.25rem; font-size: .92rem; }
+header nav a { text-decoration: none; color: var(--muted); }
+header nav a:hover { color: var(--text); }
+header nav .cta-small { background: var(--ink); color: #fff; padding: .5rem .9rem; border-radius: 8px;
+  font-weight: 700; font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; }
+header nav .cta-small:hover { color: #fff; background: #000; }
+@media (max-width: 560px) { header nav a:not(.cta-small) { display: none; } }
+
+/* ── Hero ────────────────────────────────────────────────────────────── */
+.hero { text-align: center; padding: 3rem 0 1.5rem; max-width: 50rem; }
+.badge { display: inline-flex; align-items: center; gap: .55rem; border: 1px solid var(--line); background: var(--card);
+  border-radius: 99px; padding: .4rem 1rem; font-size: .78rem; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--muted); box-shadow: var(--shadow); }
+.badge .dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--ok); }
+.hero h1 { font-size: clamp(2.2rem, 6.2vw, 3.9rem); font-weight: 800; line-height: 1.04; letter-spacing: -.035em; margin: 1.4rem 0 1rem; }
+.hero h1 em { font-style: normal; color: var(--amber); }
+.hero .sub { font-size: 1.15rem; margin-bottom: .75rem; }
+.hero .facts { color: var(--text); font-weight: 600; font-size: .95rem; margin: 0 0 1.6rem; }
+.ctas { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; text-decoration: none;
+  background: var(--ink); color: #fff; font-weight: 700; padding: .85rem 1.4rem; border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(20,23,28,.18); transition: transform .15s ease, box-shadow .15s ease; }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(20,23,28,.22); }
+.btn.ghost { background: var(--card); color: var(--text); border: 1px solid var(--line); box-shadow: var(--shadow); }
+
+/* ── Scenes ──────────────────────────────────────────────────────────── */
+.scene { margin: 2rem auto 0; }
+.scene h2 { margin-bottom: .35rem; }
+.scene .lede { color: var(--muted); max-width: 44rem; margin: 0 auto 1.25rem; text-align: center; }
+.scene .truth { font-size: .85rem; color: var(--muted); margin: .9rem auto 0; max-width: 52rem; text-align: center; }
+.scene .truth a { color: var(--text); font-weight: 600; }
+/* The hero's scene sits in a frame, as the first thing a visitor sees move. */
+.scene-hero { background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 1.5rem;
+  box-shadow: var(--shadow); max-width: 64rem; }
+.scene-hero h2 { font-size: 1.25rem; }
+@media (max-width: 560px) { .scene-hero { padding: 1rem .6rem; border-radius: 18px; } }
+
+/* ── Three steps ─────────────────────────────────────────────────────── */
+.steps { padding: 4.5rem 0 1rem; }
+.step-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; max-width: 58rem; margin: 1.75rem auto 0; }
+.step { text-align: center; }
+.step .icon { display: grid; place-items: center; width: 4.5rem; height: 4.5rem; margin: 0 auto .9rem; border-radius: 20px;
+  background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); color: var(--ink); }
+.step .icon svg { width: 2.1rem; height: 2.1rem; }
+.step b { display: block; font-weight: 700; font-size: 1.05rem; margin-bottom: .3rem; }
+.step p { color: var(--muted); font-size: .95rem; margin: 0 auto; max-width: 18rem; }
+@media (max-width: 720px) { .step-grid { grid-template-columns: 1fr; gap: 2rem; } }
+
+/* ── Tabs ────────────────────────────────────────────────────────────── */
+.tabs-sec { padding: 4rem 0 1rem; }
+.tabbar { display: none; }
+.tabs-on .tabbar { display: flex; justify-content: center; gap: .5rem; margin: 0 auto 1.25rem;
+  overflow-x: auto; padding: .25rem; scrollbar-width: none; }
+.tabbar::-webkit-scrollbar { display: none; }
+.tabbar button { flex: 0 0 auto; font: inherit; font-weight: 600; font-size: .95rem; cursor: pointer;
+  background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 99px; padding: .6rem 1.15rem;
+  box-shadow: var(--shadow); transition: background .15s ease, color .15s ease; }
+.tabbar button[aria-selected="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+.tabbar button:focus-visible { outline: 3px solid var(--amber-line); outline-offset: 2px; }
+.tabs-on .pane { margin-top: 0; background: var(--card); border: 1px solid var(--line); border-radius: 24px;
+  padding: 1.5rem; box-shadow: var(--shadow); }
+.tabs-on .pane h2 { font-size: 1.25rem; }
+.pane[hidden] { display: none; }
+@media (max-width: 720px) { .tabs-on .tabbar { justify-content: flex-start; } .tabs-on .pane { padding: 1rem .6rem; } }
+
+/* ── Proof ───────────────────────────────────────────────────────────── */
+.proof { padding: 4.5rem 0 1rem; }
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; max-width: 60rem; margin: 1.75rem auto 1.25rem; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.25rem 1rem;
+  text-align: center; box-shadow: var(--shadow); }
+.stat b { display: block; font-weight: 800; font-size: 1.9rem; letter-spacing: -.02em; line-height: 1.1; }
+.stat span { color: var(--muted); font-size: .9rem; }
+.checks { list-style: none; padding: 0; margin: 0 auto; display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; }
+.checks li { display: inline-flex; align-items: center; gap: .45rem; background: #effaf2; color: var(--ok);
+  border: 1px solid #c7ecd2; border-radius: 99px; padding: .45rem .95rem; font-weight: 600; font-size: .9rem; }
+.checks li::before { content: "✓"; font-weight: 800; }
+@media (max-width: 720px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* ── Questions ───────────────────────────────────────────────────────── */
+.faq { padding: 4.5rem 0 1rem; max-width: 46rem; }
+.faq h2 { margin-bottom: 1.5rem; }
+.faq details { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: .6rem;
+  box-shadow: var(--shadow); }
+.faq summary { cursor: pointer; list-style: none; padding: 1rem 1.25rem; font-weight: 650; display: flex;
+  justify-content: space-between; gap: 1rem; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; color: var(--muted); font-weight: 400; font-size: 1.3rem; line-height: 1; }
+.faq details[open] summary::after { content: "−"; }
+.faq details p { margin: 0; padding: 0 1.25rem 1.1rem; color: var(--muted); }
+
+/* ── The end ─────────────────────────────────────────────────────────── */
+.final { margin-top: 4.5rem; text-align: center; background: var(--ink); color: #fff; border-radius: 24px;
+  padding: 3rem 1.25rem; max-width: 64rem; }
+.final h2 { color: #fff; }
+.final p { color: #c9ccd2; margin: 0 0 1.25rem; }
+.final pre { display: block; width: fit-content; margin-left: auto; margin-right: auto; text-align: left; background: #14171c; border: 1px solid #3a4049; border-radius: 12px;
+  padding: .9rem 1.2rem; margin-bottom: 1.5rem; font: .92rem/1.6 ui-monospace, Menlo, Consolas, monospace; color: #e9ebef;
+  max-width: 100%; overflow-x: auto; }
+.final .btn { background: #fff; color: var(--ink); }
+footer { max-width: 68rem; margin: 0 auto; padding: 2rem 1rem 3rem; color: var(--muted); font-size: .9rem;
+  display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }

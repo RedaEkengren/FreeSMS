@@ -123,7 +123,9 @@
     function tick(now) {
       if (!running) return;
       t += Math.min(.1, (now - prev) / 1000); prev = now;
-      if (t >= loop) { t = 0; lastT = 0; }
+      // A scene that has played to its end says so, so that a page can move
+      // on to the next one (the tabs do, until somebody picks a tab).
+      if (t >= loop) { t = 0; lastT = 0; wrap.dispatchEvent(new CustomEvent('an:loop')); }
       render(t);
       wrap.__anT = t;
       raf = requestAnimationFrame(tick);
@@ -134,6 +136,8 @@
       else if (!go && running) { running = false; cancelAnimationFrame(raf); }
     }
     render(0);
+    // From the beginning, for a scene whose tab was just opened.
+    wrap.addEventListener('an:restart', function () { t = 0; lastT = 0; render(0); resize(); });
     document.addEventListener('visibilitychange', sync);
     if ('IntersectionObserver' in window) {
       new IntersectionObserver(function (es) { visible = es[0].isIntersecting; sync(); }, { threshold: 0.4 }).observe(wrap);

@@ -11,16 +11,30 @@
 <link rel="stylesheet" href="site.css">
 <link rel="stylesheet" href="anim.css">
 <script src="anim.js" defer></script>
+<script src="tabs.js" defer></script>
 </head>
 <body>
-<header class="top"><b>FreeSMS</b><a href="https://github.com/RedaEkengren/FreeSMS">Källkoden</a></header>
+<header class="top">
+  <a class="brand" href="./"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.5 17.3a1.8 1.8 0 0 0 2.6 2.6l5.8-5.8a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.3-.4-.4-2.3z"/></svg></span>FREESMS</a>
+  <nav>
+    <a href="#scener">Se hur det fungerar</a>
+    <a href="#fragor">Frågor</a>
+    <a class="cta-small" href="https://github.com/RedaEkengren/FreeSMS">Källkoden</a>
+  </nav>
+</header>
 <main>
 <section class="hero">
-  <h1>Verkstadssystemet som klarar gropen.</h1>
-  <p>Öppen källkod för oberoende bilverkstäder. Byggt för en telefon i en smutsig hand, ett wifi som inte når ner under bilen, och en reception som måste kunna svara när kunden ringer.</p>
+  <span class="badge"><span class="dot"></span>Öppen källkod &middot; tidig version</span>
+  <h1>Verkstadssystemet som klarar <em>gropen</em>.</h1>
+  <p class="sub">För oberoende bilverkstäder. Byggt för en telefon i en smutsig hand, ett wifi som inte når ner under bilen och en disk som måste kunna svara när kunden ringer.</p>
+  <p class="facts">Ingen licensavgift &middot; din egen server &middot; SIE-fil till bokföringen</p>
+  <div class="ctas">
+    <a class="btn" href="#scener">Se hur det fungerar</a>
+    <a class="btn ghost" href="https://github.com/RedaEkengren/FreeSMS#running-it">Kör den själv</a>
+  </div>
 </section>
 
-<section class="scene">
+<section class="scene scene-hero">
   <h2>När wifi:t försvinner</h2>
   <p class="lede">Teknikern ser något mer som behöver göras och säger till receptionen, från gropen. Nätet är borta. Det sparas i telefonen, väntar, och skickas en gång när nätet kommer tillbaka.</p>
 
@@ -85,11 +99,32 @@
   <p class="truth">Orden i scenen är produktens egna: sidan genereras från samma språkkatalog och samma kod som FreeSMS skärmar. Flödet körs mot den riktiga produkten i en webbläsare vid varje ändring av koden &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/07-scene-wifi.spec.ts">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
 </section>
 
+<section class="steps" id="scener">
+  <h2>En bil, från intag till bokföring</h2>
+  <div class="step-grid">
+    <div class="step"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13.5l1.6-4.3A2 2 0 0 1 6.5 8h11a2 2 0 0 1 1.9 1.2L21 13.5V17a1 1 0 0 1-1 1h-1.5M3 13.5V17a1 1 0 0 0 1 1h1.5M3 13.5h18M9 18h6"/><circle cx="7.5" cy="18" r="2"/><circle cx="16.5" cy="18" r="2"/></svg></span><b>Ta in en bil</b><p>Registreringsnummer, mätarställning och vad som är fel. Disken prissätter från verkstadens egen tidsbok.</p></div>
+    <div class="step"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.5 17.3a1.8 1.8 0 0 0 2.6 2.6l5.8-5.8a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.3-.4-.4-2.3z"/></svg></span><b>Laga</b><p>Mekanikern ser bilen och jobbet, stämplar, fotograferar och säger till &ndash; även utan nät.</p></div>
+    <div class="step"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg></span><b>Fakturera den</b><p>Fakturor som inte går att ändra, löpande nummer, och månaden till redovisningsbyrån som en SIE-fil.</p></div>
+  </div>
+</section>
+
+<section class="tabs-sec">
+  <h2>Se resten av produkten</h2>
+  <p class="sub">Varje scen är ett flöde som körs mot den riktiga produkten vid varje ändring av koden.</p>
+  <div class="tabbar" role="tablist" aria-label="Scener">
+    <button type="button" role="tab" data-tab="0">Morgonen</button>
+    <button type="button" role="tab" data-tab="1">Klar när?</button>
+    <button type="button" role="tab" data-tab="2">Kundens länk</button>
+    <button type="button" role="tab" data-tab="3">Två skärmar</button>
+  </div>
+  <div class="panes">
 
 
 
 
-<section class="scene">
+
+
+<section class="scene pane" role="tabpanel">
   <h2>En morgon, från intag till bokföring</h2>
   <p class="lede">En bil tas in, mekanikern gör jobbet utan att se kundens uppgifter, disken fakturerar, och månadens fakturor går till redovisningsbyrån som en fil, inte som en integration att betala för.</p>
 
@@ -149,7 +184,7 @@
       <div class="an-cap" data-t="0.3,5.6">07:30. Bilen tas in vid disken.</div>
       <div class="an-cap" data-t="6,12.6">Mekanikern ser bilen och jobbet. Inte kunden.</div>
       <div class="an-cap" data-t="13,19">Disken fakturerar. Raden, momsen och summan räknas en gång, på ett ställe.</div>
-      <div class="an-cap" data-t="19.5,29.5">Till redovisningsbyrån: en SIE-fil, som alla svenska bokföringsprogram läser.</div>
+      <div class="an-cap" data-t="19.5,29.5">Till redovisningsbyrån: en SIE-fil, standardformatet för svensk bokföring.</div>
     </div>
   </div>
   <p class="truth">Fakturans belopp räknas av produktens pengakod och SIE-raderna skrivs av dess bokföringskod, när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare, och testet läser den riktiga filen &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/09-scene-morning.spec.ts">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
@@ -161,7 +196,7 @@
 
 
 
-<section class="scene">
+<section class="scene pane" role="tabpanel">
   <h2>&rdquo;När blir den klar?&rdquo;</h2>
   <p class="lede">Kunden ringer och frågar. Svaret står på jobbet: vad som lovats, vad som sålts och vad som stämplats. Och det säger till innan löftet är brutet, inte efter.</p>
 
@@ -256,7 +291,7 @@
   <p class="truth">Siffrorna och bedömningen räknas ut av samma kod som jobbsidan använder, när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/08-scene-ready.spec.ts">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
 </section>
 
-<section class="scene">
+<section class="scene pane" role="tabpanel">
   <h2>Kunden bestämmer, med bilden framför sig</h2>
   <p class="lede">Mekanikern fotograferar det som är slitet. Kunden får en länk, ser bilden på sin telefon och svarar ja eller nej &ndash; utan konto, utan app och utan att verkstaden behöver beskriva bromsbelägg i telefon.</p>
 
@@ -316,7 +351,7 @@
 
 
 
-<section class="scene">
+<section class="scene pane" role="tabpanel">
   <h2>Ett jobb, två skärmar</h2>
   <p class="lede">Samma jobb, öppnat av mekanikern och av kundmottagningen. Mekanikern får bilen och jobbet. Kundens namn och telefonnummer finns bara på disken &ndash; inte dolt för mekanikern, utan aldrig hämtat.</p>
 
@@ -371,7 +406,47 @@
   <p class="truth">Vilken roll som får kundens uppgifter avgörs av produktens egen behörighetskod, och sidan genereras inte om scenen säger något annat. Flödet körs mot den riktiga produkten i en webbläsare, som också kontrollerar att namnet inte ens finns i mekanikerns sidkälla &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/10-scene-two-screens.spec.ts">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
 </section>
 
+  </div>
+</section>
+
+<section class="proof">
+  <h2>Byggt för att gå att lita på</h2>
+  <div class="stat-grid">
+    <div class="stat"><b>0 kr</b><span>i licens. AGPL-3.0.</span></div>
+    <div class="stat"><b>1 server</b><span>din egen. En binär och en Postgres.</span></div>
+    <div class="stat"><b>SIE 4</b><span>standardformatet för svensk bokföring.</span></div>
+    <div class="stat"><b>2 språk</b><span>Svenska först, English också.</span></div>
+  </div>
+  <ul class="checks">
+    <li>Fungerar utan nät</li>
+    <li>Kunduppgifter bara där de behövs</li>
+    <li>Fakturor som inte går att ändra</li>
+    <li>Ingen app att installera</li>
+  </ul>
+</section>
+
+<section class="faq" id="fragor">
+  <h2>Vanliga frågor</h2>
+  <details><summary>Vad kostar det?</summary><p>Ingenting. FreeSMS är öppen källkod under AGPL-3.0. Det finns ingen hostad tjänst att betala för: verkstaden kör den på sin egen server, och den som vill ha hjälp med det kan anlita vem den vill.</p></details>
+  <details><summary>Var ligger våra kunders uppgifter?</summary><p>Hos er. Databasen står på verkstadens egen server, inte hos oss. Och inne i systemet får bara de roller som behöver kundens namn och telefon se dem &ndash; mekanikerns skärm hämtar dem aldrig.</p></details>
+  <details><summary>Fungerar det med Fortnox, Visma eller vår redovisningsbyrå?</summary><p>FreeSMS lämnar över månadens fakturor och betalningar som en SIE 4-fil &ndash; standardformatet som svenska bokföringsprogram läser in. Ingen integration att betala för eller vänta på godkännande av. Filen kontrolleras mot en oberoende SIE-läsare vid varje ändring av koden; mot ett kommersiellt program har den ännu inte provats, och det säger vi hellre än att låtsas.</p></details>
+  <details><summary>Behöver vi ett certifierat kassaregister?</summary><p>FreeSMS är byggt för fakturerad försäljning och har ingen kassa. Fakturerad försäljning omfattas inte av kravet på certifierat kassaregister, men hur det gäller just er verksamhet är en fråga för er redovisningsbyrå.</p></details>
+  <details><summary>Vad händer om nätet går ner?</summary><p>Det som skrivs sparas i telefonen och skickas, exakt en gång, när nätet kommer tillbaka. Det är den första scenen på den här sidan, och den körs som ett test vid varje ändring.</p></details>
+  <details><summary>Är det klart att använda?</summary><p>Det är tidigt. En bil kan gå hela vägen från intag till bokföring, men det finns saker kvar &ndash; de står öppet som ärenden i källkoden, med vad som saknas och varför.</p></details>
+</section>
+
+<section class="final">
+  <h2>Kör den på din egen server</h2>
+  <p>Docker och inget annat.</p>
+  <pre><code>cp .env.example .env
+docker compose up</code></pre>
+  <a class="btn" href="https://github.com/RedaEkengren/FreeSMS#running-it">Så kommer du igång</a>
+</section>
 </main>
-<footer>FreeSMS är öppen källkod under AGPL-3.0.</footer>
+<footer><span>FreeSMS är öppen källkod under AGPL-3.0.</span><a href="https://github.com/RedaEkengren/FreeSMS">GitHub</a></footer>
+
+
+
+
 </body>
 </html>
