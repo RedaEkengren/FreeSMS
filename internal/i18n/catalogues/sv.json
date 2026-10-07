@@ -1079,6 +1079,58 @@
     },
     "Dealt with": {
       "other": "Åtgärdat"
+    },
+    "Send this to the customer.": {
+      "other": "Skicka det här till kunden."
+    },
+    "It is shown once — there is nowhere to look it up again, so make a new link if it is lost.": {
+      "other": "Den visas en gång – det finns ingenstans att slå upp den igen, så gör en ny länk om den kommer bort."
+    },
+    "The customer approved this": {
+      "other": "Kunden godkände det här"
+    },
+    "The customer declined this": {
+      "other": "Kunden tackade nej till det här"
+    },
+    "Pass": {
+      "other": "OK"
+    },
+    "Attention": {
+      "other": "Se över"
+    },
+    "Fail": {
+      "other": "Underkänd"
+    },
+    "Worn to the wear indicator": {
+      "other": "Nött ner till slitagevarnaren"
+    },
+    "Add the photograph": {
+      "other": "Lägg till fotot"
+    },
+    "Finish the inspection": {
+      "other": "Avsluta kontrollen"
+    },
+    "Make a link for the customer": {
+      "other": "Gör en länk till kunden"
+    },
+    "Links sent to the customer": {
+      "other": "Länkar skickade till kunden"
+    },
+    "Made %s": {
+      "other": "Gjord %s"
+    },
+    "open": {
+      "other": "öppen"
+    },
+    "closed": {
+      "other": "stängd"
+    },
+    "Close this link": {
+      "other": "Stäng den här länken"
+    },
+    "changed their mind %d time": {
+      "one": "ångrade sig %d gång",
+      "other": "ångrade sig %d gånger"
     }
   }
 }

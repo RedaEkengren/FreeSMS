@@ -89,9 +89,9 @@
   <li>
     <div class="row">
       <a href="/inspections/{{.ID}}">{{.TemplateName}}</a>
-      {{if .Completed}}<span class="tag">done</span>{{else}}<span class="tag warranty">in progress</span>{{end}}
+      {{if .Completed}}<span class="tag">{{$.T "done"}}</span>{{else}}<span class="tag warranty">{{$.T "in progress"}}</span>{{end}}
     </div>
-    <div class="waiting">{{.PerformedBy}}{{if .Findings}} &middot; {{len .Findings}} finding{{if ne (len .Findings) 1}}s{{end}}{{end}}</div>
+    <div class="waiting">{{.PerformedBy}}{{if .Findings}} &middot; {{$.N "%d finding" (len .Findings)}}{{end}}</div>
   </li>
   {{end}}
 </ul>

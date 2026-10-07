@@ -10,7 +10,9 @@ export async function signIn(page: Page, who: { email: string; password: string 
   await page.goto('/login');
   await page.fill('input[name=email]', who.email);
   await page.fill('input[name=password]', who.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  // By the form, not the button's words: the door speaks the workshop's
+  // language, which a scene's test makes Swedish.
+  await page.locator('form[action="/login"] button[type=submit]').click();
   await expect(page).not.toHaveURL(/\/login/);
 }
 

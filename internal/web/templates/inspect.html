@@ -1,14 +1,13 @@
 {{define "content"}}
 <div class="row">
-  <span class="plate">{{if .Inspection.Registration}}{{.Inspection.Registration}}{{else}}no plate{{end}}</span>
-  {{if .Inspection.Completed}}<span class="tag">done</span>{{end}}
+  <span class="plate">{{if .Inspection.Registration}}{{.Inspection.Registration}}{{else}}{{.T "no plate"}}{{end}}</span>
+  {{if .Inspection.Completed}}<span class="tag">{{.T "done"}}</span>{{end}}
 </div>
 <p class="vehicle">{{.Inspection.Make}} {{.Inspection.Model}} &middot; {{.Inspection.TemplateName}}</p>
 
 {{if .ShareURL}}
 <div class="share">
-  <p><strong>Send this to the customer.</strong> It is shown once — there is
-  nowhere to look it up again, so make a new link if it is lost.</p>
+  <p><strong>{{.T "Send this to the customer."}}</strong> {{.T "It is shown once — there is nowhere to look it up again, so make a new link if it is lost."}}</p>
   <input id="share-url" value="{{.ShareURL}}" readonly data-select>
   <button type="button" class="secondary" data-copy="#share-url" data-copied="{{$.T "Copied"}}">{{$.T "Copy the link"}}</button>
 </div>
@@ -36,7 +35,7 @@
   {{end}}
 
   {{if .Decided}}
-    <p class="waiting">Customer {{.Decision}}{{if gt .Superseded 0}} (changed their mind {{.Superseded}} time{{if ne .Superseded 1}}s{{end}}){{end}}</p>
+    <p class="waiting">{{if eq .Decision "approved"}}{{$.T "The customer approved this"}}{{else}}{{$.T "The customer declined this"}}{{end}}{{if gt .Superseded 0}} ({{$.N "changed their mind %d time" .Superseded}}){{end}}</p>
   {{end}}
 
   {{if not $.Inspection.Completed}}
@@ -47,13 +46,13 @@
          ever the one pressed. */}}
     <button type="submit" disabled hidden aria-hidden="true" tabindex="-1"></button>
     <div class="actions">
-      <button name="status" value="pass" class="secondary">Pass</button>
-      <button name="status" value="attention" class="secondary">Attention</button>
-      <button name="status" value="fail" class="secondary">Fail</button>
+      <button name="status" value="pass" class="secondary">{{$.T "Pass"}}</button>
+      <button name="status" value="attention" class="secondary">{{$.T "Attention"}}</button>
+      <button name="status" value="fail" class="secondary">{{$.T "Fail"}}</button>
     </div>
     <label class="mt-m">
-      <span>Note</span>
-      <input name="note" value="{{.Note}}" placeholder="Worn to the wear indicator">
+      <span>{{$.T "Note"}}</span>
+      <input name="note" value="{{.Note}}" placeholder="{{$.T "Worn to the wear indicator"}}">
     </label>
   </form>
 
@@ -62,7 +61,7 @@
     <!-- capture sends a phone straight to the camera rather than the gallery,
          which is one tap fewer with a dirty hand. -->
     <input type="file" name="photo" accept="image/*" capture="environment" required>
-    <button type="submit" class="secondary mt-s">Add the photograph</button>
+    <button type="submit" class="secondary mt-s">{{$.T "Add the photograph"}}</button>
   </form>
   {{end}}
 </div>
@@ -70,27 +69,27 @@
 
 {{if not .Inspection.Completed}}
 <form class="mt-l" method="post" action="/inspections/{{.Inspection.ID}}/complete" data-offline>
-  <button type="submit">Finish the inspection</button>
+  <button type="submit">{{.T "Finish the inspection"}}</button>
 </form>
 {{else if .Session.Scope.Role.SeesCustomerPersonalData}}
 <form class="mt-l" method="post" action="/inspections/{{.Inspection.ID}}/share">
-  <button type="submit">Make a link for the customer</button>
+  <button type="submit">{{.T "Make a link for the customer"}}</button>
 </form>
 {{end}}
 
 {{if .Shares}}
-<h2>Links sent to the customer</h2>
+<h2>{{.T "Links sent to the customer"}}</h2>
 <ul class="lines">
   {{range .Shares}}
   <li>
     <div class="row">
-      <span>Made {{$.Date ($.Local .CreatedAt) "2 Jan 15:04"}}</span>
-      {{if .Usable}}<span class="tag pass">open</span>{{else}}<span class="tag">closed</span>{{end}}
+      <span>{{$.T "Made %s" ($.Date ($.Local .CreatedAt) "2 Jan 15:04")}}</span>
+      {{if .Usable}}<span class="tag pass">{{$.T "open"}}</span>{{else}}<span class="tag">{{$.T "closed"}}</span>{{end}}
     </div>
     {{if .Usable}}
     <form class="mt-s" method="post" action="/inspections/{{$.Inspection.ID}}/revoke">
       <input type="hidden" name="share_id" value="{{.ID}}">
-      <button type="submit" class="secondary">Close this link</button>
+      <button type="submit" class="secondary">{{$.T "Close this link"}}</button>
     </form>
     {{end}}
   </li>
@@ -98,5 +97,5 @@
 </ul>
 {{end}}
 
-<p class="mt-xl"><a href="/jobs/{{.Inspection.WorkOrderID}}">Back to the job</a></p>
+<p class="mt-xl"><a href="/jobs/{{.Inspection.WorkOrderID}}">{{.T "Back to the job"}}</a></p>
 {{end}}
