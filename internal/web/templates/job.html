@@ -96,6 +96,10 @@
 <a class="button secondary" href="/jobs/{{.Job.ID}}/customer">{{.T "Say who is paying"}}</a>
 {{end}}
 
+{{/* Where the shop requires a final check, "ready" waits for it. */}}
+{{if and .FinalCheck.Required (eq .Job.State "in_progress")}}
+<p class="waiting">{{if .FinalCheck.Done}}{{.T "Final check done by %s." .FinalCheck.By}}{{else}}<span class="tag warranty">{{.T "Final check"}}</span> {{.T .FinalCheck.Missing}}{{end}}</p>
+{{end}}
 {{if .Next}}
 <h2>{{.T "Move it along"}}</h2>
 <div class="actions">

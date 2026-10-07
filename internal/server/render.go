@@ -52,6 +52,8 @@ type pageData struct {
 	JobParts      []workshop.JobPart
 	Contacts      []workshop.CustomerContact
 	Status        workshop.CustomerStatus
+	FinalCheck    workshop.FinalCheck
+	FinalSetting  workshop.FinalCheckSettings
 	MyLocale      string
 	Lines         []workshop.Line
 	Board         []workshop.BoardEntry

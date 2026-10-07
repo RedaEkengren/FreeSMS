@@ -319,6 +319,17 @@ func SetState(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID
 			}
 			return ErrIllegalTransition{From: from, To: to}
 		}
+		// A shop that signs work off with a final check does not have a car
+		// ready without one, whichever way the move arrives.
+		if to == StateReady {
+			fc, err := finalCheckTx(ctx, tx, scope.ShopID, jobID)
+			if err != nil {
+				return err
+			}
+			if fc.Required && !fc.Done {
+				return fmt.Errorf("%w: %s", ErrInvalid, fc.Missing)
+			}
+		}
 		if err := setStateTx(ctx, tx, jobID, to); err != nil {
 			return err
 		}

@@ -59,6 +59,9 @@ type BoardEntry struct {
 	// last became ready. Nil on a ready car is "not told".
 	ToldAt *time.Time
 
+	// Who signed the work off, where the shop requires a final check.
+	FinalCheckedBy string
+
 	// Promised, sold and clocked, put together.
 	Progress Progress
 
@@ -164,7 +167,13 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 			         ) d ON true
 			         WHERE i.work_order_id = w.id AND d.decision = 'approved'
 			           AND NOT EXISTS (SELECT 1 FROM work_order_lines l
-			                           WHERE l.inspection_item_id = it.id)),` + presenceColumns + `,` + toldColumns + `,` + progressColumns + `
+			                           WHERE l.inspection_item_id = it.id)),` + presenceColumns + `,` + toldColumns + `,
+			       coalesce((SELECT fp.display_name FROM inspections fi
+			                  JOIN shops fs ON fs.id = fi.shop_id AND fs.final_check_template_id = fi.template_id
+			                  JOIN users fu ON fu.id = fi.performed_by
+			                  JOIN people fp ON fp.id = fu.person_id
+			                  WHERE fi.work_order_id = w.id AND fi.completed_at IS NOT NULL
+			                  ORDER BY fi.completed_at DESC LIMIT 1), ''),` + progressColumns + `
 			FROM work_orders w
 			JOIN vehicles v  ON v.id = w.vehicle_id
 			-- Left, not inner. A work order is allowed to have no customer --
@@ -197,7 +206,7 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 			targets := append([]any{&b.ID, &b.Number, &b.State,
 				&b.Registration, &b.Make, &b.Model, &b.Complaint,
 				&b.CustomerName, &b.HasCustomer, &b.OpenedAt, &b.PromisedAt, &b.ReadyAt,
-				&b.WorkingNow, &b.OpenFindings, &b.ApprovedUnpriced, &b.CarAway, &b.ExpectedBack, &b.ToldAt},
+				&b.WorkingNow, &b.OpenFindings, &b.ApprovedUnpriced, &b.CarAway, &b.ExpectedBack, &b.ToldAt, &b.FinalCheckedBy},
 				b.Progress.scanTargets()...)
 			if err := rows.Scan(targets...); err != nil {
 				return fmt.Errorf("scan board entry: %w", err)

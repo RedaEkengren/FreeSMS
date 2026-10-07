@@ -42,7 +42,7 @@ var swept = map[string]string{
 	"GET /login": "", "POST /login": "", "POST /logout": "", "GET /{$}": "",
 	"GET /board": "", "GET /jobs/new": "", "POST /jobs/new": "",
 	"GET /jobs/new/lookup": "", "GET /figures": "", "GET /accounting": "",
-	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/charges": "",
+	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/charges": "", "POST /shop/final-check": "",
 	"GET /privacy": "", "GET /labour": "", "POST /labour": "",
 	"POST /labour/rate": "", "GET /time": "", "POST /time/correct": "",
 	"POST /drafts": "", "GET /drafts": "", "DELETE /drafts": "",

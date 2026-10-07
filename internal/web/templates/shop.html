@@ -55,6 +55,20 @@
   <button type="submit">{{.T "Save"}}</button>
 </form>
 
+<h2>{{.T "Final check"}}</h2>
+{{/* Whether a car can be ready without its work being checked. Off unless
+     the shop chooses a checklist. */}}
+<form method="post" action="/shop/final-check">
+  <label><span>{{.T "Checklist that signs the work off"}}</span>
+    <select name="template_id">
+      <option value="">{{.T "None: ready without a final check"}}</option>
+      {{range .Templates}}<option value="{{.ID}}" {{if eq .ID $.FinalSetting.TemplateID}}selected{{end}}>{{.Name}}</option>{{end}}
+    </select></label>
+  <label class="tick"><input type="checkbox" name="by_another" value="yes" {{if .FinalSetting.ByAnother}}checked{{end}}>
+    <span>{{.T "Somebody other than whoever did the work does it"}}</span></label>
+  <button type="submit" class="secondary">{{.T "Save"}}</button>
+</form>
+
 <h2>{{.T "What an invoice adds"}}</h2>
 <p class="waiting">{{.T "Consumables are a share of the labour the customer pays for, never of the parts, at the labour's VAT. The invoicing fee is charged once per invoice, never on a credit note. An invoice keeps what it was charged; changing these changes the next one."}}</p>
 <form method="post" action="/shop/charges">

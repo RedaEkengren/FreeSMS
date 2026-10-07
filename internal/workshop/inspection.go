@@ -217,7 +217,7 @@ func CompleteInspection(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		if tag.RowsAffected() == 0 {
 			return ErrNotFound
 		}
-		return nil
+		return findingsFromFinalCheckTx(ctx, tx, scope, inspectionID)
 	})
 }
 

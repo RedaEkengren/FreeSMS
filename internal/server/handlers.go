@@ -161,6 +161,22 @@ func (s *Server) renderJob(w http.ResponseWriter, r *http.Request, linkURL strin
 	if err != nil {
 		s.log.Error("read findings", "error", err)
 	}
+	finalCheck, err := workshop.FinalCheckFor(r.Context(), s.pool, session.Scope, id)
+	if err != nil {
+		s.log.Error("read final check", "error", err)
+	}
+	next := stateChoices(session.Scope.Role, workshop.State(job.State), job.HasWork)
+	// Not offered until the final check is done, where the shop requires
+	// one. SetState refuses it too; this keeps the page honest about it.
+	if finalCheck.Required && !finalCheck.Done {
+		kept := next[:0]
+		for _, st := range next {
+			if st != workshop.StateReady {
+				kept = append(kept, st)
+			}
+		}
+		next = kept
+	}
 	jobParts, err := workshop.PartsOnJob(r.Context(), s.pool, session.Scope, id)
 	if err != nil {
 		s.log.Error("read parts on job", "error", err)
@@ -249,7 +265,8 @@ func (s *Server) renderJob(w http.ResponseWriter, r *http.Request, linkURL strin
 		Job:         job,
 		Progress:    progress,
 		Lines:       lines,
-		Next:        stateChoices(session.Scope.Role, workshop.State(job.State), job.HasWork),
+		Next:        next,
+		FinalCheck:  finalCheck,
 		Totals:      workshop.TotalsWith(lines, surcharges),
 		Surcharges:  surcharges,
 		Invoices:    invoices,

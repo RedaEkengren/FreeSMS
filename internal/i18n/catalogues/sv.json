@@ -1336,6 +1336,33 @@
     },
     "If money is still owed, why close it anyway": {
       "other": "Om pengar fortfarande är obetalda: varför avsluta ändå"
+    },
+    "Final check": {
+      "other": "Slutkontroll"
+    },
+    "Final check done by %s.": {
+      "other": "Slutkontroll gjord av %s."
+    },
+    "The final check has not been done.": {
+      "other": "Slutkontrollen är inte gjord."
+    },
+    "The final check failed. Put right what it found, then check again.": {
+      "other": "Slutkontrollen underkändes. Åtgärda det den hittade och kontrollera igen."
+    },
+    "The final check has to be done by somebody other than whoever did the work.": {
+      "other": "Slutkontrollen ska göras av någon annan än den som gjorde jobbet."
+    },
+    "final check: %s": {
+      "other": "slutkontroll: %s"
+    },
+    "Checklist that signs the work off": {
+      "other": "Checklista som godkänner arbetet"
+    },
+    "None: ready without a final check": {
+      "other": "Ingen: klar utan slutkontroll"
+    },
+    "Somebody other than whoever did the work does it": {
+      "other": "Någon annan än den som gjorde jobbet gör den"
     }
   }
 }

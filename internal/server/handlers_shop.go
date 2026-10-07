@@ -31,13 +31,36 @@ func (s *Server) handleShop(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.log.Error("read surcharges", "error", err)
 	}
+	final, err := workshop.FinalCheckSettingsFor(r.Context(), s.pool, session.Scope)
+	if err != nil {
+		s.log.Error("read final check setting", "error", err)
+	}
+	checklists, err := workshop.Templates(r.Context(), s.pool, session.Scope)
+	if err != nil {
+		s.log.Error("read checklists", "error", err)
+	}
 	s.render(w, r, http.StatusOK, "shop", pageData{
-		Title:     "The workshop",
-		Session:   session,
-		Shop:      details,
-		Charges:   charges,
-		Languages: workshop.Languages(),
+		Title:        "The workshop",
+		Session:      session,
+		Shop:         details,
+		Charges:      charges,
+		Languages:    workshop.Languages(),
+		FinalSetting: final,
+		Templates:    checklists,
 	})
+}
+
+// handleSaveFinalCheck sets whether ready needs a final check.
+func (s *Server) handleSaveFinalCheck(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	err := workshop.SaveFinalCheck(r.Context(), s.pool, session.Scope, workshop.FinalCheckSettings{
+		TemplateID: r.FormValue("template_id"),
+		ByAnother:  r.FormValue("by_another") == "yes",
+	})
+	if s.handoverError(w, r, err) {
+		return
+	}
+	http.Redirect(w, r, "/shop", http.StatusSeeOther)
 }
 
 // handleSaveSurcharges sets förbrukningsmaterial and the invoicing fee.

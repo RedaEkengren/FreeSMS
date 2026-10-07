@@ -293,6 +293,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/takeout", s.requireSession(s.handleTakeOut))
 	mux.HandleFunc("POST /jobs/{id}/told", s.requireSession(s.handleTold))
 	mux.HandleFunc("POST /jobs/{id}/link", s.requireSession(s.handleJobLink))
+	mux.HandleFunc("POST /shop/final-check", s.requireSession(s.handleSaveFinalCheck))
 	mux.HandleFunc("GET /staff", s.requireSession(s.handleStaff))
 	mux.HandleFunc("POST /staff", s.requireSession(s.handleAddStaff))
 	mux.HandleFunc("POST /staff/{id}/active", s.requireSession(s.handleStaffActive))

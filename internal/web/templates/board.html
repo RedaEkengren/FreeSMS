@@ -24,6 +24,7 @@
     {{if .CarAway}}<div class="waiting">{{$.T "The car is at home"}}{{with .ExpectedBack}} &middot; {{$.T "back %s" ($.Date . "Mon 2 Jan")}}{{end}}</div>
     {{else if eq .State "awaiting_parts"}}<div class="waiting">{{$.T "The car is here"}}</div>{{end}}
     {{if gt .ApprovedUnpriced 0}}<div class="waiting">{{$.N "%d thing approved by the customer, not priced" .ApprovedUnpriced}}</div>{{end}}
+    {{if and (eq .State "ready") .FinalCheckedBy}}<div class="waiting">{{$.T "final check: %s" .FinalCheckedBy}}</div>{{end}}
     {{if eq .State "ready"}}{{with .ToldAt}}<div class="waiting">{{$.T "customer told %s" ($.Date ($.Local .) "15:04")}}</div>{{else}}<div class="waiting"><span class="tag warranty">{{$.T "customer not told"}}</span></div>{{end}}{{end}}
     {{if gt .WaitingDays 0}}
       <div class="waiting">{{$.N "Uncollected for %d day" .WaitingDays}}</div>

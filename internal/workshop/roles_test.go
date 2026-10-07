@@ -29,6 +29,7 @@ var everyRole = map[string]string{
 	"ProgressFor":    "hours and a time on a job, no customer data",
 	"PresenceFor":    "whether the car is here, which a technician needs before looking for it; no customer data",
 	"PartsOnJob":     "which parts are priced and taken out on a job: numbers and names, no cost, no customer data",
+	"FinalCheckFor":  "whether the work is signed off, which the technician needs before saying it is ready; no customer data",
 	"ChangePassword": "the caller's own password, checked against the current one",
 	"MyLocale":       "the caller's own language", "SetMyLocale": "the caller's own language",
 
