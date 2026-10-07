@@ -208,3 +208,34 @@
 .cl-noticed { font-size: 12px; font-weight: 700; color: #c2410c; margin-bottom: 4px; min-height: 16px; }
 .an-m .cl-answer-row { flex-direction: column; align-items: flex-start; }
 .cl-desk .cl-frame-answer { display: block; }
+
+/* ── Scene: one car, one working day (wj-) ──────────────────────────────
+   One screen at a time in the middle, the role and the clock above it,
+   and a dot per chapter so the length of the day is visible. */
+.wj-dots { position: absolute; left: 0; right: 0; top: 18px; display: flex; justify-content: center; gap: 10px; }
+.wj-dots { height: 10px; }
+.wj-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #d3d7de; }
+.wj-dot.wj-on { position: relative; margin-left: -20px; background: #d92d20; box-shadow: 0 0 0 3px rgba(217,45,32,.18); }
+.wj-who { position: absolute; left: 0; right: 0; top: 40px; display: flex; justify-content: center; align-items: baseline; gap: 12px; }
+.wj-who b { font-size: 22px; letter-spacing: -.01em; }
+.wj-who span { font-size: 15px; color: #5b6270; font-variant-numeric: tabular-nums; }
+.wj-screen { left: 200px; top: 96px; width: 560px; height: auto; min-height: 200px; }
+.wj-phone { left: 340px; top: 86px; width: 280px; height: 360px; border-radius: 28px; border: 8px solid #1f2328; }
+.wj-phone .an-head { display: none; }
+.wj-card { margin-top: 12px; }
+.wj-state { margin-top: 12px; font-weight: 700; color: #c2410c; }
+.wj-scan { margin-top: 12px; font-size: 13px; background: #f4f5f7; border-radius: 8px; padding: 8px 10px; }
+.wj-scan code { font-size: 12px; }
+.wj-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; }
+.wj-told { margin-top: 6px; font-weight: 700; color: #0a7d37; font-size: 13px; position: relative; min-height: 20px; }
+.wj-told > * { position: absolute; left: 0; top: 0; }
+.wj-phone-line { margin-top: 14px; font-size: 13px; }
+.wj-paid { margin-top: 10px; font-size: 13px; color: #0a7d37; font-weight: 700; }
+.wj-screen .wf-field, .wj-phone .wf-field { margin-top: 8px; }
+.wj-screen .mo-row { font-size: 13.5px; }
+
+.an-m .wj-screen { left: 16px; top: 92px; width: 488px; height: auto; min-height: 240px; }
+.an-m .wj-phone { left: 110px; top: 88px; width: 300px; height: 470px; }
+.an-m .wj-dots { gap: 6px; }
+.an-m .wj-dot { width: 8px; height: 8px; }
+.an-m .wj-dot.wj-on { margin-left: -14px; }

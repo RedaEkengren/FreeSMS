@@ -129,6 +129,13 @@ func invoiceFor(kind, description string, quantityMilli int, unitMinor int64, cu
 	}, nil
 }
 
+// sceneTotals is the bottom of an invoice as a scene shows it.
+type sceneTotals struct {
+	Net, VAT, Gross string
+	// Paid in cash, rounded at the counter, and the rounding kept apart.
+	Cash, Rounding string
+}
+
 // Generate renders the page from the repository at root.
 func Generate(root string) ([]byte, error) {
 	// Strict: a word nobody translated comes out marked rather than in
@@ -161,6 +168,8 @@ func Generate(root string) ([]byte, error) {
 			}
 			return p.T(label), nil
 		},
+		// A day in the shop's calendar, "2006-01-02".
+		"day": func(v string) (time.Time, error) { return time.ParseInLocation("2006-01-02", v, stockholm) },
 		// An amount as the product prints it.
 		"money": func(minor int64) string { return money.DisplayFor(Locale, "SEK").Amount(minor) },
 		// Numbers and dates as the reader's language writes them.
@@ -198,6 +207,25 @@ func Generate(root string) ([]byte, error) {
 		"sees": func(role string) bool { return access.Role(role).SeesCustomerPersonalData() },
 		// The languages that shipped, named in themselves.
 		"languages": workshop.Languages,
+		// An invoice's bottom lines, from (quantity in thousandths, unit price
+		// in öre) pairs at 25 per cent, totalled and cash-rounded by the
+		// product's money code.
+		"totals": func(pairs ...int64) (sceneTotals, error) {
+			if len(pairs)%2 != 0 {
+				return sceneTotals{}, fmt.Errorf("site: totals takes quantity and price pairs")
+			}
+			var lines []money.Line
+			for i := 0; i < len(pairs); i += 2 {
+				lines = append(lines, money.Line{QuantityMilli: pairs[i], UnitPriceMinor: pairs[i+1],
+					VATRateBasis: 2500, ChargedToCustomer: true})
+			}
+			t := money.Compute(lines)
+			show := money.DisplayFor(Locale, "SEK")
+			cash := money.CashRound(t.GrossMinor)
+			return sceneTotals{Net: show.Amount(t.NetMinor), VAT: show.Amount(t.VATMinor),
+				Gross: show.Amount(t.GrossMinor), Cash: show.Amount(cash),
+				Rounding: show.Amount(t.GrossMinor - cash)}, nil
+		},
 		// A role as the header names it.
 		"role": func(role string) (string, error) {
 			label := access.Role(role).Label()
