@@ -200,12 +200,20 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 	if err != nil {
 		return nil, err
 	}
+	// Setup creates the workshop in this language, and refuses one that did
+	// not ship. A typo in DEFAULT_LOCALE should not leave nobody able to set
+	// up: it is said once, here, and English is used.
+	locale := cfg.DefaultLocale
+	if !catalogues.Has(locale) {
+		log.Warn("DEFAULT_LOCALE has no catalogue; using English", "locale", locale)
+		locale = "en"
+	}
 	srv := &Server{
 		pool:             pool,
 		log:              log,
 		release:          cfg.Release,
 		configuredShopID: cfg.ShopID,
-		locale:           cfg.DefaultLocale,
+		locale:           locale,
 		photos:           photos,
 		vehicleLookup:    newLookup(cfg),
 		catalogues:       catalogues,
@@ -286,6 +294,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /staff/{id}/password", s.requireSession(s.handleStaffPassword))
 	mux.HandleFunc("GET /account", s.requireSession(s.handleAccount))
 	mux.HandleFunc("POST /account/password", s.requireSession(s.handleChangePassword))
+	mux.HandleFunc("POST /account/language", s.requireSession(s.handleMyLanguage))
 	mux.HandleFunc("GET /checklists", s.requireSession(s.handleChecklists))
 	mux.HandleFunc("POST /checklists", s.requireSession(s.handleSaveChecklist))
 	mux.HandleFunc("GET /checklists/{id}", s.requireSession(s.handleChecklists))

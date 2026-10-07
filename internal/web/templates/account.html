@@ -2,6 +2,15 @@
 <h1>{{.T "Your account"}}</h1>
 {{if .Changed}}<p class="waiting">{{.T "Changed. You are still signed in here; everywhere else you were signed in has been signed out."}}</p>{{end}}
 {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+<h2>{{.T "Your language"}}</h2>
+<form method="post" action="/account/language">
+  <label><span>{{.T "Read this system in"}}</span>
+    <select name="locale">
+      <option value="">{{.T "The workshop's language"}}</option>
+      {{range .Languages}}<option value="{{.Locale}}" {{if eq .Locale $.MyLocale}}selected{{end}}>{{.Name}}</option>{{end}}
+    </select></label>
+  <button type="submit">{{.T "Save"}}</button>
+</form>
 <h2>{{.T "Change your password"}}</h2>
 <form method="post" action="/account/password">
   <label><span>{{.T "Your current password"}}</span>

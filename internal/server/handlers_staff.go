@@ -93,9 +93,35 @@ func (s *Server) staffError(w http.ResponseWriter, r *http.Request, err error) b
 
 // handleAccount is anybody's own page: for now, their password.
 func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request) {
-	s.render(w, r, http.StatusOK, "account", pageData{
-		Title: "Your account", Session: sessionFrom(r.Context()), MinPassword: workshop.MinPasswordLength,
-	})
+	s.render(w, r, http.StatusOK, "account", s.accountPage(r, sessionFrom(r.Context())))
+}
+
+func (s *Server) accountPage(r *http.Request, session auth.Session) pageData {
+	mine, err := workshop.MyLocale(r.Context(), s.pool, session.Scope)
+	if err != nil {
+		s.log.Error("read own language", "error", err)
+	}
+	return pageData{
+		Title: "Your account", Session: session, MinPassword: workshop.MinPasswordLength,
+		Languages: workshop.Languages(), MyLocale: mine,
+	}
+}
+
+// handleMyLanguage sets the language the caller reads in. Blank is the
+// workshop's.
+func (s *Server) handleMyLanguage(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	err := workshop.SetMyLocale(r.Context(), s.pool, session.Scope, r.FormValue("locale"))
+	switch {
+	case errors.Is(err, workshop.ErrInvalid):
+		s.renderError(w, r, http.StatusBadRequest, "Not saved", trimInvalid(err))
+		return
+	case err != nil:
+		s.log.Error("save own language", "error", err)
+		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		return
+	}
+	http.Redirect(w, r, "/account", http.StatusSeeOther)
 }
 
 // handleChangePassword changes the caller's own password. The session it is
@@ -108,7 +134,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	err := auth.ChangePassword(r.Context(), s.pool, session.Scope, token,
 		r.FormValue("current"), r.FormValue("password"))
-	page := pageData{Title: "Your account", Session: session, MinPassword: workshop.MinPasswordLength}
+	page := s.accountPage(r, session)
 	switch {
 	case errors.Is(err, auth.ErrRefused):
 		page.Error = trimPrefixRefused(err)

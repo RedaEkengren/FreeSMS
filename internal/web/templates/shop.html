@@ -44,6 +44,14 @@
     <span>{{.T "Approved for F-tax"}}</span>
   </label>
 
+  {{/* The language the workshop works in: every page for anybody who has
+       not chosen their own, the customer's page, and the words the system
+       puts on an invoice. */}}
+  <label><span>{{.T "The workshop's language"}}</span>
+    <select name="locale">
+      {{range .Languages}}<option value="{{.Locale}}" {{if eq .Locale $.Shop.Locale}}selected{{end}}>{{.Name}}</option>{{end}}
+    </select></label>
+
   <button type="submit">{{.T "Save"}}</button>
 </form>
 

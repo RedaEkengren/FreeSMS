@@ -46,7 +46,10 @@ func NeedsSetup(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
 // Both in one transaction. A half-finished setup -- a shop with nobody able to
 // sign in to it -- would leave an installation that cannot be used and cannot
 // be set up again, because the setup page would see a shop and refuse.
-func Setup(ctx context.Context, pool *pgxpool.Pool, shopName, ownerName, email, password string) (shopID string, err error) {
+//
+// locale is the language the workshop is created in: DEFAULT_LOCALE, because
+// whoever installed it has already said which language the workshop speaks.
+func Setup(ctx context.Context, pool *pgxpool.Pool, shopName, ownerName, email, password, locale string) (shopID string, err error) {
 	shopName = strings.TrimSpace(shopName)
 	ownerName = strings.TrimSpace(ownerName)
 	email = strings.TrimSpace(email)
@@ -61,6 +64,9 @@ func Setup(ctx context.Context, pool *pgxpool.Pool, shopName, ownerName, email, 
 	case utf8.RuneCountInString(password) < MinPasswordLength:
 		return "", fmt.Errorf("%w: the password needs at least %d characters",
 			ErrInvalid, MinPasswordLength)
+	}
+	if err := checkLocale(locale); err != nil {
+		return "", err
 	}
 
 	// Refused before the hash, not after it. Setup is open to anybody who can
@@ -108,7 +114,7 @@ func Setup(ctx context.Context, pool *pgxpool.Pool, shopName, ownerName, email, 
 	}
 
 	if err := tx.QueryRow(ctx,
-		`INSERT INTO shops (name) VALUES ($1) RETURNING id`, shopName).Scan(&shopID); err != nil {
+		`INSERT INTO shops (name, locale) VALUES ($1, $2) RETURNING id`, shopName, locale).Scan(&shopID); err != nil {
 		return "", fmt.Errorf("create shop: %w", err)
 	}
 
@@ -205,6 +211,13 @@ func SaveDetails(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d 
 	if d.PaymentTermsDays < 0 {
 		return fmt.Errorf("%w: payment terms cannot be negative", ErrInvalid)
 	}
+	// Blank keeps the language the shop has: a form that does not carry the
+	// field has not asked for English.
+	if d.Locale = strings.TrimSpace(d.Locale); d.Locale != "" {
+		if err := checkLocale(d.Locale); err != nil {
+			return err
+		}
+	}
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
 			UPDATE shops SET
@@ -214,14 +227,15 @@ func SaveDetails(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d 
 			  org_number = nullif($7,''), vat_number = nullif($8,''),
 			  phone = nullif($9,''), email = nullif($10,''),
 			  payment_reference = nullif($11,''),
-			  payment_terms_days = $12, f_tax = $13
+			  payment_terms_days = $12, f_tax = $13,
+			  locale = coalesce(nullif($14, ''), locale)
 			WHERE id = $1`,
 			scope.ShopID, strings.TrimSpace(d.Name),
 			strings.TrimSpace(d.AddressLine1), strings.TrimSpace(d.AddressLine2),
 			strings.TrimSpace(d.PostalCode), strings.TrimSpace(d.City),
 			strings.TrimSpace(d.OrgNumber), strings.TrimSpace(d.VATNumber),
 			strings.TrimSpace(d.Phone), strings.TrimSpace(d.Email),
-			strings.TrimSpace(d.PaymentReference), d.PaymentTermsDays, d.FTax)
+			strings.TrimSpace(d.PaymentReference), d.PaymentTermsDays, d.FTax, d.Locale)
 		if err != nil {
 			return fmt.Errorf("save shop details: %w", err)
 		}

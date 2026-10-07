@@ -53,7 +53,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 	password := r.FormValue("password")
 
-	shopID, err := workshop.Setup(r.Context(), s.pool, form.ShopName, form.OwnerName, form.Email, password)
+	shopID, err := workshop.Setup(r.Context(), s.pool, form.ShopName, form.OwnerName, form.Email, password, s.locale)
 	switch {
 	case errors.Is(err, workshop.ErrAlreadySetUp):
 		// Somebody else finished first, or the page was left open. Either way

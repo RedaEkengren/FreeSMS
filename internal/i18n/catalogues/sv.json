@@ -1,5 +1,6 @@
 {
   "locale": "sv",
+  "name": "Svenska",
   "messages": {
     "%d day net": {
       "one": "%d dag netto",
@@ -987,7 +988,15 @@
     },
     "This device has no room left to hold unsent work. Find a connection before carrying on.": {
       "other": "Den här enheten har inte plats för mer osänt arbete. Hitta en anslutning innan du fortsätter."
+    },
+    "The workshop's language": {
+      "other": "Verkstadens språk"
+    },
+    "Your language": {
+      "other": "Ditt språk"
+    },
+    "Read this system in": {
+      "other": "Läs systemet på"
     }
-  },
-  "name": "Svenska"
+  }
 }

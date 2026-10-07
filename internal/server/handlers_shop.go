@@ -32,10 +32,11 @@ func (s *Server) handleShop(w http.ResponseWriter, r *http.Request) {
 		s.log.Error("read surcharges", "error", err)
 	}
 	s.render(w, r, http.StatusOK, "shop", pageData{
-		Title:   "The workshop",
-		Session: session,
-		Shop:    details,
-		Charges: charges,
+		Title:     "The workshop",
+		Session:   session,
+		Shop:      details,
+		Charges:   charges,
+		Languages: workshop.Languages(),
 	})
 }
 
@@ -96,6 +97,7 @@ func (s *Server) handleSaveShop(w http.ResponseWriter, r *http.Request) {
 		PaymentReference: r.FormValue("payment_reference"),
 		PaymentTermsDays: terms,
 		FTax:             r.FormValue("f_tax") == "yes",
+		Locale:           r.FormValue("locale"),
 	}
 
 	err := workshop.SaveDetails(r.Context(), s.pool, session.Scope, details)

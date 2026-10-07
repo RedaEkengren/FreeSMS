@@ -46,6 +46,8 @@ type pageData struct {
 	Progress      workshop.Progress
 	Surcharges    []workshop.SurchargeLine
 	Charges       workshop.Surcharges
+	Languages     []workshop.Language
+	MyLocale      string
 	Lines         []workshop.Line
 	Board         []workshop.BoardEntry
 	Next          []workshop.State

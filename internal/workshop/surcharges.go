@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
-	"github.com/RedaEkengren/FreeSMS/internal/i18n"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -191,23 +189,14 @@ func PreviewSurcharges(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 // The words on a surcharge line are the system's, not the shop's, and are
 // written in the shop's language: they go onto a document the customer
 // reads and that is never re-rendered in another.
-var (
-	surchargeCatalogues     *i18n.Catalogues
-	surchargeCataloguesOnce sync.Once
-)
-
 func surchargeText(locale string) func(string, ...any) string {
-	surchargeCataloguesOnce.Do(func() {
-		if c, err := i18n.Load("en", false); err == nil {
-			surchargeCatalogues = c
-		}
-	})
-	if surchargeCatalogues == nil {
+	c := catalogues()
+	if c == nil {
 		// The catalogues are embedded, so this is not expected; the English
 		// key still says something sensible on an invoice.
 		return func(key string, args ...any) string { return fmt.Sprintf(key, args...) }
 	}
-	return surchargeCatalogues.For(locale).T
+	return c.For(locale).T
 }
 
 // TotalsWith is TotalsFor with the surcharges a job would be invoiced with,

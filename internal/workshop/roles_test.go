@@ -28,6 +28,7 @@ var everyRole = map[string]string{
 	"MyTime":         "the caller's own hours",
 	"ProgressFor":    "hours and a time on a job, no customer data",
 	"ChangePassword": "the caller's own password, checked against the current one",
+	"MyLocale":       "the caller's own language", "SetMyLocale": "the caller's own language",
 
 	// The job as the person holding the spanner sees it. Job carries the
 	// vehicle and the work, and no customer field exists on it to leak.

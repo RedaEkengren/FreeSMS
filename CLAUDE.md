@@ -137,12 +137,12 @@ not exist.
   mechanical; adding a string without a catalogue key is not acceptable in
   new work.
 
-  Two things about *which* language a page picks are not done, and both are
-  the same shape as the customer's page. Sign-in has catalogue keys and
-  renders in `DEFAULT_LOCALE`, because `handleLoginForm` never asks for the
-  shop's language; and a signed-in user whose own `locale` is null falls back
-  to `DEFAULT_LOCALE` rather than to the shop's. A Swedish workshop running
-  with the shipped default therefore reads English at the door.
+  Which language a page picks: the person's (/account), then the
+  workshop's (/shop, created in `DEFAULT_LOCALE` at setup), then English.
+  A document does not carry a language of its own. An issued invoice's
+  lines are frozen, but its headings render in the reader's language, so a
+  person who reads in English prints a Swedish workshop's invoice with
+  English headings. See #85.
 
   A shop's own words are never translated and must not be: inspection
   template labels, part names, a technician's note. They go straight onto the
