@@ -428,10 +428,11 @@ const (
 type SweepResult struct {
 	LoginAttempts int64
 	Shares        int64
+	JobLinks      int64
 }
 
 // Empty reports whether there was nothing to do.
-func (s SweepResult) Empty() bool { return s.LoginAttempts == 0 && s.Shares == 0 }
+func (s SweepResult) Empty() bool { return s.LoginAttempts == 0 && s.Shares == 0 && s.JobLinks == 0 }
 
 // Sweep applies the retention policy.
 //
@@ -498,6 +499,15 @@ func Sweep(ctx context.Context, pool *pgxpool.Pool, shopID string) (SweepResult,
 				WHERE expires_at < now() - $1::interval AND token_sha256 IS NOT NULL`,
 				seconds(expiredShareRetention))
 			r.Shares += tag.RowsAffected()
+			return err
+		}),
+
+		// A job's link carries nothing but where the car is, so an expired
+		// one is simply deleted.
+		step("job links", func(ctx context.Context, tx pgx.Tx) error {
+			tag, err := tx.Exec(ctx, `DELETE FROM job_links WHERE expires_at < now() - $1::interval`,
+				seconds(expiredShareRetention))
+			r.JobLinks = tag.RowsAffected()
 			return err
 		}),
 	}

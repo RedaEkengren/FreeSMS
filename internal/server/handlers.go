@@ -89,6 +89,48 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
+	s.renderJob(w, r, "")
+}
+
+// handleJobLink makes the customer's link to the job and shows it, once: the
+// token is not stored, so there is nowhere to look it up again.
+func (s *Server) handleJobLink(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	token, err := workshop.CreateJobLink(r.Context(), s.pool, session.Scope, r.PathValue("id"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.renderJob(w, r, s.baseURL+"/k/"+token)
+}
+
+// handleCustomerStatus is the customer's page: where their car is, and once
+// invoiced what is owed. No account; the link is the key.
+func (s *Server) handleCustomerStatus(w http.ResponseWriter, r *http.Request) {
+	st, err := workshop.JobStatus(r.Context(), s.pool, s.shop(), r.PathValue("token"))
+	if errors.Is(err, workshop.ErrShareNotUsable) {
+		s.render(w, r, http.StatusNotFound, "status", pageData{
+			Locale: s.shopLocale(r),
+			Title:  "This link is no longer open",
+			Error:  "Ask the workshop for a new one.",
+		})
+		return
+	}
+	if err != nil {
+		s.log.Error("customer status", "error", err)
+		s.render(w, r, http.StatusInternalServerError, "status", pageData{
+			Locale: s.shopLocale(r),
+			Title:  "Something went wrong", Error: "Try again shortly.",
+		})
+		return
+	}
+	s.render(w, r, http.StatusOK, "status", pageData{
+		Locale: s.shopLocale(r),
+		Title:  "Your car",
+		Status: st,
+	})
+}
+
+func (s *Server) renderJob(w http.ResponseWriter, r *http.Request, linkURL string) {
 	session := sessionFrom(r.Context())
 	id := r.PathValue("id")
 
@@ -218,6 +260,7 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		Presence:    presence,
 		JobParts:    jobParts,
 		Contacts:    contacts,
+		ShareURL:    linkURL,
 		Inspections: inspections,
 		Templates:   templates,
 		Suggestions: suggestions,

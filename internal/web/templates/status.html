@@ -1,0 +1,46 @@
+{{define "content"}}
+{{/* The customer's page: where their car is, in their workshop's language.
+     Nothing about money until there is an invoice, and then no more than the
+     invoice says. No account; the link is the key. */}}
+{{if .Error}}
+  <h1>{{.T .Title}}</h1>
+  <p class="error">{{.T .Error}}</p>
+{{else}}
+{{with .Status}}
+  <h1>{{.Registration}}</h1>
+  <p class="vehicle">{{.Make}} {{.Model}} &middot; {{.ShopName}}</p>
+
+  <div class="card">
+  {{if eq .Stage "ready"}}
+    <p class="status-big">{{$.T "Your car is ready to collect."}}</p>
+  {{else if eq .Stage "waiting_for_part"}}
+    <p class="status-big">{{$.T "We are waiting for a part."}}</p>
+  {{else if eq .Stage "done"}}
+    <p class="status-big">{{$.T "This job is finished."}}</p>
+  {{else}}
+    <p class="status-big">{{$.T "We are working on your car."}}</p>
+  {{end}}
+  {{if .CarAway}}<p class="waiting">{{$.T "The car is with you."}}{{with .ExpectedBack}} {{$.T "We expect it back %s." ($.Date . "Mon 2 Jan")}}{{end}}</p>{{end}}
+  </div>
+
+  {{if .Invoiced}}
+  <h2>{{$.T "Invoice %s" .InvoiceReference}}</h2>
+  <dl>
+    <dt>{{$.T "Total"}}</dt><dd>{{$.Money .GrossMinor}}</dd>
+    {{if gt .OutstandingMinor 0}}
+    <dt>{{$.T "Left to pay"}}</dt><dd>{{$.Money .OutstandingMinor}}</dd>
+    <dt>{{$.T "Due"}}</dt><dd>{{$.Date .Due "2 Jan 2006"}}</dd>
+    {{if .PayTo}}<dt>{{$.T "Pay to"}}</dt><dd>{{.PayTo}}</dd>{{end}}
+    {{else}}
+    <dt>{{$.T "Paid"}}</dt><dd>{{$.T "Thank you."}}</dd>
+    {{end}}
+  </dl>
+  {{end}}
+
+  {{if or .ShopPhone .ShopAddress}}
+  <p class="waiting mt-l">{{if .ShopAddress}}{{.ShopAddress}}{{end}}{{if and .ShopAddress .ShopPhone}} &middot; {{end}}{{if .ShopPhone}}<a href="tel:{{.ShopPhone}}">{{.ShopPhone}}</a>{{end}}</p>
+  {{end}}
+  <p class="waiting mt-xl">{{$.T "This link is personal to your car and stops working after a while."}}</p>
+{{end}}
+{{end}}
+{{end}}

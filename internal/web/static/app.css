@@ -469,3 +469,6 @@ meter.progress { display: block; width: 100%; height: 0.75rem; margin: 0.25rem 0
 /* The name in the header, which is a link home and should not look like one. */
 a.brand { font-weight: 600; text-decoration: none; color: inherit; }
 .plate.plate-small { font-size: 1rem; }
+
+/* The customer's page says one thing first: whether to come. */
+.status-big { font-size: 1.375rem; font-weight: 700; margin: 0; }

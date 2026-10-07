@@ -292,6 +292,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/car", s.requireSession(s.handleCar))
 	mux.HandleFunc("POST /jobs/{id}/takeout", s.requireSession(s.handleTakeOut))
 	mux.HandleFunc("POST /jobs/{id}/told", s.requireSession(s.handleTold))
+	mux.HandleFunc("POST /jobs/{id}/link", s.requireSession(s.handleJobLink))
 	mux.HandleFunc("GET /staff", s.requireSession(s.handleStaff))
 	mux.HandleFunc("POST /staff", s.requireSession(s.handleAddStaff))
 	mux.HandleFunc("POST /staff/{id}/active", s.requireSession(s.handleStaffActive))
@@ -315,6 +316,7 @@ func (s *Server) routes() (http.Handler, error) {
 	// The customer's link. No session; the token is the whole of the
 	// authorisation, and it authorises exactly one inspection.
 	mux.HandleFunc("GET /i/{token}", s.handleSharedInspection)
+	mux.HandleFunc("GET /k/{token}", s.handleCustomerStatus)
 	mux.HandleFunc("POST /i/{token}/items/{itemID}", s.handleSharedDecision)
 	mux.HandleFunc("GET /i/{token}/photos/{key}", s.handleSharedPhoto)
 

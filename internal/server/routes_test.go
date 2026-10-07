@@ -55,6 +55,7 @@ var swept = map[string]string{
 	// and asking for it with a uuid is a different test -- the share tests
 	// cover an unknown, an expired and a revoked one.
 	"GET /i/{token}":                 "token, not an identifier",
+	"GET /k/{token}":                 "token, not an identifier",
 	"POST /i/{token}/items/{itemID}": "token, not an identifier",
 	"GET /i/{token}/photos/{key}":    "token, not an identifier",
 
@@ -70,6 +71,7 @@ var swept = map[string]string{
 	"POST /jobs/{id}/car":                         "sweep",
 	"POST /jobs/{id}/takeout":                     "sweep",
 	"POST /jobs/{id}/told":                        "sweep",
+	"POST /jobs/{id}/link":                        "sweep",
 	"GET /jobs/{id}/parts":                        "sweep",
 	"POST /jobs/{id}/parts":                       "sweep",
 	"GET /jobs/{id}/customer":                     "sweep",

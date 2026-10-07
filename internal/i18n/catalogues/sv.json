@@ -1300,6 +1300,39 @@
     },
     "customer not told": {
       "other": "kunden inte meddelad"
+    },
+    "Your car": {
+      "other": "Din bil"
+    },
+    "Your car is ready to collect.": {
+      "other": "Din bil är klar att hämta."
+    },
+    "We are waiting for a part.": {
+      "other": "Vi väntar på en reservdel."
+    },
+    "This job is finished.": {
+      "other": "Det här jobbet är avslutat."
+    },
+    "We are working on your car.": {
+      "other": "Vi arbetar med din bil."
+    },
+    "The car is with you.": {
+      "other": "Bilen är hos dig."
+    },
+    "We expect it back %s.": {
+      "other": "Vi väntar den tillbaka %s."
+    },
+    "Invoice %s": {
+      "other": "Faktura %s"
+    },
+    "Left to pay": {
+      "other": "Kvar att betala"
+    },
+    "Thank you.": {
+      "other": "Tack."
+    },
+    "This link is personal to your car and stops working after a while.": {
+      "other": "Den här länken hör till din bil och slutar fungera efter ett tag."
     }
   }
 }

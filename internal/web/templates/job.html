@@ -240,6 +240,19 @@
      counter's, and only once it is ready: before that there is nothing to
      tell. The history stays, so a second try reads as one. */}}
 {{if .Session.Scope.Role.SeesCustomerPersonalData}}
+{{/* The customer's link to the job: where the car is, and once invoiced
+     what is owed. Shown once; a new one closes the old. */}}
+{{if .ShareURL}}
+<div class="share">
+  <p><strong>{{.T "Send this to the customer."}}</strong> {{.T "It is shown once — there is nowhere to look it up again, so make a new link if it is lost."}}</p>
+  <input id="share-url" value="{{.ShareURL}}" readonly data-select>
+  <button type="button" class="secondary" data-copy="#share-url" data-copied="{{.T "Copied"}}">{{.T "Copy the link"}}</button>
+</div>
+{{else}}
+<form class="mt-s" method="post" action="/jobs/{{.Job.ID}}/link">
+  <button type="submit" class="secondary">{{.T "Make a link for the customer"}}</button>
+</form>
+{{end}}
 {{if or (eq .Job.State "ready") .Contacts}}
 <h2>{{.T "Telling the customer"}}</h2>
 {{if .Contacts}}
