@@ -1,0 +1,17 @@
+/* The FreeSMS site. Static, no build step, no third-party anything: the same
+   promises the product makes. System fonts and the product's own palette. */
+:root { color-scheme: light; --bg: #f4f5f7; --text: #14171c; --muted: #5b6270; --accent: #1f2328; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 1.0625rem/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow-x: hidden; }
+main { max-width: 64rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+header.top { display: flex; justify-content: space-between; align-items: center; max-width: 64rem; margin: 0 auto; padding: 1rem; }
+header.top b { font-size: 1.125rem; letter-spacing: .01em; }
+header.top a { color: var(--text); }
+.hero h1 { font-size: clamp(1.9rem, 5vw, 3rem); line-height: 1.1; margin: 1.5rem 0 .75rem; letter-spacing: -.02em; }
+.hero p { font-size: 1.15rem; color: var(--muted); max-width: 40rem; margin: 0 0 2rem; }
+.scene { margin: 2.5rem 0 1rem; }
+.scene h2 { font-size: 1.4rem; margin: 0 0 .25rem; }
+.scene .lede { color: var(--muted); margin: 0 0 1rem; max-width: 42rem; }
+.scene .truth { font-size: .875rem; color: var(--muted); font-style: italic; margin-top: .6rem; }
+footer { max-width: 64rem; margin: 0 auto; padding: 2rem 1rem; color: var(--muted); font-size: .9rem; }

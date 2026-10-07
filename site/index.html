@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+<title>FreeSMS – verkstadssystemet som klarar gropen</title>
+<meta name="description" content="Ett öppet verkstadssystem för oberoende bilverkstäder. Inget går förlorat när wifi:t försvinner.">
+<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="anim.css">
+<script src="anim.js" defer></script>
+</head>
+<body>
+<header class="top"><b>FreeSMS</b><a href="https://github.com/RedaEkengren/FreeSMS">Källkoden</a></header>
+<main>
+<section class="hero">
+  <h1>Verkstadssystemet som klarar gropen.</h1>
+  <p>Öppen källkod för oberoende bilverkstäder. Byggt för en telefon i en smutsig hand, ett wifi som inte når ner under bilen, och en reception som måste kunna svara när kunden ringer.</p>
+</section>
+
+<section class="scene">
+  <h2>När wifi:t försvinner</h2>
+  <p class="lede">Teknikern ser något mer som behöver göras och säger till receptionen, från gropen. Nätet är borta. Det sparas i telefonen, väntar, och skickas en gång när nätet kommer tillbaka.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="18">
+    <div class="an-canvas" role="img" aria-label="Animering: en tekniker skriver att bromsbeläggen bak är nere på 2 millimeter och trycker Säg till framdisken medan telefonen saknar wifi. Telefonen säger att det hålls och skickas när det finns en anslutning, och visar att en sak väntar. När wifi:t kommer tillbaka skickas det en gång, och receptionens tavla visar 1 sak upptäckt, inte prissatt, på bilen.">
+
+      <div class="an-card wf-phone">
+        <div class="wf-status">
+          <span>07:42</span>
+          <span class="wf-wifi">
+            <svg data-t="0,2.6" class="an-fade" viewBox="0 0 20 16" fill="none" stroke="#14171c" stroke-width="2" stroke-linecap="round"><path d="M2 6a12 12 0 0 1 16 0M5 9.5a7.5 7.5 0 0 1 10 0M8 13a3 3 0 0 1 4 0"/></svg>
+            <svg data-t="2.6,13.2" class="an-fade wf-off" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 6a12 12 0 0 1 16 0M5 9.5a7.5 7.5 0 0 1 10 0M8 13a3 3 0 0 1 4 0M3 1l14 14"/></svg>
+            <svg data-t="13.2" class="an-fade" viewBox="0 0 20 16" fill="none" stroke="#0a7d37" stroke-width="2" stroke-linecap="round"><path d="M2 6a12 12 0 0 1 16 0M5 9.5a7.5 7.5 0 0 1 10 0M8 13a3 3 0 0 1 4 0"/></svg>
+          </span>
+        </div>
+        <div class="wf-held an-fade" data-t="7,14.2">1 sak väntar på att skickas.</div>
+        <div class="wf-bar"><b>ABC 123</b> &middot; Volvo V70 &middot; Under arbete</div>
+        <div class="wf-body">
+          <div class="wf-h">Skramlar fram vid 80</div>
+          <span class="an-btn wf-add wf-clock">Stoppa klockan</span>
+          <div class="wf-h wf-gap">Lämna över</div>
+          <div class="wf-field"><span class="lbl">Något mer behöver göras</span><span data-type="3.0,2.0">Bromsbelägg bak nere på 2 mm</span></div>
+          <span class="an-btn wf-add wf-secondary">Säg till framdisken</span>
+        </div>
+        <div class="wf-dim an-fade" data-t="6.8,9.4"></div>
+        <div class="wf-alert an-pop" data-t="6.8,9.4">Ingen anslutning. Det här hålls och skickas när det finns en anslutning.<span class="ok">OK</span></div>
+        <div class="wf-store an-fade" data-t="7.6,13.4">Sparat i telefonen, med en nyckel som gör att det bara kan komma fram en gång: <code>POST /jobs/…/findings</code></div>
+      </div>
+
+      <div class="wf-packet" data-t="13.6,14.8">Bromsbelägg bak nere på 2 mm</div>
+
+      <div class="an-card wf-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Receptionen &middot; Inne på verkstaden</span></div>
+        <!-- The board does not refresh itself: somebody reloads it. Shown as
+             it happens rather than as a page that updates on its own. -->
+        <div class="wf-reload an-fade" data-t="15.2,15.9">Laddar om&hellip;</div>
+        <div class="wf-body">
+          <div class="wf-card">
+            <div class="wf-plate">ABC 123</div>
+            <div class="an-muted">#1 &middot; Volvo V70 &middot; Karin Kund</div>
+            <div class="an-muted">Erik jobbar på den</div>
+            <div class="wf-noticed an-r" data-t="16">1 sak upptäckt, inte prissatt</div>
+          </div>
+          <div class="wf-card wf-other">
+            <div class="wf-plate">XYZ 789</div>
+            <div class="an-muted">#2 &middot; Toyota Corolla &middot; Olle Ägare</div>
+            <div class="an-muted">Väntar på att kunden godkänner</div>
+          </div>
+        </div>
+      </div>
+
+      <span class="an-cursor" data-path="0:330,250; 2.8:194,290; 6.6:194,331c; 9.2:300,330c; 24:330,250"
+            data-path-m="0:200,250; 2.8:141,330; 6.6:141,360c; 9.2:220,300c; 24:200,250"><svg viewBox="0 0 24 24"><path d="M4 2l16 11-7 1-3 7z" fill="#fff" stroke="#14171c" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+
+      <div class="an-cap" data-t="0.3,2.4">07:42. Erik ligger under bilen, mitt i ett jobb.</div>
+      <div class="an-cap" data-t="2.6,6.6">Han ser något mer. Wifi:t når inte ner i gropen.</div>
+      <div class="an-cap" data-t="6.8,9.6">Det sparas i telefonen, inte i tomma intet.</div>
+      <div class="an-cap" data-t="9.8,13.2">Låst skärm, stängd flik: det ligger kvar och väntar.</div>
+      <div class="an-cap" data-t="13.4,16.6">Nätet är tillbaka. Det skickas, exakt en gång.</div>
+      <div class="an-cap" data-t="16.8,23.6">Receptionen laddar om tavlan, ser det och kan ringa kunden.</div>
+    </div>
+  </div>
+  <p class="truth">Ritad efter FreeSMS skärmar, med produktens egna ord. Flödet är det som webbläsartesterna kör mot den riktiga produkten vid varje ändring av koden.</p>
+</section>
+</main>
+<footer>FreeSMS är öppen källkod under AGPL-3.0.</footer>
+</body>
+</html>
