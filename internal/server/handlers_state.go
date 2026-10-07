@@ -24,7 +24,13 @@ func (s *Server) handleSetState(w http.ResponseWriter, r *http.Request) {
 	// the customer. Refusing the whole endpoint to technicians is what made
 	// them walk across the workshop to say the car was finished.
 
-	err := workshop.SetState(r.Context(), s.pool, session.Scope, id, to)
+	var err error
+	if to == workshop.StateClosed {
+		// Closing by hand asks why when money is still owed.
+		err = workshop.CloseJob(r.Context(), s.pool, session.Scope, id, r.FormValue("reason"))
+	} else {
+		err = workshop.SetState(r.Context(), s.pool, session.Scope, id, to)
+	}
 
 	var illegal workshop.ErrIllegalTransition
 	switch {
@@ -47,6 +53,9 @@ func (s *Server) handleSetState(w http.ResponseWriter, r *http.Request) {
 		return
 	case errors.As(err, &illegal):
 		s.renderError(w, r, http.StatusConflict, "Not from here", illegal.Error())
+		return
+	case errors.Is(err, workshop.ErrInvalid):
+		s.renderError(w, r, http.StatusBadRequest, "Not accepted", trimInvalid(err))
 		return
 	case errors.Is(err, access.ErrForbidden):
 		s.renderError(w, r, http.StatusForbidden, "Not for your role",

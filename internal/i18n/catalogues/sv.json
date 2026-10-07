@@ -1333,6 +1333,9 @@
     },
     "This link is personal to your car and stops working after a while.": {
       "other": "Den här länken hör till din bil och slutar fungera efter ett tag."
+    },
+    "If money is still owed, why close it anyway": {
+      "other": "Om pengar fortfarande är obetalda: varför avsluta ändå"
     }
   }
 }

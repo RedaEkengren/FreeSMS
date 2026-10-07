@@ -227,7 +227,11 @@ func RecordPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 				out.RoundingMinor = owed - out.AmountMinor
 			}
 		}
-		return insertPayment(ctx, tx, scope, b.InvoiceID, &out, "")
+		if err := insertPayment(ctx, tx, scope, b.InvoiceID, &out, ""); err != nil {
+			return err
+		}
+		// The money that settles it may be what finishes the job.
+		return closeIfFinishedTx(ctx, tx, b.WorkOrderID)
 	})
 	return out, err
 }

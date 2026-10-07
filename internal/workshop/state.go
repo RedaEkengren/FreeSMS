@@ -308,6 +308,11 @@ func SetState(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID
 		if to == StateInvoiced && from != StateInvoiced {
 			return ErrNeedsDocument
 		}
+		// Closing by hand goes through CloseJob, which asks why when money is
+		// still owed.
+		if to == StateClosed {
+			return fmt.Errorf("%w: close it with CloseJob", ErrInvalid)
+		}
 		if from != to && !MayTransition(scope.Role, from, to) {
 			if CanTransition(from, to) {
 				return access.ErrForbidden

@@ -102,6 +102,9 @@
   {{range .Next}}
   <form class="m-0" method="post" action="/jobs/{{$.Job.ID}}/state" data-offline>
     <input type="hidden" name="state" value="{{.}}">
+    {{/* A job closes itself once the car is collected and the invoice
+         settled. By hand, with money still owed, it needs a reason. */}}
+    {{if eq (print .) "closed"}}<label><span>{{$.T "If money is still owed, why close it anyway"}}</span><input name="reason" maxlength="500"></label>{{end}}
     <button type="submit" class="secondary">{{$.T .Action}}</button>
   </form>
   {{end}}

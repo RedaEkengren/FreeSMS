@@ -146,6 +146,10 @@ func presenceEvent(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 			VALUES ($1, $2, $3, $4, $5)`, scope.ShopID, jobID, event, expectedBack, scope.UserID); err != nil {
 			return fmt.Errorf("record presence: %w", err)
 		}
+		// Collecting a paid car is what finishes its job.
+		if event == "collected" {
+			return closeIfFinishedTx(ctx, tx, jobID)
+		}
 		return nil
 	})
 }
