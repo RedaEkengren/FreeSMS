@@ -146,9 +146,9 @@ header nav .cta-small:hover { color: #fff; background: var(--brand-dark); }
 .social svg { width: 1.2rem; height: 1.2rem; }
 .social:hover { color: #fff; background: var(--ink); border-color: var(--ink); transform: translateY(-2px); }
 .social[title="LinkedIn"]:hover { background: #0a66c2; border-color: #0a66c2; }
-.made-by { display: inline-flex; align-items: center; gap: .7rem; text-decoration: none; color: var(--muted); }
-.made-by img { height: 1.9rem; width: auto; opacity: .85; transition: opacity .15s ease; }
-.made-by:hover img { opacity: 1; }
+.made-by { text-decoration: none; color: var(--muted); }
+.made-by b { color: var(--text); font-weight: 600; }
+.made-by:hover b { color: var(--brand); }
 .foot-bottom { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 2.5rem;
   padding-top: 1.25rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .82rem; }
 @media (max-width: 720px) {
