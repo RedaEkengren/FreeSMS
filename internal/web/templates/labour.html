@@ -20,12 +20,12 @@ enough that shops keep their own anyway; this is that, written down.</p>
   <li>
     <div class="row">
       <span>{{.Operation}}</span>
-      <span class="tag">{{.Hours}} h</span>
+      <span class="tag">{{$.Num .Hours}} h</span>
     </div>
     <div class="waiting">{{.Scope}}{{if ne .AdjustmentMinutes 0}} &middot; includes the shop's own {{.AdjustmentMinutes}} min{{end}}</div>
     {{if .Actuals.Known}}
       <div class="waiting">
-        Really took {{.Actuals.MedianHours}} h across {{.Actuals.Jobs}} job{{if ne .Actuals.Jobs 1}}s{{end}}
+        Really took {{($.Num .Actuals.MedianHours)}} h across {{.Actuals.Jobs}} job{{if ne .Actuals.Jobs 1}}s{{end}}
         ({{.Actuals.FastestMinutes}}–{{.Actuals.SlowestMinutes}} min)
       </div>
     {{end}}

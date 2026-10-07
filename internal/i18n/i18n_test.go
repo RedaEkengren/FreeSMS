@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 )
 
 func load(t *testing.T, strict bool) *Catalogues {
@@ -138,5 +139,32 @@ func TestEveryPluralHasAnEnglishPlural(t *testing.T) {
 
 	if got := load(t, false).For("en").N("Waiting for %d part", 2); got != "Waiting for 2 parts" {
 		t.Errorf("English N(2) = %q", got)
+	}
+}
+
+// A Swedish page writes "1,5 h" and "mån 5 okt", not "1.5 h" and "Mon 5 Oct".
+func TestNumbersAndDatesAreWrittenInTheReadersLanguage(t *testing.T) {
+	c, err := Load("en", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sv, en := c.For("sv"), c.For("en")
+	if got := sv.Number("1.5"); got != "1,5" {
+		t.Errorf("sv 1.5 = %q", got)
+	}
+	if got := en.Number("1.5"); got != "1.5" {
+		t.Errorf("en 1.5 = %q", got)
+	}
+	when := time.Date(2026, time.October, 5, 7, 42, 0, 0, time.UTC)
+	if got := sv.Date(when, "Mon 2 Jan 15:04"); got != "mån 5 okt 07:42" {
+		t.Errorf("sv = %q", got)
+	}
+	if got := en.Date(when, "Mon 2 Jan 2006"); got != "Mon 5 Oct 2026" {
+		t.Errorf("en = %q", got)
+	}
+	// May and March: a month whose name is in the layout's digits is not
+	// confused with one.
+	if got := sv.Date(time.Date(2026, time.May, 1, 0, 0, 0, 0, time.UTC), "2 Jan 2006"); got != "1 maj 2026" {
+		t.Errorf("sv May = %q", got)
 	}
 }

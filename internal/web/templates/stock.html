@@ -97,7 +97,7 @@ wrongly ordered parts cost.</p>
 {{if .PriceBands}}
 <ul class="lines">
   {{range .PriceBands}}
-  <li><div class="row"><span>{{if .TopBand}}{{$.T "and above"}}{{else}}{{$.T "up to %s" ($.MoneyOrBlank .UpToMinor)}}{{end}}</span><span class="tag">{{.Markup}}</span></div></li>
+  <li><div class="row"><span>{{if .TopBand}}{{$.T "and above"}}{{else}}{{$.T "up to %s" ($.MoneyOrBlank .UpToMinor)}}{{end}}</span><span class="tag">{{($.Num .Markup)}}</span></div></li>
   {{end}}
 </ul>
 {{else}}

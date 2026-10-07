@@ -26,10 +26,10 @@ handing over a running month is how a period gets exported twice.</p>
   {{range .Exports}}
   <li>
     <div class="row">
-      <span>{{.From.Format "2 Jan 2006"}} – {{.To.Format "2 Jan 2006"}}</span>
+      <span>{{$.Date .From "2 Jan 2006"}} – {{$.Date .To "2 Jan 2006"}}</span>
       <span class="tag">{{.InvoiceCount}} document{{if ne .InvoiceCount 1}}s{{end}}</span>
     </div>
-    <div class="waiting">{{($.Local .ExportedAt).Format "2 Jan 15:04"}}{{if .ExportedBy}} &middot; {{.ExportedBy}}{{end}}</div>
+    <div class="waiting">{{$.Date ($.Local .ExportedAt) "2 Jan 15:04"}}{{if .ExportedBy}} &middot; {{.ExportedBy}}{{end}}</div>
   </li>
   {{end}}
 </ul>

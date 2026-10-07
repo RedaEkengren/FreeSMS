@@ -25,7 +25,7 @@ field anywhere in this system. A field with no purpose does not exist.</p>
   {{range .Erasures}}
   <li>
     <div class="row">
-      <span>{{($.Local .ErasedAt).Format "2 Jan 2006"}}</span>
+      <span>{{$.Date ($.Local .ErasedAt) "2 Jan 2006"}}</span>
       <span class="tag">by {{.ErasedBy}}</span>
     </div>
     <div class="waiting"><strong>Cleared:</strong> {{.Cleared}}</div>

@@ -1,6 +1,30 @@
 {
   "locale": "sv",
   "name": "Svenska",
+  "decimal": ",",
+  "months": [
+    "jan",
+    "feb",
+    "mar",
+    "apr",
+    "maj",
+    "jun",
+    "jul",
+    "aug",
+    "sep",
+    "okt",
+    "nov",
+    "dec"
+  ],
+  "weekdays": [
+    "sön",
+    "mån",
+    "tis",
+    "ons",
+    "tor",
+    "fre",
+    "lör"
+  ],
   "messages": {
     "%d day net": {
       "one": "%d dag netto",

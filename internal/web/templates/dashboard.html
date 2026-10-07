@@ -23,8 +23,8 @@ average and does not move the middle.</p>
 
 <h2>Hours</h2>
 <dl class="totals">
-  <dt>Clocked</dt><dd>{{printf "%.1f" .Dashboard.HoursClocked}}</dd>
-  <dt>Sold</dt><dd>{{printf "%.1f" .Dashboard.HoursBilled}}</dd>
+  <dt>Clocked</dt><dd>{{$.Num (printf "%.1f" .Dashboard.HoursClocked)}}</dd>
+  <dt>Sold</dt><dd>{{$.Num (printf "%.1f" .Dashboard.HoursBilled)}}</dd>
 </dl>
 
 {{if .Dashboard.HasFindings}}
@@ -42,7 +42,7 @@ average and does not move the middle.</p>
   <li>
     <div class="row">
       <span>{{.Name}}</span>
-      <span>{{printf "%.1f" .Clocked}} clocked &middot; {{printf "%.1f" .Billed}} sold</span>
+      <span>{{$.Num (printf "%.1f" .Clocked)}} clocked &middot; {{$.Num (printf "%.1f" .Billed)}} sold</span>
     </div>
   </li>
   {{end}}
@@ -50,7 +50,7 @@ average and does not move the middle.</p>
   <li>
     <div class="row">
       <span>{{.T "Nobody clocked"}}</span>
-      <span>{{printf "%.1f" .Dashboard.Unattributed}} {{.T "sold"}}</span>
+      <span>{{$.Num (printf "%.1f" .Dashboard.Unattributed)}} {{.T "sold"}}</span>
     </div>
   </li>
   {{end}}

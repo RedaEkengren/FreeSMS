@@ -10,9 +10,9 @@ been.</p>
 <div class="card">
   <div class="row">
     <a href="/jobs/{{.WorkOrderID}}">#{{.Number}} {{.Registration}}</a>
-    <span class="tag late">{{.Hours}} h</span>
+    <span class="tag late">{{$.Num .Hours}} h</span>
   </div>
-  <div class="waiting">{{.UserName}} &middot; {{($.Local .StartedAt).Format "2 Jan 15:04"}}</div>
+  <div class="waiting">{{.UserName}} &middot; {{$.Date ($.Local .StartedAt) "2 Jan 15:04"}}</div>
   {{if .Note}}<div class="waiting">{{.Note}}</div>{{end}}
   <form class="mt-m" method="post" action="/time/correct">
     <input type="hidden" name="entry_id" value="{{.ID}}">
@@ -48,13 +48,13 @@ been.</p>
     <div class="row">
       <a href="/jobs/{{.WorkOrderID}}">#{{.Number}} {{.Registration}}</a>
       <span class="tag{{if .Running}} running{{else if .Flagged}} late{{end}}">
-        {{if .Running}}running{{else}}{{.Hours}} h{{end}}
+        {{if .Running}}running{{else}}{{$.Num .Hours}} h{{end}}
       </span>
     </div>
-    <div class="waiting">{{($.Local .StartedAt).Format "Mon 2 Jan 15:04"}}</div>
+    <div class="waiting">{{$.Date ($.Local .StartedAt) "Mon 2 Jan 15:04"}}</div>
     {{if .Corrected}}
       <div class="waiting">Corrected by {{.CorrectedBy}} — was
-      {{($.Local .OriginalStart).Format "15:04"}}{{if .OriginalEnd}}–{{($.Local .OriginalEnd).Format "15:04"}}{{end}}</div>
+      {{$.Date ($.Local .OriginalStart) "15:04"}}{{if .OriginalEnd}}–{{$.Date ($.Local .OriginalEnd) "15:04"}}{{end}}</div>
     {{end}}
     {{if .Note}}<div class="waiting">{{.Note}}</div>{{end}}
   </li>

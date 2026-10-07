@@ -15,9 +15,9 @@
     {{if not .HasCustomer}}<div class="waiting">{{$.T "No customer recorded yet"}}</div>{{end}}
     <div class="waiting">{{$.T .Waiting .WaitingArg}}</div>
     {{with .Progress}}{{if or .Known .PromisedAt}}<div class="waiting">
-      {{if .PromisedAt}}{{$.T "promised %s" (($.Local .PromisedAt).Format "Mon 15:04")}}{{end}}
+      {{if .PromisedAt}}{{$.T "promised %s" ($.Date ($.Local .PromisedAt) "Mon 15:04")}}{{end}}
       {{if and .Known .PromisedAt}} &middot; {{end}}
-      {{if .Known}}{{$.T "%s of %s h" .ClockedHours .EstimateHours}}{{end}}
+      {{if .Known}}{{$.T "%s of %s h" ($.Num .ClockedHours) ($.Num .EstimateHours)}}{{end}}
       {{if eq .Verdict "at risk"}}<span class="tag warranty">{{$.T "at risk"}}</span>{{end}}
     </div>{{end}}{{end}}
     {{if gt .OpenFindings 0}}<div class="waiting">{{$.N "%d thing noticed, not priced" .OpenFindings}}</div>{{end}}

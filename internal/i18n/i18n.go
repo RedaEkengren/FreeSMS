@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 //go:embed catalogues/*.json
@@ -32,6 +33,14 @@ type Catalogue struct {
 	Locale   string
 	Name     string
 	Messages map[string]Message
+
+	// How the language writes a number and a date. A decimal comma is not a
+	// translation of a word, and neither are the names of the months, so
+	// they are here rather than among the messages. Empty means English:
+	// a point, and Go's own names.
+	Decimal  string   `json:"decimal,omitempty"`
+	Months   []string `json:"months,omitempty"`   // short, January first
+	Weekdays []string `json:"weekdays,omitempty"` // short, Sunday first, as time.Weekday counts
 }
 
 // Catalogues holds every language that shipped, and answers lookups.
@@ -66,6 +75,12 @@ func Load(fallback string, strict bool) (*Catalogues, error) {
 		}
 		if cat.Locale == "" {
 			return nil, fmt.Errorf("i18n: %s does not say which locale it is", e.Name())
+		}
+		if n := len(cat.Months); n != 0 && n != 12 {
+			return nil, fmt.Errorf("i18n: %s names %d months", e.Name(), n)
+		}
+		if n := len(cat.Weekdays); n != 0 && n != 7 {
+			return nil, fmt.Errorf("i18n: %s names %d weekdays", e.Name(), n)
 		}
 		c.byLocale[cat.Locale] = &cat
 	}
@@ -135,6 +150,54 @@ func (p *Printer) N(key string, count int, args ...any) string {
 // makes, so the two cannot disagree.
 func (p *Printer) Form(key string, count int) string {
 	return p.lookup(key, count == 1)
+}
+
+// Number writes a decimal the domain formatted -- "1.5", "45.0%" -- the way
+// the reader's language does. The domain keeps a point so that a value put
+// back into a form parses; only what a person reads changes.
+func (p *Printer) Number(s string) string {
+	if cat := p.catalogue(); cat != nil && cat.Decimal != "" {
+		return strings.ReplaceAll(s, ".", cat.Decimal)
+	}
+	return s
+}
+
+// Date formats t with a Go layout, naming months and weekdays in the
+// reader's language. Go's own names are English whatever the page is, which
+// put "7 Oct 2026" on a Swedish invoice.
+//
+// A layout with the long names ("January", "Monday") is left in English
+// rather than half translated into "okt uary": nothing uses them, and a
+// catalogue carries short ones.
+func (p *Printer) Date(t time.Time, layout string) string {
+	cat := p.catalogue()
+	if cat == nil || (len(cat.Months) == 0 && len(cat.Weekdays) == 0) ||
+		strings.Contains(layout, "January") || strings.Contains(layout, "Monday") {
+		return t.Format(layout)
+	}
+	// Go's layout tokens become marks Format leaves alone, and the marks
+	// become the names.
+	const month, weekday = "\x00M\x00", "\x00W\x00"
+	if len(cat.Months) == 12 {
+		layout = strings.ReplaceAll(layout, "Jan", month)
+	}
+	if len(cat.Weekdays) == 7 {
+		layout = strings.ReplaceAll(layout, "Mon", weekday)
+	}
+	out := t.Format(layout)
+	if len(cat.Months) == 12 {
+		out = strings.ReplaceAll(out, month, cat.Months[t.Month()-1])
+	}
+	if len(cat.Weekdays) == 7 {
+		out = strings.ReplaceAll(out, weekday, cat.Weekdays[t.Weekday()])
+	}
+	return out
+}
+
+func (p *Printer) catalogue() *Catalogue {
+	p.c.mu.RLock()
+	defer p.c.mu.RUnlock()
+	return p.c.byLocale[p.locale]
 }
 
 func (p *Printer) lookup(key string, singular bool) string {

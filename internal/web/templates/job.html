@@ -28,14 +28,14 @@
 <h2>{{.T "When it will be ready"}}</h2>
 {{with .Progress}}
 <dl>
-  {{if .PromisedAt}}<dt>{{$.T "Promised"}}</dt><dd>{{($.Local .PromisedAt).Format "Mon 2 Jan 15:04"}}
+  {{if .PromisedAt}}<dt>{{$.T "Promised"}}</dt><dd>{{$.Date ($.Local .PromisedAt) "Mon 2 Jan 15:04"}}
     {{if eq .Verdict "late"}}<span class="tag late">{{$.T "late"}}</span>
     {{else if eq .Verdict "at risk"}}<span class="tag warranty">{{$.T "at risk"}}</span>
     {{else if eq .Verdict "on time"}}<span class="tag">{{$.T "on time"}}</span>{{end}}</dd>{{end}}
   {{if .Known}}
   <dt>{{$.T "Clocked"}}</dt>
-  <dd>{{$.T "%s of %s h" .ClockedHours .EstimateHours}} &middot; {{.Percent}} %</dd>
-  {{if not .Over}}<dt>{{$.T "Left"}}</dt><dd>{{.LeftHours}} h</dd>{{end}}
+  <dd>{{$.T "%s of %s h" ($.Num .ClockedHours) ($.Num .EstimateHours)}} &middot; {{.Percent}} %</dd>
+  {{if not .Over}}<dt>{{$.T "Left"}}</dt><dd>{{($.Num .LeftHours)}} h</dd>{{end}}
   {{end}}
 </dl>
 {{if .Known}}
@@ -45,7 +45,7 @@
 {{else}}
 <p class="waiting">{{$.T "No estimate: there is no labour line on the job yet."}}</p>
 {{end}}
-{{if .Running}}<p class="waiting">{{$.T "As of %s, with a clock running." (($.Local .AsOf).Format "15:04")}}</p>{{end}}
+{{if .Running}}<p class="waiting">{{$.T "As of %s, with a clock running." ($.Date ($.Local .AsOf) "15:04")}}</p>{{end}}
 {{end}}
 {{if and .Session.Scope.Role.SeesCustomerPersonalData (not .Progress.Finished)}}
 <form method="post" action="/jobs/{{.Job.ID}}/promise">
@@ -308,9 +308,9 @@
   <input type="hidden" name="quantity" value="{{.Hours}}">
   <input type="hidden" name="unit_price" value="{{fmt $.LabourRate}}">
   <span class="what">{{.Operation}}
-    <small>{{$.T "matched on %s" .MatchedRule}}{{if .Actuals.Known}} &middot; {{$.T "really took %s h across %s" .Actuals.MedianHours .Actuals.Jobs}}{{end}}</small>
+    <small>{{$.T "matched on %s" .MatchedRule}}{{if .Actuals.Known}} &middot; {{$.T "really took %s h across %s" ($.Num .Actuals.MedianHours) .Actuals.Jobs}}{{end}}</small>
   </span>
-  <span class="tag">{{.Hours}} h</span>
+  <span class="tag">{{$.Num .Hours}} h</span>
   <button type="submit" class="secondary">{{$.T "Add"}}</button>
 </form>
 {{end}}

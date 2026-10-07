@@ -17,7 +17,7 @@
     <div class="row">
       <span class="plate plate-small">{{.Registration}}</span>
       {{if .Current}}<span class="tag pass">now</span>
-      {{else}}<span class="tag">until {{($.Local .ValidTo).Format "2 Jan 2006"}}</span>{{end}}
+      {{else}}<span class="tag">until {{$.Date ($.Local .ValidTo) "2 Jan 2006"}}</span>{{end}}
     </div>
   </li>
   {{end}}
@@ -31,7 +31,7 @@
   {{range .Vehicle.History}}
   <div class="card">
     <div class="row">
-      <a href="/jobs/{{.WorkOrderID}}">#{{.Number}} &middot; {{($.Local .OpenedAt).Format "2 Jan 2006"}}</a>
+      <a href="/jobs/{{.WorkOrderID}}">#{{.Number}} &middot; {{$.Date ($.Local .OpenedAt) "2 Jan 2006"}}</a>
       <span class="tag">{{$.T .StateLabel}}</span>
     </div>
     {{if .Complaint}}<div class="complaint">{{.Complaint}}</div>{{end}}
@@ -59,7 +59,7 @@
   <li>
     <div class="row">
       <span>{{.Km}} km</span>
-      <span class="tag{{if .Decreasing}} late{{end}}">{{($.Local .ReadAt).Format "2 Jan 2006"}}</span>
+      <span class="tag{{if .Decreasing}} late{{end}}">{{$.Date ($.Local .ReadAt) "2 Jan 2006"}}</span>
     </div>
     {{if .Decreasing}}<div class="waiting">Lower than an earlier reading</div>{{end}}
   </li>

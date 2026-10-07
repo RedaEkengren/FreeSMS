@@ -247,6 +247,24 @@ func (d pageData) N(key string, count int, args ...any) string {
 	return d.printer.N(key, count, args...)
 }
 
+// Num writes a decimal the domain formatted with a point -- hours, a
+// markup -- the way the reader's language does.
+func (d pageData) Num(s string) string {
+	if d.printer == nil {
+		return s
+	}
+	return d.printer.Number(s)
+}
+
+// Date formats a time with month and weekday names in the reader's
+// language. An instant goes through Local first: $.Date ($.Local .At) "...".
+func (d pageData) Date(t time.Time, layout string) string {
+	if d.printer == nil {
+		return t.Format(layout)
+	}
+	return d.printer.Date(t, layout)
+}
+
 // Plural is a message's plural form with the count left as %d, for a script to
 // fill in. See i18n.Printer.Form.
 func (d pageData) Plural(key string, count int) string {

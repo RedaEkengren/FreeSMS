@@ -18,8 +18,8 @@
       {{end}}
     </div>
     <div class="waiting">
-      <div>{{($.Local .IssuedAt).Format "2 Jan 2006"}}</div>
-      {{if .Seller.Known}}<div>{{$.T "Due"}} {{($.Due .).Format "2 Jan 2006"}}</div>{{end}}
+      <div>{{$.Date ($.Local .IssuedAt) "2 Jan 2006"}}</div>
+      {{if .Seller.Known}}<div>{{$.T "Due"}} {{$.Date ($.Due .) "2 Jan 2006"}}</div>{{end}}
     </div>
   </div>
 
@@ -75,17 +75,17 @@
   <dt class="grand">{{if lt .OutstandingMinor 0}}{{$.T "Owed back to the customer"}}{{else}}{{$.T "Outstanding"}}{{end}}</dt>
   <dd class="grand">{{$.Money .OutstandingMinor}}
     {{if .Overdue}}<span class="tag late">{{$.T "overdue"}}</span>{{else if .Settled}}<span class="tag">{{$.T "settled"}}</span>{{end}}</dd>
-  <dt>{{$.T "Due"}}</dt><dd>{{($.Local .Due).Format "2 Jan 2006"}}</dd>
+  <dt>{{$.T "Due"}}</dt><dd>{{$.Date ($.Local .Due) "2 Jan 2006"}}</dd>
 </dl>
 {{if .Payments}}
 <ul class="lines">
   {{range .Payments}}
   <li>
     <div class="row">
-      <span>{{.Series}}-{{.Number}} &middot; {{.PaidOn.Format "2 Jan 2006"}} &middot; {{$.T .Method}}{{if .Reference}} &middot; {{.Reference}}{{end}}</span>
+      <span>{{.Series}}-{{.Number}} &middot; {{$.Date .PaidOn "2 Jan 2006"}} &middot; {{$.T .Method}}{{if .Reference}} &middot; {{.Reference}}{{end}}</span>
       <span>{{$.Money .AmountMinor}}{{if .RoundingMinor}} + {{$.Money .RoundingMinor}} {{$.T "rounding"}}{{end}}</span>
     </div>
-    <div class="waiting">{{$.T "Recorded by %s, %s" .RecordedBy (($.Local .RecordedAt).Format "2 Jan 15:04")}}{{if .Reverses}} &middot; {{$.T "reverses a payment recorded in error"}}{{end}}</div>
+    <div class="waiting">{{$.T "Recorded by %s, %s" .RecordedBy ($.Date ($.Local .RecordedAt) "2 Jan 15:04")}}{{if .Reverses}} &middot; {{$.T "reverses a payment recorded in error"}}{{end}}</div>
     {{if and (not .Reversed) (not .Reverses)}}
     <form method="post" action="/payments/{{.ID}}/reverse">
       <input type="hidden" name="invoice" value="/invoices/{{$.Balance.InvoiceID}}">
