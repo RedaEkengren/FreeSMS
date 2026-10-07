@@ -175,6 +175,18 @@ func (s *Server) handleTakeOut(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
 }
 
+// handleTold records that the customer was told their car is ready, or
+// that somebody tried.
+func (s *Server) handleTold(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id := r.PathValue("id")
+	err := workshop.RecordContact(r.Context(), s.pool, session.Scope, id, r.FormValue("how"), r.FormValue("note"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
+}
+
 func (s *Server) handlePromise(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	id := r.PathValue("id")

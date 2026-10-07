@@ -50,6 +50,7 @@ type pageData struct {
 	Answers       []workshop.CustomerAnswer
 	Presence      workshop.Presence
 	JobParts      []workshop.JobPart
+	Contacts      []workshop.CustomerContact
 	MyLocale      string
 	Lines         []workshop.Line
 	Board         []workshop.BoardEntry
@@ -267,6 +268,12 @@ func (d pageData) Date(t time.Time, layout string) string {
 	}
 	return d.printer.Date(t, layout)
 }
+
+// ContactWays are the ways a customer can have been told, for a form.
+func (d pageData) ContactWays() []string { return workshop.ContactWays }
+
+// ContactLabel is a way's catalogue key.
+func (d pageData) ContactLabel(how string) string { return workshop.ContactLabel(how) }
 
 // Plural is a message's plural form with the count left as %d, for a script to
 // fill in. See i18n.Printer.Form.

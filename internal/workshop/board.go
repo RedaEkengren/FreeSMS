@@ -55,6 +55,10 @@ type BoardEntry struct {
 	CarAway      bool
 	ExpectedBack *time.Time
 
+	// When the customer was last reached about the car being ready, since it
+	// last became ready. Nil on a ready car is "not told".
+	ToldAt *time.Time
+
 	// Promised, sold and clocked, put together.
 	Progress Progress
 
@@ -160,7 +164,7 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 			         ) d ON true
 			         WHERE i.work_order_id = w.id AND d.decision = 'approved'
 			           AND NOT EXISTS (SELECT 1 FROM work_order_lines l
-			                           WHERE l.inspection_item_id = it.id)),` + presenceColumns + `,` + progressColumns + `
+			                           WHERE l.inspection_item_id = it.id)),` + presenceColumns + `,` + toldColumns + `,` + progressColumns + `
 			FROM work_orders w
 			JOIN vehicles v  ON v.id = w.vehicle_id
 			-- Left, not inner. A work order is allowed to have no customer --
@@ -193,7 +197,7 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 			targets := append([]any{&b.ID, &b.Number, &b.State,
 				&b.Registration, &b.Make, &b.Model, &b.Complaint,
 				&b.CustomerName, &b.HasCustomer, &b.OpenedAt, &b.PromisedAt, &b.ReadyAt,
-				&b.WorkingNow, &b.OpenFindings, &b.ApprovedUnpriced, &b.CarAway, &b.ExpectedBack},
+				&b.WorkingNow, &b.OpenFindings, &b.ApprovedUnpriced, &b.CarAway, &b.ExpectedBack, &b.ToldAt},
 				b.Progress.scanTargets()...)
 			if err := rows.Scan(targets...); err != nil {
 				return fmt.Errorf("scan board entry: %w", err)

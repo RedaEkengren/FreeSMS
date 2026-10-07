@@ -131,9 +131,13 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 	// What the customer answered on their link: the front desk's to price.
 	// Not fetched for a technician at all, so there is nothing to hide.
 	var answers []workshop.CustomerAnswer
+	var contacts []workshop.CustomerContact
 	if session.Scope.Role.SeesCustomerPersonalData() {
 		if answers, err = workshop.CustomerAnswers(r.Context(), s.pool, session.Scope, id); err != nil {
 			s.log.Error("read customer answers", "error", err)
+		}
+		if contacts, err = workshop.ContactsFor(r.Context(), s.pool, session.Scope, id); err != nil {
+			s.log.Error("read contacts", "error", err)
 		}
 	}
 
@@ -213,6 +217,7 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		Answers:     answers,
 		Presence:    presence,
 		JobParts:    jobParts,
+		Contacts:    contacts,
 		Inspections: inspections,
 		Templates:   templates,
 		Suggestions: suggestions,

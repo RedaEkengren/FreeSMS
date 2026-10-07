@@ -236,6 +236,34 @@
      desk, so a technician's page has nothing here to hide. An approved item
      is made a line in one step: the description is what the customer said
      yes to, and the price is the front desk's. */}}
+{{/* Telling the customer the car is ready, and that somebody did. Only the
+     counter's, and only once it is ready: before that there is nothing to
+     tell. The history stays, so a second try reads as one. */}}
+{{if .Session.Scope.Role.SeesCustomerPersonalData}}
+{{if or (eq .Job.State "ready") .Contacts}}
+<h2>{{.T "Telling the customer"}}</h2>
+{{if .Contacts}}
+<ul class="lines">
+  {{range .Contacts}}
+  <li><div class="row"><span>{{$.T .HowLabel}}{{if .Note}} &middot; {{.Note}}{{end}}</span>
+    {{if .Reached}}<span class="tag pass">{{$.T "told"}}</span>{{else}}<span class="tag warranty">{{$.T "not reached"}}</span>{{end}}</div>
+    <div class="waiting">{{$.Date ($.Local .At) "Mon 2 Jan 15:04"}} &middot; {{.By}}</div></li>
+  {{end}}
+</ul>
+{{end}}
+{{if eq .Job.State "ready"}}
+<form class="mt-s" method="post" action="/jobs/{{.Job.ID}}/told" data-offline>
+  <div class="pair">
+    <label><span>{{.T "How"}}</span>
+      <select name="how">{{range $.ContactWays}}<option value="{{.}}">{{$.T ($.ContactLabel .)}}</option>{{end}}</select></label>
+    <label><span>{{.T "Note"}}</span><input name="note" maxlength="500"></label>
+  </div>
+  <button type="submit" class="secondary">{{.T "Record it"}}</button>
+</form>
+{{end}}
+{{end}}
+{{end}}
+
 {{if .Answers}}
 <h2>{{.T "The customer's answers"}}</h2>
 <ul class="lines">

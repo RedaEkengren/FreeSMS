@@ -1267,6 +1267,39 @@
     },
     "Recent movements": {
       "other": "Senaste rörelserna"
+    },
+    "phoned": {
+      "other": "ringde"
+    },
+    "texted from our own phone": {
+      "other": "sms från egen telefon"
+    },
+    "emailed": {
+      "other": "mejlade"
+    },
+    "sent the link": {
+      "other": "skickade länken"
+    },
+    "told at the counter": {
+      "other": "sa det vid disken"
+    },
+    "no answer": {
+      "other": "inget svar"
+    },
+    "Telling the customer": {
+      "other": "Meddela kunden"
+    },
+    "told": {
+      "other": "meddelad"
+    },
+    "not reached": {
+      "other": "nådde inte fram"
+    },
+    "customer told %s": {
+      "other": "kunden meddelad %s"
+    },
+    "customer not told": {
+      "other": "kunden inte meddelad"
     }
   }
 }
