@@ -68,7 +68,7 @@ run() {
     docker rm -f "$APP" >/dev/null 2>&1 || true
     docker run -d --name "$APP" --network "$NETWORK" -p "$PORT:8080" \
         -v "$ATTACHMENTS_VOLUME":/var/lib/freesms/attachments \
-        -e DATABASE_URL="postgres://freesms:freesms@db:5432/freesms?sslmode=disable" \
+        -e DATABASE_URL="postgres://freesms:${POSTGRES_PASSWORD}@db:5432/freesms?sslmode=disable" \
         -e BASE_URL="http://localhost:$PORT" -e RELEASE="$1" \
         "freesms-rollback:$1" >/dev/null
 }
