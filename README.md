@@ -242,7 +242,8 @@ One binary and one Postgres database, sized for hardware a workshop already
 owns. Three ways to run it, the same code in each:
 
 - **FreeSMS Cloud**, planned: a hosted instance per workshop, paid monthly,
-  with updates, backups with point-in-time recovery, monitoring and support.
+  on our own servers, with updates, backups with point-in-time recovery,
+  monitoring and support.
   Not available yet ([#95](https://github.com/RedaEkengren/FreeSMS/issues/95)).
 - **Self-hosted**: free, under the AGPL. You answer for your own backups,
   upgrades and HTTPS.
