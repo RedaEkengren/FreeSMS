@@ -1,6 +1,9 @@
 <!doctype html>
-<!-- Generated from site/src/index.html by go run ./cmd/site. Edit that, not this. -->
-
+{{/* Every word the product would show is asked of the product: t and n are
+     the catalogue, waiting is the board's own code, state and role are the
+     labels the screens use. Written out by hand, they drift -- the first
+     version of this scene had the board say "Väntar på att kunden
+     godkänner", which the board has never said. */}}
 <html lang="sv">
 <head>
 <meta charset="utf-8">
@@ -25,7 +28,7 @@
   <p class="lede">Teknikern ser något mer som behöver göras och säger till receptionen, från gropen. Nätet är borta. Det sparas i telefonen, väntar, och skickas en gång när nätet kommer tillbaka.</p>
 
   <div class="an-wrap" data-loop="24" data-still="18">
-    <div class="an-canvas" role="img" aria-label="Animering: en tekniker skriver att bromsbeläggen bak är nere på 2 millimeter och trycker Säg till framdisken medan telefonen saknar wifi. Telefonen säger: Ingen anslutning. Det här hålls och skickas när det finns en anslutning. 1 sak väntar på att skickas. När wifi:t kommer tillbaka skickas det en gång, och receptionens tavla visar 1 sak upptäckt, inte prissatt på bilen.">
+    <div class="an-canvas" role="img" aria-label="Animering: en tekniker skriver att bromsbeläggen bak är nere på 2 millimeter och trycker {{t "Tell the front desk"}} medan telefonen saknar wifi. Telefonen säger: {{t "No connection. This is being held and will be sent when there is one."}} {{n "%d thing is waiting to be sent." 1}} När wifi:t kommer tillbaka skickas det en gång, och receptionens tavla visar {{n "%d thing noticed, not priced" 1}} på bilen.">
 
       <div class="an-card wf-phone">
         <div class="wf-status">
@@ -36,37 +39,38 @@
             <svg data-t="13.2" class="an-fade" viewBox="0 0 20 16" fill="none" stroke="#0a7d37" stroke-width="2" stroke-linecap="round"><path d="M2 6a12 12 0 0 1 16 0M5 9.5a7.5 7.5 0 0 1 10 0M8 13a3 3 0 0 1 4 0"/></svg>
           </span>
         </div>
-        <div class="wf-held an-fade" data-t="7,14.2">1 sak väntar på att skickas.</div>
-        <div class="wf-bar"><b>ABC 123</b> &middot; Volvo V70 &middot; Under arbete</div>
+        <div class="wf-held an-fade" data-t="7,14.2">{{n "%d thing is waiting to be sent." 1}}</div>
+        <div class="wf-bar"><b>ABC 123</b> &middot; Volvo V70 &middot; {{state "in_progress"}}</div>
         <div class="wf-body">
           <div class="wf-h">Skramlar fram vid 80</div>
-          <span class="an-btn wf-add wf-clock">Stoppa klockan</span>
-          <div class="wf-h wf-gap">Lämna över</div>
-          <div class="wf-field"><span class="lbl">Något mer behöver göras</span><span data-type="3.0,2.0">Bromsbelägg bak nere på 2 mm</span></div>
-          <span class="an-btn wf-add wf-secondary">Säg till framdisken</span>
+          <span class="an-btn wf-add wf-clock">{{t "Stop clock"}}</span>
+          <div class="wf-h wf-gap">{{t "Hand it on"}}</div>
+          <div class="wf-field"><span class="lbl">{{t "Something else needs doing"}}</span><span data-type="3.0,2.0">Bromsbelägg bak nere på 2 mm</span></div>
+          <span class="an-btn wf-add wf-secondary">{{t "Tell the front desk"}}</span>
         </div>
         <div class="wf-dim an-fade" data-t="6.8,9.4"></div>
-        <div class="wf-alert an-pop" data-t="6.8,9.4">Ingen anslutning. Det här hålls och skickas när det finns en anslutning.<span class="ok">OK</span></div>
+        <div class="wf-alert an-pop" data-t="6.8,9.4">{{t "No connection. This is being held and will be sent when there is one."}}<span class="ok">OK</span></div>
         <div class="wf-store an-fade" data-t="7.6,13.4">Sparat i telefonen, med en nyckel som gör att det bara kan komma fram en gång: <code>POST /jobs/…/findings</code></div>
       </div>
 
       <div class="wf-packet" data-t="13.6,14.8">Bromsbelägg bak nere på 2 mm</div>
 
       <div class="an-card wf-desk">
-        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning &middot; Inne på verkstaden</span><span class="wf-example">Exempel</span></div>
-        
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}} &middot; {{t "In the shop"}}</span><span class="wf-example">Exempel</span></div>
+        <!-- The board does not refresh itself: somebody reloads it. Shown as
+             it happens rather than as a page that updates on its own. -->
         <div class="wf-reload an-fade" data-t="15.2,15.9">Laddar om&hellip;</div>
         <div class="wf-body">
           <div class="wf-card">
             <div class="wf-plate">ABC 123</div>
             <div class="an-muted">#1 &middot; Volvo V70 &middot; Karin Kund</div>
-            <div class="an-muted">Erik jobbar på den</div>
-            <div class="wf-noticed an-r" data-t="16">1 sak upptäckt, inte prissatt</div>
+            <div class="an-muted">{{waiting "in_progress" "Erik"}}</div>
+            <div class="wf-noticed an-r" data-t="16">{{n "%d thing noticed, not priced" 1}}</div>
           </div>
           <div class="wf-card wf-other">
             <div class="wf-plate">XYZ 789</div>
             <div class="an-muted">#2 &middot; Toyota Corolla &middot; Olle Ägare</div>
-            <div class="an-muted">Väntar på kundens godkännande</div>
+            <div class="an-muted">{{waiting "awaiting_approval" ""}}</div>
           </div>
         </div>
       </div>
@@ -82,7 +86,7 @@
       <div class="an-cap" data-t="16.8,23.6">Receptionen laddar om tavlan, ser det och kan ringa kunden.</div>
     </div>
   </div>
-  <p class="truth">Orden i scenen är produktens egna: sidan genereras från samma språkkatalog och samma kod som FreeSMS skärmar. Flödet körs mot den riktiga produkten i en webbläsare vid varje ändring av koden &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/07-scene-wifi.spec.ts">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
+  <p class="truth">Orden i scenen är produktens egna: sidan genereras från samma språkkatalog och samma kod som FreeSMS skärmar. Flödet körs mot den riktiga produkten i en webbläsare vid varje ändring av koden &ndash; <a href="{{test "e2e/tests/07-scene-wifi.spec.ts" "the wifi goes down in the pit, and the front desk still hears about it"}}">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
 </section>
 </main>
 <footer>FreeSMS är öppen källkod under AGPL-3.0.</footer>
