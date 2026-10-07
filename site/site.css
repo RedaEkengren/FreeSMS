@@ -36,7 +36,11 @@ header nav a:hover { color: var(--text); }
 header nav .cta-small { background: var(--brand); color: #fff; padding: .5rem .9rem; border-radius: 8px;
   font-weight: 700; font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; }
 header nav .cta-small:hover { color: #fff; background: var(--brand-dark); }
-@media (max-width: 560px) { header nav a:not(.cta-small) { display: none; } }
+header nav .gh { display: grid; place-items: center; width: 2.4rem; height: 2.4rem; border-radius: 10px;
+  background: var(--ink); color: #fff; transition: background .15s ease, transform .15s ease; }
+header nav .gh svg { width: 1.25rem; height: 1.25rem; }
+header nav .gh:hover { background: var(--brand); color: #fff; transform: translateY(-1px); }
+@media (max-width: 560px) { header nav a:not(.gh) { display: none; } }
 
 /* ── Hero ────────────────────────────────────────────────────────────── */
 .hero { text-align: center; padding: 3rem 0 1.5rem; max-width: 50rem; }
