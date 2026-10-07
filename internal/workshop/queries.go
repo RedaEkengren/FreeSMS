@@ -66,6 +66,11 @@ type Job struct {
 	// the car back stops the caller's clock and not theirs, so the page has to
 	// say so rather than leaving it to be discovered on Friday.
 	OthersRunning string
+
+	// The car is not in the shop: collected before the job was finished, and
+	// expected back on ExpectedBack when anybody knows.
+	CarAway      bool
+	ExpectedBack *time.Time
 }
 
 // StateLabel is the condition this job is in, as a catalogue key. The column
@@ -179,7 +184,7 @@ const jobColumns = `
 	            JOIN users u2  ON u2.id = t3.user_id
 	            JOIN people p2 ON p2.id = u2.person_id
 	           WHERE t3.work_order_id = w.id AND t3.ended_at IS NULL
-	             AND t3.user_id IS DISTINCT FROM $1), '') AS others_running`
+	             AND t3.user_id IS DISTINCT FROM $1), '') AS others_running,` + presenceColumns
 
 const jobFrom = `
 	FROM work_orders w
@@ -192,7 +197,8 @@ func scanJob(row pgx.Row) (Job, error) {
 	err := row.Scan(&j.ID, &j.VehicleID, &j.Number, &j.State, &j.Complaint,
 		&j.Registration, &j.Make, &j.Model, &j.ModelYear,
 		&j.OpenedAt, &j.PromisedAt, &j.OdometerKm, &j.ClockStartedAt, &j.HasWork,
-		&j.AssignedTo, &j.AssignedToMe, &j.OpenRequests, &j.OpenFindings, &j.OthersRunning)
+		&j.AssignedTo, &j.AssignedToMe, &j.OpenRequests, &j.OpenFindings, &j.OthersRunning,
+		&j.CarAway, &j.ExpectedBack)
 	j.ClockRunning = j.ClockStartedAt != nil
 	return j, err
 }

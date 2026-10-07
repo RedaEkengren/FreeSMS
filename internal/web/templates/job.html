@@ -14,13 +14,39 @@
 <div class="split">
 <div class="side">
 <div id="clock">{{template "clock" .}}</div>
-{{if .Job.OthersRunning}}<p class="waiting">{{.Job.OthersRunning}} still has a clock running on this job.</p>{{end}}
+{{if .Job.OthersRunning}}<p class="waiting">{{.T "%s still has a clock running on this job." .Job.OthersRunning}}</p>{{end}}
 
 <dl>
   <dt>{{.T "State"}}</dt><dd>{{.T .Job.StateLabel}}</dd>
   {{if .Job.OdometerKm}}<dt>{{.T "Odometer"}}</dt><dd>{{.Job.OdometerKm}} km</dd>{{end}}
   {{if .Job.AssignedTo}}<dt>{{.T "On it"}}</dt><dd>{{.Job.AssignedTo}}</dd>{{end}}
+  {{/* Where the car is. A job waiting for a part reads the same whether the
+       car is on the lift or at home until Thursday, and that is the first
+       thing anybody asks. */}}
+  <dt>{{.T "The car"}}</dt>
+  <dd>{{if .Presence.Here}}{{.T "here"}}{{else}}<span class="tag warranty">{{.T "at home"}}</span>{{with .Presence.ExpectedBack}} {{$.T "back %s" ($.Date . "Mon 2 Jan")}}{{end}}{{end}}</dd>
 </dl>
+
+{{/* Handing the car back, and taking it in again, are the counter's. */}}
+{{if .Session.Scope.Role.SeesCustomerPersonalData}}
+{{if .Presence.Here}}
+<form class="mt-s" method="post" action="/jobs/{{.Job.ID}}/car">
+  <input type="hidden" name="event" value="collected">
+  <label><span>{{.T "Back on, if it is coming back"}}</span><input type="date" name="expected_back"></label>
+  <button type="submit" class="secondary">{{.T "The customer has collected it"}}</button>
+</form>
+{{else}}
+<form class="mt-s" method="post" action="/jobs/{{.Job.ID}}/car">
+  <input type="hidden" name="event" value="returned">
+  <button type="submit" class="secondary">{{.T "The car is back"}}</button>
+</form>
+<form class="mt-s" method="post" action="/jobs/{{.Job.ID}}/car">
+  <input type="hidden" name="event" value="rebooked">
+  <label><span>{{.T "Expected back on"}}</span><input type="date" name="expected_back" required></label>
+  <button type="submit" class="secondary">{{.T "Move the date"}}</button>
+</form>
+{{end}}
+{{end}}
 
 {{/* When will it be ready: the promise, the hours sold and the time
      clocked, together. Not clamped past the estimate -- an order at 140

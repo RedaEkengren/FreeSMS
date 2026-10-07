@@ -16,6 +16,8 @@
     <div class="vehicle">#{{.Number}} &middot; {{.Make}} {{.Model}}{{if .ModelYear}} {{.ModelYear}}{{end}}</div>
     {{if .Complaint}}<div class="complaint">{{.Complaint}}</div>{{end}}
     {{if gt .OpenRequests 0}}<div class="waiting">{{$.N "Waiting for %d part" .OpenRequests}}</div>{{end}}
+    {{/* Not something to go looking for on the lift. */}}
+    {{if .CarAway}}<div class="waiting"><span class="tag warranty">{{$.T "The car is at home"}}</span>{{with .ExpectedBack}} {{$.T "back %s" ($.Date . "Mon 2 Jan")}}{{end}}</div>{{end}}
     {{if and .AssignedTo (not .AssignedToMe)}}<div class="waiting">{{$.T "%s is on it" .AssignedTo}}</div>{{end}}
   </a>
   {{end}}

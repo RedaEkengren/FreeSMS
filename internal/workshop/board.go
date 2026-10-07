@@ -51,6 +51,10 @@ type BoardEntry struct {
 	// The other half of the same cue: somebody is waiting on the front desk.
 	ApprovedUnpriced int
 
+	// Collected before the job was finished, and when it is due back.
+	CarAway      bool
+	ExpectedBack *time.Time
+
 	// Promised, sold and clocked, put together.
 	Progress Progress
 
@@ -156,7 +160,7 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 			         ) d ON true
 			         WHERE i.work_order_id = w.id AND d.decision = 'approved'
 			           AND NOT EXISTS (SELECT 1 FROM work_order_lines l
-			                           WHERE l.inspection_item_id = it.id)),` + progressColumns + `
+			                           WHERE l.inspection_item_id = it.id)),` + presenceColumns + `,` + progressColumns + `
 			FROM work_orders w
 			JOIN vehicles v  ON v.id = w.vehicle_id
 			-- Left, not inner. A work order is allowed to have no customer --
@@ -189,7 +193,8 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 			targets := append([]any{&b.ID, &b.Number, &b.State,
 				&b.Registration, &b.Make, &b.Model, &b.Complaint,
 				&b.CustomerName, &b.HasCustomer, &b.OpenedAt, &b.PromisedAt, &b.ReadyAt,
-				&b.WorkingNow, &b.OpenFindings, &b.ApprovedUnpriced}, b.Progress.scanTargets()...)
+				&b.WorkingNow, &b.OpenFindings, &b.ApprovedUnpriced, &b.CarAway, &b.ExpectedBack},
+				b.Progress.scanTargets()...)
 			if err := rows.Scan(targets...); err != nil {
 				return fmt.Errorf("scan board entry: %w", err)
 			}

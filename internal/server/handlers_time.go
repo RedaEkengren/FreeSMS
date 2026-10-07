@@ -110,6 +110,43 @@ func parseWallClock(value string, loc *time.Location, was string) (time.Time, er
 
 // handlePromise records when the customer was told the car will be ready, as
 // a wall clock in the shop's zone; an empty field clears it.
+// handleCar records what happened to the car: collected, back, or a new
+// date for its return. A date is the shop's calendar day, typed as the date
+// control sends it.
+func (s *Server) handleCar(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id := r.PathValue("id")
+	var back *time.Time
+	if v := strings.TrimSpace(r.FormValue("expected_back")); v != "" {
+		t, err := time.ParseInLocation("2006-01-02", v, s.shopLocation(r))
+		if err != nil {
+			s.renderError(w, r, http.StatusBadRequest, "That date will not do", "Use the date picker.")
+			return
+		}
+		back = &t
+	}
+	var err error
+	switch r.FormValue("event") {
+	case "collected":
+		err = workshop.CarCollected(r.Context(), s.pool, session.Scope, id, back)
+	case "returned":
+		err = workshop.CarReturned(r.Context(), s.pool, session.Scope, id)
+	case "rebooked":
+		if back == nil {
+			s.renderError(w, r, http.StatusBadRequest, "Not accepted", "Say which day it is expected back.")
+			return
+		}
+		err = workshop.CarRebooked(r.Context(), s.pool, session.Scope, id, *back)
+	default:
+		s.renderError(w, r, http.StatusBadRequest, "Not accepted", "Collected, back or a new date.")
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
+}
+
 func (s *Server) handlePromise(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	id := r.PathValue("id")

@@ -119,6 +119,11 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.log.Error("read findings", "error", err)
 	}
+	presence, err := workshop.PresenceFor(r.Context(), s.pool, session.Scope, id)
+	if err != nil {
+		s.log.Error("read presence", "error", err)
+	}
+
 	// What the customer answered on their link: the front desk's to price.
 	// Not fetched for a technician at all, so there is nothing to hide.
 	var answers []workshop.CustomerAnswer
@@ -202,6 +207,7 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		Requests:    requests,
 		Findings:    findings,
 		Answers:     answers,
+		Presence:    presence,
 		Inspections: inspections,
 		Templates:   templates,
 		Suggestions: suggestions,

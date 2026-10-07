@@ -67,6 +67,7 @@ var swept = map[string]string{
 	"POST /jobs/{id}/inspect":                     "sweep",
 	"POST /jobs/{id}/promise":                     "sweep",
 	"POST /jobs/{id}/answers/{itemID}":            "sweep",
+	"POST /jobs/{id}/car":                         "sweep",
 	"GET /jobs/{id}/parts":                        "sweep",
 	"POST /jobs/{id}/parts":                       "sweep",
 	"GET /jobs/{id}/customer":                     "sweep",

@@ -27,6 +27,7 @@ var everyRole = map[string]string{
 	"ClockIn":             "the caller's own clock", "ClockOut": "the caller's own clock",
 	"MyTime":         "the caller's own hours",
 	"ProgressFor":    "hours and a time on a job, no customer data",
+	"PresenceFor":    "whether the car is here, which a technician needs before looking for it; no customer data",
 	"ChangePassword": "the caller's own password, checked against the current one",
 	"MyLocale":       "the caller's own language", "SetMyLocale": "the caller's own language",
 

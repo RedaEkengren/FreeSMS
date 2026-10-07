@@ -129,6 +129,14 @@ func TakeInWith(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, reg
 			return fmt.Errorf("open job: %w", err)
 		}
 
+		// Taking a car in is the car being left with us: the first row of
+		// where it is, so a later collection and return read as what they are.
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO vehicle_presence (shop_id, work_order_id, event, recorded_by)
+			VALUES ($1, $2, 'left', $3)`, scope.ShopID, jobID, scope.UserID); err != nil {
+			return fmt.Errorf("record the car left: %w", err)
+		}
+
 		if odometerKm != nil {
 			// Recorded even when it is lower than the last reading, and
 			// flagged rather than refused: a replaced cluster is legitimate,

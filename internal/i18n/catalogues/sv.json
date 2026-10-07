@@ -1174,6 +1174,42 @@
     "%d thing approved by the customer, not priced": {
       "one": "%d sak godkänd av kunden, inte prissatt",
       "other": "%d saker godkända av kunden, inte prissatta"
+    },
+    "%s still has a clock running on this job.": {
+      "other": "%s har fortfarande en klocka igång på det här jobbet."
+    },
+    "The car": {
+      "other": "Bilen"
+    },
+    "here": {
+      "other": "här"
+    },
+    "at home": {
+      "other": "hemma"
+    },
+    "back %s": {
+      "other": "tillbaka %s"
+    },
+    "Back on, if it is coming back": {
+      "other": "Tillbaka den, om den kommer tillbaka"
+    },
+    "The customer has collected it": {
+      "other": "Kunden har hämtat bilen"
+    },
+    "The car is back": {
+      "other": "Bilen är tillbaka"
+    },
+    "Expected back on": {
+      "other": "Väntas tillbaka"
+    },
+    "Move the date": {
+      "other": "Flytta datumet"
+    },
+    "The car is at home": {
+      "other": "Bilen är hemma"
+    },
+    "The car is here": {
+      "other": "Bilen står här"
     }
   }
 }
