@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -256,7 +257,26 @@ func (d pageData) N(key string, count int, args ...any) string {
 
 // Num writes a decimal the domain formatted with a point -- hours, a
 // markup -- the way the reader's language does.
-func (d pageData) Num(s string) string {
+//
+// It takes a number as well as the string the domain formatted: a stock
+// movement's quantity is a float, and a template handing one to a function
+// that wanted a string failed the whole page -- the parts desk's scan page,
+// for every part that had moved. Formatted as briefly as it is exact: 2,
+// 1,5, -0,25.
+func (d pageData) Num(v any) string {
+	var s string
+	switch n := v.(type) {
+	case string:
+		s = n
+	case float64:
+		s = strconv.FormatFloat(n, 'f', -1, 64)
+	case int:
+		s = strconv.Itoa(n)
+	case int64:
+		s = strconv.FormatInt(n, 10)
+	default:
+		s = fmt.Sprint(v)
+	}
 	if d.printer == nil {
 		return s
 	}

@@ -10,7 +10,7 @@
     </div>
     <div class="vehicle">{{.Make}} {{.Model}}</div>
     <div class="complaint">{{.Description}}</div>
-    <div class="waiting">Asked for by {{.RequestedBy}}</div>
+    <div class="waiting">{{$.T "Asked for by %s" .RequestedBy}}</div>
     <form class="mt-m" method="post" action="/parts/arrived" data-offline>
       <input type="hidden" name="request_id" value="{{.ID}}">
       <button type="submit">{{$.T "It has arrived"}}</button>
