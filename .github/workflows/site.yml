@@ -1,0 +1,54 @@
+# Publishes the marketing page, site/, to GitHub Pages.
+#
+# After CI, never beside it. CI is where internal/site checks that the page
+# is what the product generates today; publishing on push would race that
+# check and could put a page on the internet that says what the product no
+# longer does. So this runs when CI has finished on main, and only if it
+# passed, and publishes the commit CI tested -- not whatever main is by then.
+name: Site
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# One publication at a time, and a newer one wins.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+
+      # The published page only: not the template it is generated from.
+      - name: Collect the page
+        run: |
+          mkdir -p public
+          cp site/index.html site/*.css site/*.js public/
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: public
+
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
