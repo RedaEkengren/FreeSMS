@@ -245,6 +245,15 @@ func (d pageData) N(key string, count int, args ...any) string {
 	return d.printer.N(key, count, args...)
 }
 
+// Plural is a message's plural form with the count left as %d, for a script to
+// fill in. See i18n.Printer.Form.
+func (d pageData) Plural(key string, count int) string {
+	if d.printer == nil {
+		return key
+	}
+	return d.printer.Form(key, count)
+}
+
 // parseTemplates builds one template set per page.
 //
 // Each page file defines "content", so they cannot be parsed together -- the

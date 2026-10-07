@@ -137,6 +137,8 @@ type heldOffline struct {
 	Prevented bool
 	Held      []string
 	Alerts    int
+	Said      []string
+	Banner    string
 }
 
 // The button pressed is part of what was said. Pass, attention and fail are
@@ -172,5 +174,27 @@ func TestAFileIsNeverHeldAsText(t *testing.T) {
 	}
 	if !got.Prevented || got.Alerts != 1 {
 		t.Errorf("the person was not stopped and told (prevented %v, %d alerts)", got.Prevented, got.Alerts)
+	}
+}
+
+// keep.js speaks the page's language. A Swedish page hands it Swedish words
+// on #held, and the technician reads them at the moment that matters -- the
+// connection gone and their work being held -- instead of English in the
+// middle of a Swedish screen. A page without them still gets the English
+// rather than nothing.
+func TestHeldWorkIsTalkedAboutInThePagesLanguage(t *testing.T) {
+	var sv heldOffline
+	keepRun(t, "swedish", &sv)
+	if len(sv.Said) != 1 || sv.Said[0] != "Ingen anslutning. Det här hålls och skickas när det finns en anslutning." {
+		t.Errorf("a Swedish page said %q", sv.Said)
+	}
+	if sv.Banner != "1 sak väntar på att skickas." {
+		t.Errorf("a Swedish page's banner said %q", sv.Banner)
+	}
+
+	var bare heldOffline
+	keepRun(t, "pressed", &bare)
+	if len(bare.Said) != 1 || bare.Said[0] != "No connection. This is being held and will be sent when there is one." {
+		t.Errorf("a page without the words said %q, want the English", bare.Said)
 	}
 }

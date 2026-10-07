@@ -37,7 +37,21 @@
   </form>
 </header>
 {{end}}
-<div id="held" class="held" hidden></div>
+{{/* The offline queue's words. keep.js has no catalogue of its own and
+     reads them from here, so they are translated like everything else. */}}
+<div id="held" class="held" hidden
+     data-waiting-one="{{.Plural "%d thing is waiting to be sent." 1}}"
+     data-waiting-other="{{.Plural "%d thing is waiting to be sent." 2}}"
+     data-waiting-signin-one="{{.Plural "%d thing is waiting to be sent -- sign in again to send it." 1}}"
+     data-waiting-signin-other="{{.Plural "%d thing is waiting to be sent -- sign in again to send it." 2}}"
+     data-refused-one="{{.Plural "%d thing was refused by the server." 1}}"
+     data-refused-other="{{.Plural "%d thing was refused by the server." 2}}"
+     data-show="{{.T "Show and dismiss"}}"
+     data-refused-title="{{.T "Refused by the server:"}}"
+     data-dismiss="{{.T "Dismiss these?"}}"
+     data-held="{{.T "No connection. This is being held and will be sent when there is one."}}"
+     data-needs-connection="{{.T "This needs a connection. Nothing has been sent and nothing has been stored."}}"
+     data-full="{{.T "This device has no room left to hold unsent work. Find a connection before carrying on."}}"></div>
 <main>
 {{template "content" .}}
 </main>

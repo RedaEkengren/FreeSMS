@@ -129,6 +129,14 @@ func (p *Printer) N(key string, count int, args ...any) string {
 	return p.format(text, key, all...)
 }
 
+// Form is a message's text for a count with nothing substituted, for a page
+// to hand to a script that fills in the count itself -- the offline queue's
+// banner counts work the server never saw. The choice of form is the one N
+// makes, so the two cannot disagree.
+func (p *Printer) Form(key string, count int) string {
+	return p.lookup(key, count == 1)
+}
+
 func (p *Printer) lookup(key string, singular bool) string {
 	p.c.mu.RLock()
 	defer p.c.mu.RUnlock()

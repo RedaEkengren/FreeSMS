@@ -957,6 +957,36 @@
     },
     "unpaid, overdue": {
       "other": "obetald, förfallen"
+    },
+    "%d thing is waiting to be sent.": {
+      "one": "%d sak väntar på att skickas.",
+      "other": "%d saker väntar på att skickas."
+    },
+    "%d thing is waiting to be sent -- sign in again to send it.": {
+      "one": "%d sak väntar på att skickas – logga in igen för att skicka den.",
+      "other": "%d saker väntar på att skickas – logga in igen för att skicka dem."
+    },
+    "%d thing was refused by the server.": {
+      "one": "%d sak nekades av servern.",
+      "other": "%d saker nekades av servern."
+    },
+    "Show and dismiss": {
+      "other": "Visa och avfärda"
+    },
+    "Refused by the server:": {
+      "other": "Nekat av servern:"
+    },
+    "Dismiss these?": {
+      "other": "Avfärda dessa?"
+    },
+    "No connection. This is being held and will be sent when there is one.": {
+      "other": "Ingen anslutning. Det här hålls och skickas när det finns en anslutning."
+    },
+    "This needs a connection. Nothing has been sent and nothing has been stored.": {
+      "other": "Det här kräver en anslutning. Ingenting har skickats och ingenting har sparats."
+    },
+    "This device has no room left to hold unsent work. Find a connection before carrying on.": {
+      "other": "Den här enheten har inte plats för mer osänt arbete. Hitta en anslutning innan du fortsätter."
     }
   },
   "name": "Svenska"

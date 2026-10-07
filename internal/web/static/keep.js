@@ -15,6 +15,30 @@
   // Browser storage is not always there. Private windows, cleared site data
   // and locked-down devices all throw or return nothing, so every read and
   // write is wrapped and the page works without it.
+  // ---- Words --------------------------------------------------------------
+  //
+  // keep.js has no catalogue. The page is already rendered in the reader's
+  // language, so the layout writes these messages, translated like any other
+  // string, into data attributes on #held, and they are read from there. The
+  // English given here is the fallback for a page without #held or an older
+  // cached page -- something to read rather than nothing. A test refuses a
+  // message written any other way.
+  function word(el, attr, english) {
+    var said = el && el.getAttribute(attr);
+    return said || english;
+  }
+
+  function say(name, english) {
+    return word(document.getElementById("held"), "data-" + name, english);
+  }
+
+  // One and other, as the catalogue has them: the same choice the server
+  // makes, count === 1, so a page and its banner never disagree.
+  function count(name, n, one, other) {
+    var text = n === 1 ? say(name + "-one", one) : say(name + "-other", other);
+    return text.replace("%d", String(n));
+  }
+
   var store = {
     get: function (key) {
       try { return window.localStorage.getItem(key); } catch (e) { return null; }
@@ -194,8 +218,7 @@
   function setQueue(items) {
     if (!store.set(QUEUE, JSON.stringify(items))) {
       // Nowhere to put it. Better to say so than to pretend it was sent.
-      window.alert("This device has no room left to hold unsent work. " +
-                   "Find a connection before carrying on.");
+      window.alert(say("full", "This device has no room left to hold unsent work. Find a connection before carrying on."));
     }
   }
 
@@ -314,11 +337,18 @@
 
     var parts = [];
     if (waiting) {
-      parts.push(waiting + (waiting === 1 ? " thing is waiting to be sent" : " things are waiting to be sent") +
-                 (needsSignIn ? (waiting === 1 ? " -- sign in again to send it." : " -- sign in again to send them.") : "."));
+      parts.push(needsSignIn
+        ? count("waiting-signin", waiting,
+                "%d thing is waiting to be sent -- sign in again to send it.",
+                "%d things are waiting to be sent -- sign in again to send them.")
+        : count("waiting", waiting,
+                "%d thing is waiting to be sent.",
+                "%d things are waiting to be sent."));
     }
     if (bad) {
-      parts.push(bad + (bad === 1 ? " thing was refused by the server." : " things were refused by the server."));
+      parts.push(count("refused", bad,
+                       "%d thing was refused by the server.",
+                       "%d things were refused by the server."));
     }
     bar.appendChild(document.createTextNode(parts.join(" ") + " "));
 
@@ -326,7 +356,7 @@
       var look = document.createElement("button");
       look.type = "button";
       look.className = "link";
-      look.textContent = "Show and dismiss";
+      look.textContent = say("show", "Show and dismiss");
       look.addEventListener("click", function () {
         var items = refused();
         var text = items.map(function (it) {
@@ -334,7 +364,8 @@
         }).join("\n\n");
         // A confirm, not a silent delete: this is the last copy of what
         // somebody typed, and they decide when it is gone.
-        if (window.confirm("Refused by the server:\n\n" + text + "\n\nDismiss these?")) {
+        if (window.confirm(say("refused-title", "Refused by the server:") + "\n\n" + text + "\n\n" +
+                           say("dismiss", "Dismiss these?"))) {
           store.remove(REFUSED);
           show();
         }
@@ -426,10 +457,10 @@
     if (!form.hasAttribute("data-offline") || !hold(form, e.submitter)) {
       // Not something that can wait. The page stays as it is, so what
       // was typed is still in front of the person.
-      window.alert("This needs a connection. Nothing has been sent and nothing has been stored.");
+      window.alert(say("needs-connection", "This needs a connection. Nothing has been sent and nothing has been stored."));
       return;
     }
-    window.alert("No connection. This is being held and will be sent when there is one.");
+    window.alert(say("held", "No connection. This is being held and will be sent when there is one."));
   }
 
   function forEachStored(fn) {
@@ -479,7 +510,7 @@
         if (!field) return;
         var said = el.textContent;
         var done = function () {
-          el.textContent = el.getAttribute("data-copied") || "Copied";
+          el.textContent = word(el, "data-copied", "Copied");
           setTimeout(function () { el.textContent = said; }, 2000);
         };
         // The clipboard API needs a secure context, which a shop reaching the

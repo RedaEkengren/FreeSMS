@@ -116,10 +116,18 @@ function page({ cookie = "", storage = {}, form = "intake", value = "", server =
 // The inspection item's answer is the button pressed; the photograph's is a
 // file. FormData here does what the browser's does: the form's own controls,
 // never the button that submitted it.
-function offline({ named = true, file = false, submitter }) {
+function offline({ named = true, file = false, submitter, words }) {
   const listeners = {};
   const local = new Map();
   const alerts = [];
+  // #held as the layout renders it: the banner, carrying the queue's words
+  // in the page's language. Absent, as on a page cached before it had them.
+  const bar = words && {
+    text: "", hidden: true,
+    getAttribute: (n) => (n in words ? words[n] : null),
+    set textContent(v) { this.text = v; },
+    appendChild(node) { this.text += node.text || ""; },
+  };
   const note = { name: "note", type: "text", value: "Worn to the indicator" };
   const photo = { name: "photo", type: "file", value: "C:\\fakepath\\brake.jpg" };
   const controls = file ? [note, photo] : [note];
@@ -141,8 +149,9 @@ function offline({ named = true, file = false, submitter }) {
     querySelector: (sel) =>
       sel === 'meta[name="freesms-user"]' ? { getAttribute: () => USER } : null,
     querySelectorAll: () => [],
-    getElementById: () => null,
-    createElement: () => ({}),
+    getElementById: (id) => (id === "held" && bar) || null,
+    createElement: () => ({ addEventListener() {} }),
+    createTextNode: (text) => ({ text }),
   };
   const window = {
     localStorage: {
@@ -181,7 +190,7 @@ function offline({ named = true, file = false, submitter }) {
   (formEl.listeners.submit || []).forEach((fn) => fn(e));
   (listeners.submit || []).forEach((fn) => fn(e));
   const queue = JSON.parse(window.localStorage.getItem("freesms.queue") || "[]");
-  return { prevented, held: queue.map((it) => it.body), alerts: alerts.length };
+  return { prevented, held: queue.map((it) => it.body), alerts: alerts.length, said: alerts, banner: bar ? bar.text.trim() : "" };
 }
 
 const writes = (p, method) => p.fetches.filter((f) => f.method === method && f.url.startsWith("/drafts"));
@@ -189,6 +198,15 @@ const writes = (p, method) => p.fetches.filter((f) => f.method === method && f.u
 const scenarios = {
   // Pressing "fail" with no connection.
   pressed: () => offline({ submitter: { name: "status", value: "fail" } }),
+  // The same, on a Swedish page: the words come from #held.
+  swedish: () => offline({
+    submitter: { name: "status", value: "fail" },
+    words: {
+      "data-held": "Ingen anslutning. Det här hålls och skickas när det finns en anslutning.",
+      "data-waiting-one": "%d sak väntar på att skickas.",
+      "data-waiting-other": "%d saker väntar på att skickas.",
+    },
+  }),
   // The same form where the browser does not say which button was pressed.
   unknownButton: () => offline({ submitter: undefined }),
   // A photograph with no connection.

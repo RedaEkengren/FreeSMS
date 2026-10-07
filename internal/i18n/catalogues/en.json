@@ -37,6 +37,18 @@
     "used %d time": {
       "one": "used %d time",
       "other": "used %d times"
+    },
+    "%d thing is waiting to be sent.": {
+      "one": "%d thing is waiting to be sent.",
+      "other": "%d things are waiting to be sent."
+    },
+    "%d thing is waiting to be sent -- sign in again to send it.": {
+      "one": "%d thing is waiting to be sent -- sign in again to send it.",
+      "other": "%d things are waiting to be sent -- sign in again to send them."
+    },
+    "%d thing was refused by the server.": {
+      "one": "%d thing was refused by the server.",
+      "other": "%d things were refused by the server."
     }
   }
 }
