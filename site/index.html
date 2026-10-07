@@ -158,6 +158,64 @@
 
 
 
+<section class="scene">
+  <h2>Ett jobb, två skärmar</h2>
+  <p class="lede">Samma jobb, öppnat av mekanikern och av kundmottagningen. Mekanikern får bilen och jobbet. Kundens namn och telefonnummer finns bara på disken &ndash; inte dolt för mekanikern, utan aldrig hämtat.</p>
+
+  <div class="an-wrap" data-loop="18" data-still="12">
+    <div class="an-canvas" role="img" aria-label="Animering: samma jobb på två skärmar. Mekanikerns skärm visar bilen, felet, raderna och Lämna över. Kundmottagningens skärm visar dessutom Kund med namn och telefon, och Lova den till.">
+
+      <div class="an-card tw-screen tw-tech an-pop" data-t="0.2">
+        <div class="an-head"><span class="an-dots"></span><span>Mekaniker</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="tw-plate">GHI 789 <span class="an-muted">&middot; Saab 9-3 &middot; Under arbete</span></div>
+          <div class="wf-h">Gnisslar vid inbromsning</div>
+          
+<table class="tw-lines">
+  <tr><th>Vad</th><th>Antal</th><th>Belopp</th></tr>
+  <tr><td>Byte av bromsbelägg bak</td><td>1</td><td>1 290,00 kr</td></tr>
+  <tr><td>Bromsbelägg bak, sats</td><td>1</td><td>845,00 kr</td></tr>
+</table>
+
+          <div class="tw-absent an-fade" data-t="6">Ingen kund. Inte dold &ndash; aldrig hämtad.</div>
+          <div class="wf-h wf-gap">Lämna över</div>
+          <div class="wf-field"><span class="lbl">Jag behöver en del för att komma vidare</span>&nbsp;</div>
+          <div class="wf-field"><span class="lbl">Något mer behöver göras</span>&nbsp;</div>
+        </div>
+      </div>
+
+      <div class="an-card tw-screen tw-desk an-pop" data-t="1.2">
+        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="tw-plate">GHI 789 <span class="an-muted">&middot; Saab 9-3 &middot; Under arbete</span></div>
+          <div class="wf-h">Gnisslar vid inbromsning</div>
+          
+<table class="tw-lines">
+  <tr><th>Vad</th><th>Antal</th><th>Belopp</th></tr>
+  <tr><td>Byte av bromsbelägg bak</td><td>1</td><td>1 290,00 kr</td></tr>
+  <tr><td>Bromsbelägg bak, sats</td><td>1</td><td>845,00 kr</td></tr>
+</table>
+
+          <div class="tw-customer">
+            <div class="tw-ring an-fade" data-t="3.4,9"></div>
+            <div class="wf-h">Kund</div>
+            <div>Lena Lindqvist &middot; 070-111 22 33</div>
+          </div>
+          <div class="wf-field tw-actions"><span class="lbl">Lova den till</span>tis 6 okt 16:00</div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.4,3.2">Samma jobb. Två roller.</div>
+      <div class="an-cap" data-t="3.4,8.8">Kundens uppgifter: bara där någon behöver ringa kunden.</div>
+      <div class="an-cap" data-t="9,17.6">Mekanikerns sida hämtar dem aldrig, så de kan inte läcka därifrån.</div>
+    </div>
+  </div>
+  <p class="truth">Vilken roll som får kundens uppgifter avgörs av produktens egen behörighetskod, och sidan genereras inte om scenen säger något annat. Flödet körs mot den riktiga produkten i en webbläsare, som också kontrollerar att namnet inte ens finns i mekanikerns sidkälla &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/10-scene-two-screens.spec.ts">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
+</section>
+
+
+
+
 
 
 

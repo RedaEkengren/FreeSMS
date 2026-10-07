@@ -1076,6 +1076,9 @@
     "%d document": {
       "one": "%d dokument",
       "other": "%d dokument"
+    },
+    "Dealt with": {
+      "other": "Åtgärdat"
     }
   }
 }

@@ -143,7 +143,7 @@
     {{if and (not .Handled) $.Session.Scope.Role.SeesCustomerPersonalData}}
     <form class="mt-s" method="post" action="/jobs/{{$.Job.ID}}/findings/handled">
       <input type="hidden" name="finding_id" value="{{.ID}}">
-      <button type="submit" class="secondary">Dealt with</button>
+      <button type="submit" class="secondary">{{$.T "Dealt with"}}</button>
     </form>
     {{end}}
   </li>
