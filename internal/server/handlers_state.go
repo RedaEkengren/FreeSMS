@@ -127,6 +127,56 @@ func (s *Server) handleAddLine(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
 }
 
+// handlePriceAnswer makes an item the customer approved into a line. The
+// description is the item's, so what the invoice says is what the customer
+// said yes to; the front desk types what it costs.
+func (s *Server) handlePriceAnswer(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id, itemID := r.PathValue("id"), r.PathValue("itemID")
+
+	quantity, err := parseScaled(r.FormValue("quantity"), 3)
+	if err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "That quantity did not parse",
+			"Write it as a number, with a comma or a full stop: 1,5 or 1.5.")
+		return
+	}
+	price, err := parseMinorUnits(r.FormValue("unit_price"))
+	if err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "That price did not parse", err.Error())
+		return
+	}
+	err = workshop.PriceAnswer(r.Context(), s.pool, session.Scope, id, itemID, workshop.NewLine{
+		Kind:           r.FormValue("kind"),
+		Description:    r.FormValue("description"),
+		QuantityMilli:  quantity,
+		UnitPriceMinor: price,
+		VATRateBasis:   2500,
+	})
+	switch {
+	case errors.Is(err, access.ErrForbidden):
+		s.renderError(w, r, http.StatusForbidden, "Not for your role",
+			"Pricing a job is done at the front desk.")
+		return
+	case errors.Is(err, workshop.ErrNotFound):
+		s.renderError(w, r, http.StatusNotFound, "Not found", "No such answer on this job.")
+		return
+	case errors.Is(err, workshop.ErrAlreadyALine):
+		// Somebody else priced it a moment ago. That is the outcome wanted,
+		// so the job is shown with their line on it.
+		http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
+		return
+	case errors.Is(err, workshop.ErrInvalid):
+		s.renderError(w, r, http.StatusBadRequest, "That line was not accepted", trimInvalid(err))
+		return
+	case err != nil:
+		s.log.Error("price answer", "error", err)
+		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
+}
+
 // parseMinorUnits turns "1 295,50" into 129550 without going through a float.
 //
 // A float cannot hold 129550 as a product of 1295.50 and 100 exactly, and the

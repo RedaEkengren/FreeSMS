@@ -262,10 +262,10 @@
 {{/* ── Scene 4: the customer's link ───────────────────────────────────── */}}
 <section class="scene pane" role="tabpanel">
   <h2>Kunden bestämmer, med bilden framför sig</h2>
-  <p class="lede">Mekanikern fotograferar det som är slitet. Kunden får en länk, ser bilden på sin telefon och svarar ja eller nej &ndash; utan konto, utan app och utan att verkstaden behöver beskriva bromsbelägg i telefon.</p>
+  <p class="lede">Mekanikern fotograferar det som är slitet. Kunden får en länk, ser bilden på sin telefon och svarar ja eller nej &ndash; utan konto, utan app och utan att verkstaden behöver beskriva bromsbelägg i telefon. Ett ja syns direkt på tavlan, och blir en rad på jobbet i ett steg.</p>
 
-  <div class="an-wrap" data-loop="26" data-still="22">
-    <div class="an-canvas" role="img" aria-label="Animering: mekanikern markerar Bromsar fram som {{t "fail"}} med anteckningen 2 mm kvar och ett foto. Kundmottagningen gör en länk till kunden. Kunden öppnar länken på telefonen, ser fotot och trycker {{t "Yes, do it"}}. På verkstaden står det {{t "The customer approved this"}}.">
+  <div class="an-wrap" data-loop="30" data-still="26">
+    <div class="an-canvas" role="img" aria-label="Animering: mekanikern markerar Bromsar fram som {{t "fail"}} med anteckningen 2 mm kvar och ett foto. Kundmottagningen gör en länk till kunden. Kunden öppnar länken på telefonen, ser fotot och trycker {{t "Yes, do it"}}. På verkstaden står det {{n "%d thing approved by the customer, not priced" 1}}, och disken gör det till en rad på jobbet.">
 
       <div class="an-card cl-tech an-pop" data-t="0">
         <div class="an-head"><span class="an-dots"></span><span>{{role "technician"}} &middot; Vårservice</span><span class="wf-example">Exempel</span></div>
@@ -280,10 +280,20 @@
 
       <div class="an-card cl-desk an-pop" data-t="6">
         <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span></div>
-        <div class="wf-body">
+        <div class="wf-body cl-frame an-fade" data-t="6,17.4">
           <span class="an-btn">{{t "Make a link for the customer"}}</span>
           <div class="cl-share an-fade" data-t="7.4"><b>{{t "Send this to the customer."}}</b><code>https://verkstad.example/i/q7Jx…</code></div>
-          <div class="cl-decided an-fade" data-t="17.6">{{t "The customer approved this"}}</div>
+        </div>
+        <div class="wf-body cl-frame cl-frame-answer an-fade" data-t="17.4">
+          <div class="cl-noticed"><span class="an-fade" data-t="17.4,22.6">{{n "%d thing approved by the customer, not priced" 1}}</span></div>
+          <div class="cl-answer-row">
+            <span><b>Bromsar fram: 2 mm kvar, ojämnt slitna</b> <span class="an-muted">&middot; {{t "from the link"}}</span></span>
+            <span class="cl-slot">
+              <span class="rd-tag rd-risk an-fade" data-t="17.4,18.6">{{t "approved, not priced"}}</span>
+              <span class="an-btn wf-secondary cl-make an-fade" data-t="18.6,22.6">{{t "Make it a line"}}</span>
+              <span class="rd-tag cl-on an-fade" data-t="22.6">{{t "on the job"}} &middot; {{money 129000}}</span>
+            </span>
+          </div>
         </div>
       </div>
 
@@ -303,16 +313,17 @@
         </div>
       </div>
 
-      <span class="an-cursor" data-path="0:900,520; 2.0:262,118c; 10:900,520; 14.2:620,372c; 26:900,520"
+      <span class="an-cursor" data-path="0:900,520; 2.0:262,118c; 10:900,520; 14.2:620,372c; 18:700,470; 21.8:560,436c; 24:900,520; 30:900,520"
             data-path-m="0:500,640; 2.0:262,118c; 10:500,640; 14.2:150,500c; 26:500,640"><svg viewBox="0 0 24 24"><path d="M4 2l16 11-7 1-3 7z" fill="#fff" stroke="#14171c" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
 
       <div class="an-cap" data-t="0.3,5.6">Mekanikern: underkänd, en anteckning och ett foto.</div>
       <div class="an-cap" data-t="6,9.4">Disken gör en länk. Den visas en gång.</div>
       <div class="an-cap" data-t="9.6,17.2">Kunden ser bilden och svarar. Inget konto, inga priser.</div>
-      <div class="an-cap" data-t="17.4,25.6">Svaret sparas på kontrollen: vad, när och om kunden ändrar sig.</div>
+      <div class="an-cap" data-t="17.4,22.4">Ett ja syns direkt hos disken.</div>
+      <div class="an-cap" data-t="22.6,29.6">Ett klick, och det är en rad på jobbet &ndash; godkänd av kunden, med när.</div>
     </div>
   </div>
-  <p class="truth">Flödet körs mot den riktiga produkten i en webbläsare: fotot laddas upp, länken öppnas utan inloggning och kundens svar läses tillbaka på verkstaden &ndash; <a href="{{test "e2e/tests/11-scene-customer-link.spec.ts" "a photographed finding goes to the customer and their answer comes back"}}">läs testet</a>. Bromsbelägget är en teckning. Registreringsnummer, bilar, länken och namn är <span class="wf-example">exempel</span>.</p>
+  <p class="truth">Flödet körs mot den riktiga produkten i en webbläsare: fotot laddas upp, länken öppnas utan inloggning, och kundens ja blir en rad på jobbet &ndash; <a href="{{test "e2e/tests/11-scene-customer-link.spec.ts" "a photographed finding goes to the customer, and their yes becomes a line on the job"}}">läs testet</a>. Bromsbelägget är en teckning. Registreringsnummer, bilar, länken och namn är <span class="wf-example">exempel</span>.</p>
 </section>
 
 {{define "cl-pad"}}<svg viewBox="0 0 120 70" aria-hidden="true"><rect width="120" height="70" fill="#3a4049"/><circle cx="60" cy="35" r="30" fill="#8b9099"/><circle cx="60" cy="35" r="11" fill="#3a4049"/><path d="M22 14 h26 v42 h-26 z" fill="#c26b1f"/><path d="M25 17 h20 v4 h-20 z" fill="#e2a050"/></svg>{{end}}

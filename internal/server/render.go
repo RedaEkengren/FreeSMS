@@ -47,6 +47,7 @@ type pageData struct {
 	Surcharges    []workshop.SurchargeLine
 	Charges       workshop.Surcharges
 	Languages     []workshop.Language
+	Answers       []workshop.CustomerAnswer
 	MyLocale      string
 	Lines         []workshop.Line
 	Board         []workshop.BoardEntry

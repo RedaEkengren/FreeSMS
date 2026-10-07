@@ -540,26 +540,6 @@ func RecordDecision(ctx context.Context, pool *pgxpool.Pool, shopID, token, item
 	})
 }
 
-// ApprovedFindings lists the items a customer has said yes to that have not
-// been turned into lines yet, so the front desk can price them in one action.
-func ApprovedFindings(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, inspectionID string) ([]InspectionItem, error) {
-	// What the customer said yes to, for the front desk to price.
-	if !scope.Role.SeesCustomerPersonalData() {
-		return nil, access.ErrForbidden
-	}
-	items, err := itemsFor(ctx, pool, scope, inspectionID)
-	if err != nil {
-		return nil, err
-	}
-	var out []InspectionItem
-	for _, it := range items {
-		if it.Decision == "approved" {
-			out = append(out, it)
-		}
-	}
-	return out, nil
-}
-
 // InspectionsForID reads a single inspection with its items.
 func InspectionsForID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id string) (Inspection, error) {
 	var insp Inspection

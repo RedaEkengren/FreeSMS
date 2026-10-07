@@ -1131,6 +1131,49 @@
     "changed their mind %d time": {
       "one": "ångrade sig %d gång",
       "other": "ångrade sig %d gånger"
+    },
+    "cancelled": {
+      "other": "avbeställd"
+    },
+    "Asked for by %s": {
+      "other": "Efterfrågad av %s"
+    },
+    "The customer's answers": {
+      "other": "Kundens svar"
+    },
+    "on the job": {
+      "other": "på jobbet"
+    },
+    "approved, not priced": {
+      "other": "godkänd, inte prissatt"
+    },
+    "declined": {
+      "other": "nej tack"
+    },
+    "Approved %s": {
+      "other": "Godkänd %s"
+    },
+    "Declined %s": {
+      "other": "Nej tack %s"
+    },
+    "from the link": {
+      "other": "via länken"
+    },
+    "at the counter": {
+      "other": "vid disken"
+    },
+    "labour": {
+      "other": "arbete"
+    },
+    "part": {
+      "other": "del"
+    },
+    "Make it a line": {
+      "other": "Gör det till en rad"
+    },
+    "%d thing approved by the customer, not priced": {
+      "one": "%d sak godkänd av kunden, inte prissatt",
+      "other": "%d saker godkända av kunden, inte prissatta"
     }
   }
 }

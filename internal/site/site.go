@@ -161,6 +161,8 @@ func Generate(root string) ([]byte, error) {
 			}
 			return p.T(label), nil
 		},
+		// An amount as the product prints it.
+		"money": func(minor int64) string { return money.DisplayFor(Locale, "SEK").Amount(minor) },
 		// Numbers and dates as the reader's language writes them.
 		"num":  p.Number,
 		"date": p.Date,

@@ -47,6 +47,10 @@ type BoardEntry struct {
 	// that somebody is waiting on them.
 	OpenFindings int
 
+	// What the customer approved on their link and nobody has priced yet.
+	// The other half of the same cue: somebody is waiting on the front desk.
+	ApprovedUnpriced int
+
 	// Promised, sold and clocked, put together.
 	Progress Progress
 
@@ -143,7 +147,16 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 			           WHERE t.work_order_id = w.id AND t.ended_at IS NULL
 			           LIMIT 1), ''),
 			       (SELECT count(*) FROM findings f
-			         WHERE f.work_order_id = w.id AND f.handled_at IS NULL),` + progressColumns + `
+			         WHERE f.work_order_id = w.id AND f.handled_at IS NULL),
+			       (SELECT count(*) FROM inspection_items it
+			         JOIN inspections i ON i.id = it.inspection_id
+			         JOIN LATERAL (
+			             SELECT decision FROM inspection_decisions
+			             WHERE item_id = it.id ORDER BY decided_at DESC, id DESC LIMIT 1
+			         ) d ON true
+			         WHERE i.work_order_id = w.id AND d.decision = 'approved'
+			           AND NOT EXISTS (SELECT 1 FROM work_order_lines l
+			                           WHERE l.inspection_item_id = it.id)),` + progressColumns + `
 			FROM work_orders w
 			JOIN vehicles v  ON v.id = w.vehicle_id
 			-- Left, not inner. A work order is allowed to have no customer --
@@ -176,7 +189,7 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 			targets := append([]any{&b.ID, &b.Number, &b.State,
 				&b.Registration, &b.Make, &b.Model, &b.Complaint,
 				&b.CustomerName, &b.HasCustomer, &b.OpenedAt, &b.PromisedAt, &b.ReadyAt,
-				&b.WorkingNow, &b.OpenFindings}, b.Progress.scanTargets()...)
+				&b.WorkingNow, &b.OpenFindings, &b.ApprovedUnpriced}, b.Progress.scanTargets()...)
 			if err := rows.Scan(targets...); err != nil {
 				return fmt.Errorf("scan board entry: %w", err)
 			}

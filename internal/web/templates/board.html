@@ -21,6 +21,7 @@
       {{if eq .Verdict "at risk"}}<span class="tag warranty">{{$.T "at risk"}}</span>{{end}}
     </div>{{end}}{{end}}
     {{if gt .OpenFindings 0}}<div class="waiting">{{$.N "%d thing noticed, not priced" .OpenFindings}}</div>{{end}}
+    {{if gt .ApprovedUnpriced 0}}<div class="waiting">{{$.N "%d thing approved by the customer, not priced" .ApprovedUnpriced}}</div>{{end}}
     {{if gt .WaitingDays 0}}
       <div class="waiting">{{$.N "Uncollected for %d day" .WaitingDays}}</div>
     {{end}}

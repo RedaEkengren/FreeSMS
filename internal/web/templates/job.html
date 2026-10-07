@@ -120,30 +120,65 @@
   <li>
     <div class="row">
       <span>{{.Description}}</span>
-      {{if .Open}}<span class="tag warranty">waiting</span>
-      {{else if .ArrivedAt}}<span class="tag">arrived</span>
-      {{else}}<span class="tag">cancelled</span>{{end}}
+      {{if .Open}}<span class="tag warranty">{{$.T "waiting"}}</span>
+      {{else if .ArrivedAt}}<span class="tag">{{$.T "arrived"}}</span>
+      {{else}}<span class="tag">{{$.T "cancelled"}}</span>{{end}}
     </div>
-    <div class="waiting">Asked for by {{.RequestedBy}}</div>
+    <div class="waiting">{{$.T "Asked for by %s" .RequestedBy}}</div>
   </li>
   {{end}}
 </ul>
 {{end}}
 
 {{if .Findings}}
-<h2>Noticed under the car</h2>
+<h2>{{.T "Noticed under the car"}}</h2>
 <ul class="lines">
   {{range .Findings}}
   <li>
     <div class="row">
       <span>{{.Note}}</span>
-      {{if not .Handled}}<span class="tag warranty">needs pricing</span>{{end}}
+      {{if not .Handled}}<span class="tag warranty">{{$.T "needs pricing"}}</span>{{end}}
     </div>
     <div class="waiting">{{.ReportedBy}}</div>
     {{if and (not .Handled) $.Session.Scope.Role.SeesCustomerPersonalData}}
     <form class="mt-s" method="post" action="/jobs/{{$.Job.ID}}/findings/handled">
       <input type="hidden" name="finding_id" value="{{.ID}}">
       <button type="submit" class="secondary">{{$.T "Dealt with"}}</button>
+    </form>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{end}}
+
+{{/* What the customer answered on their link. Only fetched for the front
+     desk, so a technician's page has nothing here to hide. An approved item
+     is made a line in one step: the description is what the customer said
+     yes to, and the price is the front desk's. */}}
+{{if .Answers}}
+<h2>{{.T "The customer's answers"}}</h2>
+<ul class="lines">
+  {{range .Answers}}
+  <li>
+    <div class="row">
+      <span>{{.Description}}</span>
+      {{if eq .Decision "approved"}}{{if .LineID}}<span class="tag pass">{{$.T "on the job"}}</span>{{else}}<span class="tag warranty">{{$.T "approved, not priced"}}</span>{{end}}
+      {{else}}<span class="tag">{{$.T "declined"}}</span>{{end}}
+    </div>
+    <div class="waiting">{{if eq .Decision "approved"}}{{$.T "Approved %s" ($.Date ($.Local .DecidedAt) "2 Jan 15:04")}}{{else}}{{$.T "Declined %s" ($.Date ($.Local .DecidedAt) "2 Jan 15:04")}}{{end}} &middot; {{if .FromLink}}{{$.T "from the link"}}{{else}}{{$.T "at the counter"}}{{end}}</div>
+    {{if .Priceable}}
+    <form class="mt-s" method="post" action="/jobs/{{$.Job.ID}}/answers/{{.ItemID}}" data-offline>
+      <input type="hidden" name="description" value="{{.Description}}">
+      <div class="pair">
+        <label><span>{{$.T "Kind"}}</span>
+          <select name="kind">
+            <option value="labour">{{$.T "labour"}}</option>
+            <option value="part">{{$.T "part"}}</option>
+          </select></label>
+        <label><span>{{$.T "Quantity"}}</span><input name="quantity" value="1" inputmode="decimal" required></label>
+      </div>
+      <label><span>{{$.T "Unit price"}}</span><input name="unit_price" inputmode="decimal" required></label>
+      <button type="submit" class="secondary">{{$.T "Make it a line"}}</button>
     </form>
     {{end}}
   </li>

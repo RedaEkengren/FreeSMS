@@ -7,8 +7,8 @@ import { owner, tech, desk, signIn, signOut, leave, readIn, pricedJob } from './
 // browser of their own -- sees the photograph and says yes, and the
 // workshop reads the answer back.
 //
-// What it does not do is put a line on the job: nothing does yet, and the
-// scene does not claim it.
+// Then the front desk sees the yes on the board and the job, and makes it a
+// line in one step (#87).
 const pixel = Buffer.from(
   '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AVN//2Q==',
   'base64');
@@ -26,7 +26,7 @@ async function workshopIn(page: import('@playwright/test').Page, locale: string)
 }
 
 test.describe.serial('the customer link scene', () => {
-  test('a photographed finding goes to the customer and their answer comes back', async ({ page, browser }) => {
+  test('a photographed finding goes to the customer, and their yes becomes a line on the job', async ({ page, browser }) => {
     // The car, taken in while the workshop is still the suite's.
     await signIn(page, desk);
     const job = await pricedJob(page, 'CUS123');
@@ -79,9 +79,24 @@ test.describe.serial('the customer link scene', () => {
       await expect(customer.getByText('Du sa ja till det här. Du kan ändra dig.')).toBeVisible();
       await phone.close();
 
-      // Back at the workshop, the answer is on the check.
+      // Back at the workshop, the answer is on the check...
       await page.goto(inspection);
       await expect(page.locator('.card', { hasText: 'Bromsar fram' }).getByText('Kunden godkände det här')).toBeVisible();
+
+      // ...and on the board and the job, where it is priced in one step.
+      await page.goto('/board');
+      await expect(page.locator('a.card', { hasText: /CUS\s?123/ })).toContainText('1 sak godkänd av kunden, inte prissatt');
+      await page.goto(job);
+      const answer = page.locator('li', { hasText: 'Bromsar fram: 2 mm kvar, ojämnt slitna' }).filter({ has: page.locator('form') });
+      await expect(answer.getByText('godkänd, inte prissatt')).toBeVisible();
+      await expect(answer.getByText('via länken')).toBeVisible();
+      await answer.locator('input[name=unit_price]').fill('1290');
+      await answer.getByRole('button', { name: 'Gör det till en rad' }).click();
+      await expect(page.locator('table.lines-table')).toContainText('Bromsar fram: 2 mm kvar, ojämnt slitna');
+      await expect(page.locator('table.lines-table')).toContainText('1 290,00 kr');
+      await expect(page.getByText('på jobbet')).toBeVisible();
+      await page.goto('/board');
+      await expect(page.locator('a.card', { hasText: /CUS\s?123/ })).not.toContainText('godkänd av kunden');
     } finally {
       await readIn(page, '');
       await leave(page);

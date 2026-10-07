@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
@@ -52,6 +53,15 @@ func AddLine(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 	if !scope.Role.SeesCustomerPersonalData() {
 		return access.ErrForbidden
 	}
+	if err := checkLine(&line); err != nil {
+		return err
+	}
+	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		return addLineTx(ctx, tx, scope, jobID, line, lineSource{})
+	})
+}
+
+func checkLine(line *NewLine) error {
 	switch {
 	case strings.TrimSpace(line.Description) == "":
 		return fmt.Errorf("%w: the line needs a description", ErrInvalid)
@@ -71,79 +81,98 @@ func AddLine(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 	if line.CostBearer != "customer" && line.UnitPriceMinor != 0 {
 		return fmt.Errorf("%w: a line the customer is not paying for must be free", ErrInvalid)
 	}
+	return nil
+}
 
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		var state State
-		if err := tx.QueryRow(ctx,
-			`SELECT state FROM work_orders WHERE id = $1 FOR UPDATE`, jobID).Scan(&state); err != nil {
-			if err == pgx.ErrNoRows {
-				return ErrNotFound
-			}
-			return fmt.Errorf("read state: %w", err)
-		}
-		switch state {
-		case StateInvoiced, StateClosed, StateCancelled:
-			return fmt.Errorf("%w: nothing can be added to a %s order", ErrInvalid, state)
-		}
+// lineSource is where a line came from when it was not typed in: an item the
+// customer approved on their link. Empty for an ordinary line.
+type lineSource struct {
+	itemID     string
+	decisionID string
+	// When the customer said yes. Such a line is approved whatever state the
+	// order is in: the customer agreed to exactly this, in writing.
+	approvedAt *time.Time
+}
 
-		if line.PriceFromPart && line.CostBearer == "customer" {
-			if line.PartID == "" {
-				return fmt.Errorf("%w: a price from the part needs a part", ErrInvalid)
-			}
-			price, number, err := partPriceTx(ctx, tx, line.PartID)
-			if err != nil {
-				return err
-			}
-			if price == nil {
-				// Nothing is not zero. Selling a part for nothing is something
-				// somebody decides, by setting its price to 0.
-				return fmt.Errorf("%w: %s has no price and no cost; give it one on the stock page", ErrInvalid, number)
-			}
-			line.UnitPriceMinor = *price
+// addLineTx adds a checked line inside a transaction.
+func addLineTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID string, line NewLine, src lineSource) error {
+	var state State
+	if err := tx.QueryRow(ctx,
+		`SELECT state FROM work_orders WHERE id = $1 FOR UPDATE`, jobID).Scan(&state); err != nil {
+		if err == pgx.ErrNoRows {
+			return ErrNotFound
 		}
+		return fmt.Errorf("read state: %w", err)
+	}
+	switch state {
+	case StateInvoiced, StateClosed, StateCancelled:
+		return fmt.Errorf("%w: nothing can be added to a %s order", ErrInvalid, state)
+	}
 
-		// Before approval, the line is part of the quote. After it, it is not.
-		preApproval := state == StateDraft || state == StateEstimated || state == StateAwaitingApproval
-
-		var position int
-		if err := tx.QueryRow(ctx,
-			`SELECT coalesce(max(position), 0) + 1 FROM work_order_lines WHERE work_order_id = $1`,
-			jobID).Scan(&position); err != nil {
-			return fmt.Errorf("next position: %w", err)
+	if line.PriceFromPart && line.CostBearer == "customer" {
+		if line.PartID == "" {
+			return fmt.Errorf("%w: a price from the part needs a part", ErrInvalid)
 		}
-
-		// The quoted price is only meaningful for a line that was quoted.
-		var estimated *int64
-		if preApproval {
-			price := line.UnitPriceMinor
-			estimated = &price
+		price, number, err := partPriceTx(ctx, tx, line.PartID)
+		if err != nil {
+			return err
 		}
-
-		const insert = `
-			INSERT INTO work_order_lines
-			  (shop_id, work_order_id, position, kind, description, quantity,
-			   unit_price_minor, estimated_unit_price_minor, vat_rate_bp, cost_bearer,
-			   approved_at, labour_time_id, part_id)
-			VALUES ($1, $2, $3, $4, $5, ($6::bigint)::numeric / 1000, $7, $8, $9, $10,
-			        CASE WHEN $11 THEN now() ELSE NULL END, nullif($12, '')::uuid,
-			        nullif($13, '')::uuid)`
-		if _, err := tx.Exec(ctx, insert,
-			scope.ShopID, jobID, position, line.Kind, strings.TrimSpace(line.Description),
-			line.QuantityMilli, line.UnitPriceMinor, estimated, line.VATRateBasis,
-			line.CostBearer, preApproval, line.LabourTimeID, line.PartID); err != nil {
-			return fmt.Errorf("add line: %w", err)
+		if price == nil {
+			// Nothing is not zero. Selling a part for nothing is something
+			// somebody decides, by setting its price to 0.
+			return fmt.Errorf("%w: %s has no price and no cost; give it one on the stock page", ErrInvalid, number)
 		}
+		line.UnitPriceMinor = *price
+	}
 
-		// Pricing a part onto a job puts it aside. Reserving more than is on
-		// the shelf is allowed and shows as a shortfall: the shop may well be
-		// ordering more, and refusing here sends somebody to a spreadsheet.
-		if line.PartID != "" && line.QuantityMilli > 0 {
-			if err := moveTx(ctx, tx, scope,
-				Movement{Kind: "reserved", Quantity: float64(line.QuantityMilli) / 1000},
-				line.PartID, jobID, ""); err != nil {
-				return err
-			}
+	// Before approval, the line is part of the quote. After it, it is not --
+	// unless the customer approved this very thing.
+	preApproval := state == StateDraft || state == StateEstimated || state == StateAwaitingApproval
+
+	var position int
+	if err := tx.QueryRow(ctx,
+		`SELECT coalesce(max(position), 0) + 1 FROM work_order_lines WHERE work_order_id = $1`,
+		jobID).Scan(&position); err != nil {
+		return fmt.Errorf("next position: %w", err)
+	}
+
+	// The quoted price is only meaningful for a line that was quoted.
+	var estimated *int64
+	if preApproval {
+		price := line.UnitPriceMinor
+		estimated = &price
+	}
+
+	const insert = `
+		INSERT INTO work_order_lines
+		  (shop_id, work_order_id, position, kind, description, quantity,
+		   unit_price_minor, estimated_unit_price_minor, vat_rate_bp, cost_bearer,
+		   approved_at, labour_time_id, part_id, inspection_item_id, customer_decision_id)
+		VALUES ($1, $2, $3, $4, $5, ($6::bigint)::numeric / 1000, $7, $8, $9, $10,
+		        CASE WHEN $11::timestamptz IS NOT NULL THEN $11::timestamptz
+		             WHEN $12 THEN now() ELSE NULL END,
+		        nullif($13, '')::uuid, nullif($14, '')::uuid,
+		        nullif($15, '')::uuid, nullif($16, '')::uuid)`
+	if _, err := tx.Exec(ctx, insert,
+		scope.ShopID, jobID, position, line.Kind, strings.TrimSpace(line.Description),
+		line.QuantityMilli, line.UnitPriceMinor, estimated, line.VATRateBasis,
+		line.CostBearer, src.approvedAt, preApproval, line.LabourTimeID, line.PartID,
+		src.itemID, src.decisionID); err != nil {
+		if isUniqueViolation(err, "work_order_lines_one_per_item") {
+			return ErrAlreadyALine
 		}
-		return nil
-	})
+		return fmt.Errorf("add line: %w", err)
+	}
+
+	// Pricing a part onto a job puts it aside. Reserving more than is on
+	// the shelf is allowed and shows as a shortfall: the shop may well be
+	// ordering more, and refusing here sends somebody to a spreadsheet.
+	if line.PartID != "" && line.QuantityMilli > 0 {
+		if err := moveTx(ctx, tx, scope,
+			Movement{Kind: "reserved", Quantity: float64(line.QuantityMilli) / 1000},
+			line.PartID, jobID, ""); err != nil {
+			return err
+		}
+	}
+	return nil
 }

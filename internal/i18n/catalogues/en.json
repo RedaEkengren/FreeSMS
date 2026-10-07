@@ -57,6 +57,10 @@
     "changed their mind %d time": {
       "one": "changed their mind %d time",
       "other": "changed their mind %d times"
+    },
+    "%d thing approved by the customer, not priced": {
+      "one": "%d thing approved by the customer, not priced",
+      "other": "%d things approved by the customer, not priced"
     }
   }
 }

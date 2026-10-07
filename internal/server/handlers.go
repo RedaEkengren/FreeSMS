@@ -119,6 +119,14 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.log.Error("read findings", "error", err)
 	}
+	// What the customer answered on their link: the front desk's to price.
+	// Not fetched for a technician at all, so there is nothing to hide.
+	var answers []workshop.CustomerAnswer
+	if session.Scope.Role.SeesCustomerPersonalData() {
+		if answers, err = workshop.CustomerAnswers(r.Context(), s.pool, session.Scope, id); err != nil {
+			s.log.Error("read customer answers", "error", err)
+		}
+	}
 
 	inspections, err := workshop.InspectionsFor(r.Context(), s.pool, session.Scope, id)
 	if err != nil {
@@ -193,6 +201,7 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		Contact:     contact,
 		Requests:    requests,
 		Findings:    findings,
+		Answers:     answers,
 		Inspections: inspections,
 		Templates:   templates,
 		Suggestions: suggestions,

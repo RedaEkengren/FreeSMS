@@ -175,8 +175,8 @@
 .an-m .tw-desk { top: 314px; }
 
 /* ── Scene: the customer's link (cl-) ─────────────────────────────────── */
-.cl-tech { left: 30px; top: 20px; width: 300px; height: 350px; }
-.cl-desk { left: 30px; top: 384px; width: 600px; height: 92px; }
+.cl-tech { left: 30px; top: 20px; width: 300px; height: 326px; }
+.cl-desk { left: 30px; top: 358px; width: 600px; height: 116px; }
 .cl-desk .wf-body { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .cl-phone { left: 652px; top: 14px; width: 280px; height: 512px; border-radius: 28px; border: 8px solid #1f2328; }
 .cl-item { display: flex; align-items: center; justify-content: space-between; font-size: 14px; }
@@ -198,3 +198,13 @@
 .an-m .cl-tech { left: 16px; top: 16px; width: 240px; height: 360px; }
 .an-m .cl-phone { left: 266px; top: 16px; width: 240px; height: 520px; }
 .an-m .cl-desk { left: 16px; top: 390px; width: 240px; height: 240px; }
+.cl-frame { position: absolute; left: 0; right: 0; top: 37px; }
+.cl-answer-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; }
+.cl-answer-row > span:first-child { flex: 1; min-width: 0; }
+.cl-slot { position: relative; flex: none; width: 190px; height: 28px; }
+.cl-slot > * { position: absolute; right: 0; top: 50%; translate: 0 -50%; white-space: nowrap; }
+.cl-on { background: #effaf2; color: #0a7d37; border: 1px solid #c7ecd2; }
+.cl-make { font-size: 12px; padding: .4em .8em; }
+.cl-noticed { font-size: 12px; font-weight: 700; color: #c2410c; margin-bottom: 4px; min-height: 16px; }
+.an-m .cl-answer-row { flex-direction: column; align-items: flex-start; }
+.cl-desk .cl-frame-answer { display: block; }
