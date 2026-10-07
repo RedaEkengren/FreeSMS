@@ -1,48 +1,45 @@
 {{define "content"}}
-<h1>Figures</h1>
+<h1>{{.T "Figures"}}</h1>
 
 <form method="get" action="/figures">
   <div class="pair">
-    <label><span>From</span><input type="date" name="from" value="{{.Dashboard.From.Format "2006-01-02"}}"></label>
-    <label><span>To</span><input type="date" name="to" value="{{.Dashboard.To.AddDate 0 0 -1 | date}}"></label>
+    <label><span>{{.T "From"}}</span><input type="date" name="from" value="{{.Dashboard.From.Format "2006-01-02"}}"></label>
+    <label><span>{{.T "To"}}</span><input type="date" name="to" value="{{.Dashboard.To.AddDate 0 0 -1 | date}}"></label>
   </div>
-  <button type="submit" class="secondary">Show it</button>
+  <button type="submit" class="secondary">{{.T "Show it"}}</button>
 </form>
 
-<h2>Invoiced</h2>
+<h2>{{.T "Invoiced"}}</h2>
 <dl class="totals">
-  <dt>Invoices issued</dt><dd>{{.Dashboard.Invoices}}</dd>
-  <dt>Net</dt><dd>{{$.Money .Dashboard.NetMinor}}</dd>
-  <dt>Average order</dt><dd>{{$.Money .Dashboard.MeanMinor}}</dd>
-  <dt>Middle order</dt><dd>{{$.Money .Dashboard.MedianMinor}}</dd>
+  <dt>{{.T "Invoices issued"}}</dt><dd>{{.Dashboard.Invoices}}</dd>
+  <dt>{{.T "Net"}}</dt><dd>{{$.Money .Dashboard.NetMinor}}</dd>
+  <dt>{{.T "Average order"}}</dt><dd>{{$.Money .Dashboard.MeanMinor}}</dd>
+  <dt>{{.T "Middle order"}}</dt><dd>{{$.Money .Dashboard.MedianMinor}}</dd>
 </dl>
-<p class="waiting">Counted by the day the invoice was issued, not the day the
-job was opened. Credit notes are included as the negatives they are.
-The average and the middle are both here because one large job moves the
-average and does not move the middle.</p>
+<p class="waiting">{{.T "Counted by the day the invoice was issued, not the day the job was opened. Credit notes are included as the negatives they are. The average and the middle are both here because one large job moves the average and does not move the middle."}}</p>
 
-<h2>Hours</h2>
+<h2>{{.T "Hours"}}</h2>
 <dl class="totals">
-  <dt>Clocked</dt><dd>{{$.Num (printf "%.1f" .Dashboard.HoursClocked)}}</dd>
-  <dt>Sold</dt><dd>{{$.Num (printf "%.1f" .Dashboard.HoursBilled)}}</dd>
+  <dt>{{.T "Clocked"}}</dt><dd>{{$.Num (printf "%.1f" .Dashboard.HoursClocked)}}</dd>
+  <dt>{{.T "Sold"}}</dt><dd>{{$.Num (printf "%.1f" .Dashboard.HoursBilled)}}</dd>
 </dl>
 
 {{if .Dashboard.HasFindings}}
-<h2>Inspections</h2>
+<h2>{{.T "Inspections"}}</h2>
 <dl class="totals">
-  <dt>Findings answered</dt><dd>{{.Dashboard.FindingsDecided}}</dd>
-  <dt>Approved</dt><dd>{{.Dashboard.ApprovalRate}}%</dd>
+  <dt>{{.T "Findings answered"}}</dt><dd>{{.Dashboard.FindingsDecided}}</dd>
+  <dt>{{.T "Approved"}}</dt><dd>{{.Dashboard.ApprovalRate}}%</dd>
 </dl>
 {{end}}
 
 {{if .Dashboard.Technicians}}
-<h2>Per person</h2>
+<h2>{{.T "Per person"}}</h2>
 <ul class="lines">
   {{range .Dashboard.Technicians}}
   <li>
     <div class="row">
       <span>{{.Name}}</span>
-      <span>{{$.Num (printf "%.1f" .Clocked)}} clocked &middot; {{$.Num (printf "%.1f" .Billed)}} sold</span>
+      <span>{{$.T "%s clocked · %s sold" ($.Num (printf "%.1f" .Clocked)) ($.Num (printf "%.1f" .Billed))}}</span>
     </div>
   </li>
   {{end}}
@@ -56,9 +53,6 @@ average and does not move the middle.</p>
   {{end}}
 </ul>
 <p class="waiting">{{.T "Sold is the labour on the jobs invoiced this period, shared by how long each person clocked on each job."}}</p>
-<p class="waiting">Clocked and sold, both, rather than one efficiency figure.
-A single score becomes a stick, and the number that makes somebody look bad is
-often the job nobody else wanted. Everyone can see their own figures on their
-hours screen.</p>
+<p class="waiting">{{.T "Clocked and sold, both, rather than one efficiency figure. A single score becomes a stick, and the number that makes somebody look bad is often the job nobody else wanted. Everyone can see their own figures on their hours screen."}}</p>
 {{end}}
 {{end}}
