@@ -266,64 +266,16 @@ func ExportAccounting(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 		file.Accounts = names
 
 		for _, d := range docs {
-			text := fmt.Sprintf("Faktura %s-%d %s", d.series, d.number, d.customer)
-			if d.credit {
-				text = fmt.Sprintf("Kreditfaktura %s-%d %s", d.series, d.number, d.customer)
-			}
-			// A credit note is its own verification, not a correction of the
-			// original. The pairing lives in the invoice data; the accounts
-			// see two entries.
-			entries := []sie.Entry{{Account: accounts["receivable"], Minor: d.gross}}
-			// Each kind of sale on its own account, in a fixed order so the
-			// same document always produces the same file.
-			var sold int64
-			for _, purpose := range []string{"sales", "sublet", "consumables", "invoice_fee"} {
-				if amount := netByDoc[d.id][purpose]; amount != 0 {
-					entries = append(entries, sie.Entry{Account: accounts[purpose], Minor: -amount})
-					sold += amount
-				}
-			}
-			if sold != d.net {
-				return fmt.Errorf("workshop: %s-%d: the lines sum to %d net and the document says %d",
-					d.series, d.number, sold, d.net)
-			}
-			// In rate order, so the same document always produces the same
-			// file, and only for rates that carry VAT: a zero-rated line is in
-			// the sales figure and has nothing to post here.
-			rates := make([]int, 0, len(vatByDoc[d.id]))
-			for rate := range vatByDoc[d.id] {
-				rates = append(rates, rate)
-			}
-			sort.Sort(sort.Reverse(sort.IntSlice(rates)))
-			var posted int64
-			for _, rate := range rates {
-				amount := vatByDoc[d.id][rate]
-				if amount == 0 {
-					continue
-				}
-				purpose, ok := vatAccounts[rate]
-				if !ok {
-					return fmt.Errorf("%w: %s-%d has %d.%02d%%", ErrUnsupportedVATRate,
-						d.series, d.number, rate/100, rate%100)
-				}
-				entries = append(entries, sie.Entry{Account: accounts[purpose], Minor: -amount})
-				posted += amount
-			}
-			// The lines and the header were written by the same transaction
-			// and must agree. If they ever do not, the file is not written:
-			// an accountant importing an unbalanced verification is worse
-			// than no file.
-			if posted != d.vat {
-				return fmt.Errorf("workshop: %s-%d: VAT per line sums to %d and the document says %d",
-					d.series, d.number, posted, d.vat)
-			}
-			file.Verifications = append(file.Verifications, sie.Verification{
-				Series:  d.series,
-				Number:  fmt.Sprintf("%d", d.number),
-				Date:    d.issued.In(books),
-				Text:    text,
-				Entries: entries,
+			v, err := InvoiceVerification(accounts, VoucherDocument{
+				Series: d.series, Number: d.number, Issued: d.issued.In(books),
+				Customer: d.customer, Credit: d.credit,
+				NetMinor: d.net, VATMinor: d.vat, GrossMinor: d.gross,
+				NetByPurpose: netByDoc[d.id], VATByRate: vatByDoc[d.id],
 			})
+			if err != nil {
+				return err
+			}
+			file.Verifications = append(file.Verifications, v)
 		}
 
 		// Each payment its own voucher in its own series, dated the day the
@@ -472,4 +424,101 @@ func AccountingExports(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		return rows.Err()
 	})
 	return out, err
+}
+
+// VoucherDocument is an issued invoice or credit note as the books need it:
+// the header's totals, and the frozen lines summed by what they sold and by
+// VAT rate.
+type VoucherDocument struct {
+	Series   string
+	Number   int64
+	Issued   time.Time // in the shop's calendar
+	Customer string
+	Credit   bool
+
+	NetMinor, VATMinor, GrossMinor int64
+	NetByPurpose                   map[string]int64 // "sales", "sublet", ...
+	VATByRate                      map[int]int64    // basis points
+}
+
+// InvoiceVerification is the verification a document is booked as: the
+// receivable, each kind of sale on its own account, and the VAT per rate.
+// Pure, so that what the books receive can be worked out and checked without
+// a database -- including for the scene on the project's site, which prints
+// what this writes.
+func InvoiceVerification(accounts map[string]int, d VoucherDocument) (sie.Verification, error) {
+	text := fmt.Sprintf("Faktura %s-%d %s", d.Series, d.Number, d.Customer)
+	if d.Credit {
+		text = fmt.Sprintf("Kreditfaktura %s-%d %s", d.Series, d.Number, d.Customer)
+	}
+	// A credit note is its own verification, not a correction of the
+	// original. The pairing lives in the invoice data; the accounts see two
+	// entries.
+	entries := []sie.Entry{{Account: accounts["receivable"], Minor: d.GrossMinor}}
+	// Each kind of sale on its own account, in a fixed order so the same
+	// document always produces the same file.
+	var sold int64
+	for _, purpose := range []string{"sales", "sublet", "consumables", "invoice_fee"} {
+		if amount := d.NetByPurpose[purpose]; amount != 0 {
+			entries = append(entries, sie.Entry{Account: accounts[purpose], Minor: -amount})
+			sold += amount
+		}
+	}
+	if sold != d.NetMinor {
+		return sie.Verification{}, fmt.Errorf("workshop: %s-%d: the lines sum to %d net and the document says %d",
+			d.Series, d.Number, sold, d.NetMinor)
+	}
+	// In rate order, so the same document always produces the same file, and
+	// only for rates that carry VAT: a zero-rated line is in the sales figure
+	// and has nothing to post here.
+	rates := make([]int, 0, len(d.VATByRate))
+	for rate := range d.VATByRate {
+		rates = append(rates, rate)
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(rates)))
+	var posted int64
+	for _, rate := range rates {
+		amount := d.VATByRate[rate]
+		if amount == 0 {
+			continue
+		}
+		purpose, ok := vatAccounts[rate]
+		if !ok {
+			return sie.Verification{}, fmt.Errorf("%w: %s-%d has %d.%02d%%", ErrUnsupportedVATRate,
+				d.Series, d.Number, rate/100, rate%100)
+		}
+		entries = append(entries, sie.Entry{Account: accounts[purpose], Minor: -amount})
+		posted += amount
+	}
+	// The lines and the header were written by the same transaction and must
+	// agree. If they ever do not, the file is not written: an accountant
+	// importing an unbalanced verification is worse than no file.
+	if posted != d.VATMinor {
+		return sie.Verification{}, fmt.Errorf("workshop: %s-%d: VAT per line sums to %d and the document says %d",
+			d.Series, d.Number, posted, d.VATMinor)
+	}
+	return sie.Verification{
+		Series:  d.Series,
+		Number:  fmt.Sprintf("%d", d.Number),
+		Date:    d.Issued,
+		Text:    text,
+		Entries: entries,
+	}, nil
+}
+
+// DefaultAccounts is the chart a shop starts with: account per purpose, and
+// the accounts' names.
+func DefaultAccounts() (map[string]int, map[int]string) {
+	accounts, names := map[string]int{}, map[int]string{}
+	for _, d := range defaultAccounts {
+		accounts[d.Purpose] = d.Account
+		names[d.Account] = d.Name
+	}
+	return accounts, names
+}
+
+// SalesPurpose is the purpose whose account receives a kind of line's net.
+func SalesPurpose(kind string) (string, bool) {
+	purpose, ok := salesAccounts[kind]
+	return purpose, ok
 }

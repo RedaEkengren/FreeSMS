@@ -9,7 +9,7 @@ wrongly ordered parts cost.</p>
 <ul class="lines">
   {{range .WriteOffs}}
   <li><div class="row"><span>{{.Label}}</span><span class="tag late">{{$.Money .CostMinor}}</span></div>
-      <div class="waiting">{{.Quantity}} units</div></li>
+      <div class="waiting">{{$.Num .Quantity}} units</div></li>
   {{end}}
 </ul>
 {{end}}

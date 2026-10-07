@@ -89,6 +89,76 @@
 
 
 
+<section class="scene">
+  <h2>En morgon, från intag till bokföring</h2>
+  <p class="lede">En bil tas in, mekanikern gör jobbet utan att se kundens uppgifter, disken fakturerar, och månadens fakturor går till redovisningsbyrån som en fil, inte som en integration att betala för.</p>
+
+  <div class="an-wrap" data-loop="30" data-still="26">
+    <div class="an-canvas" role="img" aria-label="Animering: kundmottagningen tar in ABC 123 som skramlar fram vid 80. Mekanikern ser bilen och jobbet men inte kunden, och markerar den Klar för hämtning. Disken fakturerar A-1 på 1 678,13 kr. Fakturan går till bokföringen som en SIE-fil.">
+
+      <div class="an-card mo-card mo-1 an-pop" data-t="0">
+        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning &middot; Ta in en bil</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="wf-field"><span class="lbl">Registreringsnummer</span><span data-type="0.8,0.8">ABC 123</span></div>
+          <div class="wf-field"><span class="lbl">Mätarställning, km</span><span data-type="1.8,0.6">18 500</span></div>
+          <div class="wf-field"><span class="lbl">Vad är fel</span><span data-type="2.6,1.2">Skramlar fram vid 80</span></div>
+          <span class="an-btn mo-btn">Öppna jobbet</span>
+        </div>
+      </div>
+
+      <div class="an-card mo-card mo-2 an-pop" data-t="6">
+        <div class="an-head"><span class="an-dots"></span><span>Mekaniker &middot; ABC 123 &middot; Volvo V70</span></div>
+        <div class="wf-body">
+          <div class="wf-h">Skramlar fram vid 80</div>
+          <div class="mo-state">
+            <span class="an-fade" data-t="6,8.4">Godkänd, inte påbörjad</span>
+            <span class="an-fade" data-t="8.4,11.4">Under arbete</span>
+            <span class="an-fade mo-done" data-t="11.4">Klar för hämtning</span>
+          </div>
+          <span class="an-btn mo-btn wf-secondary an-fade" data-t="6,8.4">Börja jobba</span>
+          <span class="an-btn mo-btn an-fade" data-t="8.4,11.4">Den är klar</span>
+          <p class="mo-note">Ingen kund på skärmen. Mekanikern får bilen och jobbet; kundens namn och telefon hämtas aldrig.</p>
+        </div>
+      </div>
+
+      <div class="an-card mo-card mo-3 an-pop" data-t="13">
+        <div class="an-head"><span class="an-dots"></span><span>Faktura A-1</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body mo-inv">
+          <div class="an-muted">Faktureras till: Karin Kund</div>
+          <div class="mo-row"><span>Byte av bromsskivor fram<br><small class="an-muted">1,5 &times; 895,00 kr</small></span><span>1 342,50 kr</span></div>
+          <div class="mo-row mo-sub"><span>Netto</span><span>1 342,50 kr</span></div>
+          <div class="mo-row mo-sub"><span>Moms 25%</span><span>335,63 kr</span></div>
+          <div class="mo-row mo-total"><span>Summa</span><span>1 678,13 kr</span></div>
+        </div>
+      </div>
+
+      <div class="an-card mo-card mo-4 an-pop" data-t="19.5">
+        <div class="an-head"><span class="an-dots"></span><span>Bokföring</span></div>
+        <div class="wf-body">
+          <span class="an-btn mo-btn">Ladda ner filen</span>
+          <pre class="mo-sie an-fade" data-t="21">#VER &#34;A&#34; &#34;1&#34; 20261006 &#34;Faktura A-1 Karin Kund&#34;
+{
+#TRANS 1510 {} 1678.13
+#TRANS 3010 {} -1342.50
+#TRANS 2611 {} -335.63
+}
+</pre>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,5.6">07:30. Bilen tas in vid disken.</div>
+      <div class="an-cap" data-t="6,12.6">Mekanikern ser bilen och jobbet. Inte kunden.</div>
+      <div class="an-cap" data-t="13,19">Disken fakturerar. Raden, momsen och summan räknas en gång, på ett ställe.</div>
+      <div class="an-cap" data-t="19.5,29.5">Till redovisningsbyrån: en SIE-fil, som alla svenska bokföringsprogram läser.</div>
+    </div>
+  </div>
+  <p class="truth">Fakturans belopp räknas av produktens pengakod och SIE-raderna skrivs av dess bokföringskod, när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare, och testet läser den riktiga filen &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/09-scene-morning.spec.ts">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
+</section>
+
+
+
+
+
 
 
 <section class="scene">

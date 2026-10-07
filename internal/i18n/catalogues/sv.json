@@ -1021,6 +1021,61 @@
     },
     "Read this system in": {
       "other": "Läs systemet på"
+    },
+    "Registration": {
+      "other": "Registreringsnummer"
+    },
+    "Odometer, km": {
+      "other": "Mätarställning, km"
+    },
+    "What is wrong": {
+      "other": "Vad är fel"
+    },
+    "Open the job": {
+      "other": "Öppna jobbet"
+    },
+    "Make": {
+      "other": "Märke"
+    },
+    "Model": {
+      "other": "Modell"
+    },
+    "Year": {
+      "other": "Årsmodell"
+    },
+    "Engine": {
+      "other": "Motor"
+    },
+    "Chassis number": {
+      "other": "Chassinummer"
+    },
+    "A SIE 4 file, which every Swedish accounting package imports. No licence, no integration to be approved for — it is an open format and a file you hand over.": {
+      "other": "En SIE 4-fil, som alla svenska bokföringsprogram läser in. Ingen licens och ingen integration som ska godkännas – det är ett öppet format och en fil du lämnar över."
+    },
+    "From": {
+      "other": "Från"
+    },
+    "To": {
+      "other": "Till"
+    },
+    "Send a period that has already gone over": {
+      "other": "Skicka en period som redan har lämnats över"
+    },
+    "Download the file": {
+      "other": "Ladda ner filen"
+    },
+    "Defaults to last month, because this one is not finished and handing over a running month is how a period gets exported twice.": {
+      "other": "Förvalt är förra månaden, eftersom den här inte är slut, och att lämna över en pågående månad är hur en period exporteras två gånger."
+    },
+    "Already handed over": {
+      "other": "Redan överlämnat"
+    },
+    "Nothing yet.": {
+      "other": "Inget än."
+    },
+    "%d document": {
+      "one": "%d dokument",
+      "other": "%d dokument"
     }
   }
 }

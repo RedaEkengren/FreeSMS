@@ -63,7 +63,7 @@ with several fields that lands wherever the focus happened to be.</p>
   <li>
     <div class="row">
       <span>{{.Kind}}{{if .Reason}} &middot; {{.ReasonLabel}}{{end}}</span>
-      <span class="tag">{{.Quantity}}</span>
+      <span class="tag">{{$.Num .Quantity}}</span>
     </div>
     <div class="waiting">{{$.Date ($.Local .MovedAt) "2 Jan 15:04"}}{{if .MovedBy}} &middot; {{.MovedBy}}{{end}}{{if .OrderNum}} &middot; job #{{.OrderNum}}{{end}}</div>
   </li>

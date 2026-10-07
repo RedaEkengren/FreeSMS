@@ -1,33 +1,30 @@
 {{define "content"}}
-<h1>Accounting</h1>
-<p class="waiting">A SIE 4 file, which every Swedish accounting package
-imports. No licence, no integration to be approved for — it is an open format
-and a file you hand over.</p>
+<h1>{{.T "Accounting"}}</h1>
+<p class="waiting">{{.T "A SIE 4 file, which every Swedish accounting package imports. No licence, no integration to be approved for — it is an open format and a file you hand over."}}</p>
 
 <form method="post" action="/accounting/export">
   <div class="pair">
-    <label><span>From</span><input type="date" name="from" value="{{.PeriodFrom.Format "2006-01-02"}}" required></label>
-    <label><span>To</span><input type="date" name="to" value="{{.PeriodTo.Format "2006-01-02"}}" required></label>
+    <label><span>{{.T "From"}}</span><input type="date" name="from" value="{{.PeriodFrom.Format "2006-01-02"}}" required></label>
+    <label><span>{{.T "To"}}</span><input type="date" name="to" value="{{.PeriodTo.Format "2006-01-02"}}" required></label>
   </div>
   <label class="tick">
     <input type="checkbox" name="again" value="yes">
-    <span>Send a period that has already gone over</span>
+    <span>{{.T "Send a period that has already gone over"}}</span>
   </label>
-  <button type="submit">Download the file</button>
+  <button type="submit">{{.T "Download the file"}}</button>
 </form>
-<p class="waiting">Defaults to last month, because this one is not finished and
-handing over a running month is how a period gets exported twice.</p>
+<p class="waiting">{{.T "Defaults to last month, because this one is not finished and handing over a running month is how a period gets exported twice."}}</p>
 
-<h2>Already handed over</h2>
+<h2>{{.T "Already handed over"}}</h2>
 {{if not .Exports}}
-  <p class="empty">Nothing yet.</p>
+  <p class="empty">{{.T "Nothing yet."}}</p>
 {{else}}
 <ul class="lines">
   {{range .Exports}}
   <li>
     <div class="row">
       <span>{{$.Date .From "2 Jan 2006"}} – {{$.Date .To "2 Jan 2006"}}</span>
-      <span class="tag">{{.InvoiceCount}} document{{if ne .InvoiceCount 1}}s{{end}}</span>
+      <span class="tag">{{$.N "%d document" .InvoiceCount}}</span>
     </div>
     <div class="waiting">{{$.Date ($.Local .ExportedAt) "2 Jan 15:04"}}{{if .ExportedBy}} &middot; {{.ExportedBy}}{{end}}</div>
   </li>

@@ -202,7 +202,7 @@
         {{if ne .CostBearer "customer"}}<span class="tag warranty">{{$.T "warranty: %s" .CostBearer}}</span>{{end}}
         {{if .PriceChanged}}<span class="tag warranty">{{$.T "quoted %s" ($.MoneyOrBlank .EstimatedMinor)}}</span>{{end}}
       </td>
-      <td class="num" data-label="{{$.T "Quantity"}}">{{.Quantity}}</td>
+      <td class="num" data-label="{{$.T "Quantity"}}">{{$.Num .Quantity}}</td>
       <td class="num" data-label="{{$.T "Unit price"}}">{{$.Money .UnitPriceMinor}}</td>
       <td class="num" data-label="{{$.T "Amount"}}">{{$.Money .NetMinor}}</td>
     </tr>

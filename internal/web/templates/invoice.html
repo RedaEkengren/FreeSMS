@@ -41,7 +41,7 @@
     <li>
       <div class="row">
         <span>{{.Description}}</span>
-        <span>{{.Quantity}} &times; {{$.Money .UnitPriceMinor}} = {{$.Money .NetMinor}}</span>
+        <span>{{$.Num .Quantity}} &times; {{$.Money .UnitPriceMinor}} = {{$.Money .NetMinor}}</span>
       </div>
     </li>
     {{end}}

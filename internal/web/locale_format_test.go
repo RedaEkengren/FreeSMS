@@ -18,7 +18,7 @@ import (
 func TestTemplatesWriteNumbersAndDatesInTheReadersLanguage(t *testing.T) {
 	format := regexp.MustCompile(`\.Format "([^"]*)"`)
 	sprintf := regexp.MustCompile(`printf "%[^"]*f"`)
-	decimal := regexp.MustCompile(`(?:\.[A-Z]\w*)*\.(?:ClockedHours|EstimateHours|LeftHours|MedianHours|Hours|Markup)\b`)
+	decimal := regexp.MustCompile(`(?:\.[A-Z]\w*)*\.(?:ClockedHours|EstimateHours|LeftHours|MedianHours|Hours|Markup|Quantity)\b`)
 
 	entries, _ := Templates.ReadDir("templates")
 	var dates, numbers int

@@ -126,3 +126,28 @@
 .an-m .rd-job { left: 16px; top: 76px; width: 488px; height: 260px; }
 .an-m .rd-clock { left: 16px; top: 14px; }
 .an-m .rd-board { left: 16px; top: 350px; width: 488px; height: 150px; }
+
+/* ── Scene: the morning (mo-) ─────────────────────────────────────────── */
+.mo-card { width: 430px; height: 232px; }
+.mo-1 { left: 36px; top: 20px; }
+.mo-2 { left: 494px; top: 20px; }
+.mo-3 { left: 36px; top: 268px; }
+.mo-4 { left: 494px; top: 268px; }
+.mo-1 .wf-field { margin-top: 5px; padding: 5px 10px; }
+.mo-btn { margin-top: 10px; }
+.mo-state { position: relative; height: 22px; font-weight: 700; font-size: 14px; }
+.mo-state span { position: absolute; left: 0; top: 0; }
+.mo-done { color: #0a7d37; }
+.mo-2 .an-btn { position: absolute; left: 14px; top: 110px; }
+.mo-note { position: absolute; left: 14px; right: 14px; bottom: 6px; font-size: 12px; color: #5b6270; }
+.mo-inv { font-size: 13px; }
+.mo-row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px solid #e9ebef;
+  font-variant-numeric: tabular-nums; }
+.mo-row small { font-size: 11.5px; }
+.mo-sub { color: #5b6270; }
+.mo-total { font-weight: 800; border-bottom: 0; border-top: 2px solid #1f2328; }
+.mo-sie { margin: 10px 0 0; font: 11.5px/1.45 ui-monospace, Menlo, Consolas, monospace; background: #f4f5f7;
+  border: 1px solid #e9ebef; border-radius: 8px; padding: 8px 10px; white-space: pre; overflow: hidden; }
+
+/* On a phone, one screen at a time: each arrives over the one before. */
+.an-m .mo-card { left: 16px; top: 16px; width: 488px; height: 540px; }

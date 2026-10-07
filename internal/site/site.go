@@ -31,6 +31,8 @@ import (
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/i18n"
+	"github.com/RedaEkengren/FreeSMS/internal/money"
+	"github.com/RedaEkengren/FreeSMS/internal/sie"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
@@ -52,6 +54,80 @@ var stockholm = func() *time.Location {
 	}
 	return loc
 }()
+
+// sceneInvoice is an invoice as a scene draws it: the money already in the
+// reader's format, and the verification as the SIE file carries it.
+type sceneInvoice struct {
+	Reference       string
+	Description     string
+	Quantity, Unit  string
+	Net, VAT, Gross string
+	Verification    []string
+}
+
+func invoiceFor(kind, description string, quantityMilli int, unitMinor int64, customer string, number int, issued string) (sceneInvoice, error) {
+	day, err := time.ParseInLocation("2006-01-02", issued, stockholm)
+	if err != nil {
+		return sceneInvoice{}, err
+	}
+	const rate = 2500
+	line := money.Line{QuantityMilli: int64(quantityMilli), UnitPriceMinor: unitMinor, VATRateBasis: rate, ChargedToCustomer: true}
+	totals := money.Compute([]money.Line{line})
+	purpose, ok := workshop.SalesPurpose(kind)
+	if !ok {
+		return sceneInvoice{}, fmt.Errorf("site: %q is not a kind of line", kind)
+	}
+
+	accounts, names := workshop.DefaultAccounts()
+	v, err := workshop.InvoiceVerification(accounts, workshop.VoucherDocument{
+		Series: "A", Number: int64(number), Issued: day, Customer: customer,
+		NetMinor: totals.NetMinor, VATMinor: totals.VATMinor, GrossMinor: totals.GrossMinor,
+		NetByPurpose: map[string]int64{purpose: totals.NetMinor},
+		VATByRate:    map[int]int64{rate: totals.VATMinor},
+	})
+	if err != nil {
+		return sceneInvoice{}, err
+	}
+	file, err := sie.Write(sie.File{
+		Program: "FreeSMS", ProgramVer: "1", Generated: day, CompanyName: "Exempel",
+		YearFrom: day, YearTo: day, Accounts: names, Verifications: []sie.Verification{v},
+	})
+	if err != nil {
+		return sceneInvoice{}, err
+	}
+	// The verification, as it is in the file. Only ASCII is shown: the file
+	// is CP437, and a name with å in it would need decoding to be honest.
+	var ver []string
+	inside := false
+	for _, l := range strings.Split(string(file), "\r\n") {
+		if strings.HasPrefix(l, "#VER") {
+			inside = true
+		}
+		if inside {
+			for _, r := range l {
+				if r > 127 {
+					return sceneInvoice{}, fmt.Errorf("site: the scene's verification is not ASCII: %q", l)
+				}
+			}
+			ver = append(ver, l)
+		}
+		if inside && l == "}" {
+			break
+		}
+	}
+
+	show := money.DisplayFor(Locale, "SEK")
+	return sceneInvoice{
+		Reference:    fmt.Sprintf("A-%d", number),
+		Description:  description,
+		Quantity:     fmt.Sprintf("%g", float64(quantityMilli)/1000),
+		Unit:         show.Amount(unitMinor),
+		Net:          show.Amount(totals.NetMinor),
+		VAT:          show.Amount(totals.VATMinor),
+		Gross:        show.Amount(totals.GrossMinor),
+		Verification: ver,
+	}, nil
+}
 
 // Generate renders the page from the repository at root.
 func Generate(root string) ([]byte, error) {
@@ -110,6 +186,14 @@ func Generate(root string) ([]byte, error) {
 			}
 			return "", nil
 		},
+		// An invoice of one line, totalled by the product's money code and
+		// booked by its accounting code, as the scene shows it.
+		"invoice": func(kind, description string, quantityMilli int, unitMinor int64, customer string, number int, issued string) (sceneInvoice, error) {
+			return invoiceFor(kind, description, quantityMilli, unitMinor, customer, number, issued)
+		},
+		// Whether a role is given a customer's personal data, as the
+		// product decides it where the data is read.
+		"sees": func(role string) bool { return access.Role(role).SeesCustomerPersonalData() },
 		// A role as the header names it.
 		"role": func(role string) (string, error) {
 			label := access.Role(role).Label()

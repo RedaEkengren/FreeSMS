@@ -49,6 +49,10 @@
     "%d thing was refused by the server.": {
       "one": "%d thing was refused by the server.",
       "other": "%d things were refused by the server."
+    },
+    "%d document": {
+      "one": "%d document",
+      "other": "%d documents"
     }
   }
 }

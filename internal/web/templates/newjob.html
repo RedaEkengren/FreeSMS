@@ -1,9 +1,9 @@
 {{define "content"}}
-<h1>Take in a vehicle</h1>
+<h1>{{.T "Take in a vehicle"}}</h1>
 {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
 <form method="post" action="/jobs/new" data-keep="intake">
   <label>
-    <span>Registration</span>
+    <span>{{.T "Registration"}}</span>
     <input name="registration" value="{{.Form.Registration}}"
            autocapitalize="characters" autocorrect="off" spellcheck="false" autofocus>
   </label>
@@ -18,31 +18,31 @@
   <div id="lookup">{{template "lookup" .}}</div>
 
   <label>
-    <span>Odometer, km</span>
+    <span>{{.T "Odometer, km"}}</span>
     <input name="odometer_km" value="{{.Form.OdometerKm}}" inputmode="numeric">
   </label>
   <label>
-    <span>What is wrong</span>
+    <span>{{.T "What is wrong"}}</span>
     <input name="complaint" value="{{.Form.Complaint}}" required>
   </label>
-  <button type="submit">Open the job</button>
+  <button type="submit">{{.T "Open the job"}}</button>
 </form>
 {{if .CanLookUp}}
 <p class="waiting">{{.T "The lookup never stops you taking a car in. If the service is down, type what you know."}}</p>
 {{end}}
-<p class="mt-l"><a href="/">Back</a></p>
+<p class="mt-l"><a href="/">{{.T "Back"}}</a></p>
 {{end}}
 
 {{define "lookup"}}
 {{if .LookupNote}}<p class="waiting">{{.LookupNote}}</p>{{end}}
 <div class="pair">
-  <label><span>Make</span><input name="make" value="{{.Lookup.Make}}"></label>
-  <label><span>Model</span><input name="model" value="{{.Lookup.Model}}"></label>
+  <label><span>{{.T "Make"}}</span><input name="make" value="{{.Lookup.Make}}"></label>
+  <label><span>{{.T "Model"}}</span><input name="model" value="{{.Lookup.Model}}"></label>
 </div>
 <div class="pair">
-  <label><span>Year</span><input name="model_year" inputmode="numeric"
+  <label><span>{{.T "Year"}}</span><input name="model_year" inputmode="numeric"
          value="{{if .Lookup.ModelYear}}{{.Lookup.ModelYear}}{{end}}"></label>
-  <label><span>Engine</span><input name="engine" value="{{.Lookup.Engine}}"></label>
+  <label><span>{{.T "Engine"}}</span><input name="engine" value="{{.Lookup.Engine}}"></label>
 </div>
-<label><span>Chassis number</span><input name="vin" value="{{.Lookup.VIN}}"></label>
+<label><span>{{.T "Chassis number"}}</span><input name="vin" value="{{.Lookup.VIN}}"></label>
 {{end}}

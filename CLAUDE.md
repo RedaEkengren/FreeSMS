@@ -129,9 +129,10 @@ not exist.
 - **The translation is partial.** The mechanism is in place and Swedish
   ships. Converted: the navigation and the role in the header, every work
   order state, the technician's list and job, the counter board, the parts
-  desk, the customer's page and the invoice document. Still carrying English
-  literals: the bodies of the administrative screens -- figures, stock,
-  accounting, privacy, the time library -- and some headings on the job page.
+  desk, the customer's page, the invoice document, taking a car in and the
+  accounting export. Still carrying English literals: the bodies of the
+  administrative screens -- figures, stock, privacy, the time library -- and
+  some headings on the job page.
   A page can therefore declare `lang="sv"` and show English, which is honest
   about the state and wrong for a screen reader. Converting the rest is
   mechanical; adding a string without a catalogue key is not acceptable in
