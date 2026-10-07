@@ -19,8 +19,11 @@
   /* Two urgencies, not one. --attention is a thing to note: a supplier
      warranty, a part at its minimum. --danger is a thing that is wrong now: a
      car past its promised time, less than nothing on the shelf, a failed
-     request. Only the second is red, and it is the only red on the screen. */
-  --attention: #8a5a00;
+     request. Only the second is red, and it is the only red on the screen.
+     Orange, not the dark amber it used to be, which read as brown. #c2410c
+     rather than a brighter orange because the held banner puts small text
+     on it: 5.2:1 against the page colour, where #ea580c manages 3.6. */
+  --attention: #c2410c;
   --danger: #c0261f;
 
   /* A tap target below this is missed by a gloved finger. */
@@ -42,7 +45,7 @@
     --accent: #e8ebf0;
     --accent-text: #0e1116;
     --running: #35d07f;
-    --attention: #e0a458;
+    --attention: #fb923c;
     --danger: #ff6b5e;
   }
 }
@@ -55,7 +58,7 @@
   --accent: #e8ebf0;
   --accent-text: #0e1116;
   --running: #35d07f;
-  --attention: #e0a458;
+  --attention: #fb923c;
   --danger: #ff6b5e;
 }
 

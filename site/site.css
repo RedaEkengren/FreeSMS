@@ -2,7 +2,7 @@
    promises the product makes. System fonts and the product's own palette --
    graphite and white. The site's own accent is a brake-light red: the
    product keeps red for "wrong now", but the site is not the product,
-   and the product's amber turned brown at headline size. The scenes keep
+   and an accent for a headline is not a warning. The scenes keep
    the product's colours, because they are drawn after it. */
 :root {
   color-scheme: light;
@@ -131,5 +131,17 @@ header nav .cta-small:hover { color: #fff; background: var(--brand-dark); }
   padding: .9rem 1.2rem; margin-bottom: 1.5rem; font: .92rem/1.6 ui-monospace, Menlo, Consolas, monospace; color: #e9ebef;
   max-width: 100%; overflow-x: auto; }
 .final .btn { background: var(--brand); color: #fff; }
-footer { max-width: 68rem; margin: 0 auto; padding: 2rem 1rem 3rem; color: var(--muted); font-size: .9rem;
-  display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+/* ── Footer ──────────────────────────────────────────────────────────── */
+.foot { max-width: 68rem; margin: 3rem auto 0; padding: 3rem 1rem 2.5rem; border-top: 1px solid var(--line); }
+.foot-grid { display: grid; grid-template-columns: 1.6fr repeat(3, 1fr); gap: 2rem; }
+.foot-brand p { color: var(--muted); font-size: .92rem; margin: .9rem 0 0; max-width: 20rem; }
+.foot-col { display: flex; flex-direction: column; gap: .55rem; font-size: .92rem; }
+.foot-col b { font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; color: var(--text); margin-bottom: .25rem; }
+.foot-col a { color: var(--muted); text-decoration: none; }
+.foot-col a:hover { color: var(--brand); }
+.foot-bottom { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 2.5rem;
+  padding-top: 1.25rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .82rem; }
+@media (max-width: 720px) {
+  .foot-grid { grid-template-columns: 1fr 1fr; }
+  .foot-brand { grid-column: 1 / -1; }
+}
