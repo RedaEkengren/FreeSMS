@@ -1,10 +1,14 @@
 /* The FreeSMS site. Static, no build step, no third-party anything: the same
    promises the product makes. System fonts and the product's own palette --
-   graphite and white, amber for the one thing to look at. */
+   graphite and white. The site's own accent is a brake-light red: the
+   product keeps red for "wrong now", but the site is not the product,
+   and the product's amber turned brown at headline size. The scenes keep
+   the product's colours, because they are drawn after it. */
 :root {
   color-scheme: light;
   --bg: #f6f7f9; --card: #fff; --line: #e3e6eb; --text: #14171c; --muted: #5b6270;
-  --ink: #1f2328; --amber: #8a5a00; --amber-soft: #fff4d6; --amber-line: #f0d58a; --ok: #0a7d37;
+  --ink: #1f2328; --ok: #0a7d37;
+  --brand: #d92d20; --brand-hot: #f2542d; --brand-dark: #b42318; --brand-soft: #fde8e6;
   --radius: 16px; --shadow: 0 1px 2px rgba(20,23,28,.04), 0 8px 24px rgba(20,23,28,.06);
 }
 * { box-sizing: border-box; }
@@ -24,14 +28,14 @@ header.top { display: flex; justify-content: space-between; align-items: center;
 .brand { display: inline-flex; align-items: center; gap: .6rem; text-decoration: none;
   font-weight: 700; letter-spacing: .18em; font-size: .95rem; color: var(--muted); }
 .logo { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 10px;
-  background: var(--ink); color: #fff; }
+  background: var(--brand); color: #fff; }
 .logo svg { width: 1.25rem; height: 1.25rem; }
 header nav { display: flex; align-items: center; gap: 1.25rem; font-size: .92rem; }
 header nav a { text-decoration: none; color: var(--muted); }
 header nav a:hover { color: var(--text); }
-header nav .cta-small { background: var(--ink); color: #fff; padding: .5rem .9rem; border-radius: 8px;
+header nav .cta-small { background: var(--brand); color: #fff; padding: .5rem .9rem; border-radius: 8px;
   font-weight: 700; font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; }
-header nav .cta-small:hover { color: #fff; background: #000; }
+header nav .cta-small:hover { color: #fff; background: var(--brand-dark); }
 @media (max-width: 560px) { header nav a:not(.cta-small) { display: none; } }
 
 /* ── Hero ────────────────────────────────────────────────────────────── */
@@ -41,14 +45,16 @@ header nav .cta-small:hover { color: #fff; background: #000; }
   text-transform: uppercase; color: var(--muted); box-shadow: var(--shadow); }
 .badge .dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--ok); }
 .hero h1 { font-size: clamp(2.2rem, 6.2vw, 3.9rem); font-weight: 800; line-height: 1.04; letter-spacing: -.035em; margin: 1.4rem 0 1rem; }
-.hero h1 em { font-style: normal; color: var(--amber); }
+.hero h1 em { font-style: normal; color: var(--brand);
+  background: linear-gradient(100deg, var(--brand-dark), var(--brand) 45%, var(--brand-hot));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 .hero .sub { font-size: 1.15rem; margin-bottom: .75rem; }
 .hero .facts { color: var(--text); font-weight: 600; font-size: .95rem; margin: 0 0 1.6rem; }
 .ctas { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; text-decoration: none;
-  background: var(--ink); color: #fff; font-weight: 700; padding: .85rem 1.4rem; border-radius: 12px;
-  box-shadow: 0 6px 18px rgba(20,23,28,.18); transition: transform .15s ease, box-shadow .15s ease; }
-.btn:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(20,23,28,.22); }
+  background: var(--brand); color: #fff; font-weight: 700; padding: .85rem 1.4rem; border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(217,45,32,.28); transition: transform .15s ease, box-shadow .15s ease; }
+.btn:hover { transform: translateY(-1px); background: var(--brand-dark); box-shadow: 0 10px 24px rgba(217,45,32,.32); }
 .btn.ghost { background: var(--card); color: var(--text); border: 1px solid var(--line); box-shadow: var(--shadow); }
 
 /* ── Scenes ──────────────────────────────────────────────────────────── */
@@ -83,8 +89,8 @@ header nav .cta-small:hover { color: #fff; background: #000; }
 .tabbar button { flex: 0 0 auto; font: inherit; font-weight: 600; font-size: .95rem; cursor: pointer;
   background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 99px; padding: .6rem 1.15rem;
   box-shadow: var(--shadow); transition: background .15s ease, color .15s ease; }
-.tabbar button[aria-selected="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
-.tabbar button:focus-visible { outline: 3px solid var(--amber-line); outline-offset: 2px; }
+.tabbar button[aria-selected="true"] { background: var(--brand); color: #fff; border-color: var(--brand); }
+.tabbar button:focus-visible { outline: 3px solid var(--brand-soft); outline-offset: 2px; }
 .tabs-on .pane { margin-top: 0; background: var(--card); border: 1px solid var(--line); border-radius: 24px;
   padding: 1.5rem; box-shadow: var(--shadow); }
 .tabs-on .pane h2 { font-size: 1.25rem; }
@@ -124,6 +130,6 @@ header nav .cta-small:hover { color: #fff; background: #000; }
 .final pre { display: block; width: fit-content; margin-left: auto; margin-right: auto; text-align: left; background: #14171c; border: 1px solid #3a4049; border-radius: 12px;
   padding: .9rem 1.2rem; margin-bottom: 1.5rem; font: .92rem/1.6 ui-monospace, Menlo, Consolas, monospace; color: #e9ebef;
   max-width: 100%; overflow-x: auto; }
-.final .btn { background: #fff; color: var(--ink); }
+.final .btn { background: var(--brand); color: #fff; }
 footer { max-width: 68rem; margin: 0 auto; padding: 2rem 1rem 3rem; color: var(--muted); font-size: .9rem;
   display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
