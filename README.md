@@ -131,15 +131,20 @@ FreeSMS is built around three decisions that follow from that:
 
 ## Running it
 
-Docker and nothing else.
+Docker, a password, and nothing else.
 
 ```sh
 cp .env.example .env
+# set POSTGRES_PASSWORD in .env, for example to: openssl rand -base64 24
 docker compose up
 ```
 
-That starts Postgres, applies the migrations and serves on
-<http://localhost:8080>. Check it:
+Compose refuses to start without the password rather than using one everybody
+knows. That starts Postgres, applies the migrations and serves on
+<http://localhost:8080> -- on this machine only. To reach it from the
+workshop's network, put a reverse proxy with HTTPS in front of it and set
+`BASE_URL` to the `https://` address; DEPLOY.md shows how. Sign-in cookies are
+marked secure when `BASE_URL` is HTTPS. Check it:
 
 ```sh
 curl http://localhost:8080/healthz

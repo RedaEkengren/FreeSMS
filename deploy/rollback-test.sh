@@ -22,6 +22,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
+# A throwaway stack with a throwaway password. Compose requires one, and CI
+# has no .env to take it from.
+export POSTGRES_PASSWORD=throwaway-test-stack
 export COMPOSE_PROJECT_NAME=freesms-rollback-test
 export DB_CONTAINER="${COMPOSE_PROJECT_NAME}-db-1"
 export ATTACHMENTS_VOLUME="${COMPOSE_PROJECT_NAME}_attachments"

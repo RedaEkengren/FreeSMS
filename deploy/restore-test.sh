@@ -20,6 +20,9 @@ trap 'rm -rf "$BACKUPS"; docker compose down -v --remove-orphans >/dev/null 2>&1
 # defaults to the directory name -- "mechanic" on the machine this was written
 # on, "FreeSMS" in CI. Guessing either is how a script passes locally and fails
 # on a checkout, which is exactly what happened. Pin it instead.
+# A throwaway stack with a throwaway password. Compose requires one, and CI
+# has no .env to take it from.
+export POSTGRES_PASSWORD=throwaway-test-stack
 export COMPOSE_PROJECT_NAME=freesms-restore-test
 export DB_CONTAINER="${COMPOSE_PROJECT_NAME}-db-1"
 export ATTACHMENTS_VOLUME="${COMPOSE_PROJECT_NAME}_attachments"

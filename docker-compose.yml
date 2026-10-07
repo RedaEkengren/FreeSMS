@@ -3,7 +3,9 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: freesms
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-freesms}
+      # No default. A forgotten variable used to mean a database password of
+      # "freesms", silently; now compose refuses to start and says why.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env -- see .env.example}
       POSTGRES_DB: freesms
     volumes:
       - db-data:/var/lib/postgresql/data
@@ -33,7 +35,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://freesms:${POSTGRES_PASSWORD:-freesms}@db:5432/freesms?sslmode=disable
+      DATABASE_URL: postgres://freesms:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env -- see .env.example}@db:5432/freesms?sslmode=disable
       HTTP_ADDR: ":8080"
       BASE_URL: ${BASE_URL:-http://localhost:8080}
       ATTACHMENTS_DIR: /var/lib/freesms/attachments
@@ -41,7 +43,11 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       RELEASE: ${RELEASE:-dev}
     ports:
-      - "${HTTP_PORT:-8080}:8080"
+      # Loopback by default. Publishing plain HTTP and a sign-in page on every
+      # interface was the default before; reaching the service from the
+      # network is now a choice, made through a reverse proxy with HTTPS
+      # (DEPLOY.md), or by setting HTTP_BIND on a network you trust.
+      - "${HTTP_BIND:-127.0.0.1}:${HTTP_PORT:-8080}:8080"
     volumes:
       - attachments:/var/lib/freesms/attachments
     healthcheck:

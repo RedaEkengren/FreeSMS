@@ -11,6 +11,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# A throwaway stack with a throwaway password. Compose requires one, and CI
+# has no .env to take it from.
+export POSTGRES_PASSWORD=throwaway-test-stack
 export COMPOSE_PROJECT_NAME=freesms-browser-test
 export DB_PORT=55497 HTTP_PORT=18089
 # The browser shares the app container's network and reaches it as

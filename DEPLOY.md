@@ -41,6 +41,31 @@ GitHub-hosted runner instead, following `Benbo-se/ArgusmetricsSH`.
 `concurrency` is set with `cancel-in-progress: false`. A deploy interrupted
 halfway is worse than a deploy that waits.
 
+## Reaching it from the network
+
+Compose publishes the app on `127.0.0.1` only. A workshop reaches it through a
+reverse proxy that holds the certificate, so the sign-in page and the session
+cookie never travel as plain HTTP. Caddy, beside the stack, is the shortest:
+
+```
+# Caddyfile
+verkstad.example.se {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+Caddy fetches and renews the certificate itself. Then set, in `.env`:
+
+```sh
+BASE_URL=https://verkstad.example.se
+```
+
+`BASE_URL` is what customers' links are built from, and an `https://` one
+marks the session cookie secure. A proxy in another container reaches the app
+on the compose network instead of loopback; `HTTP_BIND=0.0.0.0` publishes
+plain HTTP to every network the host is on and is for a network you trust,
+not for the internet.
+
 ## Rollback
 
 A release that applied a migration cannot always be undone by putting the
