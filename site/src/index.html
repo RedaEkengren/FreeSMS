@@ -88,6 +88,76 @@
   </div>
   <p class="truth">Orden i scenen är produktens egna: sidan genereras från samma språkkatalog och samma kod som FreeSMS skärmar. Flödet körs mot den riktiga produkten i en webbläsare vid varje ändring av koden &ndash; <a href="{{test "e2e/tests/07-scene-wifi.spec.ts" "the wifi goes down in the pit, and the front desk still hears about it"}}">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
 </section>
+
+{{/* The job's progress as the job page draws it, for one moment. The
+     numbers, the verdict and the bar are the product's own Progress. */}}
+{{define "rd-progress"}}
+<dl class="rd-dl">
+  <dt>{{t "Promised"}}</dt>
+  <dd>{{date .PromisedAt "Mon 2 Jan 15:04"}} {{if eq .Verdict "at risk"}}<span class="rd-tag rd-risk">{{t "at risk"}}</span>{{else if eq .Verdict "on time"}}<span class="rd-tag">{{t "on time"}}</span>{{end}}</dd>
+  <dt>{{t "Clocked"}}</dt>
+  <dd>{{t "%s of %s h" (num .ClockedHours) (num .EstimateHours)}} &middot; {{.Percent}} %</dd>
+  {{if not .Over}}<dt>{{t "Left"}}</dt><dd>{{num .LeftHours}} h</dd>{{end}}
+</dl>
+<svg class="rd-meter" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true"><rect class="rd-track" width="100" height="6" rx="3"/><rect class="rd-fill" width="{{.BarFill}}" height="6" rx="3"/></svg>
+{{if .Running}}<p class="rd-note">{{t "As of %s, with a clock running." (date .AsOf "15:04")}}</p>{{end}}
+{{end}}
+
+{{/* The same moment on the front desk's board. */}}
+{{define "rd-card"}}
+<div class="wf-card">
+  <div class="wf-plate">DEF 456</div>
+  <div class="an-muted">#7 &middot; Volkswagen Golf &middot; Per Persson</div>
+  <div class="an-muted">{{t "promised %s" (date .PromisedAt "Mon 15:04")}} &middot; {{t "%s of %s h" (num .ClockedHours) (num .EstimateHours)}}{{if eq .Verdict "at risk"}} <span class="rd-tag rd-risk">{{t "at risk"}}</span>{{end}}</div>
+</div>
+{{end}}
+
+<section class="scene">
+  <h2>&rdquo;När blir den klar?&rdquo;</h2>
+  <p class="lede">Kunden ringer och frågar. Svaret står på jobbet: vad som lovats, vad som sålts och vad som stämplats. Och det säger till innan löftet är brutet, inte efter.</p>
+
+  {{$a := progress 180 10 true "2026-10-06 12:10" "2026-10-06 16:00"}}
+  {{$b := progress 180 60 true "2026-10-06 13:00" "2026-10-06 16:00"}}
+  {{$c := progress 180 60 false "2026-10-06 14:20" "2026-10-06 16:00"}}
+  {{/* What the captions claim, held against the product. */}}
+  {{expect $a.Verdict "on time"}}{{expect $b.Verdict "on time"}}{{expect $c.Verdict "at risk"}}
+
+  <div class="an-wrap" data-loop="22" data-still="17">
+    <div class="an-canvas" role="img" aria-label="Animering: ett jobb på tre timmar är utlovat till klockan 16. Klockan 12.10 och 13.00 står det {{t "on time"}}. Sedan står teknikerns klocka still. Klockan 14.20, en timme och fyrtio minuter före löftet, står det {{t "at risk"}} på jobbet och på receptionens tavla, med två timmars arbete kvar.">
+
+      <div class="an-card rd-job">
+        <div class="an-head"><span class="an-dots"></span><span>DEF 456 &middot; Volkswagen Golf &middot; {{state "in_progress"}}</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="wf-h">{{t "When it will be ready"}}</div>
+          <div class="rd-frame an-fade" data-t="0,7.6">{{template "rd-progress" $a}}</div>
+          <div class="rd-frame an-fade" data-t="7.6,12.6">{{template "rd-progress" $b}}</div>
+          <div class="rd-frame an-fade" data-t="12.6">{{template "rd-progress" $c}}</div>
+        </div>
+      </div>
+
+      <div class="rd-clock">
+        <span class="an-fade" data-t="0,7.6">12:10</span>
+        <span class="an-fade" data-t="7.6,12.6">13:00</span>
+        <span class="an-fade rd-late" data-t="12.6">14:20</span>
+      </div>
+
+      <div class="an-card rd-board">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}} &middot; {{t "In the shop"}}</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="rd-slot an-fade" data-t="0,7.6">{{template "rd-card" $a}}</div>
+          <div class="rd-slot an-fade" data-t="7.6,12.6">{{template "rd-card" $b}}</div>
+          <div class="rd-slot an-fade" data-t="12.6">{{template "rd-card" $c}}</div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.4">Tre timmars arbete, utlovat till 16:00. Erik börjar 12:00.</div>
+      <div class="an-cap" data-t="7.8,12.4">13:00. En timme stämplad, två kvar. I tid.</div>
+      <div class="an-cap" data-t="12.8,17">Erik drogs till ett annat jobb. Klockan har stått still sedan 13:00.</div>
+      <div class="an-cap" data-t="17.2,21.6">Två timmar kvar, en timme och fyrtio till löftet. Disken ser det nu.</div>
+    </div>
+  </div>
+  <p class="truth">Siffrorna och bedömningen räknas ut av samma kod som jobbsidan använder, när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare &ndash; <a href="{{test "e2e/tests/08-scene-ready.spec.ts" "a promise that the work left cannot meet is flagged before it is broken"}}">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
+</section>
 </main>
 <footer>FreeSMS är öppen källkod under AGPL-3.0.</footer>
 </body>

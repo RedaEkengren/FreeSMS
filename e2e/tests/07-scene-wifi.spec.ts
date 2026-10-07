@@ -1,5 +1,5 @@
-import { test, expect, Page } from '@playwright/test';
-import { tech, desk, signIn, signOut, collectAlerts, pricedJob } from './helpers';
+import { test, expect } from '@playwright/test';
+import { tech, desk, signIn, signOut, leave, readIn, collectAlerts, pricedJob } from './helpers';
 
 // The marketing page's first scene, performed against the real product.
 // site/src/index.html links this test, and the site generator refuses to
@@ -8,18 +8,6 @@ import { tech, desk, signIn, signOut, collectAlerts, pricedJob } from './helpers
 //
 // The people read Swedish, as the scene does, so the words checked here are
 // the scene's words.
-
-// Signing out in whatever language the page is in.
-async function leave(page: Page) {
-  await page.locator('form[action="/logout"] button').click();
-  await expect(page).toHaveURL(/\/login/);
-}
-
-async function readIn(page: Page, locale: string) {
-  await page.goto('/account');
-  await page.selectOption('select[name=locale]', locale);
-  await page.locator('form[action="/account/language"] button').click();
-}
 
 test.describe.serial('the wifi scene', () => {
   test('the wifi goes down in the pit, and the front desk still hears about it', async ({ page, context }) => {

@@ -1,19 +1,5 @@
-import { test, expect, Page } from '@playwright/test';
-import { desk, signIn } from './helpers';
-
-// A wall clock in the shop's zone, minutes from now, as a datetime-local
-// control takes it. The browser here runs in UTC; the shop is in Stockholm,
-// and the page writes and reads the shop's clock.
-async function shopClock(page: Page, minutesFromNow: number): Promise<string> {
-  return page.evaluate((m) => {
-    const parts = new Intl.DateTimeFormat('sv-SE', {
-      timeZone: 'Europe/Stockholm', year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-    }).formatToParts(new Date(Date.now() + m * 60_000));
-    const v = (t: string) => parts.find((p) => p.type === t)!.value;
-    return `${v('year')}-${v('month')}-${v('day')}T${v('hour')}:${v('minute')}`;
-  }, minutesFromNow);
-}
+import { test, expect } from '@playwright/test';
+import { desk, signIn, shopClock } from './helpers';
 
 // "When is it ready?", answered on the job and on the board.
 test.describe.serial('when it will be ready', () => {

@@ -24,6 +24,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+	// The scenes are in Stockholm whether or not the machine generating
+	// them has a zone database.
+	_ "time/tzdata"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/i18n"
@@ -40,6 +44,14 @@ const (
 
 // Repository is where the page links its tests.
 const Repository = "https://github.com/RedaEkengren/FreeSMS/blob/main/"
+
+var stockholm = func() *time.Location {
+	loc, err := time.LoadLocation("Europe/Stockholm")
+	if err != nil {
+		panic(err)
+	}
+	return loc
+}()
 
 // Generate renders the page from the repository at root.
 func Generate(root string) ([]byte, error) {
@@ -72,6 +84,31 @@ func Generate(root string) ([]byte, error) {
 				return "", fmt.Errorf("site: %q is not a state", state)
 			}
 			return p.T(label), nil
+		},
+		// Numbers and dates as the reader's language writes them.
+		"num":  p.Number,
+		"date": p.Date,
+		// A job's progress at a moment, worked out by the product's own
+		// Progress: the verdict, the hours, the bar. Times are the shop's
+		// wall clock, "2006-01-02 15:04" in Stockholm.
+		"progress": func(estimate, clocked int, running bool, asOf, promised string) (workshop.Progress, error) {
+			now, err := time.ParseInLocation("2006-01-02 15:04", asOf, stockholm)
+			if err != nil {
+				return workshop.Progress{}, err
+			}
+			at, err := time.ParseInLocation("2006-01-02 15:04", promised, stockholm)
+			if err != nil {
+				return workshop.Progress{}, err
+			}
+			return workshop.Progress{EstimateMinutes: estimate, ClockedMinutes: clocked, Running: running, AsOf: now, PromisedAt: &at}, nil
+		},
+		// What a scene's caption claims, checked against what the product
+		// says. If the product stops agreeing, the scene is not generated.
+		"expect": func(got, want any) (string, error) {
+			if fmt.Sprint(got) != fmt.Sprint(want) {
+				return "", fmt.Errorf("site: the scene says %v, the product says %v", want, got)
+			}
+			return "", nil
 		},
 		// A role as the header names it.
 		"role": func(role string) (string, error) {

@@ -84,6 +84,107 @@
   </div>
   <p class="truth">Orden i scenen är produktens egna: sidan genereras från samma språkkatalog och samma kod som FreeSMS skärmar. Flödet körs mot den riktiga produkten i en webbläsare vid varje ändring av koden &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/07-scene-wifi.spec.ts">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
 </section>
+
+
+
+
+
+
+
+<section class="scene">
+  <h2>&rdquo;När blir den klar?&rdquo;</h2>
+  <p class="lede">Kunden ringer och frågar. Svaret står på jobbet: vad som lovats, vad som sålts och vad som stämplats. Och det säger till innan löftet är brutet, inte efter.</p>
+
+  
+  
+  
+  
+  
+
+  <div class="an-wrap" data-loop="22" data-still="17">
+    <div class="an-canvas" role="img" aria-label="Animering: ett jobb på tre timmar är utlovat till klockan 16. Klockan 12.10 och 13.00 står det i tid. Sedan står teknikerns klocka still. Klockan 14.20, en timme och fyrtio minuter före löftet, står det i farozonen på jobbet och på receptionens tavla, med två timmars arbete kvar.">
+
+      <div class="an-card rd-job">
+        <div class="an-head"><span class="an-dots"></span><span>DEF 456 &middot; Volkswagen Golf &middot; Under arbete</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="wf-h">När den blir klar</div>
+          <div class="rd-frame an-fade" data-t="0,7.6">
+<dl class="rd-dl">
+  <dt>Utlovad</dt>
+  <dd>tis 6 okt 16:00 <span class="rd-tag">i tid</span></dd>
+  <dt>Stämplat</dt>
+  <dd>0,2 av 3,0 h &middot; 5 %</dd>
+  <dt>Kvar</dt><dd>2,8 h</dd>
+</dl>
+<svg class="rd-meter" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true"><rect class="rd-track" width="100" height="6" rx="3"/><rect class="rd-fill" width="5" height="6" rx="3"/></svg>
+<p class="rd-note">Per klockan 12:10, med en klocka igång.</p>
+</div>
+          <div class="rd-frame an-fade" data-t="7.6,12.6">
+<dl class="rd-dl">
+  <dt>Utlovad</dt>
+  <dd>tis 6 okt 16:00 <span class="rd-tag">i tid</span></dd>
+  <dt>Stämplat</dt>
+  <dd>1,0 av 3,0 h &middot; 33 %</dd>
+  <dt>Kvar</dt><dd>2,0 h</dd>
+</dl>
+<svg class="rd-meter" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true"><rect class="rd-track" width="100" height="6" rx="3"/><rect class="rd-fill" width="33" height="6" rx="3"/></svg>
+<p class="rd-note">Per klockan 13:00, med en klocka igång.</p>
+</div>
+          <div class="rd-frame an-fade" data-t="12.6">
+<dl class="rd-dl">
+  <dt>Utlovad</dt>
+  <dd>tis 6 okt 16:00 <span class="rd-tag rd-risk">i farozonen</span></dd>
+  <dt>Stämplat</dt>
+  <dd>1,0 av 3,0 h &middot; 33 %</dd>
+  <dt>Kvar</dt><dd>2,0 h</dd>
+</dl>
+<svg class="rd-meter" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true"><rect class="rd-track" width="100" height="6" rx="3"/><rect class="rd-fill" width="33" height="6" rx="3"/></svg>
+
+</div>
+        </div>
+      </div>
+
+      <div class="rd-clock">
+        <span class="an-fade" data-t="0,7.6">12:10</span>
+        <span class="an-fade" data-t="7.6,12.6">13:00</span>
+        <span class="an-fade rd-late" data-t="12.6">14:20</span>
+      </div>
+
+      <div class="an-card rd-board">
+        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning &middot; Inne på verkstaden</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="rd-slot an-fade" data-t="0,7.6">
+<div class="wf-card">
+  <div class="wf-plate">DEF 456</div>
+  <div class="an-muted">#7 &middot; Volkswagen Golf &middot; Per Persson</div>
+  <div class="an-muted">utlovad tis 16:00 &middot; 0,2 av 3,0 h</div>
+</div>
+</div>
+          <div class="rd-slot an-fade" data-t="7.6,12.6">
+<div class="wf-card">
+  <div class="wf-plate">DEF 456</div>
+  <div class="an-muted">#7 &middot; Volkswagen Golf &middot; Per Persson</div>
+  <div class="an-muted">utlovad tis 16:00 &middot; 1,0 av 3,0 h</div>
+</div>
+</div>
+          <div class="rd-slot an-fade" data-t="12.6">
+<div class="wf-card">
+  <div class="wf-plate">DEF 456</div>
+  <div class="an-muted">#7 &middot; Volkswagen Golf &middot; Per Persson</div>
+  <div class="an-muted">utlovad tis 16:00 &middot; 1,0 av 3,0 h <span class="rd-tag rd-risk">i farozonen</span></div>
+</div>
+</div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.4">Tre timmars arbete, utlovat till 16:00. Erik börjar 12:00.</div>
+      <div class="an-cap" data-t="7.8,12.4">13:00. En timme stämplad, två kvar. I tid.</div>
+      <div class="an-cap" data-t="12.8,17">Erik drogs till ett annat jobb. Klockan har stått still sedan 13:00.</div>
+      <div class="an-cap" data-t="17.2,21.6">Två timmar kvar, en timme och fyrtio till löftet. Disken ser det nu.</div>
+    </div>
+  </div>
+  <p class="truth">Siffrorna och bedömningen räknas ut av samma kod som jobbsidan använder, när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/08-scene-ready.spec.ts">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
+</section>
 </main>
 <footer>FreeSMS är öppen källkod under AGPL-3.0.</footer>
 </body>

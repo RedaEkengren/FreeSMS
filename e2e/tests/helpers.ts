@@ -60,3 +60,30 @@ export async function nameCustomer(page: Page, name: string) {
   await page.getByRole('button', { name: 'Save and use' }).click();
   await expect(page).toHaveURL(job);
 }
+
+// Signing out in whatever language the page is in.
+export async function leave(page: Page) {
+  await page.locator('form[action="/logout"] button').click();
+  await expect(page).toHaveURL(/\/login/);
+}
+
+// The language the signed-in person reads; '' is the workshop's.
+export async function readIn(page: Page, locale: string) {
+  await page.goto('/account');
+  await page.selectOption('select[name=locale]', locale);
+  await page.locator('form[action="/account/language"] button').click();
+}
+
+// A wall clock in the shop's zone, minutes from now, as a datetime-local
+// control takes it. The browser here runs in UTC; the shop is in Stockholm,
+// and the page writes and reads the shop's clock.
+export async function shopClock(page: Page, minutesFromNow: number): Promise<string> {
+  return page.evaluate((m) => {
+    const parts = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'Europe/Stockholm', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date(Date.now() + m * 60_000));
+    const v = (t: string) => parts.find((p) => p.type === t)!.value;
+    return `${v('year')}-${v('month')}-${v('day')}T${v('hour')}:${v('minute')}`;
+  }, minutesFromNow);
+}
