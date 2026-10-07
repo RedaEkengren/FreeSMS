@@ -136,7 +136,7 @@ const partColumns = `
 	p.cost_minor, p.price_minor, p.minimum_quantity,
 	coalesce((SELECT sum(m.quantity) FROM stock_movements m
 	           WHERE m.part_id = p.id
-	             AND m.kind IN ('received', 'consumed', 'returned', 'written_off', 'counted')), 0) AS on_hand,
+	             AND m.kind IN ('received', 'consumed', 'put_back', 'returned', 'written_off', 'counted')), 0) AS on_hand,
 	coalesce((SELECT sum(m.quantity) FROM stock_movements m
 	           WHERE m.part_id = p.id AND m.kind IN ('reserved', 'unreserved')), 0) AS reserved`
 
@@ -715,7 +715,7 @@ func Stocktake(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, part
 			SELECT ($2::numeric / 1000 - coalesce(sum(quantity), 0)) * 1000
 			FROM stock_movements
 			WHERE part_id = $1
-			  AND kind IN ('received', 'consumed', 'returned', 'written_off', 'counted')`,
+			  AND kind IN ('received', 'consumed', 'put_back', 'returned', 'written_off', 'counted')`,
 			partID, countedMilli).Scan(&differenceMilli); err != nil {
 			return fmt.Errorf("read on hand: %w", err)
 		}
