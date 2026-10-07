@@ -56,6 +56,40 @@ test.describe.serial('keeping work', () => {
     await expect.poll(async () => lineCount(page, job, 'Hölls över utloggning')).toBe(1);
   });
 
+  // The words are the page's, so a Swedish technician reads Swedish at the
+  // moment that matters -- the connection gone and their work held -- and
+  // not English in the middle of a Swedish screen.
+  test('held work is talked about in the language the person reads', async ({ page, context }) => {
+    const alerts = collectAlerts(page);
+    await signIn(page, desk);
+    const job = await pricedJob(page, 'SPR001');
+    await page.goto('/account');
+    await page.selectOption('select[name=locale]', 'sv');
+    await page.locator('form[action="/account/language"] button').click();
+
+    try {
+      await page.goto(job);
+      await context.setOffline(true);
+      await page.fill('input[form=add-line][name=description]', 'Hålls på svenska');
+      await page.fill('input[form=add-line][name=quantity]', '1');
+      await page.fill('input[form=add-line][name=unit_price]', '100');
+      await page.locator('button[form=add-line]').click();
+      await expect.poll(() => alerts.join(' ')).toContain('Ingen anslutning. Det här hålls');
+      await expect(page.locator('#held')).toHaveText('1 sak väntar på att skickas.');
+
+      await context.setOffline(false);
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      await expect(page.locator('#held')).toBeHidden();
+      expect(await lineCount(page, job, 'Hålls på svenska')).toBe(1);
+    } finally {
+      // The rest of the suite reads English.
+      await context.setOffline(false);
+      await page.goto('/account');
+      await page.selectOption('select[name=locale]', '');
+      await page.locator('form[action="/account/language"] button').click();
+    }
+  });
+
   test('a draft stays with the person who typed it on a shared browser', async ({ page }) => {
     await signIn(page, desk);
     await page.goto('/jobs/new');
