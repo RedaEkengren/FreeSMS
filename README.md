@@ -233,8 +233,18 @@ docker run --rm -v "$PWD":/src -w /src golang:1.27-alpine go test ./...
 
 ## Hosting and cost
 
-Self-hosted. One binary and one Postgres database, sized for hardware a
-workshop already owns. Nobody pays for this; there is no hosted offering.
+One binary and one Postgres database, sized for hardware a workshop already
+owns. Three ways to run it, the same code in each:
+
+- **FreeSMS Cloud**, planned: a hosted instance per workshop, paid monthly,
+  with updates, backups with point-in-time recovery, monitoring and support.
+  Not available yet ([#95](https://github.com/RedaEkengren/FreeSMS/issues/95)).
+- **Self-hosted**: free, under the AGPL. You answer for your own backups,
+  upgrades and HTTPS.
+- **Installed for you**: on the workshop's own server, for those who want to
+  own their installation without running it.
+
+The software is open. Paying is for not having to run it.
 
 ## Contributing
 

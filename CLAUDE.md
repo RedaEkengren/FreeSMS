@@ -50,6 +50,7 @@ Claude-Session: <the session URL>
 | **Documents are frozen, corrections are new documents** | An issued invoice is immutable by trigger, not by convention. Conventions are kept until somebody is in a hurry at five to five. |
 | **Which role owns which transition, per transition** | Not a blanket check on an endpoint. "I need parts" and "this is ready" are facts only the person holding the spanner has; pricing and approval are conversations with the customer. |
 | **English is the source language, keys are the English text** | It reads at the call site, survives a catalogue going missing, and an untranslated string still says something sensible. Swedish is the first translation, not the source. |
+| **A paid hosted offering, Coolify style** (decided 2026-10-07, [#95](https://github.com/RedaEkengren/FreeSMS/issues/95)) | The same AGPL code; a workshop pays not to run it. Cloud is the default path, self-hosting the secondary one, and "installed for you" a third. One instance per workshop, not a shared multi-tenant service: it is how the code is already built, it keeps workshops apart by more than row level security, and leaving is a dump and a restore. DigitalOcean with managed Postgres and point-in-time recovery to start. This reverses the earlier "no hosted offering". |
 | **No dependency where a hundred lines will do** | Code 128 and the CP437 encoder are written out. Both are table lookups, and a dependency is a thing to keep up to date for the life of the project. |
 
 ## Permissions are not a later layer
@@ -193,7 +194,7 @@ not exist.
   with an open source project. The shop's own time library is the answer, and
   it is a feature rather than a consolation — shops report the paid guides are
   frequently wrong anyway.
-- No hosted offering, no payment processing, no cash register. Invoiced sales
+- No payment processing, no cash register. Invoiced sales
   are exempt from the Swedish certified cash register requirement; a cash
   drawer would pull the project into scope for it.
 - No parts supplier ordering. It needs agreements rather than code, it cannot
