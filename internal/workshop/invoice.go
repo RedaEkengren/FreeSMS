@@ -372,18 +372,26 @@ func InvoicesFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, wo
 // IsCreditNote reports whether this document reverses another.
 func (i Invoice) IsCreditNote() bool { return i.CreditOfID != nil }
 
-// consumeForInvoice takes the job's parts off the shelf.
+// consumeForInvoice takes the job's parts off the shelf, those the technician
+// has not already taken out.
 //
 // Every line with a part, whoever is paying for it: a warranty replacement
 // costs the customer nothing and the part left the shelf all the same.
 // Consuming releases whatever was reserved for the job first, so nothing is
 // counted as both put aside and used.
 func consumeForInvoice(ctx context.Context, tx pgx.Tx, scope access.Scope, workOrderID string) error {
+	// What was priced, less what the technician already took out to the job:
+	// a part taken off the shelf at the bench left it then, and issuing it
+	// again here would count it twice. More taken out than priced issues
+	// nothing more; the difference shows on the job as "uttagen, inte
+	// prissatt", where the front desk can price it.
 	rows, err := tx.Query(ctx, `
-		SELECT part_id, sum(quantity)
-		FROM work_order_lines
-		WHERE work_order_id = $1 AND part_id IS NOT NULL AND quantity > 0
-		GROUP BY part_id`, workOrderID)
+		SELECT l.part_id, sum(l.quantity) - coalesce((
+		         SELECT -sum(m.quantity) FROM stock_movements m
+		         WHERE m.work_order_id = $1 AND m.part_id = l.part_id AND m.kind IN ('consumed', 'put_back')), 0)
+		FROM work_order_lines l
+		WHERE l.work_order_id = $1 AND l.part_id IS NOT NULL AND l.quantity > 0
+		GROUP BY l.part_id`, workOrderID)
 	if err != nil {
 		return fmt.Errorf("read the job's parts: %w", err)
 	}
@@ -398,7 +406,9 @@ func consumeForInvoice(ctx context.Context, tx pgx.Tx, scope access.Scope, workO
 			rows.Close()
 			return fmt.Errorf("scan part: %w", err)
 		}
-		used = append(used, u)
+		if u.quantity > 0 {
+			used = append(used, u)
+		}
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {

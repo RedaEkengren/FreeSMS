@@ -119,6 +119,10 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.log.Error("read findings", "error", err)
 	}
+	jobParts, err := workshop.PartsOnJob(r.Context(), s.pool, session.Scope, id)
+	if err != nil {
+		s.log.Error("read parts on job", "error", err)
+	}
 	presence, err := workshop.PresenceFor(r.Context(), s.pool, session.Scope, id)
 	if err != nil {
 		s.log.Error("read presence", "error", err)
@@ -208,6 +212,7 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		Findings:    findings,
 		Answers:     answers,
 		Presence:    presence,
+		JobParts:    jobParts,
 		Inspections: inspections,
 		Templates:   templates,
 		Suggestions: suggestions,

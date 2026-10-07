@@ -49,6 +49,7 @@ type pageData struct {
 	Languages     []workshop.Language
 	Answers       []workshop.CustomerAnswer
 	Presence      workshop.Presence
+	JobParts      []workshop.JobPart
 	MyLocale      string
 	Lines         []workshop.Line
 	Board         []workshop.BoardEntry

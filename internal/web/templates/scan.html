@@ -57,15 +57,15 @@ with several fields that lands wherever the focus happened to be.</p>
 </div>
 
 {{if .Movements}}
-<h2>Recent movements</h2>
+<h2>{{.T "Recent movements"}}</h2>
 <ul class="lines">
   {{range .Movements}}
   <li>
     <div class="row">
-      <span>{{.Kind}}{{if .Reason}} &middot; {{.ReasonLabel}}{{end}}</span>
+      <span>{{$.T .KindLabel}}{{if .Reason}} &middot; {{.ReasonLabel}}{{end}}</span>
       <span class="tag">{{$.Num .Quantity}}</span>
     </div>
-    <div class="waiting">{{$.Date ($.Local .MovedAt) "2 Jan 15:04"}}{{if .MovedBy}} &middot; {{.MovedBy}}{{end}}{{if .OrderNum}} &middot; job #{{.OrderNum}}{{end}}</div>
+    <div class="waiting">{{$.Date ($.Local .MovedAt) "2 Jan 15:04"}}{{if .MovedBy}} &middot; {{.MovedBy}}{{end}}{{if .OrderNum}} &middot; {{$.T "job #%d" .OrderNum}}{{end}}</div>
   </li>
   {{end}}
 </ul>

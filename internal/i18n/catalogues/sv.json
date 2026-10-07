@@ -1210,6 +1210,63 @@
     },
     "The car is here": {
       "other": "Bilen står här"
+    },
+    "Parts on the job": {
+      "other": "Delar på jobbet"
+    },
+    "taken out, not priced": {
+      "other": "uttagen, inte prissatt"
+    },
+    "priced, not taken out": {
+      "other": "prissatt, inte uttagen"
+    },
+    "taken out": {
+      "other": "uttagen"
+    },
+    "priced %s, taken out %s": {
+      "other": "prissatt %s, uttaget %s"
+    },
+    "Take it out": {
+      "other": "Ta ut"
+    },
+    "Put one back": {
+      "other": "Lägg tillbaka en"
+    },
+    "Scan or type the part's code": {
+      "other": "Skanna eller skriv delens kod"
+    },
+    "Take it out to the job": {
+      "other": "Ta ut till jobbet"
+    },
+    "put aside for a job": {
+      "other": "reserverad till ett jobb"
+    },
+    "no longer put aside": {
+      "other": "inte längre reserverad"
+    },
+    "taken out to a job": {
+      "other": "uttagen till ett jobb"
+    },
+    "used": {
+      "other": "förbrukad"
+    },
+    "put back on the shelf": {
+      "other": "tillbaka på hyllan"
+    },
+    "went back to the supplier": {
+      "other": "tillbaka till leverantören"
+    },
+    "written off": {
+      "other": "avskriven"
+    },
+    "stocktake difference": {
+      "other": "inventeringsdifferens"
+    },
+    "job #%d": {
+      "other": "jobb #%d"
+    },
+    "Recent movements": {
+      "other": "Senaste rörelserna"
     }
   }
 }

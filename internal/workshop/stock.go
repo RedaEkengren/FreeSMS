@@ -123,6 +123,33 @@ type Movement struct {
 	CostMinor *int64
 }
 
+// KindLabel is what a movement was, as a catalogue key: a person reads
+// "taken out to a job", not "consumed".
+func (m Movement) KindLabel() string {
+	switch m.Kind {
+	case "received":
+		return "arrived"
+	case "reserved":
+		return "put aside for a job"
+	case "unreserved":
+		return "no longer put aside"
+	case "consumed":
+		if m.OrderNum != nil {
+			return "taken out to a job"
+		}
+		return "used"
+	case "put_back":
+		return "put back on the shelf"
+	case "returned":
+		return "went back to the supplier"
+	case "written_off":
+		return "written off"
+	case "counted":
+		return "stocktake difference"
+	}
+	return m.Kind
+}
+
 // ReasonLabel renders a write-off reason for a person.
 func (m Movement) ReasonLabel() string {
 	if label, ok := writeOffReasons[m.Reason]; ok {

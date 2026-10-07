@@ -147,6 +147,34 @@ func (s *Server) handleCar(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
 }
 
+// handleTakeOut takes a part out to the job: by its row on the job page, or
+// by a code scanned or typed into the job's scan field.
+func (s *Server) handleTakeOut(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id := r.PathValue("id")
+	quantity, err := parseScaled(r.FormValue("quantity"), 3)
+	if err != nil || quantity <= 0 {
+		s.renderError(w, r, http.StatusBadRequest, "That quantity did not parse",
+			"Write it as a number, with a comma or a full stop: 1,5 or 1.5.")
+		return
+	}
+	q := float64(quantity) / 1000
+	switch r.FormValue("action") {
+	case "put_back":
+		err = workshop.PutBack(r.Context(), s.pool, session.Scope, id, r.FormValue("part_id"), q)
+	default:
+		if code := strings.TrimSpace(r.FormValue("code")); code != "" {
+			_, _, err = workshop.TakeOutByCode(r.Context(), s.pool, session.Scope, id, code, q)
+		} else {
+			err = workshop.TakeOut(r.Context(), s.pool, session.Scope, id, r.FormValue("part_id"), q)
+		}
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
+}
+
 func (s *Server) handlePromise(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	id := r.PathValue("id")

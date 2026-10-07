@@ -94,7 +94,7 @@ test.describe.serial('the customer link scene', () => {
       await answer.getByRole('button', { name: 'Gör det till en rad' }).click();
       await expect(page.locator('table.lines-table')).toContainText('Bromsar fram: 2 mm kvar, ojämnt slitna');
       await expect(page.locator('table.lines-table')).toContainText('1 290,00 kr');
-      await expect(page.getByText('på jobbet')).toBeVisible();
+      await expect(page.locator('li', { hasText: 'Bromsar fram: 2 mm kvar, ojämnt slitna' }).getByText('på jobbet', { exact: true })).toBeVisible();
       await page.goto('/board');
       await expect(page.locator('a.card', { hasText: /CUS\s?123/ })).not.toContainText('godkänd av kunden');
     } finally {

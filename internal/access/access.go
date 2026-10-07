@@ -96,6 +96,11 @@ func (r Role) SeesParts() bool {
 	return false
 }
 
+// HandlesParts reports whether this role takes parts off the shelf to a job
+// and puts them back: the technician fitting them, and whoever runs stock.
+// Not pricing them, which stays with the counter.
+func (r Role) HandlesParts() bool { return r == RoleTechnician || r.SeesParts() }
+
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // IsUUID reports whether s is shaped like an identifier. A path segment that

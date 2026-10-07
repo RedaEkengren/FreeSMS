@@ -156,6 +156,61 @@
 </ul>
 {{end}}
 
+{{/* Parts on the job: what was priced, and what came off the shelf. A part
+     taken out and not priced is the cue that stops one being fitted for
+     nothing; priced and not taken out is still on the shelf. Taking out and
+     putting back are the technician's and the parts desk's; pricing stays
+     at the counter. */}}
+{{if or .JobParts .Session.Scope.Role.HandlesParts}}
+<h2>{{.T "Parts on the job"}}</h2>
+{{if .JobParts}}
+<ul class="lines">
+  {{range .JobParts}}
+  <li>
+    <div class="row">
+      <span>{{.Number}} &middot; {{.Name}}</span>
+      {{if .NotPriced}}<span class="tag warranty">{{$.T "taken out, not priced"}}</span>
+      {{else if .NotTakenOut}}<span class="tag">{{$.T "priced, not taken out"}}</span>
+      {{else}}<span class="tag pass">{{$.T "taken out"}}</span>{{end}}
+    </div>
+    <div class="waiting">{{$.T "priced %s, taken out %s" ($.Num (printf "%g" .Priced)) ($.Num (printf "%g" .TakenOut))}} {{.Unit}}</div>
+    {{if $.Session.Scope.Role.HandlesParts}}
+    <div class="actions mt-s">
+      {{if .NotTakenOut}}
+      <form method="post" action="/jobs/{{$.Job.ID}}/takeout" data-offline>
+        <input type="hidden" name="part_id" value="{{.PartID}}">
+        <input type="hidden" name="quantity" value="{{printf "%g" .Remaining}}">
+        <button type="submit" class="secondary">{{$.T "Take it out"}}</button>
+      </form>
+      {{end}}
+      {{if gt .TakenOut 0.0}}
+      <form method="post" action="/jobs/{{$.Job.ID}}/takeout" data-offline>
+        <input type="hidden" name="action" value="put_back">
+        <input type="hidden" name="part_id" value="{{.PartID}}">
+        <input type="hidden" name="quantity" value="1">
+        <button type="submit" class="secondary">{{$.T "Put one back"}}</button>
+      </form>
+      {{end}}
+    </div>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{if .Session.Scope.Role.HandlesParts}}
+{{/* A handheld scanner is a keyboard: it types the label's code and
+     presses Enter, which submits this form. */}}
+<form class="mt-s" method="post" action="/jobs/{{.Job.ID}}/takeout" data-offline>
+  <div class="pair">
+    <label><span>{{.T "Scan or type the part's code"}}</span>
+      <input name="code" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" required></label>
+    <label><span>{{.T "How many"}}</span><input name="quantity" value="1" inputmode="decimal" required></label>
+  </div>
+  <button type="submit" class="secondary">{{.T "Take it out to the job"}}</button>
+</form>
+{{end}}
+{{end}}
+
 {{if .Findings}}
 <h2>{{.T "Noticed under the car"}}</h2>
 <ul class="lines">
