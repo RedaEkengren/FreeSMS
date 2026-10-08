@@ -41,6 +41,7 @@ var queryBudgets = map[string]int{
 	"desk GET /receivables": 11,
 	"desk GET /parts":       11,
 	"desk GET /stock":       26,
+	"desk GET /calendar":    23,
 	// An htmx swap is the fast path: one block must not cost a page.
 	"desk GET /jobs/{id}/parts (htmx)": 13,
 }
@@ -202,5 +203,16 @@ func seedHistory(t *testing.T, pool *pgxpool.Pool) {
 		`INSERT INTO stock_movements (shop_id, part_id, kind, quantity)
 		 SELECT '` + shopA + `', p.id, k, q
 		 FROM parts p CROSS JOIN (VALUES ('received', 10), ('consumed', -2), ('counted', 1)) AS m(k, q)`,
+		// This week on the planner: sixty bookings, the technician away on
+		// the Monday and the shop shut on the Friday.
+		`INSERT INTO bookings (shop_id, starts_at, ends_at, technician_id, registration, what, created_by)
+		 SELECT '` + shopA + `', date_trunc('week', now()) + interval '1 day' * (n % 5) + interval '8 hours' + interval '30 minutes' * (n % 12),
+		        date_trunc('week', now()) + interval '1 day' * (n % 5) + interval '9 hours' + interval '30 minutes' * (n % 12),
+		        CASE WHEN n % 2 = 0 THEN '` + tech + `'::uuid END, 'ABC ' || (100 + n), 'Service', '` + tech + `'
+		 FROM generate_series(1, 60) n`,
+		`INSERT INTO staff_absences (shop_id, user_id, day, reason, created_by)
+		 VALUES ('` + shopA + `', '` + tech + `', date_trunc('week', now())::date, 'sick', '` + tech + `')`,
+		`INSERT INTO shop_closures (shop_id, day, reason, created_by)
+		 VALUES ('` + shopA + `', date_trunc('week', now())::date + 4, 'Inventering', '` + tech + `')`,
 	})
 }

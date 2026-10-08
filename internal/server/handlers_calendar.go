@@ -39,6 +39,10 @@ func (s *Server) handleCalendar(w http.ResponseWriter, r *http.Request) {
 	if s.handoverError(w, r, err) {
 		return
 	}
+	capacity, err := workshop.CapacityBetween(r.Context(), s.pool, session.Scope, monday, end)
+	if s.handoverError(w, r, err) {
+		return
+	}
 	var found []workshop.Booking
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if q != "" {
@@ -62,18 +66,22 @@ func (s *Server) handleCalendar(w http.ResponseWriter, r *http.Request) {
 			Monday:    monday,
 			Prev:      monday.AddDate(0, 0, -7).Format("2006-01-02"),
 			Next:      monday.AddDate(0, 0, 7).Format("2006-01-02"),
-			Days:      workshop.BuildWeek(monday, days, rows, bookings, loc),
+			Days:      workshop.BuildWeek(monday, days, rows, bookings, capacity, loc),
 			Rows:      rows,
 			HourMarks: workshop.PlannerHours(),
 			Query:     q,
 			Found:     found,
 			Searched:  q != "",
+			Lifts:     capacity.Lifts,
+			Reasons:   workshop.AbsenceReasons,
 		},
 	})
 }
 
 // plannerPage is what the calendar draws.
 type plannerPage struct {
+	Lifts      int
+	Reasons    map[string]string
 	Monday     time.Time
 	Prev, Next string
 	Days       []workshop.PlannerDay
@@ -183,4 +191,60 @@ func (s *Server) handleBookingAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/bookings/"+id, http.StatusSeeOther)
+}
+
+// handleCapacity records who is away, which days the shop is shut and how
+// many lifts it has. The role checks are in the operations.
+func (s *Server) handleCapacity(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	loc := s.zone()
+	day, derr := time.ParseInLocation("2006-01-02", strings.TrimSpace(r.FormValue("date")), loc)
+	needsDay := func() bool {
+		if derr != nil {
+			s.renderError(w, r, http.StatusBadRequest, "Not saved", "Give the day.")
+			return false
+		}
+		return true
+	}
+	var err error
+	switch r.FormValue("action") {
+	case "away":
+		if !needsDay() {
+			return
+		}
+		err = workshop.SetAbsence(r.Context(), s.pool, session.Scope, r.FormValue("user_id"), day, r.FormValue("reason"))
+	case "back":
+		if !needsDay() {
+			return
+		}
+		err = workshop.ClearAbsence(r.Context(), s.pool, session.Scope, r.FormValue("user_id"), day)
+	case "shut":
+		if !needsDay() {
+			return
+		}
+		err = workshop.CloseDay(r.Context(), s.pool, session.Scope, day, r.FormValue("reason"))
+	case "open":
+		if !needsDay() {
+			return
+		}
+		err = workshop.OpenDay(r.Context(), s.pool, session.Scope, day)
+	case "lifts":
+		n, cerr := strconv.Atoi(strings.TrimSpace(r.FormValue("lifts")))
+		if cerr != nil {
+			s.renderError(w, r, http.StatusBadRequest, "Not saved", "Lifts is a whole number; zero is not limited.")
+			return
+		}
+		err = workshop.SetLifts(r.Context(), s.pool, session.Scope, n)
+	default:
+		s.renderError(w, r, http.StatusBadRequest, "Not accepted", "Away, back, shut, open or lifts.")
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	week := ""
+	if derr == nil {
+		week = "?week=" + day.Format("2006-01-02")
+	}
+	http.Redirect(w, r, "/calendar"+week, http.StatusSeeOther)
 }

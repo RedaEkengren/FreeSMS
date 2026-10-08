@@ -68,3 +68,53 @@ func TestABookingIsTakenInFromThePlanner(t *testing.T) {
 		t.Error("the booking does not point at the job it became")
 	}
 }
+
+// A shut day and the lifts are the owner's to set; the front desk sees them
+// on the week it books into, and a technician cannot set either.
+func TestCapacityIsSetAndShownOnThePlanner(t *testing.T) {
+	ts, _ := testServer(t)
+	post := func(c *http.Client, form url.Values) int {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/calendar/capacity", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", ts.URL)
+		client := *c
+		client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	owner, desk, tech := signIn(t, ts, ownerEmail), signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	shut := url.Values{"action": {"shut"}, "date": {"2026-10-16"}, "reason": {"Inventering"}}
+	if status := post(tech, shut); status != http.StatusForbidden {
+		t.Errorf("a technician shutting the shop answered %d", status)
+	}
+	if status := post(desk, shut); status != http.StatusForbidden {
+		t.Errorf("the front desk shutting the shop answered %d", status)
+	}
+	if status := post(owner, shut); status != http.StatusSeeOther {
+		t.Fatalf("the owner shutting a day answered %d", status)
+	}
+	if status := post(owner, url.Values{"action": {"lifts"}, "lifts": {"two"}}); status != http.StatusBadRequest {
+		t.Errorf("lifts as a word answered %d", status)
+	}
+	if status := post(owner, url.Values{"action": {"lifts"}, "lifts": {"2"}}); status != http.StatusSeeOther {
+		t.Errorf("setting the lifts answered %d", status)
+	}
+
+	resp, err := desk.Get(ts.URL + "/calendar?week=2026-10-16")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(body), "Inventering") {
+		t.Error("the front desk's week does not say the shop is shut")
+	}
+	if strings.Contains(string(body), `value="shut"`) {
+		t.Error("the front desk is offered a form only the owner may use")
+	}
+}

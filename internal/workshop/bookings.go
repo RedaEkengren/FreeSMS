@@ -127,6 +127,9 @@ func CreateBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	}
 	var id string
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		if err := closedTx(ctx, tx, nb.Starts); err != nil {
+			return err
+		}
 		if err := tx.QueryRow(ctx, `
 			INSERT INTO bookings (shop_id, starts_at, ends_at, technician_id, registration, customer_name,
 			                      customer_phone, what, estimate_minutes, parts_needed, created_by)
@@ -152,6 +155,9 @@ func MoveBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 		return err
 	}
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		if err := closedTx(ctx, tx, starts); err != nil {
+			return err
+		}
 		tag, err := tx.Exec(ctx, `
 			UPDATE bookings SET starts_at = $2, ends_at = $3, technician_id = nullif($4, '')::uuid
 			WHERE id = $1 AND status = 'booked'`, id, starts, ends, technicianID)

@@ -55,7 +55,7 @@ func TestABlockIsPlacedByItsWallClockAcrossTheChangeOfHour(t *testing.T) {
 	rows := []workshop.PlannerRow{{ID: "t1", Name: "Erik"}}
 	for _, day := range []string{"2026-10-15", "2027-03-28", "2026-10-25"} {
 		b := workshop.Booking{ID: "b", TechnicianID: "t1", Starts: at(day, 9, 0), Ends: at(day, 10, 30), Status: "booked"}
-		week := workshop.BuildWeek(at(day, 0, 0), 1, rows, []workshop.Booking{b}, stockholm)
+		week := workshop.BuildWeek(at(day, 0, 0), 1, rows, []workshop.Booking{b}, workshop.Capacity{}, stockholm)
 		if len(week) != 1 || len(week[0].Lanes) != 1 || len(week[0].Lanes[0].Blocks) != 1 {
 			t.Fatalf("%s: %+v", day, week)
 		}
@@ -70,7 +70,7 @@ func TestABlockIsPlacedByItsWallClockAcrossTheChangeOfHour(t *testing.T) {
 func TestABookingOutsideOpeningHoursIsDrawnToTheEdgeAndSaysSo(t *testing.T) {
 	rows := []workshop.PlannerRow{{ID: "t1", Name: "Erik"}}
 	b := workshop.Booking{ID: "b", TechnicianID: "t1", Starts: at("2026-10-15", 6, 0), Ends: at("2026-10-15", 8, 0)}
-	blk := workshop.BuildWeek(at("2026-10-15", 0, 0), 1, rows, []workshop.Booking{b}, stockholm)[0].Lanes[0].Blocks[0]
+	blk := workshop.BuildWeek(at("2026-10-15", 0, 0), 1, rows, []workshop.Booking{b}, workshop.Capacity{}, stockholm)[0].Lanes[0].Blocks[0]
 	if blk.Start != 0 || blk.Span != 2 || !blk.Clipped {
 		t.Errorf("06:00-08:00 placed at %d for %d, clipped %v", blk.Start, blk.Span, blk.Clipped)
 	}

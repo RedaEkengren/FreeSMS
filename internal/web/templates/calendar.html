@@ -28,22 +28,35 @@
   <span class="pb pb-arrived">{{$.T "in the shop"}}</span>
   <span class="pb pb-parts">{{$.T "parts to get in"}}</span>
   <span class="pb pb-over">{{$.T "work longer than the slot"}}</span>
+  <span class="pb pb-short">{{$.T "needs somebody else"}}</span>
 </p>
 
 {{range .Days}}
 <h2>{{$.Date .Date "Mon 2 Jan"}} <span class="waiting">&middot; {{$.N "%d booking" .Count}}</span></h2>
+{{$day := .Date.Format "2006-01-02"}}
+{{if .Closed}}<p class="pl-note">{{$.T "The workshop is shut: %s" .Closed}}
+  {{if $.Session.Scope.Role.RunsTheShop}}<form class="inline" method="post" action="/calendar/capacity">
+    <input type="hidden" name="action" value="open"><input type="hidden" name="date" value="{{$day}}">
+    <button type="submit" class="link">{{$.T "Open it after all"}}</button></form>{{end}}</p>{{end}}
+{{range .LiftsOver}}<p class="pl-note">{{$.T "More cars than lifts %s" .}}</p>{{end}}
 <div class="planner-scroll">
 <div class="planner">
   <div class="pl-name"></div>
   {{range $.Planner.HourMarks}}<div class="pl-hour">{{printf "%02d" .}}</div>{{end}}
   {{range .Lanes}}
-  <div class="pl-name">{{if .Row.Name}}{{.Row.Name}}{{else}}{{$.T "Not given to anybody"}}{{end}}</div>
-  <div class="pl-lane">
+  <div class="pl-name">{{if .Row.Name}}{{.Row.Name}}{{else}}{{$.T "Not given to anybody"}}{{end}}
+    {{if .Away}}<span class="waiting">{{$.T .Away}}</span>
+    <form class="inline" method="post" action="/calendar/capacity">
+      <input type="hidden" name="action" value="back"><input type="hidden" name="date" value="{{$day}}">
+      <input type="hidden" name="user_id" value="{{.Row.ID}}">
+      <button type="submit" class="link">{{$.T "Here after all"}}</button></form>{{end}}</div>
+  <div class="pl-lane{{if .Away}} pl-away{{end}}">
     {{range .Blocks}}
-    <a class="pb {{printf "cs-%d" .Start}} {{printf "cd-%d" .Span}}{{if eq .Booking.Status "arrived"}} pb-arrived{{else if .Booking.Overbooked}} pb-over{{else if .Booking.PartsNeeded}} pb-parts{{end}}" href="/bookings/{{.Booking.ID}}">
+    <a class="pb {{printf "cs-%d" .Start}} {{printf "cd-%d" .Span}}{{if .Away}} pb-short{{else if .Clash}} pb-short{{else if eq .Booking.Status "arrived"}} pb-arrived{{else if .Booking.Overbooked}} pb-over{{else if .Booking.PartsNeeded}} pb-parts{{end}}" href="/bookings/{{.Booking.ID}}">
       <span class="pb-time">{{$.Date ($.Local .Booking.Starts) "15:04"}}&ndash;{{$.Date ($.Local .Booking.Ends) "15:04"}}{{if .Clipped}} &hellip;{{end}}</span>
       <b>{{if .Booking.Registration}}{{.Booking.Registration}}{{else}}{{$.T "no plate yet"}}{{end}}</b>
       <span>{{.Booking.What}}</span>
+      {{if .Away}}<span>{{$.T "needs somebody else"}}</span>{{else if .Clash}}<span>{{$.T "two cars at once"}}</span>{{end}}
     </a>
     {{end}}
   </div>
@@ -76,5 +89,37 @@
   <label class="tick"><input type="checkbox" name="parts_needed" value="yes"><span>{{$.T "Parts to get in before it comes"}}</span></label>
   <button type="submit">{{$.T "Book it"}}</button>
 </form>
+
+<h2>{{$.T "Who is away"}}</h2>
+<form method="post" action="/calendar/capacity">
+  <input type="hidden" name="action" value="away">
+  <div class="pair">
+    <label><span>{{$.T "Technician"}}</span>
+      <select name="user_id" required>{{range .Rows}}{{if .ID}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}</select></label>
+    <label><span>{{$.T "Day"}}</span><input type="date" name="date" required></label>
+  </div>
+  <label><span>{{$.T "Why"}}</span>
+    <select name="reason">{{range $k, $v := .Reasons}}<option value="{{$k}}">{{$.T $v}}</option>{{end}}</select></label>
+  <button type="submit">{{$.T "Mark as away"}}</button>
+</form>
+
+{{if $.Session.Scope.Role.RunsTheShop}}
+<h2>{{$.T "When the workshop is shut"}}</h2>
+<form method="post" action="/calendar/capacity">
+  <input type="hidden" name="action" value="shut">
+  <div class="pair">
+    <label><span>{{$.T "Day"}}</span><input type="date" name="date" required></label>
+    <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="200" required></label>
+  </div>
+  <button type="submit">{{$.T "Shut that day"}}</button>
+</form>
+
+<form class="mt-s" method="post" action="/calendar/capacity">
+  <input type="hidden" name="action" value="lifts">
+  <label><span>{{$.T "Lifts: how many cars can be worked on at once, zero for not limited"}}</span>
+    <input name="lifts" value="{{.Lifts}}" inputmode="numeric" required></label>
+  <button type="submit">{{$.T "Save"}}</button>
+</form>
+{{end}}
 {{end}}
 {{end}}

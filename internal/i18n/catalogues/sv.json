@@ -1553,6 +1553,60 @@
     "%d booking": {
       "one": "%d bokning",
       "other": "%d bokningar"
+    },
+    "needs somebody else": {
+      "other": "behöver någon annan"
+    },
+    "two cars at once": {
+      "other": "två bilar samtidigt"
+    },
+    "The workshop is shut: %s": {
+      "other": "Verkstaden är stängd: %s"
+    },
+    "Open it after all": {
+      "other": "Öppna ändå"
+    },
+    "More cars than lifts %s": {
+      "other": "Fler bilar än liftar %s"
+    },
+    "Here after all": {
+      "other": "På plats ändå"
+    },
+    "Who is away": {
+      "other": "Vem är borta"
+    },
+    "Why": {
+      "other": "Varför"
+    },
+    "Mark as away": {
+      "other": "Markera som borta"
+    },
+    "When the workshop is shut": {
+      "other": "När verkstaden är stängd"
+    },
+    "Shut that day": {
+      "other": "Stäng den dagen"
+    },
+    "Lifts: how many cars can be worked on at once, zero for not limited": {
+      "other": "Liftar: hur många bilar som kan jobbas på samtidigt, noll för obegränsat"
+    },
+    "off sick": {
+      "other": "sjuk"
+    },
+    "on holiday": {
+      "other": "på semester"
+    },
+    "away": {
+      "other": "borta"
+    },
+    "Give the day.": {
+      "other": "Ange dagen."
+    },
+    "Lifts is a whole number; zero is not limited.": {
+      "other": "Liftar är ett heltal; noll är obegränsat."
+    },
+    "Away, back, shut, open or lifts.": {
+      "other": "Borta, tillbaka, stäng, öppna eller liftar."
     }
   }
 }

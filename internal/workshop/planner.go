@@ -1,6 +1,9 @@
 package workshop
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // The planner draws a day as half-hour slots between opening and closing,
 // one row per technician and one for bookings not yet given to anybody. A
@@ -25,12 +28,18 @@ type PlannerBlock struct {
 	// Starts before opening or ends after closing: drawn to the edge and
 	// said so, rather than drawn somewhere it is not.
 	Clipped bool
+	// The technician is away that day: the booking needs somebody else.
+	Away bool
+	// Overlaps another booking on the same row: one person, two cars.
+	Clash bool
 }
 
 // PlannerLane is one row of a day.
 type PlannerLane struct {
 	Row    PlannerRow
 	Blocks []PlannerBlock
+	// Why the row has no capacity that day, as a catalogue key.
+	Away string
 }
 
 // PlannerDay is one day of the planner.
@@ -38,6 +47,10 @@ type PlannerDay struct {
 	Date  time.Time
 	Lanes []PlannerLane
 	Count int
+	// Why the shop is shut, when it is.
+	Closed string
+	// When more cars are booked at once than there are lifts, as "10:00-11:30".
+	LiftsOver []string
 }
 
 // PlannerHours are the hour marks for the axis: 07, 08 ... 17.
@@ -50,7 +63,7 @@ func PlannerHours() []int {
 }
 
 // BuildWeek lays bookings out over days days from first, in the shop's zone.
-func BuildWeek(first time.Time, days int, rows []PlannerRow, bookings []Booking, loc *time.Location) []PlannerDay {
+func BuildWeek(first time.Time, days int, rows []PlannerRow, bookings []Booking, capacity Capacity, loc *time.Location) []PlannerDay {
 	unassigned := PlannerRow{ID: "", Name: ""}
 	all := append(append([]PlannerRow{}, rows...), unassigned)
 	var out []PlannerDay
@@ -58,13 +71,19 @@ func BuildWeek(first time.Time, days int, rows []PlannerRow, bookings []Booking,
 		y, m, dd := first.In(loc).Date()
 		date := time.Date(y, m, dd+d, 0, 0, 0, 0, loc)
 		next := time.Date(y, m, dd+d+1, 0, 0, 0, 0, loc)
-		day := PlannerDay{Date: date}
+		key := date.Format("2006-01-02")
+		day := PlannerDay{Date: date, Closed: capacity.Closed[key]}
 		known := map[string]bool{}
 		for _, r := range rows {
 			known[r.ID] = true
 		}
 		for _, r := range all {
 			lane := PlannerLane{Row: r}
+			if r.ID != "" {
+				if reason, ok := capacity.Absent[r.ID][key]; ok {
+					lane.Away = AbsenceReasons[reason]
+				}
+			}
 			for _, b := range bookings {
 				owner := b.TechnicianID
 				if !known[owner] {
@@ -73,14 +92,20 @@ func BuildWeek(first time.Time, days int, rows []PlannerRow, bookings []Booking,
 				if owner != r.ID || !b.Starts.Before(next) || !b.Ends.After(date) {
 					continue
 				}
-				lane.Blocks = append(lane.Blocks, place(b, date, next, loc))
+				blk := place(b, date, next, loc)
+				blk.Away = lane.Away != ""
+				lane.Blocks = append(lane.Blocks, blk)
 				day.Count++
 			}
+			markClashes(lane.Blocks)
 			// An empty "not given to anybody" row is noise.
 			if r.ID == "" && len(lane.Blocks) == 0 {
 				continue
 			}
 			day.Lanes = append(day.Lanes, lane)
+		}
+		if capacity.Lifts > 0 {
+			day.LiftsOver = liftsOver(day.Lanes, capacity.Lifts)
 		}
 		out = append(out, day)
 	}
@@ -120,4 +145,47 @@ func place(b Booking, day, next time.Time, loc *time.Location) PlannerBlock {
 		block.Start, block.Span = PlannerSlots-1, 1
 	}
 	return block
+}
+
+// markClashes flags blocks on one row that overlap: one person, two cars.
+func markClashes(blocks []PlannerBlock) {
+	for i := range blocks {
+		for j := range blocks {
+			if i != j && blocks[i].Booking.Starts.Before(blocks[j].Booking.Ends) &&
+				blocks[j].Booking.Starts.Before(blocks[i].Booking.Ends) {
+				blocks[i].Clash = true
+			}
+		}
+	}
+}
+
+// liftsOver is when more cars are on the planner at once than there are
+// lifts, as wall-clock spans.
+func liftsOver(lanes []PlannerLane, lifts int) []string {
+	var count [PlannerSlots]int
+	for _, l := range lanes {
+		for _, b := range l.Blocks {
+			for s := b.Start; s < b.Start+b.Span && s < PlannerSlots; s++ {
+				count[s]++
+			}
+		}
+	}
+	clock := func(slot int) string {
+		m := plannerOpen + slot*plannerSlot
+		return fmt.Sprintf("%02d:%02d", m/60, m%60)
+	}
+	var out []string
+	for s := 0; s < PlannerSlots; {
+		if count[s] <= lifts {
+			s++
+			continue
+		}
+		e := s
+		for e < PlannerSlots && count[e] > lifts {
+			e++
+		}
+		out = append(out, clock(s)+"–"+clock(e))
+		s = e
+	}
+	return out
 }
