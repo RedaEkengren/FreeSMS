@@ -18,6 +18,15 @@
 </dl>
 <p class="waiting">{{.T "Counted by the day the invoice was issued, not the day the job was opened. Credit notes are included as the negatives they are. The average and the middle are both here because one large job moves the average and does not move the middle."}}</p>
 
+{{if and .Session.Scope.Role.RunsTheShop (or (index .Sent 0) (index .Sent 1))}}
+<h2>{{.T "Sent to customers this month"}}</h2>
+<dl class="totals">
+  <dt>{{.T "Texts"}}</dt><dd>{{index .Sent 0}}</dd>
+  <dt>{{.T "Emails"}}</dt><dd>{{index .Sent 1}}</dd>
+</dl>
+<p class="waiting">{{.T "Each text is paid for to the provider. Counted by the day it was sent, whatever the period above."}}</p>
+{{end}}
+
 <h2>{{.T "Hours"}}</h2>
 <dl class="totals">
   <dt>{{.T "Clocked"}}</dt><dd>{{$.Num (printf "%.1f" .Dashboard.HoursClocked)}}</dd>

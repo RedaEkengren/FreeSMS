@@ -48,9 +48,17 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// What sending to customers cost this month: a text is paid for each.
+	var texts, emails int
+	if session.Scope.Role.RunsTheShop() {
+		if texts, emails, err = workshop.MessagesThisMonth(r.Context(), s.pool, session.Scope, time.Now()); err != nil {
+			s.log.Error("messages this month", "error", err)
+		}
+	}
 	s.render(w, r, http.StatusOK, "dashboard", pageData{
 		Title:     "Figures",
 		Session:   session,
 		Dashboard: summary,
+		Sent:      [2]int{texts, emails},
 	})
 }

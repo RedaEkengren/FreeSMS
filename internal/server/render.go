@@ -63,6 +63,13 @@ type pageData struct {
 	// What is waiting for the person signed in, and the header's count of it.
 	Waiting      []workshop.WaitingItem
 	WaitingCount int
+	// Messages to the customer on a job, what there is to tell, and how.
+	Messages []workshop.OutboundMessage
+	Tell     []string
+	CanText  bool
+	CanEmail bool
+	// Texts and emails sent to customers this month, for whoever pays.
+	Sent [2]int
 	// Who is in when, and the person's own schedule.
 	Rota          rotaPage
 	Schedule      workshop.MySchedule
@@ -178,6 +185,10 @@ var templateFuncs = template.FuncMap{
 	"date":  func(t time.Time) string { return t.Format("2006-01-02") },
 	"asset": web.Asset,
 }
+
+// MessageAbouts are what a message to a customer can be about, as the page
+// names them.
+func (d pageData) MessageAbouts() map[string]string { return workshop.MessageAbouts }
 
 // T renders a message in the reader's language.
 //

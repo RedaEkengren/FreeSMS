@@ -309,7 +309,16 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 			return fmt.Errorf("clear addresses: %w", err)
 		}
 
-		const cleared = "Name, email address, telephone number and postal address."
+		// The numbers and addresses messages went to are theirs too, and no
+		// law asks for them to be kept.
+		if _, err := tx.Exec(ctx, `
+			UPDATE outbound_messages SET recipient = ''
+			WHERE work_order_id IN (SELECT w.id FROM work_orders w JOIN customers c ON c.id = w.customer_id
+			                        WHERE c.person_id = $1)`, personID); err != nil {
+			return fmt.Errorf("clear message recipients: %w", err)
+		}
+
+		const cleared = "Name, email address, telephone number and postal address, and where messages to them were sent."
 		const kept = "Issued invoices, including the name and address they were addressed to, " +
 			"because Swedish bookkeeping law requires them for seven years after issue. " +
 			"The technical history of vehicles, which belongs to the vehicle rather than to a person. " +

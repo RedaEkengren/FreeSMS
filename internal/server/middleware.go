@@ -99,6 +99,12 @@ func (s *Server) checkOrigin(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		// A provider's report carries no cookie, so there is no authority
+		// to forge; it is checked by the secret in its address instead.
+		if strings.HasPrefix(r.URL.Path, "/hooks/") {
+			next.ServeHTTP(w, r)
+			return
+		}
 
 		origin := r.Header.Get("Origin")
 		if origin == "" {

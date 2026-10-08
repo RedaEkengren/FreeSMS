@@ -37,13 +37,14 @@ var queryBudgets = map[string]int{
 	//
 	// The counter.
 	"desk GET /board":       16,
-	"desk GET /jobs/{id}":   32,
+	"desk GET /jobs/{id}":   33,
 	"desk GET /receivables": 11,
 	"desk GET /parts":       11,
 	"desk GET /stock":       26,
 	"desk GET /calendar":    29,
 	"desk GET /mine":        13,
 	"desk GET /mine/count":  14,
+	// The desk's job page lists what was sent to the customer (#101): one.
 	// The calendar reads the rota for its lanes (#100): six more, once,
 	// whatever the history. "For me" asks whether the schedule changed: one.
 	//
@@ -219,6 +220,13 @@ func seedHistory(t *testing.T, pool *pgxpool.Pool) {
 		 VALUES ('` + shopA + `', '` + tech + `', date_trunc('week', now())::date, 'sick', '` + tech + `')`,
 		`INSERT INTO shop_closures (shop_id, day, reason, created_by)
 		 VALUES ('` + shopA + `', date_trunc('week', now())::date + 4, 'Inventering', '` + tech + `')`,
+		// Fifty messages to the customer on shop A's job, each sent and
+		// delivered.
+		`INSERT INTO outbound_messages (shop_id, work_order_id, about, channel, recipient, body, not_before, created_by)
+		 SELECT '` + shopA + `', '` + jobA + `', 'ready', 'sms', '+46701234567', 'Klar ' || n, now(), '` + tech + `'
+		 FROM generate_series(1, 50) n`,
+		`INSERT INTO message_events (shop_id, message_id, event)
+		 SELECT '` + shopA + `', m.id, e FROM outbound_messages m CROSS JOIN unnest(ARRAY['queued', 'sent', 'delivered']) e`,
 		// Two years of rotas, a new one every month, and a change most days.
 		`INSERT INTO rotas (shop_id, user_id, valid_from, weeks, created_by)
 		 SELECT '` + shopA + `', '` + tech + `', current_date - interval '1 month' * n, 2, '` + tech + `'

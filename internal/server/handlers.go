@@ -255,6 +255,28 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 		}
 	}
 
+	// Telling the customer from here: what there is to tell, how, and what
+	// was sent. The counter's.
+	var messages []workshop.OutboundMessage
+	var tell []string
+	if session.Scope.Role.SeesCustomerPersonalData() {
+		if messages, err = workshop.MessagesFor(r.Context(), s.pool, session.Scope, id); err != nil {
+			s.log.Error("read messages", "error", err)
+		}
+		switch job.State {
+		case "ready":
+			tell = append(tell, "ready")
+		case "awaiting_parts":
+			tell = append(tell, "waiting_part")
+		}
+		for _, in := range inspections {
+			if in.Completed() && len(in.Findings()) > 0 {
+				tell = append(tell, "answer")
+				break
+			}
+		}
+	}
+
 	// Only the front desk sees documents; a technician has no use for them
 	// and they carry the customer's name.
 	var invoices []workshop.Invoice
@@ -302,6 +324,10 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 		Suggestions: suggestions,
 		Parts:       stocked,
 		LabourRate:  labourRate,
+		Messages:    messages,
+		Tell:        tell,
+		CanText:     s.sms != nil,
+		CanEmail:    s.email != nil,
 	}, nil
 }
 

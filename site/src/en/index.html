@@ -255,6 +255,7 @@
     <button type="button" role="tab" data-tab="5">The planner</button>
     <button type="button" role="tab" data-tab="6">For me</button>
     <button type="button" role="tab" data-tab="7">The rota</button>
+    <button type="button" role="tab" data-tab="8">To the customer</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -716,6 +717,64 @@
     </div>
   </div>
   <p class="truth">The words and the rest are worked out by the product&rsquo;s own code when the page is generated. The flow runs against the real product in three browsers: the rota is set, Thursday moved, the warning shown, Erik told and reading it, and the desk seeing &ldquo;away&rdquo; where Erik sees &ldquo;off sick&rdquo; &ndash; <a href="{{test "e2e/tests/16-scene-rota.spec.ts" "a week is planned, a short rest is warned about, and the person is told"}}">read the test</a>. Names are <span class="wf-example">examples</span>.</p>
+</section>
+
+{{/* ── Scene 9: telling the customer ──────────────────────────────────── */}}
+<section class="scene pane" role="tabpanel">
+  <h2>The customer is told, and you can see that they were</h2>
+  <p class="lede">Where the workshop has a provider, the front desk sends the link straight from the job: email through the workshop&rsquo;s own mail, or a text. The first message to a new address is confirmed. Nothing goes between eight in the evening and eight in the morning, nothing goes twice, and replies are not read &ndash; the number to ring is in the message.</p>
+
+  <div class="an-wrap" data-loop="17" data-still="13">
+    <div class="an-canvas" role="img" aria-label="Animation: the car MEJ 123 is ready. The front desk ticks that karin@example.com is the customer&rsquo;s address and presses {{t "Email it"}}. The message waits, and is sent. The customer gets the email {{t "Your car %s" "MEJ 123"}} with the link and the number to ring, opens the link and reads {{t "Your car is ready to collect."}} The board says {{t "customer told %s" "14:20"}}.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}} &middot; MEJ 123</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,10.8">
+              <div class="wf-h">{{t "Send to the customer"}}</div>
+              <div class="ml-tick"><span class="ml-box"><span class="an-fade" data-t="1.2">&#10003;</span></span>{{t "%s is the customer's address" "karin@example.com"}}</div>
+              <span class="an-btn wf-secondary mo-btn">{{t "Email it"}}</span>
+              <div class="ml-row an-fade" data-t="2.4"><span>{{t "Your car is ready to collect"}} &middot; {{t "email"}}</span>
+                <span class="fm-stack"><span class="rd-tag rd-risk an-fade" data-t="2.4,3.6">{{t "waiting to go"}}</span><span class="rd-tag cl-on an-fade" data-t="3.6">{{t "sent"}}</span></span></div>
+            </div>
+            <div class="an-fade" data-t="10.8">
+              <div class="wf-card"><div class="wf-plate">MEJ 123</div>
+                <div class="an-muted">{{state "ready"}}</div>
+                <div class="wj-told"><span class="rd-tag cl-on">{{t "customer told %s" "14:20"}}</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-card wf-phone ml-phone an-pop" data-t="4.4">
+        <div class="an-head"><span class="an-dots"></span><span>The customer</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">{{t "Your car %s" "MEJ 123"}}</div>
+              <p class="ml-mail">{{t "%s: your car %s is ready to collect. %s" "The Garage" "MEJ 123" "https://verkstad.example/k/q7Jx…"}}</p>
+              <p class="ml-mail an-muted">{{t "Replies to this are not read. Ring us on %s." "08-123 456 78"}}</p>
+            </div>
+            <div class="an-fade" data-t="8">
+              <div class="cl-plate">MEJ 123</div>
+              <p class="status-big ml-big">{{t "Your car is ready to collect."}}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <span class="an-cursor" data-path="0:300,420; 1:64,124c; 1.8:102,168c; 3:300,420; 7.2:700,250c; 17:300,420"
+            data-path-m="0:260,600; 1:40,120c; 1.8:90,170c; 3:260,600; 7.2:250,450c; 17:260,600"><svg viewBox="0 0 24 24"><path d="M4 2l16 11-7 1-3 7z" fill="#fff" stroke="#14171c" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+
+      <div class="an-cap" data-t="0.3,2.2">The car is ready. The desk confirms the address the first time.</div>
+      <div class="an-cap" data-t="2.4,4.2">The email is queued, and goes at once &ndash; between eight and eight.</div>
+      <div class="an-cap" data-t="4.4,7.8">The customer gets it, with the number to ring. Replies are not read.</div>
+      <div class="an-cap" data-t="8,10.6">The link says the car is ready. No account.</div>
+      <div class="an-cap" data-t="10.8,16.6">The board says the customer was told.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product&rsquo;s catalogue when the page is generated. The flow runs against the real product in a browser: the email goes over SMTP to a real mail server, and the test reads what arrived and opens the link in it as the customer would &ndash; <a href="{{test "e2e/tests/17-scene-email.spec.ts" "the customer is emailed the link from the job page, and it arrives"}}">read the test</a>. Texts through 46elks, the delivery report and quiet hours are tested by the server&rsquo;s own tests. Registrations, addresses and names are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

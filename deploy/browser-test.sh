@@ -15,6 +15,8 @@ cd "$(dirname "$0")/.."
 # has no .env to take it from.
 export POSTGRES_PASSWORD=throwaway-test-stack
 export COMPOSE_PROJECT_NAME=freesms-browser-test
+# The stack, and a mail server for the test that emails a customer.
+export COMPOSE_FILE=docker-compose.yml:deploy/browser-test.compose.yml
 export DB_PORT=55497 HTTP_PORT=18089
 # The browser shares the app container's network and reaches it as
 # localhost. Chromium upgrades a plain http:// name like "app" to https and

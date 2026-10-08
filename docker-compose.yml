@@ -43,6 +43,18 @@ services:
       DEFAULT_LOCALE: ${DEFAULT_LOCALE:-en}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       RELEASE: ${RELEASE:-dev}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      SMTP_URL: ${SMTP_URL:-}
+      LETTERMINT_TOKEN: ${LETTERMINT_TOKEN:-}
+      LETTERMINT_URL: ${LETTERMINT_URL:-https://api.lettermint.co}
+      SMS_PROVIDER: ${SMS_PROVIDER:-}
+      SMS_FROM: ${SMS_FROM:-}
+      ELKS_USERNAME: ${ELKS_USERNAME:-}
+      ELKS_PASSWORD: ${ELKS_PASSWORD:-}
+      ELKS_URL: ${ELKS_URL:-https://api.46elks.com}
+      SMS_CALLBACK_SECRET: ${SMS_CALLBACK_SECRET:-}
+      SEND_HOURS: ${SEND_HOURS:-08-20}
     ports:
       # Loopback by default. Publishing plain HTTP and a sign-in page on every
       # interface was the default before; reaching the service from the

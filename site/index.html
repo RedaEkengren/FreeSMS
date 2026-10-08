@@ -252,6 +252,7 @@
     <button type="button" role="tab" data-tab="5">Planeringen</button>
     <button type="button" role="tab" data-tab="6">Till mig</button>
     <button type="button" role="tab" data-tab="7">Schemat</button>
+    <button type="button" role="tab" data-tab="8">Till kunden</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -770,6 +771,64 @@
     </div>
   </div>
   <p class="truth">Orden och vilan räknas ut av produktens egen kod när sidan genereras. Flödet körs mot den riktiga produkten i tre webbläsare: schemat läggs, torsdagen flyttas, varningen visas, Erik får veta och läser, och disken ser &rdquo;borta&rdquo; där Erik ser &rdquo;sjuk&rdquo; &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/16-scene-rota.spec.ts">läs testet</a>. Namn är <span class="wf-example">exempel</span>.</p>
+</section>
+
+
+<section class="scene pane" role="tabpanel">
+  <h2>Kunden får veta, och det syns att den fick det</h2>
+  <p class="lede">När verkstaden har en leverantör skickar disken länken direkt från jobbet: mejl genom verkstadens egen e-post, eller sms. Första gången till en ny adress bekräftas den. Inget går mellan åtta på kvällen och åtta på morgonen, inget går två gånger, och svar läses inte &ndash; numret att ringa står i meddelandet.</p>
+
+  <div class="an-wrap" data-loop="17" data-still="13">
+    <div class="an-canvas" role="img" aria-label="Animering: bilen MEJ 123 är klar. Disken kryssar i att karin@exempel.se är kundens adress och trycker Skicka mejl. Meddelandet väntar och skickas. Kunden får mejlet Din bil MEJ 123 med länken och numret att ringa, öppnar länken och läser Din bil är klar att hämta. På tavlan står kunden meddelad 14:20.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning &middot; MEJ 123</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,10.8">
+              <div class="wf-h">Skicka till kunden</div>
+              <div class="ml-tick"><span class="ml-box"><span class="an-fade" data-t="1.2">&#10003;</span></span>karin@exempel.se är kundens adress</div>
+              <span class="an-btn wf-secondary mo-btn">Skicka mejl</span>
+              <div class="ml-row an-fade" data-t="2.4"><span>Din bil är klar att hämta &middot; mejl</span>
+                <span class="fm-stack"><span class="rd-tag rd-risk an-fade an-off" data-t="2.4,3.6">väntar på att gå</span><span class="rd-tag cl-on an-fade" data-t="3.6">skickat</span></span></div>
+            </div>
+            <div class="an-fade" data-t="10.8">
+              <div class="wf-card"><div class="wf-plate">MEJ 123</div>
+                <div class="an-muted">Klar för hämtning</div>
+                <div class="wj-told"><span class="rd-tag cl-on">kunden meddelad 14:20</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-card wf-phone ml-phone an-pop" data-t="4.4">
+        <div class="an-head"><span class="an-dots"></span><span>Kunden</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">Din bil MEJ 123</div>
+              <p class="ml-mail">Bilverkstaden: din bil MEJ 123 är klar att hämta. https://verkstad.example/k/q7Jx…</p>
+              <p class="ml-mail an-muted">Svar på det här meddelandet läses inte. Ring oss på 08-123 456 78.</p>
+            </div>
+            <div class="an-fade" data-t="8">
+              <div class="cl-plate">MEJ 123</div>
+              <p class="status-big ml-big">Din bil är klar att hämta.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <span class="an-cursor" data-path="0:300,420; 1:64,124c; 1.8:102,168c; 3:300,420; 7.2:700,250c; 17:300,420"
+            data-path-m="0:260,600; 1:40,120c; 1.8:90,170c; 3:260,600; 7.2:250,450c; 17:260,600"><svg viewBox="0 0 24 24"><path d="M4 2l16 11-7 1-3 7z" fill="#fff" stroke="#14171c" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+
+      <div class="an-cap an-off" data-t="0.3,2.2">Bilen är klar. Disken bekräftar adressen första gången.</div>
+      <div class="an-cap an-off" data-t="2.4,4.2">Mejlet köas, och går direkt &ndash; mellan åtta och åtta.</div>
+      <div class="an-cap an-off" data-t="4.4,7.8">Kunden får det, med numret att ringa. Svar läses inte.</div>
+      <div class="an-cap an-off" data-t="8,10.6">Länken visar att bilen är klar. Inget konto.</div>
+      <div class="an-cap" data-t="10.8,16.6">Tavlan säger att kunden har fått veta.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: mejlet går över SMTP till en riktig e-postserver, testet läser det som kom fram och öppnar länken i det som kunden skulle &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/17-scene-email.spec.ts">läs testet</a>. Sms genom 46elks, leveransrapporten och tysta timmar provas i serverns egna tester. Registreringsnummer, adresser och namn är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

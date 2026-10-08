@@ -307,3 +307,15 @@
 .an-m .ro-half { width: 488px; left: 16px; height: 120px; }
 .an-m .ro-left { top: 60px; } .an-m .ro-right { top: 210px; }
 .ro-phone .fm-stack > * { justify-self: stretch; }
+
+/* Telling the customer. */
+.ml-desk { left: 40px; top: 40px; width: 500px; height: 320px; }
+.ml-phone { left: 600px; }
+.ml-stack > * { justify-self: stretch; }
+.ml-tick { display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin: 6px 0 8px; }
+.ml-box { display: inline-grid; place-items: center; width: 16px; height: 16px; border: 1.5px solid #5b6270; border-radius: 4px; font-size: 12px; }
+.ml-row { display: flex; justify-content: space-between; gap: 8px; align-items: center; border-top: 1px solid #e9ebef; margin-top: 12px; padding-top: 8px; font-size: 12px; }
+.ml-mail { font-size: 12.5px; line-height: 1.5; margin: 8px 0; word-break: break-word; }
+.ml-big { font-size: 17px; margin-top: 10px; }
+.an-m .ml-desk { left: 16px; top: 16px; width: 488px; height: 250px; }
+.an-m .ml-phone { left: 135px; top: 282px; height: 330px; }

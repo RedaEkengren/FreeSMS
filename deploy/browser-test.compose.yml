@@ -1,0 +1,19 @@
+# The browser suite's additions to the stack: a mail server to send to.
+#
+# Mailpit takes mail over plain SMTP and shows it over HTTP, so the test that
+# emails a customer reads the email that actually arrived and opens the link
+# in it -- the way a customer would -- rather than trusting that a provider
+# was called. Never part of a real installation.
+services:
+  mailpit:
+    image: axllent/mailpit:v1.20
+  app:
+    depends_on:
+      mailpit:
+        condition: service_started
+    environment:
+      EMAIL_PROVIDER: smtp
+      SMTP_URL: smtp://mailpit:1025
+      EMAIL_FROM: Verkstaden <verkstad@e2e.test>
+      # A test does not wait for the morning.
+      SEND_HOURS: "00-24"

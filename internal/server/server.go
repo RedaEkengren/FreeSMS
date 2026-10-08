@@ -22,6 +22,7 @@ import (
 	"github.com/RedaEkengren/FreeSMS/internal/config"
 	"github.com/RedaEkengren/FreeSMS/internal/i18n"
 	"github.com/RedaEkengren/FreeSMS/internal/live"
+	"github.com/RedaEkengren/FreeSMS/internal/notify"
 	"github.com/RedaEkengren/FreeSMS/internal/storage"
 	"github.com/RedaEkengren/FreeSMS/internal/vehicledata"
 	"github.com/RedaEkengren/FreeSMS/internal/web"
@@ -46,6 +47,12 @@ type Server struct {
 	// Open screens, told when something they show has changed.
 	live          *live.Hub
 	liveHeartbeat time.Duration
+
+	// Providers for telling customers, nil when there is none.
+	email, sms notify.Sender
+	smsSecret  string
+	sendingMu  sync.Mutex
+	sendHours  workshop.SendHours
 
 	// Pinned by SHOP_ID when an installation serves a named shop.
 	configuredShopID string
@@ -246,6 +253,29 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 	case <-srv.shopSet:
 	default:
 	}
+
+	srv.sendHours = workshop.DefaultSendHours
+	if cfg.SendUntil > 0 {
+		srv.sendHours = workshop.SendHours{From: cfg.SendFrom, Until: cfg.SendUntil}
+	}
+	switch cfg.EmailProvider {
+	case "smtp":
+		smtpSender, err := notify.ParseSMTP(cfg.SMTPURL, cfg.EmailFrom)
+		if err != nil {
+			return nil, err
+		}
+		srv.email = smtpSender
+	case "lettermint":
+		srv.email = notify.Lettermint{URL: cfg.LettermintURL, Token: cfg.LettermintToken, From: cfg.EmailFrom}
+	}
+	if cfg.SMSProvider == "46elks" {
+		elks := notify.Elks{URL: cfg.ElksURL, Username: cfg.ElksUsername, Password: cfg.ElksPassword, From: cfg.SMSFrom}
+		if cfg.SMSCallbackSecret != "" {
+			elks.Callback = strings.TrimRight(cfg.BaseURL, "/") + "/hooks/46elks/" + cfg.SMSCallbackSecret
+			srv.smsSecret = cfg.SMSCallbackSecret
+		}
+		srv.sms = elks
+	}
 	return srv, nil
 }
 
@@ -303,6 +333,9 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/told", s.requireSession(s.handleTold))
 	mux.HandleFunc("POST /jobs/{id}/link", s.requireSession(s.handleJobLink))
 	mux.HandleFunc("GET /events", s.requireSession(s.handleEvents))
+	mux.HandleFunc("POST /jobs/{id}/message", s.requireSession(s.handleSendMessage))
+	// A provider reporting delivery: no session, a secret in the address.
+	mux.HandleFunc("POST /hooks/46elks/{secret}", s.handleElksDelivered)
 	mux.HandleFunc("GET /calendar", s.requireSession(s.handleCalendar))
 	mux.HandleFunc("POST /calendar", s.requireSession(s.handleCreateBooking))
 	mux.HandleFunc("POST /calendar/capacity", s.requireSession(s.handleCapacity))
@@ -445,6 +478,11 @@ func (s *Server) Run(ctx context.Context, addr string) error {
 		s.live.Run(ctx)
 		close(listening)
 	}()
+	sending := make(chan struct{})
+	go func() {
+		s.sendLoop(ctx)
+		close(sending)
+	}()
 
 	errs := make(chan error, 1)
 	go func() {
@@ -465,6 +503,7 @@ func (s *Server) Run(ctx context.Context, addr string) error {
 	// issue for the other half of that promise.
 	s.log.Info("shutting down")
 	<-listening
+	<-sending
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)

@@ -1754,6 +1754,102 @@
     },
     "A rota, a day, away or back.": {
       "other": "Ett schema, en dag, borta eller tillbaka."
+    },
+    "Your car is ready to collect": {
+      "other": "Din bil är klar att hämta"
+    },
+    "We need your answer": {
+      "other": "Vi behöver ditt svar"
+    },
+    "Waiting for a part": {
+      "other": "Väntar på en del"
+    },
+    "%s: your car %s is ready to collect. %s": {
+      "other": "%s: din bil %s är klar att hämta. %s"
+    },
+    "%s: we have looked at your car %s and need your answer. %s": {
+      "other": "%s: vi har gått igenom din bil %s och behöver ditt svar. %s"
+    },
+    "%s: your car %s is waiting for a part. Follow it here: %s": {
+      "other": "%s: din bil %s väntar på en del. Följ den här: %s"
+    },
+    "Replies to this are not read. Ring us on %s.": {
+      "other": "Svar på det här meddelandet läses inte. Ring oss på %s."
+    },
+    "Replies to this are not read.": {
+      "other": "Svar på det här meddelandet läses inte."
+    },
+    "Your car %s": {
+      "other": "Din bil %s"
+    },
+    "Send to the customer": {
+      "other": "Skicka till kunden"
+    },
+    "%s is the customer's number": {
+      "other": "%s är kundens nummer"
+    },
+    "%s is the customer's address": {
+      "other": "%s är kundens adress"
+    },
+    "Send it again, if it has already gone": {
+      "other": "Skicka igen, om det redan har gått"
+    },
+    "Text it": {
+      "other": "Skicka sms"
+    },
+    "Email it": {
+      "other": "Skicka mejl"
+    },
+    "text": {
+      "other": "sms"
+    },
+    "email": {
+      "other": "mejl"
+    },
+    "delivered": {
+      "other": "levererat"
+    },
+    "sent": {
+      "other": "skickat"
+    },
+    "not delivered": {
+      "other": "inte levererat"
+    },
+    "waiting to go": {
+      "other": "väntar på att gå"
+    },
+    "goes at %s": {
+      "other": "går %s"
+    },
+    "Sent to customers this month": {
+      "other": "Skickat till kunder den här månaden"
+    },
+    "Texts": {
+      "other": "Sms"
+    },
+    "Emails": {
+      "other": "Mejl"
+    },
+    "Each text is paid for to the provider. Counted by the day it was sent, whatever the period above.": {
+      "other": "Varje sms betalas till leverantören. Räknat efter dagen det skickades, oavsett perioden ovan."
+    },
+    "There is no provider for that here; send it from your own phone and record it.": {
+      "other": "Det finns ingen leverantör för det här; skicka från din egen telefon och registrera det."
+    },
+    "The customer's number cannot be read as a phone number. Correct it on the customer first.": {
+      "other": "Kundens nummer går inte att läsa som ett telefonnummer. Rätta det på kunden först."
+    },
+    "The customer has no email address that can be sent to.": {
+      "other": "Kunden har ingen e-postadress som går att skicka till."
+    },
+    "That was already sent to this customer; tick \"send it again\" if it should go twice.": {
+      "other": "Det har redan skickats till kunden; kryssa i \"skicka igen\" om det ska gå två gånger."
+    },
+    "There is no finished inspection on this job for the customer to answer.": {
+      "other": "Det finns ingen färdig inspektion på jobbet för kunden att svara på."
+    },
+    "Not sent": {
+      "other": "Inte skickat"
     }
   }
 }

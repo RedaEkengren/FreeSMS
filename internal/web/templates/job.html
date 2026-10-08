@@ -308,6 +308,38 @@
 </form>
 {{end}}
 {{end}}
+{{/* Sending from here, where the workshop has a provider. Queued, sent
+     between eight and eight, and the first message to a new number or
+     address is confirmed: one digit out is somebody else. */}}
+{{if and .Tell (or .CanText .CanEmail) (or .Contact.Phone .Contact.Email)}}
+<h2>{{.T "Send to the customer"}}</h2>
+<form method="post" action="/jobs/{{.Job.ID}}/message" data-offline>
+  <button type="submit" disabled hidden aria-hidden="true" tabindex="-1"></button>
+  <label><span>{{.T "What"}}</span>
+    <select name="about">{{range .Tell}}<option value="{{.}}">{{$.T (index $.MessageAbouts .)}}</option>{{end}}</select></label>
+  {{if and .CanText .Contact.Phone}}<label class="tick"><input type="checkbox" name="confirm_sms" value="yes">
+    <span>{{.T "%s is the customer's number" .Contact.Phone}}</span></label>{{end}}
+  {{if and .CanEmail .Contact.Email}}<label class="tick"><input type="checkbox" name="confirm_email" value="yes">
+    <span>{{.T "%s is the customer's address" .Contact.Email}}</span></label>{{end}}
+  <label class="tick"><input type="checkbox" name="again" value="yes"><span>{{.T "Send it again, if it has already gone"}}</span></label>
+  <div class="actions">
+    {{if and .CanText .Contact.Phone}}<button type="submit" name="channel" value="sms" class="secondary">{{.T "Text it"}}</button>{{end}}
+    {{if and .CanEmail .Contact.Email}}<button type="submit" name="channel" value="email" class="secondary">{{.T "Email it"}}</button>{{end}}
+  </div>
+</form>
+{{end}}
+{{if .Messages}}
+<ul class="lines">
+  {{range .Messages}}
+  <li><div class="row"><span>{{$.T (index $.MessageAbouts .About)}} &middot; {{if eq .Channel "sms"}}{{$.T "text"}}{{else}}{{$.T "email"}}{{end}} &middot; {{.Recipient}}</span>
+    {{if eq .State "delivered"}}<span class="tag pass">{{$.T "delivered"}}</span>
+    {{else if eq .State "sent"}}<span class="tag pass">{{$.T "sent"}}</span>
+    {{else if eq .State "failed"}}<span class="tag late">{{$.T "not delivered"}}</span>
+    {{else}}<span class="tag warranty">{{$.T "waiting to go"}}</span>{{end}}</div>
+    <div class="waiting">{{$.Date ($.Local .At) "Mon 2 Jan 15:04"}} &middot; {{.CreatedBy}}{{if and .Waiting (.NotBefore.After .CreatedAt)}} &middot; {{$.T "goes at %s" ($.Date ($.Local .NotBefore) "Mon 15:04")}}{{end}}{{if .Detail}} &middot; {{.Detail}}{{end}}</div></li>
+  {{end}}
+</ul>
+{{end}}
 </div>
 {{end}}
 

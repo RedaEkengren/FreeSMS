@@ -52,7 +52,9 @@ func ContactLabel(how string) string { return contactLabels[how] }
 const toldColumns = `
 	(SELECT max(cc.at) FROM customer_contacts cc
 	  WHERE cc.work_order_id = w.id AND cc.about = 'ready' AND cc.how <> 'no_answer'
-	    AND w.ready_at IS NOT NULL AND cc.at >= w.ready_at) AS told_at`
+	    AND w.ready_at IS NOT NULL AND cc.at >= w.ready_at
+	    -- Sent and then reported as never arriving is not told.
+	    AND NOT EXISTS (SELECT 1 FROM message_events me WHERE me.message_id = cc.message_id AND me.event = 'failed')) AS told_at`
 
 // RecordContact records that the front desk told, or tried to tell, the
 // customer their car is ready. The counter's: it is a conversation with the

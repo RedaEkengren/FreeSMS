@@ -73,6 +73,10 @@ func testServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 // test that checks the file on disk.
 var testExportDirs sync.Map
 
+// testServers is the Server behind each test server, for a test that has to
+// give it something only configuration would -- a message provider.
+var testServers sync.Map
+
 func exportDirOf(t *testing.T, ts *httptest.Server) string {
 	t.Helper()
 	dir, ok := testExportDirs.Load(ts.URL)
@@ -205,6 +209,7 @@ func testServerOn(t *testing.T, pool *pgxpool.Pool) (*httptest.Server, *pgxpool.
 	}()
 	ts := httptest.NewServer(handler)
 	testExportDirs.Store(ts.URL, exportDir)
+	testServers.Store(ts.URL, srv)
 	t.Cleanup(func() {
 		stopLive()
 		<-listening

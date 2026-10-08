@@ -74,3 +74,34 @@ func TestLoadRejectsBaseURLWithoutScheme(t *testing.T) {
 		t.Fatalf("Load() = %v, want a complaint about BASE_URL", err)
 	}
 }
+
+// A provider named without what it needs fails at start, not at the first
+// customer -- and the message names the variable, never a value.
+func TestAMessageProviderNeedsWhatItNeeds(t *testing.T) {
+	valid(t)
+	t.Setenv("EMAIL_PROVIDER", "lettermint")
+	t.Setenv("SMS_PROVIDER", "46elks")
+	t.Setenv("ELKS_USERNAME", "u")
+	t.Setenv("ELKS_PASSWORD", "secret-password")
+	t.Setenv("SMS_FROM", "Verkstaden med ett för långt namn")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() = nil, want error")
+	}
+	for _, want := range []string{"EMAIL_FROM", "LETTERMINT_TOKEN", "SMS_FROM"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error does not mention %s:\n%v", want, err)
+		}
+	}
+	if strings.Contains(err.Error(), "secret-password") {
+		t.Error("the error repeats a secret")
+	}
+
+	t.Setenv("EMAIL_PROVIDER", "")
+	for _, from := range []string{"Verkstaden", "+46701112233"} {
+		t.Setenv("SMS_FROM", from)
+		if _, err := Load(); err != nil {
+			t.Errorf("SMS_FROM %q: %v", from, err)
+		}
+	}
+}
