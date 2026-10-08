@@ -1,0 +1,641 @@
+<!doctype html>
+{{/* Every word the product would show is asked of the product: t and n are
+     the catalogue, waiting is the board's own code, state and role are the
+     labels the screens use. Written out by hand, they drift -- the first
+     version of this scene had the board say "Väntar på att kunden
+     godkänner", which the board has never said. */}}
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+<title>FreeSMS – the workshop system that works in the pit</title>
+<meta name="description" content="An open source management system for independent car repair shops. Nothing is lost when the wifi goes.">
+<link rel="alternate" hreflang="sv" href="https://redaekengren.github.io/FreeSMS/">
+<link rel="alternate" hreflang="en" href="https://redaekengren.github.io/FreeSMS/en/">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../anim.css">
+<script src="../anim.js" defer></script>
+<script src="../tabs.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./"><span class="logo" aria-hidden="true">{{template "icon-wrench"}}</span>FREESMS</a>
+  <nav>
+    <a href="#scenes">See it work</a>
+    <a href="#questions">Questions</a>
+    <a href="../" hreflang="sv" lang="sv">Svenska</a>
+    <a class="gh" href="https://github.com/RedaEkengren/FreeSMS" aria-label="The source code on GitHub" title="The source code on GitHub">{{template "icon-github"}}</a>
+  </nav>
+</header>
+<main>
+<section class="hero">
+  <span class="badge"><span class="dot"></span>Open source &middot; early version</span>
+  <h1>The workshop system that works in <em>the pit</em>.</h1>
+  <p class="sub">For independent car repair shops. Built for a phone in a dirty hand, wifi that does not reach under the car, and a front desk that has to have an answer when the customer rings.</p>
+  <p class="facts">No licence fee &middot; your own server &middot; an SIE file for the books</p>
+  <div class="ctas">
+    <a class="btn" href="#scenes">See it work</a>
+    <a class="btn ghost" href="https://github.com/RedaEkengren/FreeSMS#running-it">Run it yourself</a>
+  </div>
+</section>
+
+{{/* ── The whole job: one car, one working day ─────────────────────────── */}}
+{{$tot := totals 1000 89500 1000 129000 1000 84500}}
+{{expect (sees "technician") false}}{{expect (sees "service_advisor") true}}
+<section class="scene scene-hero" id="the-day">
+  <h2>One car, a whole working day</h2>
+  <p class="lede">From the car being dropped off to the job closing itself: the front desk, the technician, the customer, the parts desk and the owner, each on their own screen. A part that is not in, a car that goes home and comes back &ndash; an ordinary week.</p>
+  <div class="an-wrap" data-loop="86" data-still="64">
+    <div class="an-canvas" role="img" aria-label="Animation of a whole job: the car is taken in, the technician fails the brakes with a photograph, the customer approves on their phone and it becomes a line, the part is not in and the car goes home, the parts desk receives the part and scans it in, the car comes back, the technician scans the part out to the job, a final check, the front desk sends the customer the link, the customer pays in cash and collects the car, the job closes itself and the owner reads the figures.">
+      <div class="wj-dots">
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="0,6"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="6,12"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="12,18"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="18,24"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="24,30"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="30,36"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="36,42"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="42,48"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="48,54"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="54,60"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="60,66"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="66,72"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="72,78"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="78,86"></span>
+</div>
+      <div class="wj-who an-fade" data-t="0,6"><b>{{role "service_advisor"}}</b><span>{{date (at "2026-10-06 07:30") "Mon 15:04"}}</span></div>
+      <div class="an-card wj-screen an-pop" data-t="0,6">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-h">{{t "Take in a vehicle"}}</div>
+  <div class="wf-field"><span class="lbl">{{t "Registration"}}</span><span data-type="0.6,0.8">JOB 777</span></div>
+  <div class="wf-field"><span class="lbl">{{t "What is wrong"}}</span><span data-type="1.6,1.4">Squeals when braking</span></div>
+  <span class="an-btn mo-btn">{{t "Open the job"}}</span>
+        </div>
+      </div>
+      <div class="an-cap" data-t="0.3,5.8">The car is dropped off at the desk.</div>
+      <div class="wj-who an-fade" data-t="6,12"><b>{{role "technician"}}</b><span>{{date (at "2026-10-06 08:10") "Mon 15:04"}}</span></div>
+      <div class="an-card wj-phone an-pop" data-t="6,12">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "technician"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="cl-item"><b>Front brakes</b> <span class="rd-tag rd-risk an-fade" data-t="7.6">{{t "fail"}}</span></div>
+  <div class="wf-field"><span class="lbl">{{t "Note"}}</span><span data-type="6.6,1.2">Rear pads down to 2 mm</span></div>
+  <div class="cl-photo an-pop" data-t="8.6">{{template "cl-pad"}}</div>
+        </div>
+      </div>
+      <div class="an-cap" data-t="6.3,11.8">The technician fails the brakes, with a photograph.</div>
+      <div class="wj-who an-fade" data-t="12,18"><b>The customer</b><span>{{date (at "2026-10-06 08:40") "Mon 15:04"}}</span></div>
+      <div class="an-card wj-phone an-pop" data-t="12,18">
+        <div class="an-head"><span class="an-dots"></span><span>The customer</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="cl-item"><b>Front brakes</b> <span class="rd-tag rd-risk">{{t "needs doing"}}</span></div>
+  <div class="cl-photo cl-photo-big">{{template "cl-pad"}}</div>
+  <div class="cl-answer an-fade" data-t="12,15"><span class="an-btn">{{t "Yes, do it"}}</span> <span class="an-btn wf-secondary">{{t "No, leave it"}}</span></div>
+  <div class="cl-said an-fade" data-t="15">{{t "You said yes to this. You can change it."}}</div>
+        </div>
+      </div>
+      <div class="an-cap" data-t="12.3,17.8">The customer sees the photograph on their phone and says yes.</div>
+      <div class="wj-who an-fade" data-t="18,24"><b>{{role "service_advisor"}}</b><span>{{date (at "2026-10-06 08:45") "Mon 15:04"}}</span></div>
+      <div class="an-card wj-screen an-pop" data-t="18,24">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="cl-noticed an-fade" data-t="18,21.4">{{n "%d thing approved by the customer, not priced" 1}}</div>
+  <div class="cl-answer-row"><span><b>Front brakes: Rear pads down to 2 mm</b> <span class="an-muted">&middot; {{t "from the link"}}</span></span>
+    <span class="cl-slot"><span class="an-btn wf-secondary cl-make an-fade" data-t="18,21.4">{{t "Make it a line"}}</span>
+    <span class="rd-tag cl-on an-fade" data-t="21.4">{{t "on the job"}} &middot; {{money 129000}}</span></span></div>
+        </div>
+      </div>
+      <div class="an-cap" data-t="18.3,23.8">The yes shows at the desk and becomes a line on the job.</div>
+      <div class="wj-who an-fade" data-t="24,30"><b>{{role "technician"}}</b><span>{{date (at "2026-10-06 09:30") "Mon 15:04"}}</span></div>
+      <div class="an-card wj-phone an-pop" data-t="24,30">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "technician"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-h">{{t "Hand it on"}}</div>
+  <div class="wf-field"><span class="lbl">{{t "I need a part to carry on"}}</span><span data-type="24.4,1.4">Rear brake pads, BP-200</span></div>
+  <span class="an-btn wf-secondary mo-btn">{{t "Ask the parts desk"}}</span>
+  <div class="wj-state an-fade" data-t="26.8">{{state "awaiting_parts"}}</div>
+        </div>
+      </div>
+      <div class="an-cap" data-t="24.3,29.8">The part is not on the shelf. The job waits.</div>
+      <div class="wj-who an-fade" data-t="30,36"><b>{{role "service_advisor"}}</b><span>{{date (at "2026-10-06 10:00") "Mon 15:04"}}</span></div>
+      <div class="an-card wj-screen an-pop" data-t="30,36">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <span class="an-btn wf-secondary">{{t "The customer has collected it"}}</span>
+  <div class="wf-card wj-card an-fade" data-t="32">
+    <div class="wf-plate">JOB 777</div>
+    <div class="an-muted">{{waiting "awaiting_parts" ""}}</div>
+    <div class="wf-noticed">{{t "The car is at home"}} &middot; {{t "back %s" (date (day "2026-10-08") "Mon 2 Jan")}}</div>
+  </div>
+        </div>
+      </div>
+      <div class="an-cap" data-t="30.3,35.8">The customer takes the car home until the part comes.</div>
+      <div class="wj-who an-fade" data-t="36,42"><b>{{role "parts"}}</b><span>{{date (at "2026-10-08 07:45") "Mon 15:04"}}</span></div>
+      <div class="an-card wj-screen an-pop" data-t="36,42">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "parts"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-h">{{t "Waiting for parts"}}</div>
+  <div class="wf-card wj-card"><b>JOB 777</b> &middot; Rear brake pads, BP-200<br>
+    <span class="an-btn mo-btn an-fade" data-t="36,38.6">{{t "It has arrived"}}</span></div>
+  <div class="wj-scan an-fade" data-t="38.6"><code>7391234567890</code> &rarr; BP-200 &middot; {{t "arrived"}} <b>+1</b></div>
+        </div>
+      </div>
+      <div class="an-cap" data-t="36.3,41.8">The parts desk: the part has come, and is scanned in.</div>
+      <div class="wj-who an-fade" data-t="42,48"><b>{{role "service_advisor"}}</b><span>{{date (at "2026-10-08 08:00") "Mon 15:04"}}</span></div>
+      <div class="an-card wj-screen an-pop" data-t="42,48">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <span class="an-btn wf-secondary">{{t "The car is back"}}</span>
+  <div class="wf-card wj-card an-fade" data-t="43.6">
+    <div class="wf-plate">JOB 777</div>
+    <div class="an-muted">{{state "in_progress"}}</div>
+  </div>
+        </div>
+      </div>
+      <div class="an-cap" data-t="42.3,47.8">The car is back. The part put the job back to work.</div>
+      <div class="wj-who an-fade" data-t="48,54"><b>{{role "technician"}}</b><span>{{date (at "2026-10-08 09:00") "Mon 15:04"}}</span></div>
+      <div class="an-card wj-phone an-pop" data-t="48,54">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "technician"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-field"><span class="lbl">{{t "Scan or type the part's code"}}</span><span data-type="48.4,1">7391234567890</span></div>
+  <span class="an-btn wf-secondary mo-btn">{{t "Take it out to the job"}}</span>
+  <div class="wj-row an-fade" data-t="50.6"><b>BP-200 &middot; Rear brake pads</b> <span class="rd-tag rd-risk">{{t "taken out, not priced"}}</span></div>
+  <div class="wj-scan an-fade" data-t="51.8">{{role "parts"}}: {{t "taken out to a job"}} &middot; {{t "job #%d" 7}}</div>
+        </div>
+      </div>
+      <div class="an-cap" data-t="48.3,53.8">The technician scans the part out to the job. The parts desk sees it go.</div>
+      <div class="wj-who an-fade" data-t="54,60"><b>{{role "technician"}}</b><span>{{date (at "2026-10-08 11:30") "Mon 15:04"}}</span></div>
+      <div class="an-card wj-phone an-pop" data-t="54,60">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "technician"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-h">{{t "Final check"}}</div>
+  <div class="cl-item">Road tested <span class="rd-tag cl-on an-fade" data-t="55">{{t "pass"}}</span></div>
+  <div class="cl-item">No warning lights <span class="rd-tag cl-on an-fade" data-t="56">{{t "pass"}}</span></div>
+  <span class="an-btn mo-btn an-fade" data-t="57">{{t "It is ready"}}</span>
+        </div>
+      </div>
+      <div class="an-cap" data-t="54.3,59.8">A final check. Then the car is ready.</div>
+      <div class="wj-who an-fade" data-t="60,66"><b>{{role "service_advisor"}}</b><span>{{date (at "2026-10-08 11:35") "Mon 15:04"}}</span></div>
+      <div class="an-card wj-screen an-pop" data-t="60,66">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-card wj-card">
+    <div class="wf-plate">JOB 777</div>
+    <div class="an-muted">{{state "ready"}}</div>
+    <div class="an-muted">{{t "final check: %s" "Erik"}}</div>
+    <div class="wj-told"><span class="rd-tag rd-risk an-fade" data-t="60,62.8">{{t "customer not told"}}</span><span class="an-fade" data-t="62.8">{{t "customer told %s" "11:36"}}</span></div>
+  </div>
+  <div class="wj-phone-line an-fade" data-t="63.6">{{role "service_advisor"}} &rarr; {{t "sent the link"}} &rarr; <b>{{t "Your car is ready to collect."}}</b></div>
+        </div>
+      </div>
+      <div class="an-cap" data-t="60.3,65.8">The desk sees it is ready, and sends the customer the link.</div>
+      <div class="wj-who an-fade" data-t="66,72"><b>{{role "service_advisor"}}</b><span>{{date (at "2026-10-08 16:30") "Mon 15:04"}}</span></div>
+      <div class="an-card wj-screen an-pop" data-t="66,72">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-h">{{t "Invoice"}} A-7</div>
+  <div class="mo-row"><span>Brake diagnosis</span><span>{{money 89500}}</span></div>
+  <div class="mo-row"><span>Front brakes: Rear pads down to 2 mm</span><span>{{money 129000}}</span></div>
+  <div class="mo-row"><span>Rear brake pads, BP-200</span><span>{{money 84500}}</span></div>
+  <div class="mo-row mo-total"><span>{{t "Total"}}</span><span>{{$tot.Gross}}</span></div>
+  <div class="wj-paid an-fade" data-t="68.4">{{t "cash"}} {{$tot.Cash}} &middot; {{t "rounding"}} {{$tot.Rounding}}</div>
+        </div>
+      </div>
+      <div class="an-cap" data-t="66.3,71.8">The customer collects and pays cash. The öre are rounded on their own.</div>
+      <div class="wj-who an-fade" data-t="72,78"><b>{{role "service_advisor"}}</b><span>{{date (at "2026-10-08 16:32") "Mon 15:04"}}</span></div>
+      <div class="an-card wj-screen an-pop" data-t="72,78">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <span class="an-btn wf-secondary">{{t "The customer has collected it"}}</span>
+  <div class="wf-card wj-card an-fade" data-t="73.6">
+    <div class="wf-plate">JOB 777</div>
+    <div class="an-muted"><b>{{state "closed"}}</b></div>
+  </div>
+  <div class="wj-phone-line an-fade" data-t="74.6">{{t "This job is finished."}}</div>
+        </div>
+      </div>
+      <div class="an-cap" data-t="72.3,77.8">Collected and paid: the job closes itself.</div>
+      <div class="wj-who an-fade" data-t="78,86"><b>{{role "owner"}}</b><span>{{date (at "2026-10-08 17:00") "Mon 15:04"}}</span></div>
+      <div class="an-card wj-screen an-pop" data-t="78,86">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "owner"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-h">{{t "Figures"}}</div>
+  <div class="mo-row"><span>{{t "Invoices issued"}}</span><span>1</span></div>
+  <div class="mo-row"><span>{{t "Net"}}</span><span>{{$tot.Net}}</span></div>
+  <div class="mo-row"><span>{{t "Sold"}}</span><span>{{num "2.0"}} h</span></div>
+  <div class="mo-row"><span>{{t "Approved"}}</span><span>100%</span></div>
+        </div>
+      </div>
+      <div class="an-cap" data-t="78.3,85.8">The owner closes nothing. The owner reads the result.</div>
+    </div>
+  </div>
+  <p class="truth">Words, amounts, rounding and who may see the customer come from the product&rsquo;s own code when the page is generated. The whole flow runs against the real product, one browser per role, on every change to the code &ndash; <a href="{{test "e2e/tests/12-scene-whole-job.spec.ts" "one job, start to finish, through every role"}}">read the test</a>. Registrations, names and amounts are <span class="wf-example">examples</span>.</p>
+</section>
+
+
+<section class="steps" id="scenes">
+  <h2>A car, from the door to the books</h2>
+  <div class="step-grid">
+    <div class="step"><span class="icon" aria-hidden="true">{{template "icon-car"}}</span><b>{{t "Take in a vehicle"}}</b><p>Registration, odometer and what is wrong. The desk prices it from the workshop&rsquo;s own book of times.</p></div>
+    <div class="step"><span class="icon" aria-hidden="true">{{template "icon-wrench"}}</span><b>Fix it</b><p>The technician sees the car and the job, clocks on, photographs and speaks up &ndash; with or without a connection.</p></div>
+    <div class="step"><span class="icon" aria-hidden="true">{{template "icon-receipt"}}</span><b>{{t "Invoice it"}}</b><p>Invoices that cannot be changed, numbered without gaps, and the month to the accountant as an SIE file.</p></div>
+  </div>
+</section>
+
+<section class="tabs-sec">
+  <h2>Closer</h2>
+  <p class="sub">Each part on its own, closer. Every scene is a flow that runs against the real product on every change to the code.</p>
+  <div class="tabbar" role="tablist" aria-label="Scenes">
+    <button type="button" role="tab" data-tab="0">No wifi</button>
+    <button type="button" role="tab" data-tab="1">The morning</button>
+    <button type="button" role="tab" data-tab="2">Ready when?</button>
+    <button type="button" role="tab" data-tab="3">The customer&rsquo;s link</button>
+    <button type="button" role="tab" data-tab="4">Two screens</button>
+  </div>
+  <div class="panes">
+<section class="scene pane" role="tabpanel">
+  <h2>When the wifi goes</h2>
+  <p class="lede">The technician sees something else that needs doing and tells the front desk, from the pit. There is no connection. It is kept in the phone, waits, and is sent once when the connection is back.</p>
+
+  <div class="an-wrap" data-loop="29" data-still="23">
+    <div class="an-canvas" role="img" aria-label="Animation: a technician writes that the rear brake pads are down to 2 millimetres and presses {{t "Tell the front desk"}} while the phone has no wifi. The phone says: {{t "No connection. This is being held and will be sent when there is one."}} {{n "%d thing is waiting to be sent." 1}} The session runs out while it waits; the phone opens on the sign-in page and sends nothing until the same person has signed in again. Then it is sent once, and the front desk&rsquo;s board shows {{n "%d thing noticed, not priced" 1}} on the car.">
+
+      <div class="an-card wf-phone">
+        <div class="wf-status">
+          <span>07:42 <span class="wf-example">Example</span></span>
+          <span class="wf-wifi">
+            <svg data-t="0,2.6" class="an-fade" viewBox="0 0 20 16" fill="none" stroke="#14171c" stroke-width="2" stroke-linecap="round"><path d="M2 6a12 12 0 0 1 16 0M5 9.5a7.5 7.5 0 0 1 10 0M8 13a3 3 0 0 1 4 0"/></svg>
+            <svg data-t="2.6,13.2" class="an-fade wf-off" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 6a12 12 0 0 1 16 0M5 9.5a7.5 7.5 0 0 1 10 0M8 13a3 3 0 0 1 4 0M3 1l14 14"/></svg>
+            <svg data-t="13.2" class="an-fade" viewBox="0 0 20 16" fill="none" stroke="#0a7d37" stroke-width="2" stroke-linecap="round"><path d="M2 6a12 12 0 0 1 16 0M5 9.5a7.5 7.5 0 0 1 10 0M8 13a3 3 0 0 1 4 0"/></svg>
+          </span>
+        </div>
+        <div class="wf-held an-fade" data-t="7,13.2">{{n "%d thing is waiting to be sent." 1}}</div>
+        <div class="wf-bar"><b>ABC 123</b> &middot; Volvo V70 &middot; {{state "in_progress"}}</div>
+        <div class="wf-body">
+          <div class="wf-h">Rattles at the front at 50 mph</div>
+          <span class="an-btn wf-add wf-clock">{{t "Stop clock"}}</span>
+          <div class="wf-h wf-gap">{{t "Hand it on"}}</div>
+          <div class="wf-field"><span class="lbl">{{t "Something else needs doing"}}</span><span data-type="3.0,2.0">Rear brake pads down to 2 mm</span></div>
+          <span class="an-btn wf-add wf-secondary">{{t "Tell the front desk"}}</span>
+        </div>
+        <div class="wf-dim an-fade" data-t="6.8,9.4"></div>
+        <div class="wf-alert an-pop" data-t="6.8,9.4">{{t "No connection. This is being held and will be sent when there is one."}}<span class="ok">OK</span></div>
+        <!-- The session ran out while the work waited: the phone opens on
+             the sign-in page, sends nothing, and keeps it for the same person. -->
+        <div class="wf-signin an-fade" data-t="14,18.2">
+          <div class="wf-h">{{t "Sign in"}}</div>
+          <div class="wf-field"><span class="lbl">{{t "Email"}}</span><span data-type="14.8,1.2">erik@example.com</span></div>
+          <div class="wf-field"><span class="lbl">{{t "Password"}}</span><span data-type="16.2,0.8">••••••••••</span></div>
+          <span class="an-btn wf-add">{{t "Sign in"}}</span>
+        </div>
+        <div class="wf-store an-fade" data-t="7.6,13.4">Kept in the phone, with a key that means it can only arrive once: <code>POST /jobs/…/findings</code></div>
+      </div>
+
+      <div class="wf-packet" data-t="18.6,19.8">Rear brake pads down to 2 mm</div>
+
+      <div class="an-card wf-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}} &middot; {{t "In the shop"}}</span><span class="wf-example">Example</span></div>
+        <!-- The board does not refresh itself: somebody reloads it. Shown as
+             it happens rather than as a page that updates on its own. -->
+        <div class="wf-reload an-fade" data-t="20.2,20.9">Reloading&hellip;</div>
+        <div class="wf-body">
+          <div class="wf-card">
+            <div class="wf-plate">ABC 123</div>
+            <div class="an-muted">#1 &middot; Volvo V70 &middot; Karin Kund</div>
+            <div class="an-muted">{{waiting "in_progress" "Erik"}}</div>
+            <div class="wf-noticed an-r" data-t="21">{{n "%d thing noticed, not priced" 1}}</div>
+          </div>
+          <div class="wf-card wf-other">
+            <div class="wf-plate">XYZ 789</div>
+            <div class="an-muted">#2 &middot; Toyota Corolla &middot; Olle Ägare</div>
+            <div class="an-muted">{{waiting "awaiting_approval" ""}}</div>
+          </div>
+        </div>
+      </div>
+
+      <span class="an-cursor" data-path="0:330,250; 2.8:194,290; 6.6:194,331c; 9.2:300,330c; 17.4:194,240c; 29:330,250"
+            data-path-m="0:200,250; 2.8:141,330; 6.6:141,360c; 9.2:220,300c; 17.4:141,228c; 29:200,250"><svg viewBox="0 0 24 24"><path d="M4 2l16 11-7 1-3 7z" fill="#fff" stroke="#14171c" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+
+      <div class="an-cap" data-t="0.3,2.4">07:42. Erik is under a car, in the middle of a job.</div>
+      <div class="an-cap" data-t="2.6,6.6">He sees something else. The wifi does not reach the pit.</div>
+      <div class="an-cap" data-t="6.8,9.6">It is kept in the phone, not lost in the air.</div>
+      <div class="an-cap" data-t="9.8,13.2">Screen locked, tab closed: it stays, and waits.</div>
+      <div class="an-cap" data-t="13.4,18.2">The connection is back, but the session ran out. Nothing is sent until the same person signs in again.</div>
+      <div class="an-cap" data-t="18.4,21.6">Signed in. It is sent, exactly once.</div>
+      <div class="an-cap" data-t="21.8,28.6">The front desk reloads the board, sees it, and can ring the customer.</div>
+    </div>
+  </div>
+  <p class="truth">The words in the scene are the product&rsquo;s own: the page is generated from the same catalogue and the same code as FreeSMS&rsquo;s screens. The flow runs against the real product in a browser on every change to the code &ndash; <a href="{{test "e2e/tests/07-scene-wifi.spec.ts" "the wifi goes down in the pit, and the front desk still hears about it"}}">read the test</a>. Registrations, cars, customers and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+
+
+{{/* ── Scene 2: the morning ─────────────────────────────────────────── */}}
+{{$inv := invoice "labour" "Front brake discs replaced" 1500 89500 "Karin Kund" 1 "2026-10-06"}}
+{{/* The scene says the technician does not see the customer and the front
+     desk does. The product decides that, so it is asked. */}}
+{{expect (sees "technician") false}}{{expect (sees "service_advisor") true}}
+<section class="scene pane" role="tabpanel">
+  <h2>A morning, from the door to the books</h2>
+  <p class="lede">A car is taken in, the technician does the work without seeing the customer&rsquo;s details, the desk invoices, and the month&rsquo;s invoices go to the accountant as a file, not as an integration to pay for.</p>
+
+  <div class="an-wrap" data-loop="30" data-still="26">
+    <div class="an-canvas" role="img" aria-label="Animation: the front desk takes in ABC 123, which rattles at the front at 50 mph. The technician sees the car and the job but not the customer, and marks it {{t "Ready for collection"}}. The desk invoices {{$inv.Reference}} for {{$inv.Gross}}. The invoice goes to the books as an SIE file.">
+
+      <div class="an-card mo-card mo-1 an-pop" data-t="0">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}} &middot; {{t "Take in a vehicle"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="wf-field"><span class="lbl">{{t "Registration"}}</span><span data-type="0.8,0.8">ABC 123</span></div>
+          <div class="wf-field"><span class="lbl">{{t "Odometer, km"}}</span><span data-type="1.8,0.6">11,500</span></div>
+          <div class="wf-field"><span class="lbl">{{t "What is wrong"}}</span><span data-type="2.6,1.2">Rattles at the front at 50 mph</span></div>
+          <span class="an-btn mo-btn">{{t "Open the job"}}</span>
+        </div>
+      </div>
+
+      <div class="an-card mo-card mo-2 an-pop" data-t="6">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "technician"}} &middot; ABC 123 &middot; Volvo V70</span></div>
+        <div class="wf-body">
+          <div class="wf-h">Rattles at the front at 50 mph</div>
+          <div class="mo-state">
+            <span class="an-fade" data-t="6,8.4">{{state "approved"}}</span>
+            <span class="an-fade" data-t="8.4,11.4">{{state "in_progress"}}</span>
+            <span class="an-fade mo-done" data-t="11.4">{{state "ready"}}</span>
+          </div>
+          <span class="an-btn mo-btn wf-secondary an-fade" data-t="6,8.4">{{t "Start work"}}</span>
+          <span class="an-btn mo-btn an-fade" data-t="8.4,11.4">{{t "It is ready"}}</span>
+          <p class="mo-note">No customer on the screen. The technician is given the car and the job; the customer&rsquo;s name and phone are never fetched.</p>
+        </div>
+      </div>
+
+      <div class="an-card mo-card mo-3 an-pop" data-t="13">
+        <div class="an-head"><span class="an-dots"></span><span>{{t "Invoice"}} {{$inv.Reference}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body mo-inv">
+          <div class="an-muted">{{t "Billed to"}}: Karin Kund</div>
+          <div class="mo-row"><span>{{$inv.Description}}<br><small class="an-muted">{{num $inv.Quantity}} &times; {{$inv.Unit}}</small></span><span>{{$inv.Net}}</span></div>
+          <div class="mo-row mo-sub"><span>{{t "Net"}}</span><span>{{$inv.Net}}</span></div>
+          <div class="mo-row mo-sub"><span>{{t "VAT"}} 25%</span><span>{{$inv.VAT}}</span></div>
+          <div class="mo-row mo-total"><span>{{t "Total"}}</span><span>{{$inv.Gross}}</span></div>
+        </div>
+      </div>
+
+      <div class="an-card mo-card mo-4 an-pop" data-t="19.5">
+        <div class="an-head"><span class="an-dots"></span><span>{{t "Accounting"}}</span></div>
+        <div class="wf-body">
+          <span class="an-btn mo-btn">{{t "Download the file"}}</span>
+          <pre class="mo-sie an-fade" data-t="21">{{range $inv.Verification}}{{.}}
+{{end}}</pre>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,5.6">07:30. The car is taken in at the desk.</div>
+      <div class="an-cap" data-t="6,12.6">The technician sees the car and the job. Not the customer.</div>
+      <div class="an-cap" data-t="13,19">The desk invoices. The line, the VAT and the total are worked out once, in one place.</div>
+      <div class="an-cap" data-t="19.5,29.5">To the accountant: an SIE file, the standard format for Swedish bookkeeping.</div>
+    </div>
+  </div>
+  <p class="truth">The invoice&rsquo;s amounts are worked out by the product&rsquo;s money code and the SIE lines written by its accounting code, when the page is generated. The flow runs against the real product in a browser, and the test reads the real file &ndash; <a href="{{test "e2e/tests/09-scene-morning.spec.ts" "a car taken in, worked on without the customer, invoiced and handed to the accountant"}}">read the test</a>. Registrations, cars, customers and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+
+
+<section class="scene pane" role="tabpanel">
+  <h2>&ldquo;When will it be ready?&rdquo;</h2>
+  <p class="lede">The customer rings and asks. The answer is on the job: what was promised, what was sold and what has been clocked. And it speaks up before the promise is broken, not after.</p>
+
+  {{$a := progress 180 10 true "2026-10-06 12:10" "2026-10-06 16:00"}}
+  {{$b := progress 180 60 true "2026-10-06 13:00" "2026-10-06 16:00"}}
+  {{$c := progress 180 60 false "2026-10-06 14:20" "2026-10-06 16:00"}}
+  {{/* What the captions claim, held against the product. */}}
+  {{expect $a.Verdict "on time"}}{{expect $b.Verdict "on time"}}{{expect $c.Verdict "at risk"}}
+
+  <div class="an-wrap" data-loop="22" data-still="18">
+    <div class="an-canvas" role="img" aria-label="Animation: a three hour job is promised for four o&rsquo;clock. At 12:10 and at 13:00 it says {{t "on time"}} Then the technician&rsquo;s clock stops. At 14:20, an hour and forty minutes before the promise, it says {{t "at risk"}} on the job and on the front desk&rsquo;s board, with two hours of work left.">
+
+      <div class="an-card rd-job">
+        <div class="an-head"><span class="an-dots"></span><span>DEF 456 &middot; Volkswagen Golf &middot; {{state "in_progress"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="wf-h">{{t "When it will be ready"}}</div>
+          <div class="rd-frame an-fade" data-t="0,7.6">{{template "rd-progress" $a}}</div>
+          <div class="rd-frame an-fade" data-t="7.6,12.6">{{template "rd-progress" $b}}</div>
+          <div class="rd-frame an-fade" data-t="12.6">{{template "rd-progress" $c}}</div>
+        </div>
+      </div>
+
+      <div class="rd-clock">
+        <span class="an-fade" data-t="0,7.6">12:10</span>
+        <span class="an-fade" data-t="7.6,12.6">13:00</span>
+        <span class="an-fade rd-late" data-t="12.6">14:20</span>
+      </div>
+
+      <div class="an-card rd-board">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}} &middot; {{t "In the shop"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="rd-slot an-fade" data-t="0,7.6">{{template "rd-card" $a}}</div>
+          <div class="rd-slot an-fade" data-t="7.6,12.6">{{template "rd-card" $b}}</div>
+          <div class="rd-slot an-fade" data-t="12.6">{{template "rd-card" $c}}</div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.4">Three hours of work, promised for 16:00. Erik starts at 12:00.</div>
+      <div class="an-cap" data-t="7.8,12.4">13:00. An hour clocked, two to go. On time.</div>
+      <div class="an-cap" data-t="12.8,17">Erik was pulled onto another job. The clock has not moved since 13:00.</div>
+      <div class="an-cap" data-t="17.2,21.6">Two hours left, an hour and forty to the promise. The desk sees it now.</div>
+    </div>
+  </div>
+  <p class="truth">The figures and the verdict are worked out by the same code the job page uses, when the page is generated. The flow runs against the real product in a browser &ndash; <a href="{{test "e2e/tests/08-scene-ready.spec.ts" "a promise that the work left cannot meet is flagged before it is broken"}}">read the test</a>. Registrations, cars, customers and names are <span class="wf-example">examples</span>.</p>
+</section>
+{{/* ── Scene 4: the customer's link ───────────────────────────────────── */}}
+<section class="scene pane" role="tabpanel">
+  <h2>The customer decides, with the photograph in front of them</h2>
+  <p class="lede">The technician photographs what is worn. The customer gets a link, sees the photograph on their phone and answers yes or no &ndash; no account, no app, and nobody describing brake pads down the telephone. A yes shows on the board at once, and becomes a line on the job in one step.</p>
+
+  <div class="an-wrap" data-loop="30" data-still="26">
+    <div class="an-canvas" role="img" aria-label="Animation: the technician marks Front brakes as {{t "fail"}} with the note 2 mm left and a photograph. The front desk makes a link for the customer. The customer opens the link on their phone, sees the photograph and presses {{t "Yes, do it"}} At the workshop it says {{n "%d thing approved by the customer, not priced" 1}}, and the desk makes it a line on the job.">
+
+      <div class="an-card cl-tech an-pop" data-t="0">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "technician"}} &middot; Spring service</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="cl-item"><b>Front brakes</b> <span class="rd-tag rd-risk an-fade" data-t="2.4">{{t "fail"}}</span></div>
+          <div class="cl-actions"><span class="an-btn wf-secondary">{{t "Pass"}}</span><span class="an-btn wf-secondary">{{t "Attention"}}</span><span class="an-btn wf-secondary">{{t "Fail"}}</span></div>
+          <div class="wf-field"><span class="lbl">{{t "Note"}}</span><span data-type="0.6,1.4">2 mm left, worn unevenly</span></div>
+          <div class="cl-photo an-pop" data-t="3.4">{{template "cl-pad"}}</div>
+          <span class="an-btn wf-secondary mo-btn">{{t "Add the photograph"}}</span>
+        </div>
+      </div>
+
+      <div class="an-card cl-desk an-pop" data-t="6">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span></div>
+        <div class="wf-body cl-frame an-fade" data-t="6,17.4">
+          <span class="an-btn">{{t "Make a link for the customer"}}</span>
+          <div class="cl-share an-fade" data-t="7.4"><b>{{t "Send this to the customer."}}</b><code>https://verkstad.example/i/q7Jx…</code></div>
+        </div>
+        <div class="wf-body cl-frame cl-frame-answer an-fade" data-t="17.4">
+          <div class="cl-noticed"><span class="an-fade" data-t="17.4,22.6">{{n "%d thing approved by the customer, not priced" 1}}</span></div>
+          <div class="cl-answer-row">
+            <span><b>Front brakes: 2 mm left, worn unevenly</b> <span class="an-muted">&middot; {{t "from the link"}}</span></span>
+            <span class="cl-slot">
+              <span class="rd-tag rd-risk an-fade" data-t="17.4,18.6">{{t "approved, not priced"}}</span>
+              <span class="an-btn wf-secondary cl-make an-fade" data-t="18.6,22.6">{{t "Make it a line"}}</span>
+              <span class="rd-tag cl-on an-fade" data-t="22.6">{{t "on the job"}} &middot; {{money 129000}}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-card cl-phone an-pop" data-t="9.6">
+        <div class="wf-body">
+          <div class="cl-plate">ABC 123 <span class="wf-example">Example</span></div>
+          <div class="an-muted cl-small">Volvo V70 &middot; {{t "checked by %s at %s" "Erik" "The Garage"}}</div>
+          <p class="cl-small">{{t "These need your decision. Approve what you want done."}}</p>
+          <div class="wf-card">
+            <div class="cl-item"><b>Front brakes</b> <span class="rd-tag rd-risk">{{t "needs doing"}}</span></div>
+            <div class="cl-small">2 mm left, worn unevenly</div>
+            <div class="cl-photo cl-photo-big">{{template "cl-pad"}}</div>
+            <div class="cl-answer an-fade" data-t="9.6,14.6"><span class="an-btn">{{t "Yes, do it"}}</span> <span class="an-btn wf-secondary">{{t "No, leave it"}}</span></div>
+            <div class="cl-said an-fade" data-t="14.6">{{t "You said yes to this. You can change it."}}</div>
+          </div>
+          <p class="an-muted cl-tiny">{{t "This link is personal to your vehicle and stops working after a while. It shows no prices — the workshop will quote you for whatever you approve."}}</p>
+        </div>
+      </div>
+
+      <span class="an-cursor" data-path="0:900,520; 2.0:262,118c; 10:900,520; 14.2:620,372c; 18:700,470; 21.8:560,436c; 24:900,520; 30:900,520"
+            data-path-m="0:500,640; 2.0:262,118c; 10:500,640; 14.2:150,500c; 26:500,640"><svg viewBox="0 0 24 24"><path d="M4 2l16 11-7 1-3 7z" fill="#fff" stroke="#14171c" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+
+      <div class="an-cap" data-t="0.3,5.6">The technician: failed, a note and a photograph.</div>
+      <div class="an-cap" data-t="6,9.4">The desk makes a link. It is shown once.</div>
+      <div class="an-cap" data-t="9.6,17.2">The customer sees the photograph and answers. No account, no prices.</div>
+      <div class="an-cap" data-t="17.4,22.4">A yes shows at the desk at once.</div>
+      <div class="an-cap" data-t="22.6,29.6">One click, and it is a line on the job &ndash; approved by the customer, and when.</div>
+    </div>
+  </div>
+  <p class="truth">The flow runs against the real product in a browser: the photograph is uploaded, the link is opened without signing in, and the customer&rsquo;s yes becomes a line on the job &ndash; <a href="{{test "e2e/tests/11-scene-customer-link.spec.ts" "a photographed finding goes to the customer, and their yes becomes a line on the job"}}">read the test</a>. The brake pad is a drawing. Registrations, cars, the link and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+
+{{/* ── Scene 5: one job, two screens ──────────────────────────────────── */}}
+{{expect (sees "technician") false}}{{expect (sees "service_advisor") true}}
+{{define "tw-lines"}}
+<table class="tw-lines">
+  <tr><th>{{t "What"}}</th><th>{{t "Quantity"}}</th><th>{{t "Amount"}}</th></tr>
+  <tr><td>Rear brake pads replaced</td><td>1</td><td>{{money 129000}}</td></tr>
+  <tr><td>Rear brake pads, set</td><td>1</td><td>{{money 84500}}</td></tr>
+</table>
+{{end}}
+<section class="scene pane" role="tabpanel">
+  <h2>One job, two screens</h2>
+  <p class="lede">The same job, opened by the technician and by the front desk. The technician is given the car and the job. The customer&rsquo;s name and phone number are only at the desk &ndash; not hidden from the technician, never fetched.</p>
+
+  <div class="an-wrap" data-loop="18" data-still="12">
+    <div class="an-canvas" role="img" aria-label="Animation: the same job on two screens. The technician&rsquo;s screen shows the car, the fault, the lines and {{t "Hand it on"}}. The front desk&rsquo;s screen also shows {{t "Customer"}} with a name and phone number, and {{t "Promise it for"}}.">
+
+      <div class="an-card tw-screen tw-tech an-pop" data-t="0.2">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "technician"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="tw-plate">GHI 789 <span class="an-muted">&middot; Saab 9-3 &middot; {{state "in_progress"}}</span></div>
+          <div class="wf-h">Squeals when braking</div>
+          {{template "tw-lines"}}
+          <div class="tw-absent an-fade" data-t="6">No customer. Not hidden &ndash; never fetched.</div>
+          <div class="wf-h wf-gap">{{t "Hand it on"}}</div>
+          <div class="wf-field"><span class="lbl">{{t "I need a part to carry on"}}</span>&nbsp;</div>
+          <div class="wf-field"><span class="lbl">{{t "Something else needs doing"}}</span>&nbsp;</div>
+        </div>
+      </div>
+
+      <div class="an-card tw-screen tw-desk an-pop" data-t="1.2">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="tw-plate">GHI 789 <span class="an-muted">&middot; Saab 9-3 &middot; {{state "in_progress"}}</span></div>
+          <div class="wf-h">Squeals when braking</div>
+          {{template "tw-lines"}}
+          <div class="tw-customer">
+            <div class="tw-ring an-fade" data-t="3.4,9"></div>
+            <div class="wf-h">{{t "Customer"}}</div>
+            <div>Lena Lindqvist &middot; 070-111 22 33</div>
+          </div>
+          <div class="wf-field tw-actions"><span class="lbl">{{t "Promise it for"}}</span>{{date (at "2026-10-06 16:00") "Mon 2 Jan 15:04"}}</div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.4,3.2">The same job. Two roles.</div>
+      <div class="an-cap" data-t="3.4,8.8">The customer&rsquo;s details: only where somebody needs to ring them.</div>
+      <div class="an-cap" data-t="9,17.6">The technician&rsquo;s page never fetches them, so they cannot leak from there.</div>
+    </div>
+  </div>
+  <p class="truth">Which role is given the customer&rsquo;s details is decided by the product&rsquo;s own permission code, and the page is not generated if the scene says otherwise. The flow runs against the real product in a browser, which also checks that the name is not even in the technician&rsquo;s page source &ndash; <a href="{{test "e2e/tests/10-scene-two-screens.spec.ts" "one job opened by the technician and the front desk shows the customer to one of them"}}">read the test</a>. Registrations, cars, customers and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+  </div>
+</section>
+
+<section class="proof">
+  <h2>Built to be relied on</h2>
+  <div class="stat-grid">
+    <div class="stat"><b>0 kr</b><span>in licence fees. AGPL-3.0.</span></div>
+    <div class="stat"><b>1 server</b><span>your own. One binary and one Postgres.</span></div>
+    <div class="stat"><b>SIE 4</b><span>the standard format for Swedish bookkeeping.</span></div>
+    <div class="stat"><b>{{len languages}} languages</b><span>{{range $i, $l := languages}}{{if $i}} and {{end}}{{$l.Name}}{{end}}, with more to come.</span></div>
+  </div>
+  <ul class="checks">
+    <li>Works without a connection</li>
+    <li>Customer details only where they are needed</li>
+    <li>Invoices that cannot be changed</li>
+    <li>No app to install</li>
+  </ul>
+</section>
+
+<section class="faq" id="questions">
+  <h2>Questions</h2>
+  <details><summary>What does it cost?</summary><p>Nothing. FreeSMS is open source under AGPL-3.0. There is no hosted service to pay for: the workshop runs it on its own server, and anybody who wants help with that can hire whoever they like.</p></details>
+  <details><summary>Where are our customers&rsquo; details kept?</summary><p>With you. The database is on the workshop&rsquo;s own server, not ours. And inside the system only the roles that need a customer&rsquo;s name and phone number see them &ndash; the technician&rsquo;s screen never fetches them.</p></details>
+  <details><summary>Does it work with our accounts package, or our accountant?</summary><p>FreeSMS hands over the month&rsquo;s invoices and payments as an SIE 4 file &ndash; the standard format Swedish bookkeeping programs read, Fortnox and Visma among them. No integration to pay for or wait to be approved. The file is checked against an independent SIE reader on every change to the code; it has not yet been tried against a commercial program, and we would rather say so than pretend. Outside Sweden there is no export yet.</p></details>
+  <details><summary>Do we need a certified cash register?</summary><p>FreeSMS is built for invoiced sales and has no till. In Sweden, invoiced sales are not covered by the certified cash register requirement, but how that applies to your business is a question for your accountant.</p></details>
+  <details><summary>What happens when the connection drops?</summary><p>What is written is kept in the phone and sent, exactly once, when the connection is back. That is the first of the closer scenes on this page, and it runs as a test on every change.</p></details>
+  <details><summary>Is it ready to use?</summary><p>It is early. A car can go all the way from the door to the books, but there are things left &ndash; they are open as issues in the source code, with what is missing and why.</p></details>
+</section>
+
+<section class="final">
+  <h2>Run it on your own server</h2>
+  <p>Docker, one password and nothing else. Behind HTTPS the whole workshop reaches it.</p>
+  <pre><code>cp .env.example .env
+# set POSTGRES_PASSWORD in .env
+docker compose up</code></pre>
+  <a class="btn" href="https://github.com/RedaEkengren/FreeSMS#running-it">Getting started</a>
+</section>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-brand">
+      <a class="brand" href="./"><span class="logo" aria-hidden="true">{{template "icon-wrench"}}</span>FREESMS</a>
+      <p>An open source system for independent car repair shops. Built for the pit, not for a meeting room.</p>
+      <div class="socials">
+        <a class="social" href="https://github.com/RedaEkengren/FreeSMS" aria-label="FreeSMS on GitHub" title="GitHub">{{template "icon-github"}}</a>
+        <a class="social" href="https://www.linkedin.com/in/reda-karl-ekengren-b2a05623b" aria-label="Reda Ekengren on LinkedIn" title="LinkedIn">{{template "icon-linkedin"}}</a>
+      </div>
+    </div>
+    <nav class="foot-col" aria-label="The product">
+      <b>The product</b>
+      <a href="#scenes">See it work</a>
+      <a href="#questions">Questions</a>
+      <a href="https://github.com/RedaEkengren/FreeSMS#running-it">Run it yourself</a>
+    </nav>
+    <nav class="foot-col" aria-label="The source code">
+      <b>The source code</b>
+      <a href="https://github.com/RedaEkengren/FreeSMS/issues">What is being worked on</a>
+      <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/SECURITY.md">Report a security problem</a>
+    </nav>
+    <nav class="foot-col" aria-label="The project">
+      <b>The project</b>
+      <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/LICENSE">Licence: AGPL-3.0</a>
+      <a href="https://github.com/RedaEkengren/FreeSMS#contributing">Contribute</a>
+      <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/CLA.md">Contributor agreement (CLA)</a>
+    </nav>
+  </div>
+  <div class="foot-bottom">
+    <a class="made-by" href="https://www.linkedin.com/in/reda-karl-ekengren-b2a05623b">By <b>Reda Ekengren</b></a>
+    <span>No tracking, no cookies, no fonts or scripts from anybody else on this page.</span>
+  </div>
+</footer>
+
+</body>
+</html>

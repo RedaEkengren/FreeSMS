@@ -1,4 +1,4 @@
-import { expect, Page } from '@playwright/test';
+import { expect, Browser, Page } from '@playwright/test';
 
 // Test values for a disposable workshop. Nothing here is a real person or a
 // real password; the database is created empty and thrown away with the run.
@@ -74,6 +74,20 @@ export async function readIn(page: Page, locale: string) {
   await page.goto('/account');
   await page.selectOption('select[name=locale]', locale);
   await page.locator('form[action="/account/language"] button').click();
+}
+
+// The workshop's language, which is what a page with nobody signed in
+// speaks: sign-in, and the customer's link. Set by the owner, in a browser
+// of its own so the caller's session is untouched.
+export async function shopLanguage(browser: Browser, locale: string) {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await signIn(page, owner);
+  await page.goto('/shop');
+  const details = page.locator('form[action="/shop"]');
+  await details.locator('select[name=locale]').selectOption(locale);
+  await details.locator('button[type=submit]').click();
+  await ctx.close();
 }
 
 // A wall clock in the shop's zone, minutes from now, as a datetime-local

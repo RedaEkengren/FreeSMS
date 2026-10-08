@@ -21,8 +21,9 @@
  * visible. With prefers-reduced-motion it draws one still frame, at
  * data-still seconds, and never moves.
  *
- * Without JavaScript every element is simply visible, which for every scene
- * here reads as the finished state.
+ * Without JavaScript the still frame is shown: the site generator marks every
+ * timed element that is not on screen at data-still with an-off, which is
+ * hidden until this runs.
  */
 (function () {
   'use strict';

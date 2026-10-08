@@ -11,6 +11,8 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
 <title>FreeSMS – verkstadssystemet som klarar gropen</title>
 <meta name="description" content="Ett öppet verkstadssystem för oberoende bilverkstäder. Inget går förlorat när wifi:t försvinner.">
+<link rel="alternate" hreflang="sv" href="https://redaekengren.github.io/FreeSMS/">
+<link rel="alternate" hreflang="en" href="https://redaekengren.github.io/FreeSMS/en/">
 <link rel="stylesheet" href="site.css">
 <link rel="stylesheet" href="anim.css">
 <script src="anim.js" defer></script>
@@ -22,6 +24,7 @@
   <nav>
     <a href="#scener">Se hur det fungerar</a>
     <a href="#fragor">Frågor</a>
+    <a href="en/" hreflang="en" lang="en">English</a>
     <a class="gh" href="https://github.com/RedaEkengren/FreeSMS" aria-label="Källkoden på GitHub" title="Källkoden på GitHub">{{template "icon-github"}}</a>
   </nav>
 </header>
@@ -61,7 +64,7 @@
 <span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="72,78"></span>
 <span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="78,86"></span>
 </div>
-      <div class="wj-who an-fade" data-t="0,6"><b>{{role "service_advisor"}}</b><span>tis 07:30</span></div>
+      <div class="wj-who an-fade" data-t="0,6"><b>{{role "service_advisor"}}</b><span>{{date (at "2026-10-06 07:30") "Mon 15:04"}}</span></div>
       <div class="an-card wj-screen an-pop" data-t="0,6">
         <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Exempel</span></div>
         <div class="wf-body">
@@ -72,7 +75,7 @@
         </div>
       </div>
       <div class="an-cap" data-t="0.3,5.8">Bilen lämnas vid disken.</div>
-      <div class="wj-who an-fade" data-t="6,12"><b>{{role "technician"}}</b><span>tis 08:10</span></div>
+      <div class="wj-who an-fade" data-t="6,12"><b>{{role "technician"}}</b><span>{{date (at "2026-10-06 08:10") "Mon 15:04"}}</span></div>
       <div class="an-card wj-phone an-pop" data-t="6,12">
         <div class="an-head"><span class="an-dots"></span><span>{{role "technician"}}</span><span class="wf-example">Exempel</span></div>
         <div class="wf-body">
@@ -82,7 +85,7 @@
         </div>
       </div>
       <div class="an-cap" data-t="6.3,11.8">Mekanikern underkänner bromsarna, med en bild.</div>
-      <div class="wj-who an-fade" data-t="12,18"><b>Kunden</b><span>tis 08:40</span></div>
+      <div class="wj-who an-fade" data-t="12,18"><b>Kunden</b><span>{{date (at "2026-10-06 08:40") "Mon 15:04"}}</span></div>
       <div class="an-card wj-phone an-pop" data-t="12,18">
         <div class="an-head"><span class="an-dots"></span><span>Kunden</span><span class="wf-example">Exempel</span></div>
         <div class="wf-body">
@@ -93,7 +96,7 @@
         </div>
       </div>
       <div class="an-cap" data-t="12.3,17.8">Kunden ser bilden på sin telefon och svarar ja.</div>
-      <div class="wj-who an-fade" data-t="18,24"><b>{{role "service_advisor"}}</b><span>tis 08:45</span></div>
+      <div class="wj-who an-fade" data-t="18,24"><b>{{role "service_advisor"}}</b><span>{{date (at "2026-10-06 08:45") "Mon 15:04"}}</span></div>
       <div class="an-card wj-screen an-pop" data-t="18,24">
         <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Exempel</span></div>
         <div class="wf-body">
@@ -104,7 +107,7 @@
         </div>
       </div>
       <div class="an-cap" data-t="18.3,23.8">Ja:et syns hos disken och blir en rad på jobbet.</div>
-      <div class="wj-who an-fade" data-t="24,30"><b>{{role "technician"}}</b><span>tis 09:30</span></div>
+      <div class="wj-who an-fade" data-t="24,30"><b>{{role "technician"}}</b><span>{{date (at "2026-10-06 09:30") "Mon 15:04"}}</span></div>
       <div class="an-card wj-phone an-pop" data-t="24,30">
         <div class="an-head"><span class="an-dots"></span><span>{{role "technician"}}</span><span class="wf-example">Exempel</span></div>
         <div class="wf-body">
@@ -115,7 +118,7 @@
         </div>
       </div>
       <div class="an-cap" data-t="24.3,29.8">Delen finns inte på hyllan. Jobbet väntar.</div>
-      <div class="wj-who an-fade" data-t="30,36"><b>{{role "service_advisor"}}</b><span>tis 10:00</span></div>
+      <div class="wj-who an-fade" data-t="30,36"><b>{{role "service_advisor"}}</b><span>{{date (at "2026-10-06 10:00") "Mon 15:04"}}</span></div>
       <div class="an-card wj-screen an-pop" data-t="30,36">
         <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Exempel</span></div>
         <div class="wf-body">
@@ -128,7 +131,7 @@
         </div>
       </div>
       <div class="an-cap" data-t="30.3,35.8">Kunden tar bilen hem tills delen kommer.</div>
-      <div class="wj-who an-fade" data-t="36,42"><b>{{role "parts"}}</b><span>tor 07:45</span></div>
+      <div class="wj-who an-fade" data-t="36,42"><b>{{role "parts"}}</b><span>{{date (at "2026-10-08 07:45") "Mon 15:04"}}</span></div>
       <div class="an-card wj-screen an-pop" data-t="36,42">
         <div class="an-head"><span class="an-dots"></span><span>{{role "parts"}}</span><span class="wf-example">Exempel</span></div>
         <div class="wf-body">
@@ -139,7 +142,7 @@
         </div>
       </div>
       <div class="an-cap" data-t="36.3,41.8">Lagret: delen har kommit och scannas in.</div>
-      <div class="wj-who an-fade" data-t="42,48"><b>{{role "service_advisor"}}</b><span>tor 08:00</span></div>
+      <div class="wj-who an-fade" data-t="42,48"><b>{{role "service_advisor"}}</b><span>{{date (at "2026-10-08 08:00") "Mon 15:04"}}</span></div>
       <div class="an-card wj-screen an-pop" data-t="42,48">
         <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Exempel</span></div>
         <div class="wf-body">
@@ -151,7 +154,7 @@
         </div>
       </div>
       <div class="an-cap" data-t="42.3,47.8">Bilen är tillbaka. Delen tog jobbet tillbaka till arbete.</div>
-      <div class="wj-who an-fade" data-t="48,54"><b>{{role "technician"}}</b><span>tor 09:00</span></div>
+      <div class="wj-who an-fade" data-t="48,54"><b>{{role "technician"}}</b><span>{{date (at "2026-10-08 09:00") "Mon 15:04"}}</span></div>
       <div class="an-card wj-phone an-pop" data-t="48,54">
         <div class="an-head"><span class="an-dots"></span><span>{{role "technician"}}</span><span class="wf-example">Exempel</span></div>
         <div class="wf-body">
@@ -162,7 +165,7 @@
         </div>
       </div>
       <div class="an-cap" data-t="48.3,53.8">Mekanikern scannar ut delen till jobbet. Lagret ser den gå.</div>
-      <div class="wj-who an-fade" data-t="54,60"><b>{{role "technician"}}</b><span>tor 11:30</span></div>
+      <div class="wj-who an-fade" data-t="54,60"><b>{{role "technician"}}</b><span>{{date (at "2026-10-08 11:30") "Mon 15:04"}}</span></div>
       <div class="an-card wj-phone an-pop" data-t="54,60">
         <div class="an-head"><span class="an-dots"></span><span>{{role "technician"}}</span><span class="wf-example">Exempel</span></div>
         <div class="wf-body">
@@ -173,7 +176,7 @@
         </div>
       </div>
       <div class="an-cap" data-t="54.3,59.8">Slutkontroll. Sedan är bilen klar.</div>
-      <div class="wj-who an-fade" data-t="60,66"><b>{{role "service_advisor"}}</b><span>tor 11:35</span></div>
+      <div class="wj-who an-fade" data-t="60,66"><b>{{role "service_advisor"}}</b><span>{{date (at "2026-10-08 11:35") "Mon 15:04"}}</span></div>
       <div class="an-card wj-screen an-pop" data-t="60,66">
         <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Exempel</span></div>
         <div class="wf-body">
@@ -187,7 +190,7 @@
         </div>
       </div>
       <div class="an-cap" data-t="60.3,65.8">Disken ser att den är klar, och skickar kunden länken.</div>
-      <div class="wj-who an-fade" data-t="66,72"><b>{{role "service_advisor"}}</b><span>tor 16:30</span></div>
+      <div class="wj-who an-fade" data-t="66,72"><b>{{role "service_advisor"}}</b><span>{{date (at "2026-10-08 16:30") "Mon 15:04"}}</span></div>
       <div class="an-card wj-screen an-pop" data-t="66,72">
         <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Exempel</span></div>
         <div class="wf-body">
@@ -200,7 +203,7 @@
         </div>
       </div>
       <div class="an-cap" data-t="66.3,71.8">Kunden hämtar och betalar kontant. Ören avrundas för sig.</div>
-      <div class="wj-who an-fade" data-t="72,78"><b>{{role "service_advisor"}}</b><span>tor 16:32</span></div>
+      <div class="wj-who an-fade" data-t="72,78"><b>{{role "service_advisor"}}</b><span>{{date (at "2026-10-08 16:32") "Mon 15:04"}}</span></div>
       <div class="an-card wj-screen an-pop" data-t="72,78">
         <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Exempel</span></div>
         <div class="wf-body">
@@ -213,7 +216,7 @@
         </div>
       </div>
       <div class="an-cap" data-t="72.3,77.8">Hämtad och betald: jobbet stänger sig självt.</div>
-      <div class="wj-who an-fade" data-t="78,86"><b>{{role "owner"}}</b><span>tor 17:00</span></div>
+      <div class="wj-who an-fade" data-t="78,86"><b>{{role "owner"}}</b><span>{{date (at "2026-10-08 17:00") "Mon 15:04"}}</span></div>
       <div class="an-card wj-screen an-pop" data-t="78,86">
         <div class="an-head"><span class="an-dots"></span><span>{{role "owner"}}</span><span class="wf-example">Exempel</span></div>
         <div class="wf-body">
@@ -255,8 +258,8 @@
   <h2>När wifi:t försvinner</h2>
   <p class="lede">Teknikern ser något mer som behöver göras och säger till receptionen, från gropen. Nätet är borta. Det sparas i telefonen, väntar, och skickas en gång när nätet kommer tillbaka.</p>
 
-  <div class="an-wrap" data-loop="24" data-still="18">
-    <div class="an-canvas" role="img" aria-label="Animering: en tekniker skriver att bromsbeläggen bak är nere på 2 millimeter och trycker {{t "Tell the front desk"}} medan telefonen saknar wifi. Telefonen säger: {{t "No connection. This is being held and will be sent when there is one."}} {{n "%d thing is waiting to be sent." 1}} När wifi:t kommer tillbaka skickas det en gång, och receptionens tavla visar {{n "%d thing noticed, not priced" 1}} på bilen.">
+  <div class="an-wrap" data-loop="29" data-still="23">
+    <div class="an-canvas" role="img" aria-label="Animering: en tekniker skriver att bromsbeläggen bak är nere på 2 millimeter och trycker {{t "Tell the front desk"}} medan telefonen saknar wifi. Telefonen säger: {{t "No connection. This is being held and will be sent when there is one."}} {{n "%d thing is waiting to be sent." 1}} Passet hinner gå ut medan det väntar; telefonen öppnar på inloggningen och skickar inget förrän samma person loggat in igen. Då skickas det en gång, och receptionens tavla visar {{n "%d thing noticed, not priced" 1}} på bilen.">
 
       <div class="an-card wf-phone">
         <div class="wf-status">
@@ -267,7 +270,7 @@
             <svg data-t="13.2" class="an-fade" viewBox="0 0 20 16" fill="none" stroke="#0a7d37" stroke-width="2" stroke-linecap="round"><path d="M2 6a12 12 0 0 1 16 0M5 9.5a7.5 7.5 0 0 1 10 0M8 13a3 3 0 0 1 4 0"/></svg>
           </span>
         </div>
-        <div class="wf-held an-fade" data-t="7,14.2">{{n "%d thing is waiting to be sent." 1}}</div>
+        <div class="wf-held an-fade" data-t="7,13.2">{{n "%d thing is waiting to be sent." 1}}</div>
         <div class="wf-bar"><b>ABC 123</b> &middot; Volvo V70 &middot; {{state "in_progress"}}</div>
         <div class="wf-body">
           <div class="wf-h">Skramlar fram vid 80</div>
@@ -278,22 +281,30 @@
         </div>
         <div class="wf-dim an-fade" data-t="6.8,9.4"></div>
         <div class="wf-alert an-pop" data-t="6.8,9.4">{{t "No connection. This is being held and will be sent when there is one."}}<span class="ok">OK</span></div>
+        <!-- The session ran out while the work waited: the phone opens on
+             the sign-in page, sends nothing, and keeps it for the same person. -->
+        <div class="wf-signin an-fade" data-t="14,18.2">
+          <div class="wf-h">{{t "Sign in"}}</div>
+          <div class="wf-field"><span class="lbl">{{t "Email"}}</span><span data-type="14.8,1.2">erik@exempel.se</span></div>
+          <div class="wf-field"><span class="lbl">{{t "Password"}}</span><span data-type="16.2,0.8">••••••••••</span></div>
+          <span class="an-btn wf-add">{{t "Sign in"}}</span>
+        </div>
         <div class="wf-store an-fade" data-t="7.6,13.4">Sparat i telefonen, med en nyckel som gör att det bara kan komma fram en gång: <code>POST /jobs/…/findings</code></div>
       </div>
 
-      <div class="wf-packet" data-t="13.6,14.8">Bromsbelägg bak nere på 2 mm</div>
+      <div class="wf-packet" data-t="18.6,19.8">Bromsbelägg bak nere på 2 mm</div>
 
       <div class="an-card wf-desk">
         <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}} &middot; {{t "In the shop"}}</span><span class="wf-example">Exempel</span></div>
         <!-- The board does not refresh itself: somebody reloads it. Shown as
              it happens rather than as a page that updates on its own. -->
-        <div class="wf-reload an-fade" data-t="15.2,15.9">Laddar om&hellip;</div>
+        <div class="wf-reload an-fade" data-t="20.2,20.9">Laddar om&hellip;</div>
         <div class="wf-body">
           <div class="wf-card">
             <div class="wf-plate">ABC 123</div>
             <div class="an-muted">#1 &middot; Volvo V70 &middot; Karin Kund</div>
             <div class="an-muted">{{waiting "in_progress" "Erik"}}</div>
-            <div class="wf-noticed an-r" data-t="16">{{n "%d thing noticed, not priced" 1}}</div>
+            <div class="wf-noticed an-r" data-t="21">{{n "%d thing noticed, not priced" 1}}</div>
           </div>
           <div class="wf-card wf-other">
             <div class="wf-plate">XYZ 789</div>
@@ -303,15 +314,16 @@
         </div>
       </div>
 
-      <span class="an-cursor" data-path="0:330,250; 2.8:194,290; 6.6:194,331c; 9.2:300,330c; 24:330,250"
-            data-path-m="0:200,250; 2.8:141,330; 6.6:141,360c; 9.2:220,300c; 24:200,250"><svg viewBox="0 0 24 24"><path d="M4 2l16 11-7 1-3 7z" fill="#fff" stroke="#14171c" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+      <span class="an-cursor" data-path="0:330,250; 2.8:194,290; 6.6:194,331c; 9.2:300,330c; 17.4:194,240c; 29:330,250"
+            data-path-m="0:200,250; 2.8:141,330; 6.6:141,360c; 9.2:220,300c; 17.4:141,228c; 29:200,250"><svg viewBox="0 0 24 24"><path d="M4 2l16 11-7 1-3 7z" fill="#fff" stroke="#14171c" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
 
       <div class="an-cap" data-t="0.3,2.4">07:42. Erik ligger under bilen, mitt i ett jobb.</div>
       <div class="an-cap" data-t="2.6,6.6">Han ser något mer. Wifi:t når inte ner i gropen.</div>
       <div class="an-cap" data-t="6.8,9.6">Det sparas i telefonen, inte i tomma intet.</div>
       <div class="an-cap" data-t="9.8,13.2">Låst skärm, stängd flik: det ligger kvar och väntar.</div>
-      <div class="an-cap" data-t="13.4,16.6">Nätet är tillbaka. Det skickas, exakt en gång.</div>
-      <div class="an-cap" data-t="16.8,23.6">Receptionen laddar om tavlan, ser det och kan ringa kunden.</div>
+      <div class="an-cap" data-t="13.4,18.2">Nätet är tillbaka, men passet hann gå ut. Inget skickas förrän samma person loggat in igen.</div>
+      <div class="an-cap" data-t="18.4,21.6">Inloggad. Det skickas, exakt en gång.</div>
+      <div class="an-cap" data-t="21.8,28.6">Receptionen laddar om tavlan, ser det och kan ringa kunden.</div>
     </div>
   </div>
   <p class="truth">Orden i scenen är produktens egna: sidan genereras från samma språkkatalog och samma kod som FreeSMS skärmar. Flödet körs mot den riktiga produkten i en webbläsare vid varje ändring av koden &ndash; <a href="{{test "e2e/tests/07-scene-wifi.spec.ts" "the wifi goes down in the pit, and the front desk still hears about it"}}">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
@@ -385,28 +397,7 @@
   <p class="truth">Fakturans belopp räknas av produktens pengakod och SIE-raderna skrivs av dess bokföringskod, när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare, och testet läser den riktiga filen &ndash; <a href="{{test "e2e/tests/09-scene-morning.spec.ts" "a car taken in, worked on without the customer, invoiced and handed to the accountant"}}">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
 </section>
 
-{{/* The job's progress as the job page draws it, for one moment. The
-     numbers, the verdict and the bar are the product's own Progress. */}}
-{{define "rd-progress"}}
-<dl class="rd-dl">
-  <dt>{{t "Promised"}}</dt>
-  <dd>{{date .PromisedAt "Mon 2 Jan 15:04"}} {{if eq .Verdict "at risk"}}<span class="rd-tag rd-risk">{{t "at risk"}}</span>{{else if eq .Verdict "on time"}}<span class="rd-tag">{{t "on time"}}</span>{{end}}</dd>
-  <dt>{{t "Clocked"}}</dt>
-  <dd>{{t "%s of %s h" (num .ClockedHours) (num .EstimateHours)}} &middot; {{.Percent}} %</dd>
-  {{if not .Over}}<dt>{{t "Left"}}</dt><dd>{{num .LeftHours}} h</dd>{{end}}
-</dl>
-<svg class="rd-meter" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true"><rect class="rd-track" width="100" height="6" rx="3"/><rect class="rd-fill" width="{{.BarFill}}" height="6" rx="3"/></svg>
-{{if .Running}}<p class="rd-note">{{t "As of %s, with a clock running." (date .AsOf "15:04")}}</p>{{end}}
-{{end}}
 
-{{/* The same moment on the front desk's board. */}}
-{{define "rd-card"}}
-<div class="wf-card">
-  <div class="wf-plate">DEF 456</div>
-  <div class="an-muted">#7 &middot; Volkswagen Golf &middot; Per Persson</div>
-  <div class="an-muted">{{t "promised %s" (date .PromisedAt "Mon 15:04")}} &middot; {{t "%s of %s h" (num .ClockedHours) (num .EstimateHours)}}{{if eq .Verdict "at risk"}} <span class="rd-tag rd-risk">{{t "at risk"}}</span>{{end}}</div>
-</div>
-{{end}}
 
 <section class="scene pane" role="tabpanel">
   <h2>&rdquo;När blir den klar?&rdquo;</h2>
@@ -418,7 +409,7 @@
   {{/* What the captions claim, held against the product. */}}
   {{expect $a.Verdict "on time"}}{{expect $b.Verdict "on time"}}{{expect $c.Verdict "at risk"}}
 
-  <div class="an-wrap" data-loop="22" data-still="17">
+  <div class="an-wrap" data-loop="22" data-still="18">
     <div class="an-canvas" role="img" aria-label="Animering: ett jobb på tre timmar är utlovat till klockan 16. Klockan 12.10 och 13.00 står det {{t "on time"}}. Sedan står teknikerns klocka still. Klockan 14.20, en timme och fyrtio minuter före löftet, står det {{t "at risk"}} på jobbet och på receptionens tavla, med två timmars arbete kvar.">
 
       <div class="an-card rd-job">
@@ -521,15 +512,14 @@
   <p class="truth">Flödet körs mot den riktiga produkten i en webbläsare: fotot laddas upp, länken öppnas utan inloggning, och kundens ja blir en rad på jobbet &ndash; <a href="{{test "e2e/tests/11-scene-customer-link.spec.ts" "a photographed finding goes to the customer, and their yes becomes a line on the job"}}">läs testet</a>. Bromsbelägget är en teckning. Registreringsnummer, bilar, länken och namn är <span class="wf-example">exempel</span>.</p>
 </section>
 
-{{define "cl-pad"}}<svg viewBox="0 0 120 70" aria-hidden="true"><rect width="120" height="70" fill="#3a4049"/><circle cx="60" cy="35" r="30" fill="#8b9099"/><circle cx="60" cy="35" r="11" fill="#3a4049"/><path d="M22 14 h26 v42 h-26 z" fill="#c26b1f"/><path d="M25 17 h20 v4 h-20 z" fill="#e2a050"/></svg>{{end}}
 
 {{/* ── Scene 5: one job, two screens ──────────────────────────────────── */}}
 {{expect (sees "technician") false}}{{expect (sees "service_advisor") true}}
 {{define "tw-lines"}}
 <table class="tw-lines">
   <tr><th>{{t "What"}}</th><th>{{t "Quantity"}}</th><th>{{t "Amount"}}</th></tr>
-  <tr><td>Byte av bromsbelägg bak</td><td>1</td><td>1 290,00 kr</td></tr>
-  <tr><td>Bromsbelägg bak, sats</td><td>1</td><td>845,00 kr</td></tr>
+  <tr><td>Byte av bromsbelägg bak</td><td>1</td><td>{{money 129000}}</td></tr>
+  <tr><td>Bromsbelägg bak, sats</td><td>1</td><td>{{money 84500}}</td></tr>
 </table>
 {{end}}
 <section class="scene pane" role="tabpanel">
@@ -563,7 +553,7 @@
             <div class="wf-h">{{t "Customer"}}</div>
             <div>Lena Lindqvist &middot; 070-111 22 33</div>
           </div>
-          <div class="wf-field tw-actions"><span class="lbl">{{t "Promise it for"}}</span>tis 6 okt 16:00</div>
+          <div class="wf-field tw-actions"><span class="lbl">{{t "Promise it for"}}</span>{{date (at "2026-10-06 16:00") "Mon 2 Jan 15:04"}}</div>
         </div>
       </div>
 
@@ -647,10 +637,5 @@ docker compose up</code></pre>
   </div>
 </footer>
 
-{{define "icon-wrench"}}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.5 17.3a1.8 1.8 0 0 0 2.6 2.6l5.8-5.8a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.3-.4-.4-2.3z"/></svg>{{end}}
-{{define "icon-github"}}<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>{{end}}
-{{define "icon-linkedin"}}<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.23 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z"/></svg>{{end}}
-{{define "icon-car"}}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13.5l1.6-4.3A2 2 0 0 1 6.5 8h11a2 2 0 0 1 1.9 1.2L21 13.5V17a1 1 0 0 1-1 1h-1.5M3 13.5V17a1 1 0 0 0 1 1h1.5M3 13.5h18M9 18h6"/><circle cx="7.5" cy="18" r="2"/><circle cx="16.5" cy="18" r="2"/></svg>{{end}}
-{{define "icon-receipt"}}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>{{end}}
 </body>
 </html>

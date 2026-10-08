@@ -1,0 +1,694 @@
+<!doctype html>
+<!-- Generated from site/src/en/index.html by go run ./cmd/site. Edit that, not this. -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+<title>FreeSMS – the workshop system that works in the pit</title>
+<meta name="description" content="An open source management system for independent car repair shops. Nothing is lost when the wifi goes.">
+<link rel="alternate" hreflang="sv" href="https://redaekengren.github.io/FreeSMS/">
+<link rel="alternate" hreflang="en" href="https://redaekengren.github.io/FreeSMS/en/">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../anim.css">
+<script src="../anim.js" defer></script>
+<script src="../tabs.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.5 17.3a1.8 1.8 0 0 0 2.6 2.6l5.8-5.8a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.3-.4-.4-2.3z"/></svg></span>FREESMS</a>
+  <nav>
+    <a href="#scenes">See it work</a>
+    <a href="#questions">Questions</a>
+    <a href="../" hreflang="sv" lang="sv">Svenska</a>
+    <a class="gh" href="https://github.com/RedaEkengren/FreeSMS" aria-label="The source code on GitHub" title="The source code on GitHub"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+  </nav>
+</header>
+<main>
+<section class="hero">
+  <span class="badge"><span class="dot"></span>Open source &middot; early version</span>
+  <h1>The workshop system that works in <em>the pit</em>.</h1>
+  <p class="sub">For independent car repair shops. Built for a phone in a dirty hand, wifi that does not reach under the car, and a front desk that has to have an answer when the customer rings.</p>
+  <p class="facts">No licence fee &middot; your own server &middot; an SIE file for the books</p>
+  <div class="ctas">
+    <a class="btn" href="#scenes">See it work</a>
+    <a class="btn ghost" href="https://github.com/RedaEkengren/FreeSMS#running-it">Run it yourself</a>
+  </div>
+</section>
+
+
+
+
+<section class="scene scene-hero" id="the-day">
+  <h2>One car, a whole working day</h2>
+  <p class="lede">From the car being dropped off to the job closing itself: the front desk, the technician, the customer, the parts desk and the owner, each on their own screen. A part that is not in, a car that goes home and comes back &ndash; an ordinary week.</p>
+  <div class="an-wrap" data-loop="86" data-still="64">
+    <div class="an-canvas" role="img" aria-label="Animation of a whole job: the car is taken in, the technician fails the brakes with a photograph, the customer approves on their phone and it becomes a line, the part is not in and the car goes home, the parts desk receives the part and scans it in, the car comes back, the technician scans the part out to the job, a final check, the front desk sends the customer the link, the customer pays in cash and collects the car, the job closes itself and the owner reads the figures.">
+      <div class="wj-dots">
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade an-off" data-t="0,6"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade an-off" data-t="6,12"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade an-off" data-t="12,18"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade an-off" data-t="18,24"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade an-off" data-t="24,30"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade an-off" data-t="30,36"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade an-off" data-t="36,42"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade an-off" data-t="42,48"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade an-off" data-t="48,54"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade an-off" data-t="54,60"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade" data-t="60,66"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade an-off" data-t="66,72"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade an-off" data-t="72,78"></span>
+<span class="wj-dot"></span><span class="wj-dot wj-on an-fade an-off" data-t="78,86"></span>
+</div>
+      <div class="wj-who an-fade an-off" data-t="0,6"><b>Front desk</b><span>Tue 07:30</span></div>
+      <div class="an-card wj-screen an-pop an-off" data-t="0,6">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-h">Take in a vehicle</div>
+  <div class="wf-field"><span class="lbl">Registration</span><span data-type="0.6,0.8">JOB 777</span></div>
+  <div class="wf-field"><span class="lbl">What is wrong</span><span data-type="1.6,1.4">Squeals when braking</span></div>
+  <span class="an-btn mo-btn">Open the job</span>
+        </div>
+      </div>
+      <div class="an-cap an-off" data-t="0.3,5.8">The car is dropped off at the desk.</div>
+      <div class="wj-who an-fade an-off" data-t="6,12"><b>Technician</b><span>Tue 08:10</span></div>
+      <div class="an-card wj-phone an-pop an-off" data-t="6,12">
+        <div class="an-head"><span class="an-dots"></span><span>Technician</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="cl-item"><b>Front brakes</b> <span class="rd-tag rd-risk an-fade" data-t="7.6">fail</span></div>
+  <div class="wf-field"><span class="lbl">Note</span><span data-type="6.6,1.2">Rear pads down to 2 mm</span></div>
+  <div class="cl-photo an-pop" data-t="8.6"><svg viewBox="0 0 120 70" aria-hidden="true"><rect width="120" height="70" fill="#3a4049"/><circle cx="60" cy="35" r="30" fill="#8b9099"/><circle cx="60" cy="35" r="11" fill="#3a4049"/><path d="M22 14 h26 v42 h-26 z" fill="#c26b1f"/><path d="M25 17 h20 v4 h-20 z" fill="#e2a050"/></svg></div>
+        </div>
+      </div>
+      <div class="an-cap an-off" data-t="6.3,11.8">The technician fails the brakes, with a photograph.</div>
+      <div class="wj-who an-fade an-off" data-t="12,18"><b>The customer</b><span>Tue 08:40</span></div>
+      <div class="an-card wj-phone an-pop an-off" data-t="12,18">
+        <div class="an-head"><span class="an-dots"></span><span>The customer</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="cl-item"><b>Front brakes</b> <span class="rd-tag rd-risk">needs doing</span></div>
+  <div class="cl-photo cl-photo-big"><svg viewBox="0 0 120 70" aria-hidden="true"><rect width="120" height="70" fill="#3a4049"/><circle cx="60" cy="35" r="30" fill="#8b9099"/><circle cx="60" cy="35" r="11" fill="#3a4049"/><path d="M22 14 h26 v42 h-26 z" fill="#c26b1f"/><path d="M25 17 h20 v4 h-20 z" fill="#e2a050"/></svg></div>
+  <div class="cl-answer an-fade an-off" data-t="12,15"><span class="an-btn">Yes, do it</span> <span class="an-btn wf-secondary">No, leave it</span></div>
+  <div class="cl-said an-fade" data-t="15">You said yes to this. You can change it.</div>
+        </div>
+      </div>
+      <div class="an-cap an-off" data-t="12.3,17.8">The customer sees the photograph on their phone and says yes.</div>
+      <div class="wj-who an-fade an-off" data-t="18,24"><b>Front desk</b><span>Tue 08:45</span></div>
+      <div class="an-card wj-screen an-pop an-off" data-t="18,24">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="cl-noticed an-fade an-off" data-t="18,21.4">1 thing approved by the customer, not priced</div>
+  <div class="cl-answer-row"><span><b>Front brakes: Rear pads down to 2 mm</b> <span class="an-muted">&middot; from the link</span></span>
+    <span class="cl-slot"><span class="an-btn wf-secondary cl-make an-fade an-off" data-t="18,21.4">Make it a line</span>
+    <span class="rd-tag cl-on an-fade" data-t="21.4">on the job &middot; SEK 1,290.00</span></span></div>
+        </div>
+      </div>
+      <div class="an-cap an-off" data-t="18.3,23.8">The yes shows at the desk and becomes a line on the job.</div>
+      <div class="wj-who an-fade an-off" data-t="24,30"><b>Technician</b><span>Tue 09:30</span></div>
+      <div class="an-card wj-phone an-pop an-off" data-t="24,30">
+        <div class="an-head"><span class="an-dots"></span><span>Technician</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-h">Hand it on</div>
+  <div class="wf-field"><span class="lbl">I need a part to carry on</span><span data-type="24.4,1.4">Rear brake pads, BP-200</span></div>
+  <span class="an-btn wf-secondary mo-btn">Ask the parts desk</span>
+  <div class="wj-state an-fade" data-t="26.8">Waiting for parts</div>
+        </div>
+      </div>
+      <div class="an-cap an-off" data-t="24.3,29.8">The part is not on the shelf. The job waits.</div>
+      <div class="wj-who an-fade an-off" data-t="30,36"><b>Front desk</b><span>Tue 10:00</span></div>
+      <div class="an-card wj-screen an-pop an-off" data-t="30,36">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <span class="an-btn wf-secondary">The customer has collected it</span>
+  <div class="wf-card wj-card an-fade" data-t="32">
+    <div class="wf-plate">JOB 777</div>
+    <div class="an-muted">Waiting for parts</div>
+    <div class="wf-noticed">The car is at home &middot; back Thu 8 Oct</div>
+  </div>
+        </div>
+      </div>
+      <div class="an-cap an-off" data-t="30.3,35.8">The customer takes the car home until the part comes.</div>
+      <div class="wj-who an-fade an-off" data-t="36,42"><b>Parts</b><span>Thu 07:45</span></div>
+      <div class="an-card wj-screen an-pop an-off" data-t="36,42">
+        <div class="an-head"><span class="an-dots"></span><span>Parts</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-h">Waiting for parts</div>
+  <div class="wf-card wj-card"><b>JOB 777</b> &middot; Rear brake pads, BP-200<br>
+    <span class="an-btn mo-btn an-fade an-off" data-t="36,38.6">It has arrived</span></div>
+  <div class="wj-scan an-fade" data-t="38.6"><code>7391234567890</code> &rarr; BP-200 &middot; arrived <b>+1</b></div>
+        </div>
+      </div>
+      <div class="an-cap an-off" data-t="36.3,41.8">The parts desk: the part has come, and is scanned in.</div>
+      <div class="wj-who an-fade an-off" data-t="42,48"><b>Front desk</b><span>Thu 08:00</span></div>
+      <div class="an-card wj-screen an-pop an-off" data-t="42,48">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <span class="an-btn wf-secondary">The car is back</span>
+  <div class="wf-card wj-card an-fade" data-t="43.6">
+    <div class="wf-plate">JOB 777</div>
+    <div class="an-muted">Being worked on</div>
+  </div>
+        </div>
+      </div>
+      <div class="an-cap an-off" data-t="42.3,47.8">The car is back. The part put the job back to work.</div>
+      <div class="wj-who an-fade an-off" data-t="48,54"><b>Technician</b><span>Thu 09:00</span></div>
+      <div class="an-card wj-phone an-pop an-off" data-t="48,54">
+        <div class="an-head"><span class="an-dots"></span><span>Technician</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-field"><span class="lbl">Scan or type the part&#39;s code</span><span data-type="48.4,1">7391234567890</span></div>
+  <span class="an-btn wf-secondary mo-btn">Take it out to the job</span>
+  <div class="wj-row an-fade" data-t="50.6"><b>BP-200 &middot; Rear brake pads</b> <span class="rd-tag rd-risk">taken out, not priced</span></div>
+  <div class="wj-scan an-fade" data-t="51.8">Parts: taken out to a job &middot; job #7</div>
+        </div>
+      </div>
+      <div class="an-cap an-off" data-t="48.3,53.8">The technician scans the part out to the job. The parts desk sees it go.</div>
+      <div class="wj-who an-fade an-off" data-t="54,60"><b>Technician</b><span>Thu 11:30</span></div>
+      <div class="an-card wj-phone an-pop an-off" data-t="54,60">
+        <div class="an-head"><span class="an-dots"></span><span>Technician</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-h">Final check</div>
+  <div class="cl-item">Road tested <span class="rd-tag cl-on an-fade" data-t="55">pass</span></div>
+  <div class="cl-item">No warning lights <span class="rd-tag cl-on an-fade" data-t="56">pass</span></div>
+  <span class="an-btn mo-btn an-fade" data-t="57">It is ready</span>
+        </div>
+      </div>
+      <div class="an-cap an-off" data-t="54.3,59.8">A final check. Then the car is ready.</div>
+      <div class="wj-who an-fade" data-t="60,66"><b>Front desk</b><span>Thu 11:35</span></div>
+      <div class="an-card wj-screen an-pop" data-t="60,66">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-card wj-card">
+    <div class="wf-plate">JOB 777</div>
+    <div class="an-muted">Ready for collection</div>
+    <div class="an-muted">final check: Erik</div>
+    <div class="wj-told"><span class="rd-tag rd-risk an-fade an-off" data-t="60,62.8">customer not told</span><span class="an-fade" data-t="62.8">customer told 11:36</span></div>
+  </div>
+  <div class="wj-phone-line an-fade" data-t="63.6">Front desk &rarr; sent the link &rarr; <b>Your car is ready to collect.</b></div>
+        </div>
+      </div>
+      <div class="an-cap" data-t="60.3,65.8">The desk sees it is ready, and sends the customer the link.</div>
+      <div class="wj-who an-fade an-off" data-t="66,72"><b>Front desk</b><span>Thu 16:30</span></div>
+      <div class="an-card wj-screen an-pop an-off" data-t="66,72">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-h">Invoice A-7</div>
+  <div class="mo-row"><span>Brake diagnosis</span><span>SEK 895.00</span></div>
+  <div class="mo-row"><span>Front brakes: Rear pads down to 2 mm</span><span>SEK 1,290.00</span></div>
+  <div class="mo-row"><span>Rear brake pads, BP-200</span><span>SEK 845.00</span></div>
+  <div class="mo-row mo-total"><span>Total</span><span>SEK 3,787.50</span></div>
+  <div class="wj-paid an-fade an-off" data-t="68.4">cash SEK 3,788.00 &middot; rounding SEK -0.50</div>
+        </div>
+      </div>
+      <div class="an-cap an-off" data-t="66.3,71.8">The customer collects and pays cash. The öre are rounded on their own.</div>
+      <div class="wj-who an-fade an-off" data-t="72,78"><b>Front desk</b><span>Thu 16:32</span></div>
+      <div class="an-card wj-screen an-pop an-off" data-t="72,78">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <span class="an-btn wf-secondary">The customer has collected it</span>
+  <div class="wf-card wj-card an-fade an-off" data-t="73.6">
+    <div class="wf-plate">JOB 777</div>
+    <div class="an-muted"><b>Closed</b></div>
+  </div>
+  <div class="wj-phone-line an-fade an-off" data-t="74.6">This job is finished.</div>
+        </div>
+      </div>
+      <div class="an-cap an-off" data-t="72.3,77.8">Collected and paid: the job closes itself.</div>
+      <div class="wj-who an-fade an-off" data-t="78,86"><b>Owner</b><span>Thu 17:00</span></div>
+      <div class="an-card wj-screen an-pop an-off" data-t="78,86">
+        <div class="an-head"><span class="an-dots"></span><span>Owner</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+  <div class="wf-h">Figures</div>
+  <div class="mo-row"><span>Invoices issued</span><span>1</span></div>
+  <div class="mo-row"><span>Net</span><span>SEK 3,030.00</span></div>
+  <div class="mo-row"><span>Sold</span><span>2.0 h</span></div>
+  <div class="mo-row"><span>Approved</span><span>100%</span></div>
+        </div>
+      </div>
+      <div class="an-cap an-off" data-t="78.3,85.8">The owner closes nothing. The owner reads the result.</div>
+    </div>
+  </div>
+  <p class="truth">Words, amounts, rounding and who may see the customer come from the product&rsquo;s own code when the page is generated. The whole flow runs against the real product, one browser per role, on every change to the code &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/12-scene-whole-job.spec.ts">read the test</a>. Registrations, names and amounts are <span class="wf-example">examples</span>.</p>
+</section>
+
+
+<section class="steps" id="scenes">
+  <h2>A car, from the door to the books</h2>
+  <div class="step-grid">
+    <div class="step"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13.5l1.6-4.3A2 2 0 0 1 6.5 8h11a2 2 0 0 1 1.9 1.2L21 13.5V17a1 1 0 0 1-1 1h-1.5M3 13.5V17a1 1 0 0 0 1 1h1.5M3 13.5h18M9 18h6"/><circle cx="7.5" cy="18" r="2"/><circle cx="16.5" cy="18" r="2"/></svg></span><b>Take in a vehicle</b><p>Registration, odometer and what is wrong. The desk prices it from the workshop&rsquo;s own book of times.</p></div>
+    <div class="step"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.5 17.3a1.8 1.8 0 0 0 2.6 2.6l5.8-5.8a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.3-.4-.4-2.3z"/></svg></span><b>Fix it</b><p>The technician sees the car and the job, clocks on, photographs and speaks up &ndash; with or without a connection.</p></div>
+    <div class="step"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg></span><b>Invoice it</b><p>Invoices that cannot be changed, numbered without gaps, and the month to the accountant as an SIE file.</p></div>
+  </div>
+</section>
+
+<section class="tabs-sec">
+  <h2>Closer</h2>
+  <p class="sub">Each part on its own, closer. Every scene is a flow that runs against the real product on every change to the code.</p>
+  <div class="tabbar" role="tablist" aria-label="Scenes">
+    <button type="button" role="tab" data-tab="0">No wifi</button>
+    <button type="button" role="tab" data-tab="1">The morning</button>
+    <button type="button" role="tab" data-tab="2">Ready when?</button>
+    <button type="button" role="tab" data-tab="3">The customer&rsquo;s link</button>
+    <button type="button" role="tab" data-tab="4">Two screens</button>
+  </div>
+  <div class="panes">
+<section class="scene pane" role="tabpanel">
+  <h2>When the wifi goes</h2>
+  <p class="lede">The technician sees something else that needs doing and tells the front desk, from the pit. There is no connection. It is kept in the phone, waits, and is sent once when the connection is back.</p>
+
+  <div class="an-wrap" data-loop="29" data-still="23">
+    <div class="an-canvas" role="img" aria-label="Animation: a technician writes that the rear brake pads are down to 2 millimetres and presses Tell the front desk while the phone has no wifi. The phone says: No connection. This is being held and will be sent when there is one. 1 thing is waiting to be sent. The session runs out while it waits; the phone opens on the sign-in page and sends nothing until the same person has signed in again. Then it is sent once, and the front desk&rsquo;s board shows 1 thing noticed, not priced on the car.">
+
+      <div class="an-card wf-phone">
+        <div class="wf-status">
+          <span>07:42 <span class="wf-example">Example</span></span>
+          <span class="wf-wifi">
+            <svg data-t="0,2.6" class="an-fade an-off" viewBox="0 0 20 16" fill="none" stroke="#14171c" stroke-width="2" stroke-linecap="round"><path d="M2 6a12 12 0 0 1 16 0M5 9.5a7.5 7.5 0 0 1 10 0M8 13a3 3 0 0 1 4 0"/></svg>
+            <svg data-t="2.6,13.2" class="an-fade wf-off an-off" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 6a12 12 0 0 1 16 0M5 9.5a7.5 7.5 0 0 1 10 0M8 13a3 3 0 0 1 4 0M3 1l14 14"/></svg>
+            <svg data-t="13.2" class="an-fade" viewBox="0 0 20 16" fill="none" stroke="#0a7d37" stroke-width="2" stroke-linecap="round"><path d="M2 6a12 12 0 0 1 16 0M5 9.5a7.5 7.5 0 0 1 10 0M8 13a3 3 0 0 1 4 0"/></svg>
+          </span>
+        </div>
+        <div class="wf-held an-fade an-off" data-t="7,13.2">1 thing is waiting to be sent.</div>
+        <div class="wf-bar"><b>ABC 123</b> &middot; Volvo V70 &middot; Being worked on</div>
+        <div class="wf-body">
+          <div class="wf-h">Rattles at the front at 50 mph</div>
+          <span class="an-btn wf-add wf-clock">Stop clock</span>
+          <div class="wf-h wf-gap">Hand it on</div>
+          <div class="wf-field"><span class="lbl">Something else needs doing</span><span data-type="3.0,2.0">Rear brake pads down to 2 mm</span></div>
+          <span class="an-btn wf-add wf-secondary">Tell the front desk</span>
+        </div>
+        <div class="wf-dim an-fade an-off" data-t="6.8,9.4"></div>
+        <div class="wf-alert an-pop an-off" data-t="6.8,9.4">No connection. This is being held and will be sent when there is one.<span class="ok">OK</span></div>
+        
+        <div class="wf-signin an-fade an-off" data-t="14,18.2">
+          <div class="wf-h">Sign in</div>
+          <div class="wf-field"><span class="lbl">Email</span><span data-type="14.8,1.2">erik@example.com</span></div>
+          <div class="wf-field"><span class="lbl">Password</span><span data-type="16.2,0.8">••••••••••</span></div>
+          <span class="an-btn wf-add">Sign in</span>
+        </div>
+        <div class="wf-store an-fade an-off" data-t="7.6,13.4">Kept in the phone, with a key that means it can only arrive once: <code>POST /jobs/…/findings</code></div>
+      </div>
+
+      <div class="wf-packet an-off" data-t="18.6,19.8">Rear brake pads down to 2 mm</div>
+
+      <div class="an-card wf-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk &middot; In the shop</span><span class="wf-example">Example</span></div>
+        
+        <div class="wf-reload an-fade an-off" data-t="20.2,20.9">Reloading&hellip;</div>
+        <div class="wf-body">
+          <div class="wf-card">
+            <div class="wf-plate">ABC 123</div>
+            <div class="an-muted">#1 &middot; Volvo V70 &middot; Karin Kund</div>
+            <div class="an-muted">Erik is on it</div>
+            <div class="wf-noticed an-r" data-t="21">1 thing noticed, not priced</div>
+          </div>
+          <div class="wf-card wf-other">
+            <div class="wf-plate">XYZ 789</div>
+            <div class="an-muted">#2 &middot; Toyota Corolla &middot; Olle Ägare</div>
+            <div class="an-muted">Waiting for the customer to approve</div>
+          </div>
+        </div>
+      </div>
+
+      <span class="an-cursor" data-path="0:330,250; 2.8:194,290; 6.6:194,331c; 9.2:300,330c; 17.4:194,240c; 29:330,250"
+            data-path-m="0:200,250; 2.8:141,330; 6.6:141,360c; 9.2:220,300c; 17.4:141,228c; 29:200,250"><svg viewBox="0 0 24 24"><path d="M4 2l16 11-7 1-3 7z" fill="#fff" stroke="#14171c" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+
+      <div class="an-cap an-off" data-t="0.3,2.4">07:42. Erik is under a car, in the middle of a job.</div>
+      <div class="an-cap an-off" data-t="2.6,6.6">He sees something else. The wifi does not reach the pit.</div>
+      <div class="an-cap an-off" data-t="6.8,9.6">It is kept in the phone, not lost in the air.</div>
+      <div class="an-cap an-off" data-t="9.8,13.2">Screen locked, tab closed: it stays, and waits.</div>
+      <div class="an-cap an-off" data-t="13.4,18.2">The connection is back, but the session ran out. Nothing is sent until the same person signs in again.</div>
+      <div class="an-cap an-off" data-t="18.4,21.6">Signed in. It is sent, exactly once.</div>
+      <div class="an-cap" data-t="21.8,28.6">The front desk reloads the board, sees it, and can ring the customer.</div>
+    </div>
+  </div>
+  <p class="truth">The words in the scene are the product&rsquo;s own: the page is generated from the same catalogue and the same code as FreeSMS&rsquo;s screens. The flow runs against the real product in a browser on every change to the code &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/07-scene-wifi.spec.ts">read the test</a>. Registrations, cars, customers and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+
+
+
+
+
+
+<section class="scene pane" role="tabpanel">
+  <h2>A morning, from the door to the books</h2>
+  <p class="lede">A car is taken in, the technician does the work without seeing the customer&rsquo;s details, the desk invoices, and the month&rsquo;s invoices go to the accountant as a file, not as an integration to pay for.</p>
+
+  <div class="an-wrap" data-loop="30" data-still="26">
+    <div class="an-canvas" role="img" aria-label="Animation: the front desk takes in ABC 123, which rattles at the front at 50 mph. The technician sees the car and the job but not the customer, and marks it Ready for collection. The desk invoices A-1 for SEK 1,678.13. The invoice goes to the books as an SIE file.">
+
+      <div class="an-card mo-card mo-1 an-pop" data-t="0">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk &middot; Take in a vehicle</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="wf-field"><span class="lbl">Registration</span><span data-type="0.8,0.8">ABC 123</span></div>
+          <div class="wf-field"><span class="lbl">Odometer, km</span><span data-type="1.8,0.6">11,500</span></div>
+          <div class="wf-field"><span class="lbl">What is wrong</span><span data-type="2.6,1.2">Rattles at the front at 50 mph</span></div>
+          <span class="an-btn mo-btn">Open the job</span>
+        </div>
+      </div>
+
+      <div class="an-card mo-card mo-2 an-pop" data-t="6">
+        <div class="an-head"><span class="an-dots"></span><span>Technician &middot; ABC 123 &middot; Volvo V70</span></div>
+        <div class="wf-body">
+          <div class="wf-h">Rattles at the front at 50 mph</div>
+          <div class="mo-state">
+            <span class="an-fade an-off" data-t="6,8.4">Approved, not started</span>
+            <span class="an-fade an-off" data-t="8.4,11.4">Being worked on</span>
+            <span class="an-fade mo-done" data-t="11.4">Ready for collection</span>
+          </div>
+          <span class="an-btn mo-btn wf-secondary an-fade an-off" data-t="6,8.4">Start work</span>
+          <span class="an-btn mo-btn an-fade an-off" data-t="8.4,11.4">It is ready</span>
+          <p class="mo-note">No customer on the screen. The technician is given the car and the job; the customer&rsquo;s name and phone are never fetched.</p>
+        </div>
+      </div>
+
+      <div class="an-card mo-card mo-3 an-pop" data-t="13">
+        <div class="an-head"><span class="an-dots"></span><span>Invoice A-1</span><span class="wf-example">Example</span></div>
+        <div class="wf-body mo-inv">
+          <div class="an-muted">Billed to: Karin Kund</div>
+          <div class="mo-row"><span>Front brake discs replaced<br><small class="an-muted">1.5 &times; SEK 895.00</small></span><span>SEK 1,342.50</span></div>
+          <div class="mo-row mo-sub"><span>Net</span><span>SEK 1,342.50</span></div>
+          <div class="mo-row mo-sub"><span>VAT 25%</span><span>SEK 335.63</span></div>
+          <div class="mo-row mo-total"><span>Total</span><span>SEK 1,678.13</span></div>
+        </div>
+      </div>
+
+      <div class="an-card mo-card mo-4 an-pop" data-t="19.5">
+        <div class="an-head"><span class="an-dots"></span><span>Accounting</span></div>
+        <div class="wf-body">
+          <span class="an-btn mo-btn">Download the file</span>
+          <pre class="mo-sie an-fade" data-t="21">#VER &#34;A&#34; &#34;1&#34; 20261006 &#34;Faktura A-1 Karin Kund&#34;
+{
+#TRANS 1510 {} 1678.13
+#TRANS 3010 {} -1342.50
+#TRANS 2611 {} -335.63
+}
+</pre>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,5.6">07:30. The car is taken in at the desk.</div>
+      <div class="an-cap an-off" data-t="6,12.6">The technician sees the car and the job. Not the customer.</div>
+      <div class="an-cap an-off" data-t="13,19">The desk invoices. The line, the VAT and the total are worked out once, in one place.</div>
+      <div class="an-cap" data-t="19.5,29.5">To the accountant: an SIE file, the standard format for Swedish bookkeeping.</div>
+    </div>
+  </div>
+  <p class="truth">The invoice&rsquo;s amounts are worked out by the product&rsquo;s money code and the SIE lines written by its accounting code, when the page is generated. The flow runs against the real product in a browser, and the test reads the real file &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/09-scene-morning.spec.ts">read the test</a>. Registrations, cars, customers and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+
+
+<section class="scene pane" role="tabpanel">
+  <h2>&ldquo;When will it be ready?&rdquo;</h2>
+  <p class="lede">The customer rings and asks. The answer is on the job: what was promised, what was sold and what has been clocked. And it speaks up before the promise is broken, not after.</p>
+
+  
+  
+  
+  
+  
+
+  <div class="an-wrap" data-loop="22" data-still="18">
+    <div class="an-canvas" role="img" aria-label="Animation: a three hour job is promised for four o&rsquo;clock. At 12:10 and at 13:00 it says on time Then the technician&rsquo;s clock stops. At 14:20, an hour and forty minutes before the promise, it says at risk on the job and on the front desk&rsquo;s board, with two hours of work left.">
+
+      <div class="an-card rd-job">
+        <div class="an-head"><span class="an-dots"></span><span>DEF 456 &middot; Volkswagen Golf &middot; Being worked on</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="wf-h">When it will be ready</div>
+          <div class="rd-frame an-fade an-off" data-t="0,7.6">
+<dl class="rd-dl">
+  <dt>Promised</dt>
+  <dd>Tue 6 Oct 16:00 <span class="rd-tag">on time</span></dd>
+  <dt>Clocked</dt>
+  <dd>0.2 of 3.0 h &middot; 5 %</dd>
+  <dt>Left</dt><dd>2.8 h</dd>
+</dl>
+<svg class="rd-meter" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true"><rect class="rd-track" width="100" height="6" rx="3"/><rect class="rd-fill" width="5" height="6" rx="3"/></svg>
+<p class="rd-note">As of 12:10, with a clock running.</p>
+</div>
+          <div class="rd-frame an-fade an-off" data-t="7.6,12.6">
+<dl class="rd-dl">
+  <dt>Promised</dt>
+  <dd>Tue 6 Oct 16:00 <span class="rd-tag">on time</span></dd>
+  <dt>Clocked</dt>
+  <dd>1.0 of 3.0 h &middot; 33 %</dd>
+  <dt>Left</dt><dd>2.0 h</dd>
+</dl>
+<svg class="rd-meter" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true"><rect class="rd-track" width="100" height="6" rx="3"/><rect class="rd-fill" width="33" height="6" rx="3"/></svg>
+<p class="rd-note">As of 13:00, with a clock running.</p>
+</div>
+          <div class="rd-frame an-fade" data-t="12.6">
+<dl class="rd-dl">
+  <dt>Promised</dt>
+  <dd>Tue 6 Oct 16:00 <span class="rd-tag rd-risk">at risk</span></dd>
+  <dt>Clocked</dt>
+  <dd>1.0 of 3.0 h &middot; 33 %</dd>
+  <dt>Left</dt><dd>2.0 h</dd>
+</dl>
+<svg class="rd-meter" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true"><rect class="rd-track" width="100" height="6" rx="3"/><rect class="rd-fill" width="33" height="6" rx="3"/></svg>
+
+</div>
+        </div>
+      </div>
+
+      <div class="rd-clock">
+        <span class="an-fade an-off" data-t="0,7.6">12:10</span>
+        <span class="an-fade an-off" data-t="7.6,12.6">13:00</span>
+        <span class="an-fade rd-late" data-t="12.6">14:20</span>
+      </div>
+
+      <div class="an-card rd-board">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk &middot; In the shop</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="rd-slot an-fade an-off" data-t="0,7.6">
+<div class="wf-card">
+  <div class="wf-plate">DEF 456</div>
+  <div class="an-muted">#7 &middot; Volkswagen Golf &middot; Per Persson</div>
+  <div class="an-muted">promised Tue 16:00 &middot; 0.2 of 3.0 h</div>
+</div>
+</div>
+          <div class="rd-slot an-fade an-off" data-t="7.6,12.6">
+<div class="wf-card">
+  <div class="wf-plate">DEF 456</div>
+  <div class="an-muted">#7 &middot; Volkswagen Golf &middot; Per Persson</div>
+  <div class="an-muted">promised Tue 16:00 &middot; 1.0 of 3.0 h</div>
+</div>
+</div>
+          <div class="rd-slot an-fade" data-t="12.6">
+<div class="wf-card">
+  <div class="wf-plate">DEF 456</div>
+  <div class="an-muted">#7 &middot; Volkswagen Golf &middot; Per Persson</div>
+  <div class="an-muted">promised Tue 16:00 &middot; 1.0 of 3.0 h <span class="rd-tag rd-risk">at risk</span></div>
+</div>
+</div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.4">Three hours of work, promised for 16:00. Erik starts at 12:00.</div>
+      <div class="an-cap an-off" data-t="7.8,12.4">13:00. An hour clocked, two to go. On time.</div>
+      <div class="an-cap an-off" data-t="12.8,17">Erik was pulled onto another job. The clock has not moved since 13:00.</div>
+      <div class="an-cap" data-t="17.2,21.6">Two hours left, an hour and forty to the promise. The desk sees it now.</div>
+    </div>
+  </div>
+  <p class="truth">The figures and the verdict are worked out by the same code the job page uses, when the page is generated. The flow runs against the real product in a browser &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/08-scene-ready.spec.ts">read the test</a>. Registrations, cars, customers and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>The customer decides, with the photograph in front of them</h2>
+  <p class="lede">The technician photographs what is worn. The customer gets a link, sees the photograph on their phone and answers yes or no &ndash; no account, no app, and nobody describing brake pads down the telephone. A yes shows on the board at once, and becomes a line on the job in one step.</p>
+
+  <div class="an-wrap" data-loop="30" data-still="26">
+    <div class="an-canvas" role="img" aria-label="Animation: the technician marks Front brakes as fail with the note 2 mm left and a photograph. The front desk makes a link for the customer. The customer opens the link on their phone, sees the photograph and presses Yes, do it At the workshop it says 1 thing approved by the customer, not priced, and the desk makes it a line on the job.">
+
+      <div class="an-card cl-tech an-pop" data-t="0">
+        <div class="an-head"><span class="an-dots"></span><span>Technician &middot; Spring service</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="cl-item"><b>Front brakes</b> <span class="rd-tag rd-risk an-fade" data-t="2.4">fail</span></div>
+          <div class="cl-actions"><span class="an-btn wf-secondary">Pass</span><span class="an-btn wf-secondary">Attention</span><span class="an-btn wf-secondary">Fail</span></div>
+          <div class="wf-field"><span class="lbl">Note</span><span data-type="0.6,1.4">2 mm left, worn unevenly</span></div>
+          <div class="cl-photo an-pop" data-t="3.4"><svg viewBox="0 0 120 70" aria-hidden="true"><rect width="120" height="70" fill="#3a4049"/><circle cx="60" cy="35" r="30" fill="#8b9099"/><circle cx="60" cy="35" r="11" fill="#3a4049"/><path d="M22 14 h26 v42 h-26 z" fill="#c26b1f"/><path d="M25 17 h20 v4 h-20 z" fill="#e2a050"/></svg></div>
+          <span class="an-btn wf-secondary mo-btn">Add the photograph</span>
+        </div>
+      </div>
+
+      <div class="an-card cl-desk an-pop" data-t="6">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span></div>
+        <div class="wf-body cl-frame an-fade an-off" data-t="6,17.4">
+          <span class="an-btn">Make a link for the customer</span>
+          <div class="cl-share an-fade" data-t="7.4"><b>Send this to the customer.</b><code>https://verkstad.example/i/q7Jx…</code></div>
+        </div>
+        <div class="wf-body cl-frame cl-frame-answer an-fade" data-t="17.4">
+          <div class="cl-noticed"><span class="an-fade an-off" data-t="17.4,22.6">1 thing approved by the customer, not priced</span></div>
+          <div class="cl-answer-row">
+            <span><b>Front brakes: 2 mm left, worn unevenly</b> <span class="an-muted">&middot; from the link</span></span>
+            <span class="cl-slot">
+              <span class="rd-tag rd-risk an-fade an-off" data-t="17.4,18.6">approved, not priced</span>
+              <span class="an-btn wf-secondary cl-make an-fade an-off" data-t="18.6,22.6">Make it a line</span>
+              <span class="rd-tag cl-on an-fade" data-t="22.6">on the job &middot; SEK 1,290.00</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-card cl-phone an-pop" data-t="9.6">
+        <div class="wf-body">
+          <div class="cl-plate">ABC 123 <span class="wf-example">Example</span></div>
+          <div class="an-muted cl-small">Volvo V70 &middot; checked by Erik at The Garage</div>
+          <p class="cl-small">These need your decision. Approve what you want done.</p>
+          <div class="wf-card">
+            <div class="cl-item"><b>Front brakes</b> <span class="rd-tag rd-risk">needs doing</span></div>
+            <div class="cl-small">2 mm left, worn unevenly</div>
+            <div class="cl-photo cl-photo-big"><svg viewBox="0 0 120 70" aria-hidden="true"><rect width="120" height="70" fill="#3a4049"/><circle cx="60" cy="35" r="30" fill="#8b9099"/><circle cx="60" cy="35" r="11" fill="#3a4049"/><path d="M22 14 h26 v42 h-26 z" fill="#c26b1f"/><path d="M25 17 h20 v4 h-20 z" fill="#e2a050"/></svg></div>
+            <div class="cl-answer an-fade an-off" data-t="9.6,14.6"><span class="an-btn">Yes, do it</span> <span class="an-btn wf-secondary">No, leave it</span></div>
+            <div class="cl-said an-fade" data-t="14.6">You said yes to this. You can change it.</div>
+          </div>
+          <p class="an-muted cl-tiny">This link is personal to your vehicle and stops working after a while. It shows no prices — the workshop will quote you for whatever you approve.</p>
+        </div>
+      </div>
+
+      <span class="an-cursor" data-path="0:900,520; 2.0:262,118c; 10:900,520; 14.2:620,372c; 18:700,470; 21.8:560,436c; 24:900,520; 30:900,520"
+            data-path-m="0:500,640; 2.0:262,118c; 10:500,640; 14.2:150,500c; 26:500,640"><svg viewBox="0 0 24 24"><path d="M4 2l16 11-7 1-3 7z" fill="#fff" stroke="#14171c" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+
+      <div class="an-cap an-off" data-t="0.3,5.6">The technician: failed, a note and a photograph.</div>
+      <div class="an-cap an-off" data-t="6,9.4">The desk makes a link. It is shown once.</div>
+      <div class="an-cap an-off" data-t="9.6,17.2">The customer sees the photograph and answers. No account, no prices.</div>
+      <div class="an-cap an-off" data-t="17.4,22.4">A yes shows at the desk at once.</div>
+      <div class="an-cap" data-t="22.6,29.6">One click, and it is a line on the job &ndash; approved by the customer, and when.</div>
+    </div>
+  </div>
+  <p class="truth">The flow runs against the real product in a browser: the photograph is uploaded, the link is opened without signing in, and the customer&rsquo;s yes becomes a line on the job &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/11-scene-customer-link.spec.ts">read the test</a>. The brake pad is a drawing. Registrations, cars, the link and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+
+
+
+
+<section class="scene pane" role="tabpanel">
+  <h2>One job, two screens</h2>
+  <p class="lede">The same job, opened by the technician and by the front desk. The technician is given the car and the job. The customer&rsquo;s name and phone number are only at the desk &ndash; not hidden from the technician, never fetched.</p>
+
+  <div class="an-wrap" data-loop="18" data-still="12">
+    <div class="an-canvas" role="img" aria-label="Animation: the same job on two screens. The technician&rsquo;s screen shows the car, the fault, the lines and Hand it on. The front desk&rsquo;s screen also shows Customer with a name and phone number, and Promise it for.">
+
+      <div class="an-card tw-screen tw-tech an-pop" data-t="0.2">
+        <div class="an-head"><span class="an-dots"></span><span>Technician</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="tw-plate">GHI 789 <span class="an-muted">&middot; Saab 9-3 &middot; Being worked on</span></div>
+          <div class="wf-h">Squeals when braking</div>
+          
+<table class="tw-lines">
+  <tr><th>What</th><th>Quantity</th><th>Amount</th></tr>
+  <tr><td>Rear brake pads replaced</td><td>1</td><td>SEK 1,290.00</td></tr>
+  <tr><td>Rear brake pads, set</td><td>1</td><td>SEK 845.00</td></tr>
+</table>
+
+          <div class="tw-absent an-fade" data-t="6">No customer. Not hidden &ndash; never fetched.</div>
+          <div class="wf-h wf-gap">Hand it on</div>
+          <div class="wf-field"><span class="lbl">I need a part to carry on</span>&nbsp;</div>
+          <div class="wf-field"><span class="lbl">Something else needs doing</span>&nbsp;</div>
+        </div>
+      </div>
+
+      <div class="an-card tw-screen tw-desk an-pop" data-t="1.2">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="tw-plate">GHI 789 <span class="an-muted">&middot; Saab 9-3 &middot; Being worked on</span></div>
+          <div class="wf-h">Squeals when braking</div>
+          
+<table class="tw-lines">
+  <tr><th>What</th><th>Quantity</th><th>Amount</th></tr>
+  <tr><td>Rear brake pads replaced</td><td>1</td><td>SEK 1,290.00</td></tr>
+  <tr><td>Rear brake pads, set</td><td>1</td><td>SEK 845.00</td></tr>
+</table>
+
+          <div class="tw-customer">
+            <div class="tw-ring an-fade an-off" data-t="3.4,9"></div>
+            <div class="wf-h">Customer</div>
+            <div>Lena Lindqvist &middot; 070-111 22 33</div>
+          </div>
+          <div class="wf-field tw-actions"><span class="lbl">Promise it for</span>Tue 6 Oct 16:00</div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.4,3.2">The same job. Two roles.</div>
+      <div class="an-cap an-off" data-t="3.4,8.8">The customer&rsquo;s details: only where somebody needs to ring them.</div>
+      <div class="an-cap" data-t="9,17.6">The technician&rsquo;s page never fetches them, so they cannot leak from there.</div>
+    </div>
+  </div>
+  <p class="truth">Which role is given the customer&rsquo;s details is decided by the product&rsquo;s own permission code, and the page is not generated if the scene says otherwise. The flow runs against the real product in a browser, which also checks that the name is not even in the technician&rsquo;s page source &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/10-scene-two-screens.spec.ts">read the test</a>. Registrations, cars, customers and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+  </div>
+</section>
+
+<section class="proof">
+  <h2>Built to be relied on</h2>
+  <div class="stat-grid">
+    <div class="stat"><b>0 kr</b><span>in licence fees. AGPL-3.0.</span></div>
+    <div class="stat"><b>1 server</b><span>your own. One binary and one Postgres.</span></div>
+    <div class="stat"><b>SIE 4</b><span>the standard format for Swedish bookkeeping.</span></div>
+    <div class="stat"><b>2 languages</b><span>English and Svenska, with more to come.</span></div>
+  </div>
+  <ul class="checks">
+    <li>Works without a connection</li>
+    <li>Customer details only where they are needed</li>
+    <li>Invoices that cannot be changed</li>
+    <li>No app to install</li>
+  </ul>
+</section>
+
+<section class="faq" id="questions">
+  <h2>Questions</h2>
+  <details><summary>What does it cost?</summary><p>Nothing. FreeSMS is open source under AGPL-3.0. There is no hosted service to pay for: the workshop runs it on its own server, and anybody who wants help with that can hire whoever they like.</p></details>
+  <details><summary>Where are our customers&rsquo; details kept?</summary><p>With you. The database is on the workshop&rsquo;s own server, not ours. And inside the system only the roles that need a customer&rsquo;s name and phone number see them &ndash; the technician&rsquo;s screen never fetches them.</p></details>
+  <details><summary>Does it work with our accounts package, or our accountant?</summary><p>FreeSMS hands over the month&rsquo;s invoices and payments as an SIE 4 file &ndash; the standard format Swedish bookkeeping programs read, Fortnox and Visma among them. No integration to pay for or wait to be approved. The file is checked against an independent SIE reader on every change to the code; it has not yet been tried against a commercial program, and we would rather say so than pretend. Outside Sweden there is no export yet.</p></details>
+  <details><summary>Do we need a certified cash register?</summary><p>FreeSMS is built for invoiced sales and has no till. In Sweden, invoiced sales are not covered by the certified cash register requirement, but how that applies to your business is a question for your accountant.</p></details>
+  <details><summary>What happens when the connection drops?</summary><p>What is written is kept in the phone and sent, exactly once, when the connection is back. That is the first of the closer scenes on this page, and it runs as a test on every change.</p></details>
+  <details><summary>Is it ready to use?</summary><p>It is early. A car can go all the way from the door to the books, but there are things left &ndash; they are open as issues in the source code, with what is missing and why.</p></details>
+</section>
+
+<section class="final">
+  <h2>Run it on your own server</h2>
+  <p>Docker, one password and nothing else. Behind HTTPS the whole workshop reaches it.</p>
+  <pre><code>cp .env.example .env
+# set POSTGRES_PASSWORD in .env
+docker compose up</code></pre>
+  <a class="btn" href="https://github.com/RedaEkengren/FreeSMS#running-it">Getting started</a>
+</section>
+</main>
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-brand">
+      <a class="brand" href="./"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.5 17.3a1.8 1.8 0 0 0 2.6 2.6l5.8-5.8a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.3-.4-.4-2.3z"/></svg></span>FREESMS</a>
+      <p>An open source system for independent car repair shops. Built for the pit, not for a meeting room.</p>
+      <div class="socials">
+        <a class="social" href="https://github.com/RedaEkengren/FreeSMS" aria-label="FreeSMS on GitHub" title="GitHub"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+        <a class="social" href="https://www.linkedin.com/in/reda-karl-ekengren-b2a05623b" aria-label="Reda Ekengren on LinkedIn" title="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.23 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z"/></svg></a>
+      </div>
+    </div>
+    <nav class="foot-col" aria-label="The product">
+      <b>The product</b>
+      <a href="#scenes">See it work</a>
+      <a href="#questions">Questions</a>
+      <a href="https://github.com/RedaEkengren/FreeSMS#running-it">Run it yourself</a>
+    </nav>
+    <nav class="foot-col" aria-label="The source code">
+      <b>The source code</b>
+      <a href="https://github.com/RedaEkengren/FreeSMS/issues">What is being worked on</a>
+      <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/SECURITY.md">Report a security problem</a>
+    </nav>
+    <nav class="foot-col" aria-label="The project">
+      <b>The project</b>
+      <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/LICENSE">Licence: AGPL-3.0</a>
+      <a href="https://github.com/RedaEkengren/FreeSMS#contributing">Contribute</a>
+      <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/CLA.md">Contributor agreement (CLA)</a>
+    </nav>
+  </div>
+  <div class="foot-bottom">
+    <a class="made-by" href="https://www.linkedin.com/in/reda-karl-ekengren-b2a05623b">By <b>Reda Ekengren</b></a>
+    <span>No tracking, no cookies, no fonts or scripts from anybody else on this page.</span>
+  </div>
+</footer>
+
+</body>
+</html>

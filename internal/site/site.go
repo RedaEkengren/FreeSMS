@@ -23,6 +23,8 @@ import (
 	"html/template"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	// The scenes are in Stockholm whether or not the machine generating
@@ -36,13 +38,24 @@ import (
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
-// Source is the page as written, Output what is published. Both relative to
-// the repository root.
-const (
-	Source = "site/src/index.html"
-	Output = "site/index.html"
-	Locale = "sv"
-)
+// Page is one language's page: Source as written, Output as published, both
+// relative to the repository root.
+type Page struct {
+	Source, Output, Locale string
+}
+
+// Pages are the languages the site is published in. Swedish first, the
+// language of the first workshops; English for everyone else. Each is written
+// in its language rather than run through a machine -- and every word the
+// product would say comes from the product's catalogue for that language.
+var Pages = []Page{
+	{Source: "site/src/index.html", Output: "site/index.html", Locale: "sv"},
+	{Source: "site/src/en/index.html", Output: "site/en/index.html", Locale: "en"},
+}
+
+// Shared holds what every page uses that is not words: icons, drawings, and
+// how a job's progress is laid out.
+const Shared = "site/src/shared.html"
 
 // Repository is where the page links its tests.
 const Repository = "https://github.com/RedaEkengren/FreeSMS/blob/main/"
@@ -65,7 +78,7 @@ type sceneInvoice struct {
 	Verification    []string
 }
 
-func invoiceFor(kind, description string, quantityMilli int, unitMinor int64, customer string, number int, issued string) (sceneInvoice, error) {
+func invoiceFor(locale, kind, description string, quantityMilli int, unitMinor int64, customer string, number int, issued string) (sceneInvoice, error) {
 	day, err := time.ParseInLocation("2006-01-02", issued, stockholm)
 	if err != nil {
 		return sceneInvoice{}, err
@@ -116,7 +129,7 @@ func invoiceFor(kind, description string, quantityMilli int, unitMinor int64, cu
 		}
 	}
 
-	show := money.DisplayFor(Locale, "SEK")
+	show := money.DisplayFor(locale, "SEK")
 	return sceneInvoice{
 		Reference:    fmt.Sprintf("A-%d", number),
 		Description:  description,
@@ -136,8 +149,9 @@ type sceneTotals struct {
 	Cash, Rounding string
 }
 
-// Generate renders the page from the repository at root.
-func Generate(root string) ([]byte, error) {
+// Generate renders one language's page from the repository at root.
+func Generate(root string, page Page) ([]byte, error) {
+	Locale := page.Locale
 	// Strict: a word nobody translated comes out marked rather than in
 	// English, and is refused below.
 	cats, err := i18n.Load("en", true)
@@ -170,6 +184,8 @@ func Generate(root string) ([]byte, error) {
 		},
 		// A day in the shop's calendar, "2006-01-02".
 		"day": func(v string) (time.Time, error) { return time.ParseInLocation("2006-01-02", v, stockholm) },
+		// A moment on the shop's wall clock, "2006-01-02 15:04".
+		"at": func(v string) (time.Time, error) { return time.ParseInLocation("2006-01-02 15:04", v, stockholm) },
 		// An amount as the product prints it.
 		"money": func(minor int64) string { return money.DisplayFor(Locale, "SEK").Amount(minor) },
 		// Numbers and dates as the reader's language writes them.
@@ -200,7 +216,7 @@ func Generate(root string) ([]byte, error) {
 		// An invoice of one line, totalled by the product's money code and
 		// booked by its accounting code, as the scene shows it.
 		"invoice": func(kind, description string, quantityMilli int, unitMinor int64, customer string, number int, issued string) (sceneInvoice, error) {
-			return invoiceFor(kind, description, quantityMilli, unitMinor, customer, number, issued)
+			return invoiceFor(Locale, kind, description, quantityMilli, unitMinor, customer, number, issued)
 		},
 		// Whether a role is given a customer's personal data, as the
 		// product decides it where the data is read.
@@ -247,12 +263,20 @@ func Generate(root string) ([]byte, error) {
 		},
 	}
 
-	raw, err := os.ReadFile(filepath.Join(root, Source))
+	raw, err := os.ReadFile(filepath.Join(root, page.Source))
 	if err != nil {
 		return nil, err
 	}
 	tmpl, err := template.New("index").Funcs(funcs).Parse(string(raw))
 	if err != nil {
+		return nil, err
+	}
+	// Definitions only, so it adds to the page rather than replacing it.
+	if shared, err := os.ReadFile(filepath.Join(root, Shared)); err == nil {
+		if tmpl, err = tmpl.Parse(string(shared)); err != nil {
+			return nil, err
+		}
+	} else if !os.IsNotExist(err) {
 		return nil, err
 	}
 	var out bytes.Buffer
@@ -262,7 +286,13 @@ func Generate(root string) ([]byte, error) {
 	// After the doctype, which has to come first.
 	doctype, rest, _ := strings.Cut(out.String(), "\n")
 	out.Reset()
-	out.WriteString(doctype + "\n<!-- Generated from " + Source + " by go run ./cmd/site. Edit that, not this. -->\n" + rest)
+	out.WriteString(doctype + "\n<!-- Generated from " + page.Source + " by go run ./cmd/site. Edit that, not this. -->\n" + rest)
+	still, err := stillFrames(out.String())
+	if err != nil {
+		return nil, err
+	}
+	out.Reset()
+	out.WriteString(still)
 	for _, line := range strings.Split(out.String(), "\n") {
 		if strings.Contains(line, "!!") {
 			missing = append(missing, strings.TrimSpace(line))
@@ -272,4 +302,74 @@ func Generate(root string) ([]byte, error) {
 		return nil, fmt.Errorf("site: untranslated words on the page:\n%s", strings.Join(missing, "\n"))
 	}
 	return out.Bytes(), nil
+}
+
+var (
+	sceneWrap = regexp.MustCompile(`<div class="an-wrap" data-loop="([0-9.]+)" data-still="([0-9.]+)">`)
+	timed     = regexp.MustCompile(`data-t="([0-9.]+)(?:,([0-9.]+))?"`)
+)
+
+// stillFrames marks, in every scene with a still, each timed element that is
+// not on screen at that moment, by the engine's own rule: on from its first
+// time until its second, or until half a second before the loop ends.
+//
+// Without JavaScript the engine never runs, and every element of a scene is
+// on screen at once. That read as the finished state while scenes only ever
+// added to themselves; a scene with chapters that come and go is fourteen
+// screens on top of each other. The marked elements are hidden until the
+// engine takes over, so a page with no script shows the still frame -- the
+// same frame reduced motion shows.
+func stillFrames(page string) (string, error) {
+	starts := sceneWrap.FindAllStringSubmatchIndex(page, -1)
+	var out strings.Builder
+	last := 0
+	for i, m := range starts {
+		end := len(page)
+		if i+1 < len(starts) {
+			end = starts[i+1][0]
+		}
+		loop, err := strconv.ParseFloat(page[m[2]:m[3]], 64)
+		if err != nil {
+			return "", err
+		}
+		still, err := strconv.ParseFloat(page[m[4]:m[5]], 64)
+		if err != nil {
+			return "", err
+		}
+		scene := page[m[0]:end]
+		var marked strings.Builder
+		at := 0
+		for _, t := range timed.FindAllStringSubmatchIndex(scene, -1) {
+			on, _ := strconv.ParseFloat(scene[t[2]:t[3]], 64)
+			off := loop - .5
+			if t[4] >= 0 {
+				off, _ = strconv.ParseFloat(scene[t[4]:t[5]], 64)
+			}
+			if still >= on && still < off {
+				continue
+			}
+			tagStart := strings.LastIndex(scene[:t[0]], "<")
+			tagEnd := tagStart + strings.Index(scene[tagStart:], ">")
+			if tagStart < at || tagEnd < t[1] {
+				return "", fmt.Errorf("site: cannot find the element around %s", scene[t[0]:t[1]])
+			}
+			tag := scene[tagStart:tagEnd]
+			if c := strings.Index(tag, `class="`); c >= 0 {
+				q := tagStart + c + len(`class="`)
+				q += strings.Index(scene[q:], `"`)
+				marked.WriteString(scene[at:q] + " an-off")
+				at = q
+			} else {
+				name := tagStart + 1 + strings.IndexAny(scene[tagStart+1:], " >")
+				marked.WriteString(scene[at:name] + ` class="an-off"`)
+				at = name
+			}
+		}
+		marked.WriteString(scene[at:])
+		out.WriteString(page[last:m[0]])
+		out.WriteString(marked.String())
+		last = end
+	}
+	out.WriteString(page[last:])
+	return out.String(), nil
 }

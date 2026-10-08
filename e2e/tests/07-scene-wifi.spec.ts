@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { tech, desk, signIn, signOut, leave, readIn, collectAlerts, pricedJob } from './helpers';
+import { tech, desk, signIn, signOut, leave, readIn, collectAlerts, pricedJob, shopLanguage } from './helpers';
 
 // The marketing page's first scene, performed against the real product.
 // site/src/index.html links this test, and the site generator refuses to
@@ -10,7 +10,7 @@ import { tech, desk, signIn, signOut, leave, readIn, collectAlerts, pricedJob } 
 // the scene's words.
 
 test.describe.serial('the wifi scene', () => {
-  test('the wifi goes down in the pit, and the front desk still hears about it', async ({ page, context }) => {
+  test('the wifi goes down in the pit, and the front desk still hears about it', async ({ page, context, browser }) => {
     // The car is in, priced and approved, and the technician is on it with
     // the clock running.
     await signIn(page, desk);
@@ -26,6 +26,8 @@ test.describe.serial('the wifi scene', () => {
 
     let phone = page;
     try {
+      // A Swedish workshop: the sign-in page speaks the workshop's language.
+      await shopLanguage(browser, 'sv');
       await readIn(phone, 'sv');
       await phone.goto(job);
       await expect(phone.getByText('Under arbete').first()).toBeVisible();
@@ -42,12 +44,20 @@ test.describe.serial('the wifi scene', () => {
       await expect.poll(() => alerts.join(' ')).toBe('Ingen anslutning. Det här hålls och skickas när det finns en anslutning.');
       await expect(phone.locator('#held')).toHaveText('1 sak väntar på att skickas.');
 
-      // A locked screen, a closed tab: it waits in the phone.
+      // A locked screen, a closed tab: it waits in the phone -- long enough
+      // for the session to run out.
       await phone.close();
+      await context.clearCookies();
       await context.setOffline(false);
       phone = await context.newPage();
       await phone.goto(job);
-      // Opened with a connection, the phone sends what it held.
+      // The phone opens on the sign-in page and sends nothing until the
+      // same person is back. It says nothing about the work there either:
+      // nobody is signed in, and on a shared phone it may not be theirs.
+      await expect(phone).toHaveURL(/\/login/);
+      await expect(phone.locator('#held')).toBeHidden();
+      await signIn(phone, tech);
+      await phone.goto(job);
       await expect(phone.locator('#held')).toBeHidden();
       await leave(phone);
 
@@ -60,6 +70,7 @@ test.describe.serial('the wifi scene', () => {
       await expect(card).toContainText(`${tech.name} jobbar på den`);
     } finally {
       // The rest of the suite reads English.
+      await shopLanguage(browser, 'en');
       await context.setOffline(false);
       await readIn(phone, '');
       await leave(phone);
