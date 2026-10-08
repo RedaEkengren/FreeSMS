@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
@@ -84,7 +85,7 @@ func TestSomebodyAwayLeavesTheirBookingsNeedingSomebodyElse(t *testing.T) {
 		}
 		rows, _ := workshop.PlannerRows(ctx, pool, advisor())
 		bookings, _ := workshop.BookingsBetween(ctx, pool, advisor(), from, to)
-		return workshop.BuildWeek(from, 1, rows, bookings, cap, stockholm)[0]
+		return workshop.BuildWeek(from, 1, rows, bookings, cap, time.Time{}, stockholm)[0]
 	}
 	var lane *workshop.PlannerLane
 	day := week()
@@ -117,7 +118,7 @@ func TestOnePersonWithTwoCarsAndMoreCarsThanLiftsAreShown(t *testing.T) {
 		{ID: "c", TechnicianID: "t1", Starts: at(day, 11, 0), Ends: at(day, 12, 0)},
 		{ID: "d", TechnicianID: "t2", Starts: at(day, 9, 30), Ends: at(day, 10, 30)},
 	}
-	got := workshop.BuildWeek(at(day, 0, 0), 1, rows, bookings, workshop.Capacity{Lifts: 2}, stockholm)[0]
+	got := workshop.BuildWeek(at(day, 0, 0), 1, rows, bookings, workshop.Capacity{Lifts: 2}, time.Time{}, stockholm)[0]
 	clash := map[string]bool{}
 	for _, l := range got.Lanes {
 		for _, b := range l.Blocks {
@@ -131,7 +132,7 @@ func TestOnePersonWithTwoCarsAndMoreCarsThanLiftsAreShown(t *testing.T) {
 	if want := []string{"09:30–10:00"}; !reflect.DeepEqual(got.LiftsOver, want) {
 		t.Errorf("more cars than lifts = %q, want %q", got.LiftsOver, want)
 	}
-	if none := workshop.BuildWeek(at(day, 0, 0), 1, rows, bookings, workshop.Capacity{}, stockholm)[0]; none.LiftsOver != nil {
+	if none := workshop.BuildWeek(at(day, 0, 0), 1, rows, bookings, workshop.Capacity{}, time.Time{}, stockholm)[0]; none.LiftsOver != nil {
 		t.Errorf("no lifts given is not limited, got %q", none.LiftsOver)
 	}
 }

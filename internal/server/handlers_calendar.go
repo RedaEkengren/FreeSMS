@@ -66,7 +66,7 @@ func (s *Server) handleCalendar(w http.ResponseWriter, r *http.Request) {
 			Monday:    monday,
 			Prev:      monday.AddDate(0, 0, -7).Format("2006-01-02"),
 			Next:      monday.AddDate(0, 0, 7).Format("2006-01-02"),
-			Days:      workshop.BuildWeek(monday, days, rows, bookings, capacity, loc),
+			Days:      workshop.BuildWeek(monday, days, rows, bookings, capacity, time.Now(), loc),
 			Rows:      rows,
 			HourMarks: workshop.PlannerHours(),
 			Query:     q,

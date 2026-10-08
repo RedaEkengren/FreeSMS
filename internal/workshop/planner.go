@@ -2,6 +2,7 @@ package workshop
 
 import (
 	"fmt"
+	"sort"
 	"time"
 )
 
@@ -32,6 +33,14 @@ type PlannerBlock struct {
 	Away bool
 	// Overlaps another booking on the same row: one person, two cars.
 	Clash bool
+	// Minutes the car is past its slot with its job still open.
+	Overrun int
+	// Minutes this booking is expected to start late because the work
+	// before it on the row runs over, and whose work that is. Shown, never
+	// moved: whether to ring the customer, give the car to somebody else or
+	// stay late is a person's decision.
+	Late      int
+	LateAfter string
 }
 
 // PlannerLane is one row of a day.
@@ -63,7 +72,7 @@ func PlannerHours() []int {
 }
 
 // BuildWeek lays bookings out over days days from first, in the shop's zone.
-func BuildWeek(first time.Time, days int, rows []PlannerRow, bookings []Booking, capacity Capacity, loc *time.Location) []PlannerDay {
+func BuildWeek(first time.Time, days int, rows []PlannerRow, bookings []Booking, capacity Capacity, now time.Time, loc *time.Location) []PlannerDay {
 	unassigned := PlannerRow{ID: "", Name: ""}
 	all := append(append([]PlannerRow{}, rows...), unassigned)
 	var out []PlannerDay
@@ -98,6 +107,9 @@ func BuildWeek(first time.Time, days int, rows []PlannerRow, bookings []Booking,
 				day.Count++
 			}
 			markClashes(lane.Blocks)
+			if r.ID != "" {
+				markLate(lane.Blocks, now)
+			}
 			// An empty "not given to anybody" row is noise.
 			if r.ID == "" && len(lane.Blocks) == 0 {
 				continue
@@ -188,4 +200,53 @@ func liftsOver(lanes []PlannerLane, lifts int) []string {
 		s = e
 	}
 	return out
+}
+
+// markLate carries an overrun down one person's day. Each booking starts
+// when it was booked or when the work before it is expected to end,
+// whichever is later, and takes its estimate -- or its slot, without one.
+// A job still open past its slot is expected to end no earlier than now.
+func markLate(blocks []PlannerBlock, now time.Time) {
+	order := make([]int, len(blocks))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(a, b int) bool {
+		return blocks[order[a]].Booking.Starts.Before(blocks[order[b]].Booking.Starts)
+	})
+	var free time.Time
+	var cause string
+	for _, i := range order {
+		blk := &blocks[i]
+		b := blk.Booking
+		start := b.Starts
+		if free.After(start) && !blk.Clash {
+			blk.Late = int(free.Sub(start).Minutes())
+			blk.LateAfter = cause
+			start = free
+		}
+		work := b.Ends.Sub(b.Starts)
+		if b.EstimateMinutes != nil && time.Duration(*b.EstimateMinutes)*time.Minute > work {
+			work = time.Duration(*b.EstimateMinutes) * time.Minute
+		}
+		end := start.Add(work)
+		if b.JobOpen && now.After(b.Ends) {
+			blk.Overrun = int(now.Sub(b.Ends).Minutes())
+			if now.After(end) {
+				end = now
+			}
+		}
+		// The cause stays where the lateness began: three cars down a
+		// morning, the third is late because of the first.
+		if end.After(free) {
+			free = end
+			switch {
+			case blk.Late > 0:
+			case end.After(b.Ends):
+				cause = b.Registration
+			default:
+				cause = ""
+			}
+		}
+	}
 }

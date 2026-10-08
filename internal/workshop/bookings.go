@@ -34,6 +34,8 @@ type Booking struct {
 	WorkOrderID     string
 	CreatedAt       time.Time
 	CreatedBy       string
+	// The car is in and its job is not finished yet.
+	JobOpen bool
 }
 
 // EstimateHours is the work expected, as a page writes hours.
@@ -78,20 +80,22 @@ const bookingColumns = `
 	b.id, b.starts_at, b.ends_at, coalesce(b.technician_id::text, ''), coalesce(tp.display_name, ''),
 	coalesce(b.registration, ''), coalesce(b.customer_name, ''), coalesce(b.customer_phone, ''),
 	b.what, b.estimate_minutes, b.parts_needed, b.status, coalesce(b.work_order_id::text, ''),
-	b.created_at, coalesce(cp.display_name, '')`
+	b.created_at, coalesce(cp.display_name, ''),
+	coalesce(w.state NOT IN ('ready', 'invoiced', 'closed', 'declined', 'cancelled'), false)`
 
 const bookingFrom = `
 	FROM bookings b
 	LEFT JOIN users tu  ON tu.id = b.technician_id
 	LEFT JOIN people tp ON tp.id = tu.person_id
 	LEFT JOIN users cu  ON cu.id = b.created_by
-	LEFT JOIN people cp ON cp.id = cu.person_id`
+	LEFT JOIN people cp ON cp.id = cu.person_id
+	LEFT JOIN work_orders w ON w.id = b.work_order_id`
 
 func scanBooking(row pgx.Row) (Booking, error) {
 	var b Booking
 	err := row.Scan(&b.ID, &b.Starts, &b.Ends, &b.TechnicianID, &b.Technician,
 		&b.Registration, &b.CustomerName, &b.CustomerPhone, &b.What, &b.EstimateMinutes,
-		&b.PartsNeeded, &b.Status, &b.WorkOrderID, &b.CreatedAt, &b.CreatedBy)
+		&b.PartsNeeded, &b.Status, &b.WorkOrderID, &b.CreatedAt, &b.CreatedBy, &b.JobOpen)
 	return b, err
 }
 

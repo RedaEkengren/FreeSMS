@@ -1607,6 +1607,18 @@
     },
     "Away, back, shut, open or lifts.": {
       "other": "Borta, tillbaka, stäng, öppna eller liftar."
+    },
+    "starts late": {
+      "other": "börjar sent"
+    },
+    "still on it, %d min over": {
+      "other": "pågår fortfarande, %d min över"
+    },
+    "about %d min late, after %s": {
+      "other": "ca %d min sent, efter %s"
+    },
+    "about %d min late": {
+      "other": "ca %d min sent"
     }
   }
 }

@@ -29,6 +29,7 @@
   <span class="pb pb-parts">{{$.T "parts to get in"}}</span>
   <span class="pb pb-over">{{$.T "work longer than the slot"}}</span>
   <span class="pb pb-short">{{$.T "needs somebody else"}}</span>
+  <span class="pb pb-late">{{$.T "starts late"}}</span>
 </p>
 
 {{range .Days}}
@@ -52,11 +53,13 @@
       <button type="submit" class="link">{{$.T "Here after all"}}</button></form>{{end}}</div>
   <div class="pl-lane{{if .Away}} pl-away{{end}}">
     {{range .Blocks}}
-    <a class="pb {{printf "cs-%d" .Start}} {{printf "cd-%d" .Span}}{{if .Away}} pb-short{{else if .Clash}} pb-short{{else if eq .Booking.Status "arrived"}} pb-arrived{{else if .Booking.Overbooked}} pb-over{{else if .Booking.PartsNeeded}} pb-parts{{end}}" href="/bookings/{{.Booking.ID}}">
+    <a class="pb {{printf "cs-%d" .Start}} {{printf "cd-%d" .Span}}{{if .Away}} pb-short{{else if .Clash}} pb-short{{else if .Overrun}} pb-over{{else if .Late}} pb-late{{else if eq .Booking.Status "arrived"}} pb-arrived{{else if .Booking.Overbooked}} pb-over{{else if .Booking.PartsNeeded}} pb-parts{{end}}" href="/bookings/{{.Booking.ID}}">
       <span class="pb-time">{{$.Date ($.Local .Booking.Starts) "15:04"}}&ndash;{{$.Date ($.Local .Booking.Ends) "15:04"}}{{if .Clipped}} &hellip;{{end}}</span>
       <b>{{if .Booking.Registration}}{{.Booking.Registration}}{{else}}{{$.T "no plate yet"}}{{end}}</b>
       <span>{{.Booking.What}}</span>
       {{if .Away}}<span>{{$.T "needs somebody else"}}</span>{{else if .Clash}}<span>{{$.T "two cars at once"}}</span>{{end}}
+      {{if .Overrun}}<span>{{$.T "still on it, %d min over" .Overrun}}</span>{{end}}
+      {{if .Late}}<span>{{if .LateAfter}}{{$.T "about %d min late, after %s" .Late .LateAfter}}{{else}}{{$.T "about %d min late" .Late}}{{end}}</span>{{end}}
     </a>
     {{end}}
   </div>

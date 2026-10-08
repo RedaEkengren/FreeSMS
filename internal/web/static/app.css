@@ -494,6 +494,8 @@ a.brand { font-weight: 600; text-decoration: none; color: inherit; }
 /* Somebody is missing: the row's person is away, or has two cars at once.
    A dashed edge rather than a colour, so it reads on top of any status. */
 .pb-short { background: var(--surface); color: var(--text); outline: 2px dashed var(--attention); outline-offset: -2px; }
+/* Expected to start late: the work before it runs over. Shown, not moved. */
+.pb-late { background: var(--surface); color: var(--text); border-left: 4px solid var(--attention); }
 .pl-away { background: repeating-linear-gradient(135deg, var(--surface) 0 6px, var(--border) 6px 8px); }
 .pl-note { border-left: 3px solid var(--attention); padding: 0.25rem 0.75rem; margin: 0.25rem 0; }
 form.inline { display: inline; }
