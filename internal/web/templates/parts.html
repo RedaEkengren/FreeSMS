@@ -11,9 +11,25 @@
     <div class="vehicle">{{.Make}} {{.Model}}</div>
     <div class="complaint">{{.Description}}</div>
     <div class="waiting">{{$.T "Asked for by %s" .RequestedBy}}</div>
+    {{/* Part of it having come is the normal case, said as such. */}}
+    <div class="waiting">{{if .Partly}}<span class="tag warranty">{{$.T "%s of %s here, %s to come" ($.Num .Received) ($.Num .Quantity) ($.Num .Rest)}}</span>{{else}}{{$.T "%s asked for" ($.Num .Quantity)}}{{end}}</div>
     <form class="mt-m" method="post" action="/parts/arrived" data-offline>
+      {{/* The answer is the button pressed. Enter in the quantity would
+           press the first one and record a delivery nobody chose; a disabled
+           default makes Enter do nothing. */}}
+      <button type="submit" disabled hidden aria-hidden="true" tabindex="-1"></button>
       <input type="hidden" name="request_id" value="{{.ID}}">
-      <button type="submit">{{$.T "It has arrived"}}</button>
+      <label><span>{{$.T "How many came"}}</span><input name="quantity" value="{{$.Num .Rest}}" inputmode="decimal"></label>
+      <div class="actions">
+        <button type="submit" name="action" value="delivery">{{$.T "It has arrived"}}</button>
+        <button type="submit" name="action" value="shelf" class="secondary">{{$.T "Taken from the shelf"}}</button>
+      </div>
+    </form>
+    <form class="mt-s" method="post" action="/parts/arrived" data-offline>
+      <input type="hidden" name="request_id" value="{{.ID}}">
+      <input type="hidden" name="action" value="cancel">
+      <label><span>{{$.T "Not coming, because"}}</span><input name="reason" placeholder="{{$.T "The supplier cannot deliver it"}}" required></label>
+      <button type="submit" class="secondary">{{$.T "Stop waiting for it"}}</button>
     </form>
   </div>
   {{end}}

@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
@@ -34,7 +35,17 @@ func (s *Server) handleRequestPart(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	id := r.PathValue("id")
 
-	err := workshop.RequestPart(r.Context(), s.pool, session.Scope, id, r.FormValue("description"))
+	quantity := 1.0
+	if v := strings.TrimSpace(r.FormValue("quantity")); v != "" {
+		q, err := parseScaled(v, 3)
+		if err != nil || q <= 0 {
+			s.renderError(w, r, http.StatusBadRequest, "That quantity did not parse",
+				"Write it as a number, with a comma or a full stop: 1,5 or 1.5.")
+			return
+		}
+		quantity = float64(q) / 1000
+	}
+	err := workshop.RequestParts(r.Context(), s.pool, session.Scope, id, r.FormValue("description"), quantity)
 	if s.handoverError(w, r, err) {
 		return
 	}
@@ -44,7 +55,29 @@ func (s *Server) handleRequestPart(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handlePartArrived(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 
-	err := workshop.MarkPartArrived(r.Context(), s.pool, session.Scope, r.FormValue("request_id"))
+	requestID := r.FormValue("request_id")
+	var err error
+	switch r.FormValue("action") {
+	case "cancel":
+		err = workshop.CancelPartRequest(r.Context(), s.pool, session.Scope, requestID, r.FormValue("reason"))
+	default:
+		// Empty is whatever is still owed.
+		var quantity float64
+		if v := strings.TrimSpace(r.FormValue("quantity")); v != "" {
+			q, perr := parseScaled(v, 3)
+			if perr != nil || q <= 0 {
+				s.renderError(w, r, http.StatusBadRequest, "That quantity did not parse",
+					"Write it as a number, with a comma or a full stop: 1,5 or 1.5.")
+				return
+			}
+			quantity = float64(q) / 1000
+		}
+		source := "delivery"
+		if r.FormValue("action") == "shelf" {
+			source = "shelf"
+		}
+		err = workshop.ReceivePart(r.Context(), s.pool, session.Scope, requestID, quantity, source)
+	}
 	if s.handoverError(w, r, err) {
 		return
 	}

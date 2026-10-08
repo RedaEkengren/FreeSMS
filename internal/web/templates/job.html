@@ -153,7 +153,8 @@
   <li>
     <div class="row">
       <span>{{.Description}}</span>
-      {{if .Open}}<span class="tag warranty">{{$.T "waiting"}}</span>
+      {{if .Partly}}<span class="tag warranty">{{$.T "%s of %s here, %s to come" ($.Num .Received) ($.Num .Quantity) ($.Num .Rest)}}</span>
+      {{else if .Open}}<span class="tag warranty">{{$.T "waiting"}}</span>
       {{else if .ArrivedAt}}<span class="tag">{{$.T "arrived"}}</span>
       {{else}}<span class="tag">{{$.T "cancelled"}}</span>{{end}}
     </div>
@@ -442,10 +443,13 @@
 {{if not .Session.Scope.Role.SeesCustomerPersonalData}}
 <h2>{{.T "Hand it on"}}</h2>
 <form method="post" action="/jobs/{{.Job.ID}}/parts" data-offline>
+  <div class="pair">
   <label>
     <span>{{.T "I need a part to carry on"}}</span>
-    <input name="description" placeholder="Track rod end, left front">
+    <input name="description" placeholder="{{.T "Track rod end, left front"}}">
   </label>
+  <label><span>{{.T "How many"}}</span><input name="quantity" value="1" inputmode="decimal"></label>
+  </div>
   <button type="submit" class="secondary">{{.T "Ask the parts desk"}}</button>
 </form>
 <form class="mt" method="post" action="/jobs/{{.Job.ID}}/findings" data-offline>
