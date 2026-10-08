@@ -33,6 +33,7 @@ var everyRole = map[string]string{
 	"ChangePassword": "the caller's own password, checked against the current one",
 	"MyLocale":       "the caller's own language", "SetMyLocale": "the caller's own language",
 	"AlertSound": "the caller's own setting", "SetAlertSound": "the caller's own setting",
+	"ScheduleFor": "the caller's own schedule and clocked hours", "MarkScheduleSeen": "the caller's own schedule",
 	// Each role is given its own kind of item, decided inside by role; the
 	// technician's carry the job and the shop's own words, never a customer.
 	"WaitingFor": "what is waiting for the caller, per role", "CountWaiting": "how many of WaitingFor",
@@ -86,7 +87,8 @@ func TestEveryOperationSaysWhoMayCallIt(t *testing.T) {
 					}
 					checked++
 					body := string(src[fset.Position(fn.Body.Pos()).Offset:fset.Position(fn.Body.End()).Offset])
-					checks := strings.Contains(body, "scope.Role.") || strings.Contains(body, "(scope.Role,")
+					checks := strings.Contains(body, "scope.Role.") || strings.Contains(body, "(scope.Role,") ||
+						strings.Contains(body, "scope.PlansStaff()")
 					_, open := everyRole[fn.Name.Name]
 					switch {
 					case !checks && !open:

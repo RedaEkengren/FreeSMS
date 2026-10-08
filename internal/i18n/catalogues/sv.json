@@ -1655,6 +1655,105 @@
     },
     "Off unless you turn it on. A browser plays it only once you have touched the page.": {
       "other": "Avstängt tills du slår på det. En webbläsare spelar det först när du har rört vid sidan."
+    },
+    "Only %s hours' rest in this week; the law asks for 36": {
+      "other": "Bara %s timmars vila den här veckan; lagen kräver 36"
+    },
+    "Only %s hours' rest before this shift; the law asks for 11": {
+      "other": "Bara %s timmars vila före det här passet; lagen kräver 11"
+    },
+    "not on the rota today": {
+      "other": "inte i tjänst idag"
+    },
+    "Your schedule has changed": {
+      "other": "Ditt schema har ändrats"
+    },
+    "outside their hours": {
+      "other": "utanför personens tider"
+    },
+    "Rota": {
+      "other": "Schema"
+    },
+    "Your own schedule, and what you clocked": {
+      "other": "Ditt eget schema, och vad du stämplat"
+    },
+    "changed": {
+      "other": "ändrat"
+    },
+    "off": {
+      "other": "ledig"
+    },
+    "Change a day": {
+      "other": "Ändra en dag"
+    },
+    "Who": {
+      "other": "Vem"
+    },
+    "Change the day": {
+      "other": "Ändra dagen"
+    },
+    "Back to the rota": {
+      "other": "Tillbaka till schemat"
+    },
+    "A new rota": {
+      "other": "Nytt schema"
+    },
+    "Usual hours from a date, repeating every week or every second week. The rota before it stays, for the days before.": {
+      "other": "Vanliga tider från ett datum, varje vecka eller varannan vecka. Schemat före ligger kvar, för dagarna innan."
+    },
+    "Repeats": {
+      "other": "Upprepas"
+    },
+    "every week": {
+      "other": "varje vecka"
+    },
+    "every second week (A and B)": {
+      "other": "varannan vecka (A och B)"
+    },
+    "Week A": {
+      "other": "Vecka A"
+    },
+    "Week B, if every second week": {
+      "other": "Vecka B, om varannan vecka"
+    },
+    "A day left empty is a day off. A shift that ends before it starts ends the next morning.": {
+      "other": "En tom dag är en ledig dag. Ett pass som slutar före det börjar slutar nästa morgon."
+    },
+    "Save the rota": {
+      "other": "Spara schemat"
+    },
+    "My schedule": {
+      "other": "Mitt schema"
+    },
+    "Your hours for this week and the next, and what you clocked. Only you see what you clocked.": {
+      "other": "Dina tider den här veckan och nästa, och vad du stämplat. Bara du ser vad du stämplat."
+    },
+    "no rota": {
+      "other": "inget schema"
+    },
+    "clocked %s h": {
+      "other": "stämplat %s h"
+    },
+    "on the rota %s h": {
+      "other": "enligt schemat %s h"
+    },
+    "Who is in when": {
+      "other": "Vem är på plats när"
+    },
+    "Stop them planning staff": {
+      "other": "Låt dem inte planera personal"
+    },
+    "Let them plan staff": {
+      "other": "Låt dem planera personal"
+    },
+    "plans staff": {
+      "other": "planerar personal"
+    },
+    "A rota repeats every one to four weeks.": {
+      "other": "Ett schema upprepas var en till fyra veckor."
+    },
+    "A rota, a day, away or back.": {
+      "other": "Ett schema, en dag, borta eller tillbaka."
     }
   }
 }

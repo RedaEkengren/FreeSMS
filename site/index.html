@@ -251,6 +251,7 @@
     <button type="button" role="tab" data-tab="4">Två skärmar</button>
     <button type="button" role="tab" data-tab="5">Planeringen</button>
     <button type="button" role="tab" data-tab="6">Till mig</button>
+    <button type="button" role="tab" data-tab="7">Schemat</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -716,6 +717,59 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i tre webbläsare, en per roll, och testet kontrollerar att ingen sida laddades om &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/15-scene-for-me.spec.ts">läs testet</a>. Registreringsnummer och namn är <span class="wf-example">exempel</span>.</p>
+</section>
+
+
+<section class="scene pane" role="tabpanel">
+  <h2>Schemat, och vem som får veta vad</h2>
+  <p class="lede">Den som planerar personal lägger veckan och flyttar en dag. Lagens vila varnas för, inte förbjuds &ndash; kollektivavtal skiljer sig. Den det gäller får veta att schemat ändrats. Kollegor ser att någon är borta, inte varför: sjukdom är hälsouppgifter.</p>
+
+  <div class="an-wrap" data-loop="20" data-still="16">
+    <div class="an-canvas" role="img" aria-label="Animering: i schemat flyttas Eriks torsdag till 14:00–23:00, och schemat varnar Bara 8,0 timmars vila före det här passet; lagen kräver 11. Hos Erik står det Ditt schema har ändrats, och hans schema visar torsdagen som ändrad. Erik är sjuk på onsdagen: disken ser borta, Erik ser sjuk.">
+
+      <div class="an-card ro-card an-fade an-off" data-t="0,6.4">
+        <div class="an-head"><span class="an-dots"></span><span>Schema &middot; Veckan från 19 okt</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <table class="ro-table">
+            <tr><th></th><th>mån 19</th><th>tis 20</th><th>ons 21</th><th>tor 22</th><th>fre 23</th></tr>
+            <tr><th>Erik</th><td>07:00–16:00</td><td>07:00–16:00</td><td>07:00–16:00</td>
+              <td class="ro-stack"><span class="an-fade an-off" data-t="0,1.6">07:00–16:00</span><span class="an-fade ro-changed" data-t="1.6">14:00–23:00 <i>ändrat</i></span></td><td>07:00–16:00</td></tr>
+          </table>
+          <div class="pn-note an-fade" data-t="2.8">Bara 8,0 timmars vila före det här passet; lagen kräver 11 &middot; fre 23 okt</div>
+        </div>
+      </div>
+
+      <div class="an-card wf-phone ro-phone an-fade an-off" data-t="6.6,13">
+        <div class="an-head"><span class="an-dots"></span><span>Erik</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack">
+            <div class="an-fade an-off" data-t="0,9.4"><div class="wf-h">Till mig <span class="fm-count">1</span></div>
+              <div class="fm-item">Ditt schema har ändrats</div></div>
+            <div class="an-fade" data-t="9.4"><div class="wf-h">Mitt schema</div>
+              <div class="ro-day"><b>ons 21 okt</b><span>07:00–16:00</span></div>
+              <div class="ro-day"><b>tor 22 okt</b><span>14:00–23:00 <span class="ro-tag">ändrat</span></span></div>
+              <div class="ro-day"><b>fre 23 okt</b><span>07:00–16:00</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-card ro-half ro-left an-pop" data-t="13.2">
+        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning</span></div>
+        <div class="wf-body"><div class="ro-day"><b>Erik &middot; ons 21 okt</b><span class="ro-away">borta</span></div></div>
+      </div>
+      <div class="an-card ro-half ro-right an-pop" data-t="13.8">
+        <div class="an-head"><span class="an-dots"></span><span>Erik</span></div>
+        <div class="wf-body"><div class="ro-day"><b>ons 21 okt</b><span class="ro-away">sjuk</span></div></div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,2.6">Eriks torsdag flyttas till ett kvällspass.</div>
+      <div class="an-cap an-off" data-t="2.8,6.4">Åtta timmars vila till fredagens pass. Schemat säger till.</div>
+      <div class="an-cap an-off" data-t="6.6,9.2">Erik får veta att hans schema har ändrats.</div>
+      <div class="an-cap an-off" data-t="9.4,13">Han tittar, och då är det hanterat.</div>
+      <div class="an-cap" data-t="13.2,19.6">Sjuk på onsdagen: disken ser att han är borta, inte varför.</div>
+    </div>
+  </div>
+  <p class="truth">Orden och vilan räknas ut av produktens egen kod när sidan genereras. Flödet körs mot den riktiga produkten i tre webbläsare: schemat läggs, torsdagen flyttas, varningen visas, Erik får veta och läser, och disken ser &rdquo;borta&rdquo; där Erik ser &rdquo;sjuk&rdquo; &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/16-scene-rota.spec.ts">läs testet</a>. Namn är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

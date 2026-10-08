@@ -22,6 +22,8 @@ type StaffMember struct {
 	Email  string
 	Role   access.Role
 	Active bool
+	// Given the planning of people (rotas, absences).
+	Planner bool
 	// The person looking at the list. They cannot switch themselves off, so
 	// the page does not offer it.
 	You bool
@@ -41,7 +43,7 @@ func Staff(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Staff
 	var out []StaffMember
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
-			SELECT u.id, p.display_name, coalesce(p.email, ''), u.role, u.active
+			SELECT u.id, p.display_name, coalesce(p.email, ''), u.role, u.active, u.plans_staff
 			FROM users u JOIN people p ON p.id = u.person_id
 			ORDER BY NOT u.active, p.display_name`)
 		if err != nil {
@@ -51,7 +53,7 @@ func Staff(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Staff
 		for rows.Next() {
 			var m StaffMember
 			var role string
-			if err := rows.Scan(&m.UserID, &m.Name, &m.Email, &role, &m.Active); err != nil {
+			if err := rows.Scan(&m.UserID, &m.Name, &m.Email, &role, &m.Active, &m.Planner); err != nil {
 				return fmt.Errorf("scan staff: %w", err)
 			}
 			m.Role, m.You = access.Role(role), m.UserID == scope.UserID

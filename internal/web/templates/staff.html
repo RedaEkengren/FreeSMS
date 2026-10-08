@@ -13,7 +13,7 @@
       <span>{{.Name}}{{if .You}} ({{$.T "you"}}){{end}}</span>
       <span class="tag">{{$.T .Role.Label}}</span>
     </div>
-    <div class="waiting">{{.Email}}{{if not .Active}} &middot; {{$.T "switched off"}}{{end}}</div>
+    <div class="waiting">{{.Email}}{{if not .Active}} &middot; {{$.T "switched off"}}{{end}}{{if .Planner}} &middot; {{$.T "plans staff"}}{{end}}</div>
     {{if not .You}}
     <details class="mt-s">
       <summary>{{$.T "Change"}}</summary>
@@ -22,6 +22,16 @@
           <input type="password" name="password" autocomplete="new-password" minlength="{{$.MinPassword}}" required></label>
         <button type="submit" class="secondary">{{$.T "Set the password"}}</button>
       </form>
+      {{/* Planning people is given, not a role: in a larger workshop the
+           workshop manager plans the staff and does not run the money. */}}
+      {{if not .Role.RunsTheShop}}
+      <form class="mt-s" method="post" action="/staff/{{.UserID}}/planner">
+        {{if .Planner}}<input type="hidden" name="on" value="no">
+        <button type="submit" class="secondary">{{$.T "Stop them planning staff"}}</button>
+        {{else}}<input type="hidden" name="on" value="yes">
+        <button type="submit" class="secondary">{{$.T "Let them plan staff"}}</button>{{end}}
+      </form>
+      {{end}}
       <form class="mt-s" method="post" action="/staff/{{.UserID}}/active">
         {{if .Active}}
         <input type="hidden" name="active" value="no">

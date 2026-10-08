@@ -48,17 +48,18 @@
   {{range .Lanes}}
   <div class="pl-name">{{if .Row.Name}}{{.Row.Name}}{{else}}{{$.T "Not given to anybody"}}{{end}}
     {{if .Away}}<span class="waiting">{{$.T .Away}}</span>
+    {{if and $.Session.Scope.PlansStaff (ne .Away "not on the rota today")}}
     <form class="inline" method="post" action="/calendar/capacity">
       <input type="hidden" name="action" value="back"><input type="hidden" name="date" value="{{$day}}">
       <input type="hidden" name="user_id" value="{{.Row.ID}}">
-      <button type="submit" class="link">{{$.T "Here after all"}}</button></form>{{end}}</div>
+      <button type="submit" class="link">{{$.T "Here after all"}}</button></form>{{end}}{{end}}</div>
   <div class="pl-lane{{if .Away}} pl-away{{end}}">
     {{range .Blocks}}
-    <a class="pb {{printf "cs-%d" .Start}} {{printf "cd-%d" .Span}}{{if .Away}} pb-short{{else if .Clash}} pb-short{{else if .Overrun}} pb-over{{else if .Late}} pb-late{{else if eq .Booking.Status "arrived"}} pb-arrived{{else if .Booking.Overbooked}} pb-over{{else if .Booking.PartsNeeded}} pb-parts{{end}}" href="/bookings/{{.Booking.ID}}">
+    <a class="pb {{printf "cs-%d" .Start}} {{printf "cd-%d" .Span}}{{if .Away}} pb-short{{else if .Clash}} pb-short{{else if .OffShift}} pb-short{{else if .Overrun}} pb-over{{else if .Late}} pb-late{{else if eq .Booking.Status "arrived"}} pb-arrived{{else if .Booking.Overbooked}} pb-over{{else if .Booking.PartsNeeded}} pb-parts{{end}}" href="/bookings/{{.Booking.ID}}">
       <span class="pb-time">{{$.Date ($.Local .Booking.Starts) "15:04"}}&ndash;{{$.Date ($.Local .Booking.Ends) "15:04"}}{{if .Clipped}} &hellip;{{end}}</span>
       <b>{{if .Booking.Registration}}{{.Booking.Registration}}{{else}}{{$.T "no plate yet"}}{{end}}</b>
       <span>{{.Booking.What}}</span>
-      {{if .Away}}<span>{{$.T "needs somebody else"}}</span>{{else if .Clash}}<span>{{$.T "two cars at once"}}</span>{{end}}
+      {{if .Away}}<span>{{$.T "needs somebody else"}}</span>{{else if .Clash}}<span>{{$.T "two cars at once"}}</span>{{else if .OffShift}}<span>{{$.T "outside their hours"}}</span>{{end}}
       {{if .Overrun}}<span>{{$.T "still on it, %d min over" .Overrun}}</span>{{end}}
       {{if .Late}}<span>{{if .LateAfter}}{{$.T "about %d min late, after %s" .Late .LateAfter}}{{else}}{{$.T "about %d min late" .Late}}{{end}}</span>{{end}}
     </a>
@@ -95,18 +96,8 @@
   <button type="submit">{{$.T "Book it"}}</button>
 </form>
 
-<h2>{{$.T "Who is away"}}</h2>
-<form method="post" action="/calendar/capacity">
-  <input type="hidden" name="action" value="away">
-  <div class="pair">
-    <label><span>{{$.T "Technician"}}</span>
-      <select name="user_id" required>{{range .Rows}}{{if .ID}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}</select></label>
-    <label><span>{{$.T "Day"}}</span><input type="date" name="date" required></label>
-  </div>
-  <label><span>{{$.T "Why"}}</span>
-    <select name="reason">{{range $k, $v := .Reasons}}<option value="{{$k}}">{{$.T $v}}</option>{{end}}</select></label>
-  <button type="submit">{{$.T "Mark as away"}}</button>
-</form>
+{{/* Who is away, and everybody's hours, are set on the rota. */}}
+<p class="mt-l"><a href="/rota">{{$.T "Who is in when"}}</a></p>
 
 {{if $.Session.Scope.Role.RunsTheShop}}
 <h2>{{$.T "When the workshop is shut"}}</h2>

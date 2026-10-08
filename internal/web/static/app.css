@@ -550,3 +550,14 @@ form.inline { display: inline; }
 .count:empty { display: none; }
 .count { display: inline-block; min-width: 1.25rem; padding: 0 .35rem; margin-left: .15rem; border-radius: 999px;
   background: var(--attention); color: #fff; font-size: .75rem; font-weight: 700; line-height: 1.25rem; text-align: center; }
+
+/* The rota: a week of everybody's hours. Scrolls sideways in its own box on
+   a phone; the page never does. */
+.rota-scroll { overflow-x: auto; margin: .5rem 0 1rem; }
+table.rota { border-collapse: collapse; min-width: 44rem; width: 100%; font-size: .875rem; }
+table.rota th, table.rota td { border-bottom: 1px solid var(--border); padding: .4rem .5rem; text-align: left; white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.rota td.rota-away { background: repeating-linear-gradient(135deg, var(--surface) 0 6px, var(--border) 6px 8px); }
+table.rota td.rota-changed { box-shadow: inset 3px 0 0 var(--attention); }
+table.rota tr.rota-warn td { border-left: 3px solid var(--attention); color: var(--text); white-space: normal; }
+table.rota-form th { text-align: left; padding-right: .75rem; font-weight: 600; }
+table.rota-form td { padding: .15rem .25rem; }

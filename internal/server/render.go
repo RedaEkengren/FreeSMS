@@ -61,8 +61,11 @@ type pageData struct {
 	FinalSetting  workshop.FinalCheckSettings
 	MyLocale      string
 	// What is waiting for the person signed in, and the header's count of it.
-	Waiting       []workshop.WaitingItem
-	WaitingCount  int
+	Waiting      []workshop.WaitingItem
+	WaitingCount int
+	// Who is in when, and the person's own schedule.
+	Rota          rotaPage
+	Schedule      workshop.MySchedule
 	AlertSound    bool
 	Lines         []workshop.Line
 	Board         []workshop.BoardEntry
@@ -169,8 +172,11 @@ type setupForm = intakeForm
 var templateFuncs = template.FuncMap{
 	"fmt":    money.Format,
 	"divide": func(a, b int) int { return a / b },
-	"date":   func(t time.Time) string { return t.Format("2006-01-02") },
-	"asset":  web.Asset,
+	"add":    func(a, b int) int { return a + b },
+	// Minutes as hours with a point, for Num to write in the reader's way.
+	"hours": workshop.Hours,
+	"date":  func(t time.Time) string { return t.Format("2006-01-02") },
+	"asset": web.Asset,
 }
 
 // T renders a message in the reader's language.
@@ -323,7 +329,7 @@ func (d pageData) Plural(key string, count int) string {
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "shop", "customer", "checklists", "part", "staff", "account", "mine", "receivables", "setup", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "shop", "customer", "checklists", "part", "staff", "account", "mine", "rota", "schedule", "receivables", "setup", "error"}
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).Funcs(templateFuncs).ParseFS(web.Templates,

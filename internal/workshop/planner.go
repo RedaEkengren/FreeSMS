@@ -33,6 +33,8 @@ type PlannerBlock struct {
 	Away bool
 	// Overlaps another booking on the same row: one person, two cars.
 	Clash bool
+	// Outside the hours the technician is on the rota for that day.
+	OffShift bool
 	// Minutes the car is past its slot with its job still open.
 	Overrun int
 	// Minutes this booking is expected to start late because the work
@@ -88,9 +90,13 @@ func BuildWeek(first time.Time, days int, rows []PlannerRow, bookings []Booking,
 		}
 		for _, r := range all {
 			lane := PlannerLane{Row: r}
+			shift, onRota := capacity.Shifts[r.ID][key]
+			onRota = onRota && shift.Known
 			if r.ID != "" {
 				if reason, ok := capacity.Absent[r.ID][key]; ok {
 					lane.Away = AbsenceReasons[reason]
+				} else if onRota && !shift.Working {
+					lane.Away = "not on the rota today"
 				}
 			}
 			for _, b := range bookings {
@@ -103,6 +109,8 @@ func BuildWeek(first time.Time, days int, rows []PlannerRow, bookings []Booking,
 				}
 				blk := place(b, date, next, loc)
 				blk.Away = lane.Away != ""
+				blk.OffShift = !blk.Away && onRota && shift.Working &&
+					(b.Starts.Before(shift.Starts) || b.Ends.After(shift.Ends))
 				lane.Blocks = append(lane.Blocks, blk)
 				day.Count++
 			}

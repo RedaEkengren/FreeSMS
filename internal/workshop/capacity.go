@@ -26,6 +26,8 @@ type Capacity struct {
 	Closed map[string]string
 	// Lifts, or zero for not limited.
 	Lifts int
+	// Shifts: user ID, then the day as 2006-01-02, to their schedule.
+	Shifts map[string]map[string]ScheduledDay
 }
 
 // AbsenceReasons are why somebody is away, as catalogue keys.
@@ -36,8 +38,23 @@ func CapacityBetween(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 	if !scope.Role.SeesCustomerPersonalData() {
 		return Capacity{}, access.ErrForbidden
 	}
-	c := Capacity{Absent: map[string]map[string]string{}, Closed: map[string]string{}}
+	c := Capacity{Absent: map[string]map[string]string{}, Closed: map[string]string{}, Shifts: map[string]map[string]ScheduledDay{}}
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		loc, err := shopLocationTx(ctx, tx)
+		if err != nil {
+			return err
+		}
+		days := int(civil(to.In(loc)) - civil(from.In(loc)))
+		all, _, err := schedules(ctx, tx, "", from, days, loc)
+		if err != nil {
+			return err
+		}
+		for user, list := range all {
+			c.Shifts[user] = map[string]ScheduledDay{}
+			for _, d := range list {
+				c.Shifts[user][d.Day.Format("2006-01-02")] = d
+			}
+		}
 		var lifts *int
 		if err := tx.QueryRow(ctx, `SELECT lifts FROM shops WHERE id = $1`, scope.ShopID).Scan(&lifts); err != nil {
 			return err
@@ -59,6 +76,10 @@ func CapacityBetween(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 			}
 			if c.Absent[user] == nil {
 				c.Absent[user] = map[string]string{}
+			}
+			// Why is for whoever plans staff; the counter reads "away".
+			if !scope.PlansStaff() {
+				reason = "other"
 			}
 			c.Absent[user][day.Format("2006-01-02")] = reason
 		}
@@ -85,7 +106,7 @@ func CapacityBetween(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 // SetAbsence records somebody away for a day. The bookings on their row stay,
 // and show as needing somebody else.
 func SetAbsence(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, userID string, day time.Time, reason string) error {
-	if !scope.Role.SeesCustomerPersonalData() {
+	if !scope.PlansStaff() {
 		return access.ErrForbidden
 	}
 	if _, ok := AbsenceReasons[reason]; !ok {
@@ -109,7 +130,7 @@ func SetAbsence(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, use
 
 // ClearAbsence takes it back: they came in after all.
 func ClearAbsence(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, userID string, day time.Time) error {
-	if !scope.Role.SeesCustomerPersonalData() {
+	if !scope.PlansStaff() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(userID) {

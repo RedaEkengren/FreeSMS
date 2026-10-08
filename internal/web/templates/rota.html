@@ -1,0 +1,101 @@
+{{define "content"}}
+<h1>{{.T "Rota"}}</h1>
+{{with .Rota}}
+<div class="row">
+  <a href="/rota?week={{.Prev}}">&larr; {{$.T "Previous week"}}</a>
+  <strong>{{$.T "Week of %s" ($.Date .Monday "2 Jan")}}</strong>
+  <a href="/rota?week={{.Next}}">{{$.T "Next week"}} &rarr;</a>
+</div>
+<p class="mt-s"><a href="/schedule">{{$.T "Your own schedule, and what you clocked"}}</a></p>
+
+{{/* Who is in when. A colleague reads the hours and that somebody is away;
+     why, and the rest warnings, reach only whoever plans staff -- they are
+     not fetched for anybody else. Nobody's clocked hours are here. */}}
+<div id="live-rota" data-live="staff">
+<div class="rota-scroll">
+<table class="rota">
+  <thead><tr><th></th>{{range .Days}}<th>{{$.Date . "Mon 2"}}</th>{{end}}</tr></thead>
+  <tbody>
+  {{range .People}}
+    <tr>
+      <th>{{.Name}}</th>
+      {{range .Days}}
+      <td class="{{if .Away}}rota-away{{else if .Changed}}rota-changed{{end}}">
+        {{if .Away}}{{$.T .Away}}
+        {{else if .Working}}{{$.Date ($.Local .Starts) "15:04"}}&ndash;{{$.Date ($.Local .Ends) "15:04"}}{{if .Changed}} <span class="waiting">{{$.T "changed"}}</span>{{end}}
+        {{else if .Known}}<span class="waiting">{{$.T "off"}}</span>
+        {{else}}<span class="waiting">&middot;</span>{{end}}
+      </td>
+      {{end}}
+    </tr>
+    {{range .Warnings}}
+    <tr class="rota-warn"><td></td><td colspan="7">{{$.T .Says ($.Num .RestHours)}} &middot; {{$.Date .Day "Mon 2 Jan"}}</td></tr>
+    {{end}}
+  {{end}}
+  </tbody>
+</table>
+</div>
+</div>
+
+{{if $.Session.Scope.PlansStaff}}
+<h2>{{$.T "Change a day"}}</h2>
+<form method="post" action="/rota">
+  {{/* The answer is the button pressed; Enter in a field presses nothing. */}}
+  <button type="submit" disabled hidden aria-hidden="true" tabindex="-1"></button>
+  <div class="pair">
+    <label><span>{{$.T "Who"}}</span><select name="user_id" required>{{range .People}}<option value="{{.UserID}}">{{.Name}}</option>{{end}}</select></label>
+    <label><span>{{$.T "Day"}}</span><input type="date" name="date" required></label>
+  </div>
+  <div class="pair">
+    <label><span>{{$.T "From"}}</span><input type="time" name="starts" step="900"></label>
+    <label><span>{{$.T "To"}}</span><input type="time" name="ends" step="900"></label>
+  </div>
+  <div class="actions">
+    <button type="submit" name="action" value="shift">{{$.T "Change the day"}}</button>
+    <button type="submit" name="action" value="rota_day" class="secondary">{{$.T "Back to the rota"}}</button>
+  </div>
+</form>
+
+<h2>{{$.T "Who is away"}}</h2>
+<form method="post" action="/rota">
+  {{/* The answer is the button pressed; Enter in a field presses nothing. */}}
+  <button type="submit" disabled hidden aria-hidden="true" tabindex="-1"></button>
+  <div class="pair">
+    <label><span>{{$.T "Who"}}</span><select name="user_id" required>{{range .People}}<option value="{{.UserID}}">{{.Name}}</option>{{end}}</select></label>
+    <label><span>{{$.T "Day"}}</span><input type="date" name="date" required></label>
+  </div>
+  <label><span>{{$.T "Why"}}</span>
+    <select name="reason">{{range $k, $v := .Reasons}}<option value="{{$k}}">{{$.T $v}}</option>{{end}}</select></label>
+  <div class="actions">
+    <button type="submit" name="action" value="away">{{$.T "Mark as away"}}</button>
+    <button type="submit" name="action" value="back" class="secondary">{{$.T "Here after all"}}</button>
+  </div>
+</form>
+
+<h2>{{$.T "A new rota"}}</h2>
+<p class="waiting">{{$.T "Usual hours from a date, repeating every week or every second week. The rota before it stays, for the days before."}}</p>
+<form method="post" action="/rota">
+  <input type="hidden" name="action" value="rota">
+  <div class="pair">
+    <label><span>{{$.T "Who"}}</span><select name="user_id" required>{{range .People}}<option value="{{.UserID}}">{{.Name}}</option>{{end}}</select></label>
+    <label><span>{{$.T "From"}}</span><input type="date" name="date" required></label>
+  </div>
+  <label><span>{{$.T "Repeats"}}</span>
+    <select name="weeks"><option value="1">{{$.T "every week"}}</option><option value="2">{{$.T "every second week (A and B)"}}</option></select></label>
+  {{range $wk := .FormWeeks}}
+  <h3>{{if eq $wk 0}}{{$.T "Week A"}}{{else}}{{$.T "Week B, if every second week"}}{{end}}</h3>
+  <table class="rota-form">
+    <tr><th></th><th>{{$.T "From"}}</th><th>{{$.T "To"}}</th></tr>
+    {{range $i, $d := $.Rota.Weekdays}}
+    <tr><th>{{$.Date $d "Mon"}}</th>
+      <td><input type="time" step="900" name="h{{$wk}}{{add $i 1}}_from" aria-label="{{$.T "From"}}"></td>
+      <td><input type="time" step="900" name="h{{$wk}}{{add $i 1}}_to" aria-label="{{$.T "To"}}"></td></tr>
+    {{end}}
+  </table>
+  {{end}}
+  <p class="waiting">{{$.T "A day left empty is a day off. A shift that ends before it starts ends the next morning."}}</p>
+  <button type="submit">{{$.T "Save the rota"}}</button>
+</form>
+{{end}}
+{{end}}
+{{end}}

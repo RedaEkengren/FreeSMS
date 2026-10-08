@@ -49,7 +49,13 @@ test('the planner shows who is away, a shut day and more cars than lifts', async
   await capacity(page, 'lifts', { lifts: '1' });
   await book(page, day, '09:00', 'CAP 001');
   await book(page, day, '09:30', 'CAP 002');
-  await capacity(page, 'away', { user_id: 'tech', date: day, reason: 'holiday' });
+  // Who is away is set on the rota, by whoever plans staff.
+  await page.goto('/rota');
+  const away = page.locator('form[action="/rota"]:has(button[value=away])');
+  await away.locator('select[name=user_id]').selectOption({ label: 'Erik Mekaniker' });
+  await away.locator('input[name=date]').fill(day);
+  await away.locator('select[name=reason]').selectOption('holiday');
+  await away.locator('button[value=away]').click();
   await capacity(page, 'shut', { date: after, reason: 'Inventering' });
 
   await page.goto(`/calendar?week=${day}`);

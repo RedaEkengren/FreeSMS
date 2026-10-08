@@ -51,6 +51,7 @@ var waitingSays = map[string]string{
 	"late":               "Past its promised time",
 	"part_requested":     "A part was asked for: %s",
 	"taken_out_unpriced": "Taken out, not priced: %s",
+	"schedule_changed":   "Your schedule has changed",
 }
 
 // Says is the item's catalogue key.
@@ -67,8 +68,11 @@ func (w WaitingItem) Plural() bool {
 
 // Link is where dealing with it starts.
 func (w WaitingItem) Link() string {
-	if w.Kind == "part_requested" {
+	switch w.Kind {
+	case "part_requested":
 		return "/parts"
+	case "schedule_changed":
+		return "/schedule"
 	}
 	return "/jobs/" + w.JobID
 }
@@ -81,6 +85,9 @@ func WaitingFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]
 	add := func(items []WaitingItem, err error) error {
 		out = append(out, items...)
 		return err
+	}
+	if err := add(scheduleChanged(ctx, pool, scope)); err != nil {
+		return nil, err
 	}
 	switch scope.Role {
 	case access.RoleTechnician:
@@ -309,4 +316,27 @@ func deskWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, la
 		}
 	}
 	return out, nil
+}
+
+// scheduleChanged: somebody else changed the caller's rota, a day of theirs
+// still to come, or recorded them away, since they last looked at their own
+// schedule. A rota that changes silently is how two people turn up for one
+// shift, or none.
+func scheduleChanged(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]WaitingItem, error) {
+	var changed bool
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `
+			WITH seen AS (SELECT coalesce(schedule_seen_at, '-infinity') AS at FROM users WHERE id = $1)
+			SELECT EXISTS (SELECT 1 FROM rotas r, seen
+			               WHERE r.user_id = $1 AND r.created_by <> $1 AND r.created_at > seen.at)
+			    OR EXISTS (SELECT 1 FROM shift_changes c, seen
+			               WHERE c.user_id = $1 AND c.created_by <> $1 AND c.day >= current_date AND c.created_at > seen.at)
+			    OR EXISTS (SELECT 1 FROM staff_absences a, seen
+			               WHERE a.user_id = $1 AND a.created_by <> $1 AND a.day >= current_date AND a.created_at > seen.at)`,
+			scope.UserID).Scan(&changed)
+	})
+	if err != nil || !changed {
+		return nil, err
+	}
+	return []WaitingItem{{Kind: "schedule_changed"}}, nil
 }

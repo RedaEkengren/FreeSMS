@@ -30,8 +30,8 @@ var queryBudgets = map[string]int{
 	"tech GET /jobs/{id}":                21,
 	"tech GET /time":                     11,
 	"tech GET /inspections/{inspection}": 12,
-	"tech GET /mine":                     11,
-	"tech GET /mine/count":               12,
+	"tech GET /mine":                     12,
+	"tech GET /mine/count":               13,
 	// The job page reads in one transaction (database.Reading). It was 57
 	// and 100 when every read began and ended its own.
 	//
@@ -41,9 +41,12 @@ var queryBudgets = map[string]int{
 	"desk GET /receivables": 11,
 	"desk GET /parts":       11,
 	"desk GET /stock":       26,
-	"desk GET /calendar":    23,
-	"desk GET /mine":        12,
-	"desk GET /mine/count":  13,
+	"desk GET /calendar":    29,
+	"desk GET /mine":        13,
+	"desk GET /mine/count":  14,
+	// The calendar reads the rota for its lanes (#100): six more, once,
+	// whatever the history. "For me" asks whether the schedule changed: one.
+	//
 	// An htmx swap is the fast path: one block must not cost a page.
 	"desk GET /jobs/{id}/parts (htmx)": 13,
 }
@@ -216,5 +219,15 @@ func seedHistory(t *testing.T, pool *pgxpool.Pool) {
 		 VALUES ('` + shopA + `', '` + tech + `', date_trunc('week', now())::date, 'sick', '` + tech + `')`,
 		`INSERT INTO shop_closures (shop_id, day, reason, created_by)
 		 VALUES ('` + shopA + `', date_trunc('week', now())::date + 4, 'Inventering', '` + tech + `')`,
+		// Two years of rotas, a new one every month, and a change most days.
+		`INSERT INTO rotas (shop_id, user_id, valid_from, weeks, created_by)
+		 SELECT '` + shopA + `', '` + tech + `', current_date - interval '1 month' * n, 2, '` + tech + `'
+		 FROM generate_series(0, 24) n`,
+		`INSERT INTO rota_hours (shop_id, rota_id, week, weekday, starts, ends)
+		 SELECT '` + shopA + `', r.id, w, d, '07:00', '16:00'
+		 FROM rotas r CROSS JOIN generate_series(0, 1) w CROSS JOIN generate_series(1, 5) d`,
+		`INSERT INTO shift_changes (shop_id, user_id, day, starts, ends, created_by)
+		 SELECT '` + shopA + `', '` + tech + `', current_date - n, '10:00', '18:00', '` + tech + `'
+		 FROM generate_series(-14, 700) n`,
 	})
 }

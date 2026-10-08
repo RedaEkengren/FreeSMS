@@ -58,28 +58,31 @@ func TestSomebodyAwayLeavesTheirBookingsNeedingSomebodyElse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := workshop.SetAbsence(ctx, pool, technician(), techUserID, at("2026-10-15", 0, 0), "sick"); !errors.Is(err, access.ErrForbidden) {
-		t.Errorf("a technician wrote the absence list: %v", err)
+	// Whoever plans staff records it; the counter and the technician do not.
+	for _, s := range []access.Scope{technician(), advisor()} {
+		if err := workshop.SetAbsence(ctx, pool, s, techUserID, at("2026-10-15", 0, 0), "sick"); !errors.Is(err, access.ErrForbidden) {
+			t.Errorf("%s wrote the absence list: %v", s.Role, err)
+		}
 	}
-	if err := workshop.SetAbsence(ctx, pool, advisor(), "44444444-4444-4444-4444-444444444444", at("2026-10-15", 0, 0), "sick"); !errors.Is(err, workshop.ErrNotFound) {
+	if err := workshop.SetAbsence(ctx, pool, owner(), "44444444-4444-4444-4444-444444444444", at("2026-10-15", 0, 0), "sick"); !errors.Is(err, workshop.ErrNotFound) {
 		t.Errorf("somebody who does not work here was marked away: %v", err)
 	}
-	if err := workshop.SetAbsence(ctx, pool, advisor(), techUserID, at("2026-10-15", 0, 0), "lunch"); !errors.Is(err, workshop.ErrInvalid) {
+	if err := workshop.SetAbsence(ctx, pool, owner(), techUserID, at("2026-10-15", 0, 0), "lunch"); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("an unknown reason: %v", err)
 	}
-	if err := workshop.SetAbsence(ctx, pool, advisor(), techUserID, at("2026-10-15", 0, 0), "holiday"); err != nil {
+	if err := workshop.SetAbsence(ctx, pool, owner(), techUserID, at("2026-10-15", 0, 0), "holiday"); err != nil {
 		t.Fatalf("SetAbsence: %v", err)
 	}
 	// Rang in sick on a day already down as holiday: the reason changes,
 	// the day is not counted twice.
-	if err := workshop.SetAbsence(ctx, pool, advisor(), techUserID, at("2026-10-15", 0, 0), "sick"); err != nil {
+	if err := workshop.SetAbsence(ctx, pool, owner(), techUserID, at("2026-10-15", 0, 0), "sick"); err != nil {
 		t.Fatalf("SetAbsence again: %v", err)
 	}
 
-	week := func() workshop.PlannerDay {
+	week := func(reader access.Scope) workshop.PlannerDay {
 		t.Helper()
 		from, to := at("2026-10-15", 0, 0), at("2026-10-16", 0, 0)
-		cap, err := workshop.CapacityBetween(ctx, pool, advisor(), from, to)
+		cap, err := workshop.CapacityBetween(ctx, pool, reader, from, to)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -87,21 +90,28 @@ func TestSomebodyAwayLeavesTheirBookingsNeedingSomebodyElse(t *testing.T) {
 		bookings, _ := workshop.BookingsBetween(ctx, pool, advisor(), from, to)
 		return workshop.BuildWeek(from, 1, rows, bookings, cap, time.Time{}, stockholm)[0]
 	}
-	var lane *workshop.PlannerLane
-	day := week()
-	for i := range day.Lanes {
-		if day.Lanes[i].Row.ID == techUserID {
-			lane = &day.Lanes[i]
+	laneOf := func(day workshop.PlannerDay) *workshop.PlannerLane {
+		for i := range day.Lanes {
+			if day.Lanes[i].Row.ID == techUserID {
+				return &day.Lanes[i]
+			}
 		}
+		return nil
 	}
-	if lane == nil || lane.Away != "off sick" || len(lane.Blocks) != 1 || !lane.Blocks[0].Away || lane.Blocks[0].Booking.ID != id {
-		t.Fatalf("the away technician's lane: %+v", lane)
+	// Why is the planner's to know. Sickness is health data; the counter
+	// needs to know Erik is not in, not why.
+	if lane := laneOf(week(owner())); lane == nil || lane.Away != "off sick" {
+		t.Fatalf("whoever plans staff reads %+v", lane)
+	}
+	lane := laneOf(week(advisor()))
+	if lane == nil || lane.Away != "away" || len(lane.Blocks) != 1 || !lane.Blocks[0].Away || lane.Blocks[0].Booking.ID != id {
+		t.Fatalf("the counter's lane for the away technician: %+v", lane)
 	}
 
-	if err := workshop.ClearAbsence(ctx, pool, advisor(), techUserID, at("2026-10-15", 0, 0)); err != nil {
+	if err := workshop.ClearAbsence(ctx, pool, owner(), techUserID, at("2026-10-15", 0, 0)); err != nil {
 		t.Fatal(err)
 	}
-	for _, l := range week().Lanes {
+	for _, l := range week(advisor()).Lanes {
 		if l.Row.ID == techUserID && (l.Away != "" || l.Blocks[0].Away) {
 			t.Errorf("came in after all and still shown away: %+v", l)
 		}

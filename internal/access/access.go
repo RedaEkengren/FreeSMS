@@ -130,7 +130,18 @@ type Scope struct {
 	ShopID string
 	UserID string
 	Role   Role
+	// Given the planning of people by whoever runs the shop. Read with
+	// PlansStaff, which also answers yes for those who run it.
+	Planner bool
 }
+
+// PlansStaff reports whether this person may set rotas and absences, and
+// read why somebody is away. Whoever runs the shop may; anybody else only
+// when they were given it -- in a larger workshop, the workshop manager.
+//
+// Why somebody is away can be their health, which GDPR article 9 puts in a
+// category of its own. The front desk needs to know Erik is not in, not why.
+func (s Scope) PlansStaff() bool { return s.Role.RunsTheShop() || s.Planner }
 
 // Validate rejects a scope before it can reach the database.
 func (s Scope) Validate() error {

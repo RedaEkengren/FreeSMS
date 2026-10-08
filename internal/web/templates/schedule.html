@@ -1,0 +1,24 @@
+{{define "content"}}
+<h1>{{.T "My schedule"}}</h1>
+<p class="waiting">{{.T "Your hours for this week and the next, and what you clocked. Only you see what you clocked."}}</p>
+<div id="live-schedule" data-live="staff">
+<ul class="lines">
+  {{range .Schedule.Days}}
+  {{$clocked := index $.Schedule.Clocked (date .Day)}}
+  <li>
+    <div class="row">
+      <span><b>{{$.Date .Day "Mon 2 Jan"}}</b></span>
+      <span>
+        {{if .Away}}<span class="tag warranty">{{$.T .Away}}</span>
+        {{else if .Working}}{{$.Date ($.Local .Starts) "15:04"}}&ndash;{{$.Date ($.Local .Ends) "15:04"}}{{if .Changed}} <span class="tag warranty">{{$.T "changed"}}</span>{{end}}
+        {{else if .Known}}{{$.T "off"}}
+        {{else}}<span class="waiting">{{$.T "no rota"}}</span>{{end}}
+      </span>
+    </div>
+    {{if $clocked}}<div class="waiting">{{$.T "clocked %s h" ($.Num (hours $clocked))}}{{if .Working}} &middot; {{$.T "on the rota %s h" ($.Num (hours .Minutes))}}{{end}}</div>{{end}}
+  </li>
+  {{end}}
+</ul>
+</div>
+<p class="mt-l"><a href="/rota">{{.T "Who is in when"}}</a></p>
+{{end}}

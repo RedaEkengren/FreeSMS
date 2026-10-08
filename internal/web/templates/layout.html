@@ -17,7 +17,7 @@
     <a class="brand" href="/">FreeSMS</a>
     {{/* The count fills in after the page has loaded, so it costs no page
          anything; empty when nothing is waiting. */}}
-    <a href="/mine" class="nav" data-live-topics="board parts">{{.T "For me"}} <span id="mine-count" class="count"
+    <a href="/mine" class="nav" data-live-topics="board parts staff">{{.T "For me"}} <span id="mine-count" class="count"
       hx-get="/mine/count" hx-trigger="load" hx-swap="outerHTML" hx-headers='{"X-FreeSMS-Live": "1"}'></span></a>
     {{if .Session.Scope.Role.SeesParts}}<a href="/parts" class="nav">{{.T "Parts"}}</a>
     <a href="/stock" class="nav">{{.T "Stock"}}</a>
@@ -32,6 +32,7 @@
     {{/* "Hours" and "Times" were two words apart and meant opposite things:
          your own clock, and the shop's labour guide. Both say which now. */}}
     <a href="/time" class="nav">{{.T "My hours"}}</a>
+    <a href="/rota" class="nav">{{.T "Rota"}}</a>
     {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/labour" class="nav">{{.T "Labour times"}}</a>{{end}}
     <a href="/search" class="nav">{{.T "Search"}}</a>
   </nav>

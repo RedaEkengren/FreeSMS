@@ -288,3 +288,22 @@
 .fm-stack > * { grid-area: 1 / 1; }
 .fm-stack > .fm-item, .fm-stack > .fm-empty { justify-self: stretch; }
 .fm-act { margin-top: 14px; } .fm-act > .fm-note { justify-self: stretch; } .fm-act > * { margin-top: 0; }
+
+/* The rota scene. */
+.ro-card { left: 40px; top: 60px; width: 880px; height: 240px; }
+.ro-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.ro-table th, .ro-table td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #e9ebef; white-space: nowrap; }
+.ro-stack { display: grid; } .ro-stack > * { grid-area: 1 / 1; }
+.ro-changed { box-shadow: inset 3px 0 0 #c2410c; padding-left: 6px; }
+.ro-changed i, .ro-tag { font-style: normal; color: #c2410c; font-size: 11px; }
+.ro-phone { left: 330px; }
+.ro-day { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid #e9ebef; font-size: 12.5px; }
+.ro-away { color: #9a3412; background: #ffedd5; border-radius: 4px; padding: 0 6px; }
+.ro-half { top: 120px; width: 400px; height: 130px; }
+.ro-left { left: 60px; } .ro-right { left: 500px; }
+.an-m .ro-card { left: 16px; top: 40px; width: 488px; height: 300px; }
+.an-m .ro-table { font-size: 10.5px; } .an-m .ro-table th, .an-m .ro-table td { padding: 6px 3px; }
+.an-m .ro-phone { left: 135px; top: 16px; }
+.an-m .ro-half { width: 488px; left: 16px; height: 120px; }
+.an-m .ro-left { top: 60px; } .an-m .ro-right { top: 210px; }
+.ro-phone .fm-stack > * { justify-self: stretch; }

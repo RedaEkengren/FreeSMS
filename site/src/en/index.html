@@ -254,6 +254,7 @@
     <button type="button" role="tab" data-tab="4">Two screens</button>
     <button type="button" role="tab" data-tab="5">The planner</button>
     <button type="button" role="tab" data-tab="6">For me</button>
+    <button type="button" role="tab" data-tab="7">The rota</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -662,6 +663,59 @@
     </div>
   </div>
   <p class="truth">The words come from the product&rsquo;s catalogue when the page is generated. The flow runs against the real product in three browsers, one per role, and the test checks that no page was reloaded &ndash; <a href="{{test "e2e/tests/15-scene-for-me.spec.ts" "what is waiting for each person arrives by itself and leaves when it is dealt with"}}">read the test</a>. Registrations and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+{{/* ── Scene 8: the rota ─────────────────────────────────────────────── */}}
+<section class="scene pane" role="tabpanel">
+  <h2>The rota, and who may know what</h2>
+  <p class="lede">Whoever plans staff sets the week and moves a day. The law&rsquo;s rest is warned about, not enforced &ndash; collective agreements differ. The person it concerns is told their schedule changed. Colleagues see that somebody is away, not why: sickness is health data.</p>
+
+  <div class="an-wrap" data-loop="20" data-still="16">
+    <div class="an-canvas" role="img" aria-label="Animation: on the rota, Erik&rsquo;s Thursday moves to 14:00–23:00, and the rota warns {{t "Only %s hours' rest before this shift; the law asks for 11" (num "8.0")}}. Erik&rsquo;s list says {{t "Your schedule has changed"}}, and his schedule shows Thursday as changed. Erik is off sick on Wednesday: the front desk sees {{t "away"}}, Erik sees {{t "off sick"}}.">
+
+      <div class="an-card ro-card an-fade" data-t="0,6.4">
+        <div class="an-head"><span class="an-dots"></span><span>{{t "Rota"}} &middot; {{t "Week of %s" (date (at "2026-10-19 00:00") "2 Jan")}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <table class="ro-table">
+            <tr><th></th><th>{{date (at "2026-10-19 00:00") "Mon 2"}}</th><th>{{date (at "2026-10-20 00:00") "Mon 2"}}</th><th>{{date (at "2026-10-21 00:00") "Mon 2"}}</th><th>{{date (at "2026-10-22 00:00") "Mon 2"}}</th><th>{{date (at "2026-10-23 00:00") "Mon 2"}}</th></tr>
+            <tr><th>Erik</th><td>07:00–16:00</td><td>07:00–16:00</td><td>07:00–16:00</td>
+              <td class="ro-stack"><span class="an-fade" data-t="0,1.6">07:00–16:00</span><span class="an-fade ro-changed" data-t="1.6">14:00–23:00 <i>{{t "changed"}}</i></span></td><td>07:00–16:00</td></tr>
+          </table>
+          <div class="pn-note an-fade" data-t="2.8">{{t "Only %s hours' rest before this shift; the law asks for 11" (num "8.0")}} &middot; {{date (at "2026-10-23 00:00") "Mon 2 Jan"}}</div>
+        </div>
+      </div>
+
+      <div class="an-card wf-phone ro-phone an-fade" data-t="6.6,13">
+        <div class="an-head"><span class="an-dots"></span><span>Erik</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack">
+            <div class="an-fade" data-t="0,9.4"><div class="wf-h">{{t "For me"}} <span class="fm-count">1</span></div>
+              <div class="fm-item">{{t "Your schedule has changed"}}</div></div>
+            <div class="an-fade" data-t="9.4"><div class="wf-h">{{t "My schedule"}}</div>
+              <div class="ro-day"><b>{{date (at "2026-10-21 00:00") "Mon 2 Jan"}}</b><span>07:00–16:00</span></div>
+              <div class="ro-day"><b>{{date (at "2026-10-22 00:00") "Mon 2 Jan"}}</b><span>14:00–23:00 <span class="ro-tag">{{t "changed"}}</span></span></div>
+              <div class="ro-day"><b>{{date (at "2026-10-23 00:00") "Mon 2 Jan"}}</b><span>07:00–16:00</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-card ro-half ro-left an-pop" data-t="13.2">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span></div>
+        <div class="wf-body"><div class="ro-day"><b>Erik &middot; {{date (at "2026-10-21 00:00") "Mon 2 Jan"}}</b><span class="ro-away">{{t "away"}}</span></div></div>
+      </div>
+      <div class="an-card ro-half ro-right an-pop" data-t="13.8">
+        <div class="an-head"><span class="an-dots"></span><span>Erik</span></div>
+        <div class="wf-body"><div class="ro-day"><b>{{date (at "2026-10-21 00:00") "Mon 2 Jan"}}</b><span class="ro-away">{{t "off sick"}}</span></div></div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,2.6">Erik&rsquo;s Thursday moves to a late shift.</div>
+      <div class="an-cap" data-t="2.8,6.4">Eight hours&rsquo; rest before Friday. The rota says so.</div>
+      <div class="an-cap" data-t="6.6,9.2">Erik is told his schedule has changed.</div>
+      <div class="an-cap" data-t="9.4,13">He looks, and that deals with it.</div>
+      <div class="an-cap" data-t="13.2,19.6">Off sick on Wednesday: the desk sees he is away, not why.</div>
+    </div>
+  </div>
+  <p class="truth">The words and the rest are worked out by the product&rsquo;s own code when the page is generated. The flow runs against the real product in three browsers: the rota is set, Thursday moved, the warning shown, Erik told and reading it, and the desk seeing &ldquo;away&rdquo; where Erik sees &ldquo;off sick&rdquo; &ndash; <a href="{{test "e2e/tests/16-scene-rota.spec.ts" "a week is planned, a short rest is warned about, and the person is told"}}">read the test</a>. Names are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>
