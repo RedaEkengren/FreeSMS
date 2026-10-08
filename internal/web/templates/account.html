@@ -11,6 +11,13 @@
     </select></label>
   <button type="submit">{{.T "Save"}}</button>
 </form>
+<h2>{{.T "When something is waiting for you"}}</h2>
+<form method="post" action="/account/alert">
+  <label class="tick"><input type="checkbox" name="on" value="yes"{{if .AlertSound}} checked{{end}}>
+    <span>{{.T "A sound, and a buzz on a phone, when something new is waiting for me"}}</span></label>
+  <p class="waiting">{{.T "Off unless you turn it on. A browser plays it only once you have touched the page."}}</p>
+  <button type="submit">{{.T "Save"}}</button>
+</form>
 <h2>{{.T "Change your password"}}</h2>
 <form method="post" action="/account/password">
   <label><span>{{.T "Your current password"}}</span>

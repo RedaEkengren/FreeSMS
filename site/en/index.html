@@ -250,6 +250,7 @@
     <button type="button" role="tab" data-tab="3">The customer&rsquo;s link</button>
     <button type="button" role="tab" data-tab="4">Two screens</button>
     <button type="button" role="tab" data-tab="5">The planner</button>
+    <button type="button" role="tab" data-tab="6">For me</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -660,6 +661,61 @@
     </div>
   </div>
   <p class="truth">The words come from the product&rsquo;s catalogue when the page is generated. The flow runs against the real product in a browser: the lifts are set, the cars booked, Erik marked away, the day shut &ndash; and a booking on the shut day refused &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/13-planner-capacity.spec.ts">read the test</a>. Registrations and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+
+<section class="scene pane" role="tabpanel">
+  <h2>What is waiting for you, and only that</h2>
+  <p class="lede">Each person sees what is theirs to do &ndash; not a feed of everything that happened. A thing reaches the right person by itself, and leaves when somebody has dealt with it. Nobody ticks anything off by hand, and two people at the counter see the same list.</p>
+
+  <div class="an-wrap" data-loop="26" data-still="14.5">
+    <div class="an-canvas" role="img" aria-label="Animation: the technician&rsquo;s list is empty. The parts desk marks the part It has arrived, and the technician&rsquo;s list says at once The part you asked for has arrived: Track rod end, left. The technician starts the clock on the job and the list is empty again. The technician reports something else, and the front desk&rsquo;s list says 1 thing noticed, not priced until the desk presses Dealt with.">
+
+      <div class="an-card wf-phone">
+        <div class="an-head"><span class="an-dots"></span><span>Technician</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="wf-h">For me <span class="fm-count an-pop an-off" data-t="4.2,9.6">1</span></div>
+          <div class="fm-stack">
+            <div class="fm-empty an-fade an-off" data-t="0,4.2">Nothing is waiting for you.</div>
+            <div class="fm-item an-r an-off" data-t="4.2,9.6"><b>FOR 123</b> &middot; #7<br>The part you asked for has arrived: Track rod end, left</div>
+            <div class="fm-empty an-fade" data-t="9.6">Nothing is waiting for you.</div>
+          </div>
+          <div class="fm-stack fm-act">
+            <span class="an-btn wf-add fm-clock an-fade an-off" data-t="7.4,9.6">Start clock</span>
+            <div class="wf-field fm-note an-fade" data-t="11.6"><span class="lbl">Something else needs doing</span><span data-type="12,1.4">Ball joint has play</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-card wf-desk an-fade an-off" data-t="0,11.6">
+        <div class="an-head"><span class="an-dots"></span><span>Parts &middot; Waiting for parts</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="wf-card"><div class="wf-plate">FOR 123</div><div class="an-muted">Track rod end, left</div>
+            <div class="fm-stack"><span class="an-btn mo-btn an-fade an-off" data-t="0,3.6">It has arrived</span>
+            <div class="rd-tag cl-on an-fade" data-t="3.6">arrived</div></div></div>
+        </div>
+      </div>
+
+      <div class="an-card wf-desk an-fade" data-t="11.6">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk &middot; For me <span class="fm-count an-pop" data-t="13.6,18.4">1</span></span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack">
+            <div class="fm-item an-r" data-t="13.6,18.4"><b>FOR 123</b> &middot; #7<br>1 thing noticed, not priced
+            <span class="an-btn wf-secondary fm-dealt">Dealt with</span></div>
+            <div class="fm-empty an-fade an-off" data-t="0,13.6">Nothing is waiting for you.</div>
+            <div class="fm-empty an-fade an-off" data-t="18.4">Nothing is waiting for you.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,4">Erik asked for a part. His list is empty.</div>
+      <div class="an-cap an-off" data-t="4.2,7.2">The parts desk books it in. It is on Erik&rsquo;s list at once.</div>
+      <div class="an-cap an-off" data-t="7.4,11.4">He starts the clock on the job. That deals with it, and it is gone.</div>
+      <div class="an-cap" data-t="11.6,17.2">He sees something else. It goes to the front desk.</div>
+      <div class="an-cap an-off" data-t="17.4,25.6">The desk deals with it. Nobody ticks anything off by hand.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product&rsquo;s catalogue when the page is generated. The flow runs against the real product in three browsers, one per role, and the test checks that no page was reloaded &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/15-scene-for-me.spec.ts">read the test</a>. Registrations and names are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

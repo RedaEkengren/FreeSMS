@@ -1,0 +1,29 @@
+{{define "content"}}
+<h1>{{.T "For me"}}</h1>
+{{/* Nothing to tick off. Each line is true until somebody deals with it,
+     and then it is gone -- from everybody's list at once. */}}
+<div id="live-mine" data-live="board parts">
+{{if not .Waiting}}
+  <p class="empty">{{.T "Nothing is waiting for you."}}</p>
+{{else}}
+<ul class="lines">
+  {{range .Waiting}}
+  <li><a href="{{.Link}}">
+    <div class="row">
+      <span class="plate">{{if .Registration}}{{.Registration}}{{else}}{{$.T "no plate"}}{{end}}</span>
+      {{if .Number}}<span class="tag">#{{.Number}}</span>{{end}}
+    </div>
+    <div class="waiting">{{if .Plural}}{{$.N .Says .Count}}{{else}}{{$.T .Says .Text}}{{end}}</div>
+  </a></li>
+  {{end}}
+</ul>
+{{end}}
+</div>
+{{end}}
+
+{{/* The header's count. It asks for itself again when the stream says
+     something changed (live.js sends freesms:change), as a refresh: it does
+     not count as the person doing anything. */}}
+{{define "count"}}<span id="mine-count" class="count" data-n="{{.WaitingCount}}"{{if .AlertSound}} data-sound{{end}}
+  hx-get="/mine/count" hx-trigger="freesms:change from:body" hx-swap="outerHTML"
+  hx-headers='{"X-FreeSMS-Live": "1"}'>{{if .WaitingCount}}{{.WaitingCount}}{{end}}</span>{{end}}

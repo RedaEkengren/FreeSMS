@@ -1619,6 +1619,42 @@
     },
     "about %d min late": {
       "other": "ca %d min sent"
+    },
+    "For me": {
+      "other": "Till mig"
+    },
+    "Nothing is waiting for you.": {
+      "other": "Inget väntar på dig."
+    },
+    "The part you asked for has arrived: %s": {
+      "other": "Delen du bad om har kommit: %s"
+    },
+    "The customer said yes, and it is on the job: %s": {
+      "other": "Kunden sa ja, och det ligger på jobbet: %s"
+    },
+    "Booked on you, and the car is in": {
+      "other": "Bokad på dig, och bilen är här"
+    },
+    "Ready, and the customer has not been told": {
+      "other": "Klar, och kunden har inte fått veta"
+    },
+    "Past its promised time": {
+      "other": "Förbi utlovad tid"
+    },
+    "A part was asked for: %s": {
+      "other": "En del har beställts: %s"
+    },
+    "Taken out, not priced: %s": {
+      "other": "Uttagen, inte prissatt: %s"
+    },
+    "When something is waiting for you": {
+      "other": "När något väntar på dig"
+    },
+    "A sound, and a buzz on a phone, when something new is waiting for me": {
+      "other": "Ett ljud, och en vibration i telefonen, när något nytt väntar på mig"
+    },
+    "Off unless you turn it on. A browser plays it only once you have touched the page.": {
+      "other": "Avstängt tills du slår på det. En webbläsare spelar det först när du har rört vid sidan."
     }
   }
 }

@@ -32,6 +32,10 @@ var everyRole = map[string]string{
 	"FinalCheckFor":  "whether the work is signed off, which the technician needs before saying it is ready; no customer data",
 	"ChangePassword": "the caller's own password, checked against the current one",
 	"MyLocale":       "the caller's own language", "SetMyLocale": "the caller's own language",
+	"AlertSound": "the caller's own setting", "SetAlertSound": "the caller's own setting",
+	// Each role is given its own kind of item, decided inside by role; the
+	// technician's carry the job and the shop's own words, never a customer.
+	"WaitingFor": "what is waiting for the caller, per role", "CountWaiting": "how many of WaitingFor",
 
 	// The job as the person holding the spanner sees it. Job carries the
 	// vehicle and the work, and no customer field exists on it to leak.

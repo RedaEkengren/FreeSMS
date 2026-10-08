@@ -30,6 +30,8 @@ var queryBudgets = map[string]int{
 	"tech GET /jobs/{id}":                21,
 	"tech GET /time":                     11,
 	"tech GET /inspections/{inspection}": 12,
+	"tech GET /mine":                     11,
+	"tech GET /mine/count":               12,
 	// The job page reads in one transaction (database.Reading). It was 57
 	// and 100 when every read began and ended its own.
 	//
@@ -40,6 +42,8 @@ var queryBudgets = map[string]int{
 	"desk GET /parts":       11,
 	"desk GET /stock":       26,
 	"desk GET /calendar":    23,
+	"desk GET /mine":        12,
+	"desk GET /mine/count":  13,
 	// An htmx swap is the fast path: one block must not cost a page.
 	"desk GET /jobs/{id}/parts (htmx)": 13,
 }

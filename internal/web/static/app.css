@@ -545,3 +545,8 @@ form.inline { display: inline; }
 .cd-20 { grid-column-end: span 20; }
 .cd-21 { grid-column-end: span 21; }
 .cd-22 { grid-column-end: span 22; }
+
+/* How many things are waiting for the person signed in. Empty is nothing. */
+.count:empty { display: none; }
+.count { display: inline-block; min-width: 1.25rem; padding: 0 .35rem; margin-left: .15rem; border-radius: 999px;
+  background: var(--attention); color: #fff; font-size: .75rem; font-weight: 700; line-height: 1.25rem; text-align: center; }

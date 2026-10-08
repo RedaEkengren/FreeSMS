@@ -31,10 +31,10 @@
     return Array.prototype.slice.call((root || document).querySelectorAll("[data-live][id]"));
   }
 
-  function topicsOnPage() {
+  function topicsOf(selector, attr) {
     var all = {};
-    regions().forEach(function (el) {
-      el.getAttribute("data-live").split(/\s+/).forEach(function (t) { if (t) all[t] = true; });
+    Array.prototype.forEach.call(document.querySelectorAll(selector), function (el) {
+      el.getAttribute(attr).split(/\s+/).forEach(function (t) { if (t) all[t] = true; });
     });
     return all;
   }
@@ -89,6 +89,8 @@
   }
 
   function refresh() {
+    // A page whose only live part is the header has nothing to fetch.
+    if (!regions().length) return;
     if (running) { again = true; return; }
     running = true;
     waiting = false;
@@ -120,15 +122,22 @@
   var polling = null;
   function poll() {
     if (polling) return;
-    polling = window.setInterval(refresh, POLL);
+    polling = window.setInterval(function () { refresh(); tell(); }, POLL);
   }
 
-  function listen(topics) {
+  // Something that is not a part of the page but cares -- the header's
+  // count of what is waiting -- is told with an event, and asks for itself.
+  function tell() {
+    document.body.dispatchEvent(new CustomEvent("freesms:change"));
+  }
+
+  function listen(topics, others) {
     if (!window.EventSource) { poll(); return; }
     var stream = new EventSource("/events");
     var dropped = false;
     stream.addEventListener("change", function (e) {
       if (e.data === "*" || topics[e.data]) soon();
+      if (e.data === "*" || others[e.data]) tell();
     });
     stream.addEventListener("signedout", function () {
       stream.close();
@@ -136,7 +145,7 @@
     });
     stream.addEventListener("open", function () {
       // Back after a drop: whatever happened meanwhile was not heard.
-      if (dropped) { dropped = false; soon(); }
+      if (dropped) { dropped = false; soon(); tell(); }
     });
     stream.addEventListener("error", function () {
       dropped = true;
@@ -146,14 +155,42 @@
     });
   }
 
+  // A sound and a buzz when more is waiting than a moment ago -- only for a
+  // person who turned it on (data-sound), and never for what was already
+  // waiting when the page opened.
+  var waitingWas = null;
+  function chime() {
+    var count = document.getElementById("mine-count");
+    if (!count) return;
+    var n = parseInt(count.getAttribute("data-n"), 10) || 0;
+    if (waitingWas !== null && n > waitingWas && count.hasAttribute("data-sound")) {
+      try {
+        var Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) {
+          var ctx = new Ctx(), tone = ctx.createOscillator(), gain = ctx.createGain();
+          tone.frequency.value = 880;
+          gain.gain.setValueAtTime(0.15, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+          tone.connect(gain).connect(ctx.destination);
+          tone.start();
+          tone.stop(ctx.currentTime + 0.25);
+        }
+      } catch (e) { /* A browser that will not play before a touch: silence. */ }
+      if (navigator.vibrate) navigator.vibrate(150);
+    }
+    waitingWas = n;
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
-    var topics = topicsOnPage();
-    if (!Object.keys(topics).length) return;
-    listen(topics);
+    var topics = topicsOf("[data-live][id]", "data-live");
+    var others = topicsOf("[data-live-topics]", "data-live-topics");
+    if (!Object.keys(topics).length && !Object.keys(others).length) return;
+    listen(topics, others);
+    document.body.addEventListener("htmx:afterSettle", chime);
 
     // A phone that slept heard nothing; it catches up when it is looked at.
     document.addEventListener("visibilitychange", function () {
-      if (document.visibilityState === "visible") soon();
+      if (document.visibilityState === "visible") { soon(); tell(); }
     });
     // A part left alone because somebody was in it is brought up to date
     // once they leave it.

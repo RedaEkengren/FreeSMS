@@ -273,3 +273,18 @@
 .an-m .pn-b { top: 96px; }
 /* As the planner marks it: somebody is missing. A dashed edge, not a colour. */
 .pn-short { background: #fff; color: #14171c; outline: 2px dashed #c2410c; outline-offset: -2px; }
+
+/* The "for me" scene: the header's count and a list item, as the app draws them. */
+.fm-count { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 999px; background: #c2410c;
+  color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; vertical-align: middle; }
+.fm-item { border-bottom: 1px solid #e9ebef; padding: 8px 0; font-size: 12.5px; line-height: 1.45; }
+.fm-item b { letter-spacing: .04em; }
+.fm-empty { color: #9aa3b2; font-size: 12.5px; padding: 8px 0; }
+.fm-dealt { display: inline-block; margin-top: 6px; padding: .35em .8em; font-size: 11.5px; }
+.fm-clock { margin-top: 14px; }
+.fm-note { margin-top: 14px; }
+/* Things that take each other's place share one: what is hidden takes no room. */
+.fm-stack { display: grid; align-items: start; justify-items: start; }
+.fm-stack > * { grid-area: 1 / 1; }
+.fm-stack > .fm-item, .fm-stack > .fm-empty { justify-self: stretch; }
+.fm-act { margin-top: 14px; } .fm-act > .fm-note { justify-self: stretch; } .fm-act > * { margin-top: 0; }

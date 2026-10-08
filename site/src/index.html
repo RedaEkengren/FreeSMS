@@ -253,6 +253,7 @@
     <button type="button" role="tab" data-tab="3">Kundens länk</button>
     <button type="button" role="tab" data-tab="4">Två skärmar</button>
     <button type="button" role="tab" data-tab="5">Planeringen</button>
+    <button type="button" role="tab" data-tab="6">Till mig</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -606,6 +607,61 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: liftarna sätts, bilarna bokas, Erik markeras ledig, dagen stängs &ndash; och en bokning på den stängda dagen nekas &ndash; <a href="{{test "e2e/tests/13-planner-capacity.spec.ts" "the planner shows who is away, a shut day and more cars than lifts"}}">läs testet</a>. Registreringsnummer och namn är <span class="wf-example">exempel</span>.</p>
+</section>
+
+{{/* ── Scene 7: what is waiting for me ────────────────────────────────── */}}
+<section class="scene pane" role="tabpanel">
+  <h2>Det som väntar på dig, och bara det</h2>
+  <p class="lede">Var och en ser det som är deras att göra &ndash; inte ett flöde av allt som hänt. En sak kommer till rätt person av sig själv, och försvinner när någon har tagit hand om den. Ingen bockar av något för hand, och två vid disken ser samma lista.</p>
+
+  <div class="an-wrap" data-loop="26" data-still="14.5">
+    <div class="an-canvas" role="img" aria-label="Animering: teknikerns lista är tom. Lagret markerar delen {{t "It has arrived"}}, och hos teknikern står det direkt {{t "The part you asked for has arrived: %s" "Styrled vänster"}}. Teknikern startar klockan på jobbet och listan är tom igen. Teknikern säger till om något mer, och hos disken står det {{n "%d thing noticed, not priced" 1}} tills disken trycker {{t "Dealt with"}}.">
+
+      <div class="an-card wf-phone">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "technician"}}</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="wf-h">{{t "For me"}} <span class="fm-count an-pop" data-t="4.2,9.6">1</span></div>
+          <div class="fm-stack">
+            <div class="fm-empty an-fade" data-t="0,4.2">{{t "Nothing is waiting for you."}}</div>
+            <div class="fm-item an-r" data-t="4.2,9.6"><b>FOR 123</b> &middot; #7<br>{{t "The part you asked for has arrived: %s" "Styrled vänster"}}</div>
+            <div class="fm-empty an-fade" data-t="9.6">{{t "Nothing is waiting for you."}}</div>
+          </div>
+          <div class="fm-stack fm-act">
+            <span class="an-btn wf-add fm-clock an-fade" data-t="7.4,9.6">{{t "Start clock"}}</span>
+            <div class="wf-field fm-note an-fade" data-t="11.6"><span class="lbl">{{t "Something else needs doing"}}</span><span data-type="12,1.4">Spindelled glapp</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-card wf-desk an-fade" data-t="0,11.6">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "parts"}} &middot; {{t "Waiting for parts"}}</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="wf-card"><div class="wf-plate">FOR 123</div><div class="an-muted">Styrled vänster</div>
+            <div class="fm-stack"><span class="an-btn mo-btn an-fade" data-t="0,3.6">{{t "It has arrived"}}</span>
+            <div class="rd-tag cl-on an-fade" data-t="3.6">{{t "arrived"}}</div></div></div>
+        </div>
+      </div>
+
+      <div class="an-card wf-desk an-fade" data-t="11.6">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}} &middot; {{t "For me"}} <span class="fm-count an-pop" data-t="13.6,18.4">1</span></span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack">
+            <div class="fm-item an-r" data-t="13.6,18.4"><b>FOR 123</b> &middot; #7<br>{{n "%d thing noticed, not priced" 1}}
+            <span class="an-btn wf-secondary fm-dealt">{{t "Dealt with"}}</span></div>
+            <div class="fm-empty an-fade" data-t="0,13.6">{{t "Nothing is waiting for you."}}</div>
+            <div class="fm-empty an-fade" data-t="18.4">{{t "Nothing is waiting for you."}}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,4">Erik har bett om en del. Hans lista är tom.</div>
+      <div class="an-cap" data-t="4.2,7.2">Lagret tar emot den. Den syns hos Erik direkt.</div>
+      <div class="an-cap" data-t="7.4,11.4">Han startar klockan på jobbet. Då är det hanterat, och borta.</div>
+      <div class="an-cap" data-t="11.6,17.2">Han ser något mer. Det hamnar hos disken.</div>
+      <div class="an-cap" data-t="17.4,25.6">Disken tar hand om det. Ingen bockar av något för hand.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i tre webbläsare, en per roll, och testet kontrollerar att ingen sida laddades om &ndash; <a href="{{test "e2e/tests/15-scene-for-me.spec.ts" "what is waiting for each person arrives by itself and leaves when it is dealt with"}}">läs testet</a>. Registreringsnummer och namn är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

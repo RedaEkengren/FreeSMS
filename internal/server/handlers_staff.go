@@ -101,9 +101,13 @@ func (s *Server) accountPage(r *http.Request, session auth.Session) pageData {
 	if err != nil {
 		s.log.Error("read own language", "error", err)
 	}
+	sound, err := workshop.AlertSound(r.Context(), s.pool, session.Scope)
+	if err != nil {
+		s.log.Error("read alert sound", "error", err)
+	}
 	return pageData{
 		Title: "Your account", Session: session, MinPassword: workshop.MinPasswordLength,
-		Languages: workshop.Languages(), MyLocale: mine,
+		Languages: workshop.Languages(), MyLocale: mine, AlertSound: sound,
 	}
 }
 
