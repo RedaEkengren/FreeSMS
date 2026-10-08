@@ -1,11 +1,13 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/auth"
+	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
@@ -132,9 +134,13 @@ func (s *Server) handleCustomerStatus(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) renderJob(w http.ResponseWriter, r *http.Request, linkURL string) {
 	session := sessionFrom(r.Context())
-	id := r.PathValue("id")
-
-	job, lines, err := workshop.JobByID(r.Context(), s.pool, session.Scope, id)
+	// Every read in one transaction, and the page rendered after it ends: a
+	// slow phone does not hold a connection open while it downloads.
+	var page pageData
+	var err error
+	database.Reading(r.Context(), s.pool, session.Scope, func(ctx context.Context) {
+		page, err = s.readJob(r.WithContext(ctx), linkURL)
+	})
 	if errors.Is(err, workshop.ErrNotFound) {
 		// A work order belonging to another shop is not there, so this is the
 		// same 404 as one that never existed. Row level security makes that
@@ -146,6 +152,19 @@ func (s *Server) renderJob(w http.ResponseWriter, r *http.Request, linkURL strin
 		s.log.Error("read job", "error", err)
 		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
 		return
+	}
+	s.render(w, r, http.StatusOK, "job", page)
+}
+
+// readJob reads what the job page shows. Only the job itself failing loses
+// the page; any other read that fails is logged and left off.
+func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
+	session := sessionFrom(r.Context())
+	id := r.PathValue("id")
+
+	job, lines, err := workshop.JobByID(r.Context(), s.pool, session.Scope, id)
+	if err != nil {
+		return pageData{}, err
 	}
 
 	progress, err := workshop.ProgressFor(r.Context(), s.pool, session.Scope, id)
@@ -259,7 +278,7 @@ func (s *Server) renderJob(w http.ResponseWriter, r *http.Request, linkURL strin
 		}
 	}
 
-	s.render(w, r, http.StatusOK, "job", pageData{
+	return pageData{
 		Title:       "Job",
 		Session:     session,
 		Job:         job,
@@ -283,7 +302,7 @@ func (s *Server) renderJob(w http.ResponseWriter, r *http.Request, linkURL strin
 		Suggestions: suggestions,
 		Parts:       stocked,
 		LabourRate:  labourRate,
-	})
+	}, nil
 }
 
 // handleClock starts or stops the caller's clock and returns the button.

@@ -27,17 +27,15 @@ import (
 var queryBudgets = map[string]int{
 	// The technician's screens, on the worst connection: these matter most.
 	"tech GET /":                         11,
-	"tech GET /jobs/{id}":                57,
+	"tech GET /jobs/{id}":                21,
 	"tech GET /time":                     11,
 	"tech GET /inspections/{inspection}": 12,
-	// The job pages are mostly a fixed cost: every read is its own
-	// transaction, five round trips each. Reading the page in one would cut
-	// them by most of that, and is its own piece of work; until then these
-	// are the numbers held.
+	// The job page reads in one transaction (database.Reading). It was 57
+	// and 100 when every read began and ended its own.
 	//
 	// The counter.
 	"desk GET /board":       16,
-	"desk GET /jobs/{id}":   100,
+	"desk GET /jobs/{id}":   32,
 	"desk GET /receivables": 11,
 	"desk GET /parts":       11,
 	"desk GET /stock":       26,
