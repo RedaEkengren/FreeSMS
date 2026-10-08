@@ -250,14 +250,22 @@ func InspectionsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 	if err != nil {
 		return nil, err
 	}
-	for idx := range out {
-		items, err := itemsFor(ctx, pool, scope, out[idx].ID)
-		if err != nil {
-			return nil, err
+	// Every inspection's items at once, rather than a transaction each.
+	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		ids := make([]string, len(out))
+		for idx := range out {
+			ids[idx] = out[idx].ID
 		}
-		out[idx].Items = items
-	}
-	return out, nil
+		items, err := loadItemsFor(ctx, tx, ids)
+		if err != nil {
+			return err
+		}
+		for idx := range out {
+			out[idx].Items = items[out[idx].ID]
+		}
+		return nil
+	})
+	return out, err
 }
 
 func itemsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, inspectionID string) ([]InspectionItem, error) {
@@ -271,10 +279,31 @@ func itemsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, inspe
 // loadItems reads a checklist with its photographs and the customer's latest
 // answer per item.
 func loadItems(ctx context.Context, tx pgx.Tx, inspectionID string, out *[]InspectionItem) error {
+	byInspection, err := loadItemsFor(ctx, tx, []string{inspectionID})
+	if err != nil {
+		return err
+	}
+	*out = append(*out, byInspection[inspectionID]...)
+	return nil
+}
+
+// loadItemsFor reads the items of several inspections at once, in one query
+// whatever the number of inspections, items or photographs. It used to ask
+// for each item's photographs separately, and each inspection's items in a
+// transaction of their own: invisible with a test fixture's one item, and a
+// job page of a hundred and fifty round trips for a car with five checks on
+// it. The query budget in internal/server found it.
+func loadItemsFor(ctx context.Context, tx pgx.Tx, inspectionIDs []string) (map[string][]InspectionItem, error) {
+	out := map[string][]InspectionItem{}
+	if len(inspectionIDs) == 0 {
+		return out, nil
+	}
 	rows, err := tx.Query(ctx, `
-		SELECT it.id, it.position, it.label, coalesce(it.status, ''), coalesce(it.note, ''),
+		SELECT it.inspection_id, it.id, it.position, it.label, coalesce(it.status, ''), coalesce(it.note, ''),
 		       coalesce(d.decision, ''), d.decided_at,
-		       (SELECT count(*) FROM inspection_decisions dd WHERE dd.item_id = it.id) AS decisions
+		       (SELECT count(*) FROM inspection_decisions dd WHERE dd.item_id = it.id) AS decisions,
+		       coalesce((SELECT array_agg(a.storage_key ORDER BY a.created_at)
+		                 FROM attachments a WHERE a.inspection_item_id = it.id), '{}')
 		FROM inspection_items it
 		-- The latest answer. Earlier ones stay in the table: a customer who
 		-- approves and then declines has done two things, and the first is the
@@ -283,50 +312,30 @@ func loadItems(ctx context.Context, tx pgx.Tx, inspectionID string, out *[]Inspe
 		    SELECT decision, decided_at FROM inspection_decisions
 		    WHERE item_id = it.id ORDER BY decided_at DESC, id DESC LIMIT 1
 		) d ON true
-		WHERE it.inspection_id = $1
-		ORDER BY it.position`, inspectionID)
+		WHERE it.inspection_id = ANY($1::uuid[])
+		ORDER BY it.inspection_id, it.position`, inspectionIDs)
 	if err != nil {
-		return fmt.Errorf("list items: %w", err)
+		return nil, fmt.Errorf("list items: %w", err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
+		var inspectionID string
 		var it InspectionItem
 		var decisions int
-		if err := rows.Scan(&it.ID, &it.Position, &it.Label, &it.Status, &it.Note,
-			&it.Decision, &it.DecidedAt, &decisions); err != nil {
-			return fmt.Errorf("scan item: %w", err)
+		if err := rows.Scan(&inspectionID, &it.ID, &it.Position, &it.Label, &it.Status, &it.Note,
+			&it.Decision, &it.DecidedAt, &decisions, &it.Photos); err != nil {
+			return nil, fmt.Errorf("scan item: %w", err)
 		}
 		if decisions > 1 {
 			it.Superseded = decisions - 1
 		}
-		*out = append(*out, it)
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-
-	for idx := range *out {
-		photos, err := tx.Query(ctx,
-			`SELECT storage_key FROM attachments WHERE inspection_item_id = $1 ORDER BY created_at`,
-			(*out)[idx].ID)
-		if err != nil {
-			return fmt.Errorf("list photos: %w", err)
+		if len(it.Photos) == 0 {
+			it.Photos = nil
 		}
-		for photos.Next() {
-			var key string
-			if err := photos.Scan(&key); err != nil {
-				photos.Close()
-				return fmt.Errorf("scan photo: %w", err)
-			}
-			(*out)[idx].Photos = append((*out)[idx].Photos, key)
-		}
-		photos.Close()
-		if err := photos.Err(); err != nil {
-			return err
-		}
+		out[inspectionID] = append(out[inspectionID], it)
 	}
-	return nil
+	return out, rows.Err()
 }
 
 // CreateShare makes a link for the customer and returns the token.

@@ -62,8 +62,14 @@ const (
 
 func testServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 	t.Helper()
+	return testServerOn(t, testsupport.FreshPool(t))
+}
+
+// testServerOn is testServer on a pool the caller made, for a test that
+// needs one with something attached -- a tracer counting queries.
+func testServerOn(t *testing.T, pool *pgxpool.Pool) (*httptest.Server, *pgxpool.Pool) {
+	t.Helper()
 	ctx := context.Background()
-	pool := testsupport.FreshPool(t)
 	if err := database.Migrate(ctx, pool, migrations.FS); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}

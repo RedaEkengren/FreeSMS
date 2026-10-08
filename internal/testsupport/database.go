@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -35,6 +36,13 @@ const testLockKey int64 = 991_147_003
 // these ran would be a step duration nobody reads.
 func FreshPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
+	return FreshPoolWith(t, nil)
+}
+
+// FreshPoolWith is FreshPool with a tracer on every connection, for a test
+// that counts what reaches the database.
+func FreshPoolWith(t *testing.T, tracer pgx.QueryTracer) *pgxpool.Pool {
+	t.Helper()
 
 	url := os.Getenv(EnvDatabaseURL)
 
@@ -58,7 +66,14 @@ func FreshPool(t *testing.T) *pgxpool.Pool {
 	}
 
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, url)
+	cfg, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		t.Fatalf("parse %s: %v", EnvDatabaseURL, err)
+	}
+	if tracer != nil {
+		cfg.ConnConfig.Tracer = tracer
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
