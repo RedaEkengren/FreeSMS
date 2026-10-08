@@ -32,6 +32,7 @@
   <span class="pb pb-late">{{$.T "starts late"}}</span>
 </p>
 
+<div id="live-planner" data-live="calendar">
 {{range .Days}}
 <h2>{{$.Date .Date "Mon 2 Jan"}} <span class="waiting">&middot; {{$.N "%d booking" .Count}}</span></h2>
 {{$day := .Date.Format "2006-01-02"}}
@@ -68,6 +69,7 @@
 </div>
 {{end}}
 
+</div>
 <h2>{{$.T "New booking"}}</h2>
 <form method="post" action="/calendar" data-keep="booking">
   <div class="pair">

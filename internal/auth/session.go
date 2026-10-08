@@ -189,6 +189,21 @@ func recordAttempt(ctx context.Context, pool *pgxpool.Pool, shopID, email string
 // makes deactivation immediate. A self-contained signed token would stay valid
 // until it expired, because nothing would be consulted when it was presented.
 func Authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string) (Session, error) {
+	return authenticate(ctx, pool, shopID, token, true)
+}
+
+// Check is Authenticate without counting as activity.
+//
+// A screen that refreshes itself is not a person using it. If its refreshes
+// moved the session's last-seen time, a board left open on a shared counter
+// would never reach its idle limit and would stay signed in as whoever last
+// used it for as long as the browser was open. The live stream and a screen's
+// own refreshes use this; anything a person did uses Authenticate.
+func Check(ctx context.Context, pool *pgxpool.Pool, shopID, token string) (Session, error) {
+	return authenticate(ctx, pool, shopID, token, false)
+}
+
+func authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string, touch bool) (Session, error) {
 	if token == "" {
 		return Session{}, ErrNoSession
 	}
@@ -224,8 +239,10 @@ func Authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string)
 			return ErrNoSession
 		}
 
-		if _, err := tx.Exec(ctx, `UPDATE sessions SET last_seen_at = now() WHERE id = $1`, sessionID); err != nil {
-			return fmt.Errorf("touch session: %w", err)
+		if touch {
+			if _, err := tx.Exec(ctx, `UPDATE sessions SET last_seen_at = now() WHERE id = $1`, sessionID); err != nil {
+				return fmt.Errorf("touch session: %w", err)
+			}
 		}
 
 		s = Session{

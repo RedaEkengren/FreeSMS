@@ -1,5 +1,6 @@
 {{define "content"}}
 <h1>{{.T "Waiting for parts"}}</h1>
+<div id="live-parts" data-live="parts">
 {{if not .Requests}}
   <p class="empty">{{.T "Nothing outstanding."}}</p>
 {{else}}
@@ -34,5 +35,6 @@
   </div>
   {{end}}
 {{end}}
+</div>
 <p class="mt-l"><a href="/">{{.T "Back"}}</a></p>
 {{end}}

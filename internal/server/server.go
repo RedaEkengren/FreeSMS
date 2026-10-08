@@ -21,6 +21,7 @@ import (
 	"github.com/RedaEkengren/FreeSMS/internal/auth"
 	"github.com/RedaEkengren/FreeSMS/internal/config"
 	"github.com/RedaEkengren/FreeSMS/internal/i18n"
+	"github.com/RedaEkengren/FreeSMS/internal/live"
 	"github.com/RedaEkengren/FreeSMS/internal/storage"
 	"github.com/RedaEkengren/FreeSMS/internal/vehicledata"
 	"github.com/RedaEkengren/FreeSMS/internal/web"
@@ -41,6 +42,10 @@ type Server struct {
 	baseURL       string
 	vehicleLookup vehicledata.Lookup
 	catalogues    *i18n.Catalogues
+
+	// Open screens, told when something they show has changed.
+	live          *live.Hub
+	liveHeartbeat time.Duration
 
 	// Pinned by SHOP_ID when an installation serves a named shop.
 	configuredShopID string
@@ -212,6 +217,8 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 	srv := &Server{
 		pool:             pool,
 		log:              log,
+		live:             live.New(pool, log, liveStreams),
+		liveHeartbeat:    25 * time.Second,
 		release:          cfg.Release,
 		configuredShopID: cfg.ShopID,
 		locale:           locale,
@@ -295,6 +302,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/takeout", s.requireSession(s.handleTakeOut))
 	mux.HandleFunc("POST /jobs/{id}/told", s.requireSession(s.handleTold))
 	mux.HandleFunc("POST /jobs/{id}/link", s.requireSession(s.handleJobLink))
+	mux.HandleFunc("GET /events", s.requireSession(s.handleEvents))
 	mux.HandleFunc("GET /calendar", s.requireSession(s.handleCalendar))
 	mux.HandleFunc("POST /calendar", s.requireSession(s.handleCreateBooking))
 	mux.HandleFunc("POST /calendar/capacity", s.requireSession(s.handleCapacity))
@@ -422,6 +430,15 @@ func (s *Server) Run(ctx context.Context, addr string) error {
 		IdleTimeout:       120 * time.Second,
 	}
 
+	// The hub ends with ctx, and closes every stream as it does -- before
+	// the shutdown below, which would otherwise wait the full twenty seconds
+	// for streams that never finish on their own.
+	listening := make(chan struct{})
+	go func() {
+		s.live.Run(ctx)
+		close(listening)
+	}()
+
 	errs := make(chan error, 1)
 	go func() {
 		s.log.Info("listening", "addr", addr, "release", s.release)
@@ -440,6 +457,7 @@ func (s *Server) Run(ctx context.Context, addr string) error {
 	// mid-save during a deploy should not lose the save; see the autosave
 	// issue for the other half of that promise.
 	s.log.Info("shutting down")
+	<-listening
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)

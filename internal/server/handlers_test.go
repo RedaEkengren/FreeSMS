@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/auth"
 	"github.com/RedaEkengren/FreeSMS/internal/config"
@@ -193,9 +194,22 @@ func testServerOn(t *testing.T, pool *pgxpool.Pool) (*httptest.Server, *pgxpool.
 	if err != nil {
 		t.Fatalf("routes: %v", err)
 	}
+	// Listening, as Run does, with a heartbeat short enough that a test sees
+	// a session end within it.
+	srv.liveHeartbeat = 100 * time.Millisecond
+	liveCtx, stopLive := context.WithCancel(context.Background())
+	listening := make(chan struct{})
+	go func() {
+		srv.live.Run(liveCtx)
+		close(listening)
+	}()
 	ts := httptest.NewServer(handler)
 	testExportDirs.Store(ts.URL, exportDir)
-	t.Cleanup(ts.Close)
+	t.Cleanup(func() {
+		stopLive()
+		<-listening
+		ts.Close()
+	})
 	return ts, pool
 }
 

@@ -1,4 +1,5 @@
 {{define "content"}}
+<div id="live-head" data-live="job:{{.Job.ID}}">
 <div class="row">
   <span class="plate">{{if .Job.Registration}}{{.Job.Registration}}{{else}}{{.T "no plate"}}{{end}}</span>
   <span class="tag">#{{.Job.Number}}</span>
@@ -6,13 +7,19 @@
 <p class="vehicle">{{.Job.Make}} {{.Job.Model}}{{if .Job.ModelYear}} {{.Job.ModelYear}}{{end}}</p>
 
 {{if .Job.Complaint}}<p>{{.Job.Complaint}}</p>{{end}}
+</div>
 
+{{/* Each live-* part brings itself up to date while the page is open, when
+     somebody else changes the job (live.js). The customer's link is outside
+     them on purpose: it is shown once, and a refresh would take it away
+     before it was copied. */}}
 {{/* Two columns once there is room for them, and one stacked column on a
      phone. The order here is the order a phone reads them in, which is why
      the clock and the state come first: the technician's screen is the
      default and the desk is the exception. */}}
 <div class="split">
 <div class="side">
+<div id="live-status" data-live="job:{{.Job.ID}}">
 <div id="clock">{{template "clock" .}}</div>
 {{if .Job.OthersRunning}}<p class="waiting">{{.T "%s still has a clock running on this job." .Job.OthersRunning}}</p>{{end}}
 
@@ -26,7 +33,9 @@
   <dt>{{.T "The car"}}</dt>
   <dd>{{if .Presence.Here}}{{.T "here"}}{{else}}<span class="tag warranty">{{.T "at home"}}</span>{{with .Presence.ExpectedBack}} {{$.T "back %s" ($.Date . "Mon 2 Jan")}}{{end}}{{end}}</dd>
 </dl>
+</div>
 
+<div id="live-car" data-live="job:{{.Job.ID}}">
 {{/* Handing the car back, and taking it in again, are the counter's. */}}
 {{if .Session.Scope.Role.SeesCustomerPersonalData}}
 {{if .Presence.Here}}
@@ -47,7 +56,9 @@
 </form>
 {{end}}
 {{end}}
+</div>
 
+<div id="live-ready" data-live="job:{{.Job.ID}}">
 {{/* When will it be ready: the promise, the hours sold and the time
      clocked, together. Not clamped past the estimate -- an order at 140
      per cent is the one somebody needs to look at. */}}
@@ -81,7 +92,9 @@
   <button type="submit" class="secondary">{{.T "Save the promise"}}</button>
 </form>
 {{end}}
+</div>
 
+<div id="live-customer" data-live="job:{{.Job.ID}}">
 {{if .Contact.Known}}
 <h2>{{.T "Customer"}}</h2>
 <div class="waiting">{{.Contact.Name}}</div>
@@ -95,7 +108,9 @@
 <p class="waiting">{{.T "No customer recorded yet"}}</p>
 <a class="button secondary" href="/jobs/{{.Job.ID}}/customer">{{.T "Say who is paying"}}</a>
 {{end}}
+</div>
 
+<div id="live-move" data-live="job:{{.Job.ID}}">
 {{/* Where the shop requires a final check, "ready" waits for it. */}}
 {{if and .FinalCheck.Required (eq .Job.State "in_progress")}}
 <p class="waiting">{{if .FinalCheck.Done}}{{.T "Final check done by %s." .FinalCheck.By}}{{else}}<span class="tag warranty">{{.T "Final check"}}</span> {{.T .FinalCheck.Missing}}{{end}}</p>
@@ -114,7 +129,9 @@
   {{end}}
 </div>
 {{end}}
+</div>
 
+<div id="live-inspections" data-live="job:{{.Job.ID}}">
 <h2>{{.T "Inspections"}}</h2>
 {{if .Inspections}}
 <ul class="lines">
@@ -145,7 +162,9 @@
 <p class="empty">{{.T "There is no inspection checklist yet."}}
   {{if .Session.Scope.Role.RunsTheShop}}<a href="/checklists">{{.T "Make one"}}</a>{{else}}{{.T "Whoever runs the workshop makes them."}}{{end}}</p>
 {{end}}
+</div>
 
+<div id="live-requests" data-live="job:{{.Job.ID}}">
 {{if .Requests}}
 <h2>{{.T "Parts"}}</h2>
 <ul class="lines">
@@ -163,7 +182,9 @@
   {{end}}
 </ul>
 {{end}}
+</div>
 
+<div id="live-jobparts" data-live="job:{{.Job.ID}}">
 {{/* Parts on the job: what was priced, and what came off the shelf. A part
      taken out and not priced is the cue that stops one being fitted for
      nothing; priced and not taken out is still on the shelf. Taking out and
@@ -218,7 +239,9 @@
 </form>
 {{end}}
 {{end}}
+</div>
 
+<div id="live-findings" data-live="job:{{.Job.ID}}">
 {{if .Findings}}
 <h2>{{.T "Noticed under the car"}}</h2>
 <ul class="lines">
@@ -239,6 +262,7 @@
   {{end}}
 </ul>
 {{end}}
+</div>
 
 {{/* What the customer answered on their link. Only fetched for the front
      desk, so a technician's page has nothing here to hide. An approved item
@@ -261,6 +285,7 @@
   <button type="submit" class="secondary">{{.T "Make a link for the customer"}}</button>
 </form>
 {{end}}
+<div id="live-telling" data-live="job:{{.Job.ID}}">
 {{if or (eq .Job.State "ready") .Contacts}}
 <h2>{{.T "Telling the customer"}}</h2>
 {{if .Contacts}}
@@ -283,8 +308,10 @@
 </form>
 {{end}}
 {{end}}
+</div>
 {{end}}
 
+<div id="live-answers" data-live="job:{{.Job.ID}}">
 {{if .Answers}}
 <h2>{{.T "The customer's answers"}}</h2>
 <ul class="lines">
@@ -315,7 +342,9 @@
   {{end}}
 </ul>
 {{end}}
+</div>
 
+<div id="live-totals" data-live="job:{{.Job.ID}}">
 {{if .Lines}}
 {{/* In the side rail rather than under the lines: the total is what the front
      desk is asked for on the telephone, and it used to scroll away with
@@ -334,6 +363,7 @@
   <dt class="grand">{{.T "Total"}}</dt><dd class="grand">{{.Money .Totals.GrossMinor}}</dd>
 </dl>
 {{end}}
+</div>
 
 </div>
 
@@ -349,6 +379,7 @@
       data-keep="job-line:{{.Job.ID}}" data-offline></form>
 {{end}}
 
+<div id="live-lines" data-live="job:{{.Job.ID}}">
 <table class="lines-table">
   <thead>
     <tr>
@@ -410,7 +441,9 @@
   </tfoot>
   {{end}}
 </table>
+</div>
 
+<div id="live-docs" data-live="job:{{.Job.ID}}">
 {{if .Invoices}}
 <h2>{{.T "Documents"}}</h2>
 <ul class="lines">
@@ -439,6 +472,7 @@
   </form>
   {{end}}
 {{end}}
+</div>
 
 {{if not .Session.Scope.Role.SeesCustomerPersonalData}}
 <h2>{{.T "Hand it on"}}</h2>

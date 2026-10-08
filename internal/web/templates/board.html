@@ -1,5 +1,6 @@
 {{define "content"}}
 <h1>{{.T "In the shop"}}</h1>
+<div id="live-board" data-live="board">
 {{if not .Board}}
   <p class="empty">{{.T "Nothing open."}}</p>
 {{else}}
@@ -33,5 +34,6 @@
   {{end}}
 </div>
 {{end}}
+</div>
 <p class="mt-l"><a href="/jobs/new">{{.T "Take in a vehicle"}}</a></p>
 {{end}}

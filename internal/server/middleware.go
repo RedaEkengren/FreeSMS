@@ -33,7 +33,11 @@ func (s *Server) withSession(next http.Handler) http.Handler {
 			return
 		}
 
-		session, err := auth.Authenticate(r.Context(), s.pool, s.shop(), cookie.Value)
+		authenticate := auth.Authenticate
+		if background(r) {
+			authenticate = auth.Check
+		}
+		session, err := authenticate(r.Context(), s.pool, s.shop(), cookie.Value)
 		if err != nil {
 			s.clearSessionCookie(w)
 			next.ServeHTTP(w, r)
@@ -41,6 +45,16 @@ func (s *Server) withSession(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), sessionKey, session)))
 	})
+}
+
+// LiveHeader marks a request a screen made to refresh itself, rather than one
+// a person made.
+const LiveHeader = "X-FreeSMS-Live"
+
+// background reports a request no person made: the live stream, or a screen
+// refreshing itself. It checks the session without counting as activity.
+func background(r *http.Request) bool {
+	return r.URL.Path == "/events" || r.Header.Get(LiveHeader) != ""
 }
 
 // requireSession sends anonymous requests to the sign-in page.

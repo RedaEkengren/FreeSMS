@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="{{asset "app.css"}}">
 <script src="{{asset "htmx.min.js"}}" defer></script>
 <script src="{{asset "keep.js"}}" defer></script>
+{{if .Session.Scope.UserID}}<script src="{{asset "live.js"}}" defer></script>{{end}}
 </head>
 <body>
 {{if .Session.Scope.UserID}}

@@ -60,6 +60,14 @@ Caddy fetches and renews the certificate itself. Then set, in `.env`:
 BASE_URL=https://verkstad.example.se
 ```
 
+Open screens keep themselves up to date over `/events`, a server-sent event
+stream that stays open for as long as the page does. A proxy must pass it
+through as it is written rather than collect it: Caddy does that for event
+streams by itself, and nginx is told to by the `X-Accel-Buffering: no` the
+app sends. A proxy that buffers anyway, or closes quiet connections sooner
+than the 25-second heartbeat, does not break anything -- the screens fall
+back to refreshing every 30 seconds -- but it does make them slower to hear.
+
 `BASE_URL` is what customers' links are built from, and an `https://` one
 marks the session cookie secure. A proxy in another container reaches the app
 on the compose network instead of loopback; `HTTP_BIND=0.0.0.0` publishes
