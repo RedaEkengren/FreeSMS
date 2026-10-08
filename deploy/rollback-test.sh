@@ -123,14 +123,17 @@ for kind in safe restore; do
     run previous
     if [ "$kind" = safe ]; then
         healthy || fail "the previous release refused a schema marked safe for it"
-        docker logs "$APP" 2>&1 | grep -q 'newer release' || fail "the rollback was not logged"
+        # Not grep -q: it stops reading at the first match, docker logs is
+        # killed writing the rest, and under pipefail that failure is the
+        # pipeline's -- a match reported as a miss, now and then.
+        docker logs "$APP" 2>&1 | grep 'newer release' >/dev/null || fail "the rollback was not logged"
         [ "$(sql "SELECT count(*) FROM shops")" = 2 ] || fail "writes made after the deploy were lost"
         echo "previous release healthy over $NEXT; nothing written since the deploy was lost"
         continue
     fi
 
     healthy && fail "the previous release started against a schema it cannot read"
-    docker logs "$APP" 2>&1 | grep -q 'roll forward' || fail "the refusal did not say what to do"
+    docker logs "$APP" 2>&1 | grep 'roll forward' >/dev/null || fail "the refusal did not say what to do"
     echo "previous release refused, as it should, and said why"
 
     say "restore: the pre-deploy dump, then the previous release"
