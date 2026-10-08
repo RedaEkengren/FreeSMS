@@ -34,6 +34,7 @@ type Server struct {
 	log           *slog.Logger
 	release       string
 	locale        string
+	exportDir     string
 	secureCookies bool
 	templates     map[string]*template.Template
 	photos        *storage.Store
@@ -215,6 +216,7 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 		configuredShopID: cfg.ShopID,
 		locale:           locale,
 		photos:           photos,
+		exportDir:        cfg.ExportDir,
 		vehicleLookup:    newLookup(cfg),
 		catalogues:       catalogues,
 		baseURL:          strings.TrimRight(cfg.BaseURL, "/"),
@@ -329,6 +331,8 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /shop/charges", s.requireSession(s.handleSaveSurcharges))
 	mux.HandleFunc("GET /privacy", s.requireSession(s.handlePrivacy))
 	mux.HandleFunc("GET /people/{id}/export", s.requireSession(s.handleExportPerson))
+	mux.HandleFunc("POST /privacy/export", s.requireSession(s.handleShopExport))
+	mux.HandleFunc("GET /exports/{id}", s.requireSession(s.handleShopExportFile))
 	mux.HandleFunc("POST /people/{id}/erase", s.requireSession(s.handleErasePerson))
 
 	mux.HandleFunc("GET /labour", s.requireSession(s.handleLabour))

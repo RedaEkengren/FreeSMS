@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/RedaEkengren/FreeSMS/internal/auth"
@@ -37,6 +38,7 @@ const (
 	photoB      = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	checklistB  = "bbbbbbbb-0000-0000-0000-000000000008"
 	paymentB    = "bbbbbbbb-0000-0000-0000-000000000009"
+	exportB     = "bbbbbbbb-0000-0000-0000-00000000000a"
 
 	// A string that appears nowhere in shop A. If it reaches a response body,
 	// something leaked, whatever the status code said.
@@ -65,11 +67,25 @@ func testServer(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 	return testServerOn(t, testsupport.FreshPool(t))
 }
 
+// testExportDirs is where each test server writes whole-shop exports, for a
+// test that checks the file on disk.
+var testExportDirs sync.Map
+
+func exportDirOf(t *testing.T, ts *httptest.Server) string {
+	t.Helper()
+	dir, ok := testExportDirs.Load(ts.URL)
+	if !ok {
+		t.Fatal("no export directory recorded for this server")
+	}
+	return dir.(string)
+}
+
 // testServerOn is testServer on a pool the caller made, for a test that
 // needs one with something attached -- a tracer counting queries.
 func testServerOn(t *testing.T, pool *pgxpool.Pool) (*httptest.Server, *pgxpool.Pool) {
 	t.Helper()
 	ctx := context.Background()
+	exportDir := t.TempDir()
 	if err := database.Migrate(ctx, pool, migrations.FS); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
@@ -153,6 +169,8 @@ func testServerOn(t *testing.T, pool *pgxpool.Pool) (*httptest.Server, *pgxpool.
 		`INSERT INTO invoice_payments (id, shop_id, invoice_id, series, number, amount_minor, method, paid_on, recorded_by)
 		 VALUES ('` + paymentB + `','` + shopB + `','` + invoiceB + `','B',1,1000,'bank',current_date,
 		         'bbbbbbbb-0000-0000-0000-0000000000bb')`,
+		`INSERT INTO shop_exports (id, shop_id, requested_by, finished_at, file_name, byte_size) VALUES
+		 ('` + exportB + `','` + shopB + `','bbbbbbbb-0000-0000-0000-0000000000bb', now(), 'shop-b.zip', 1)`,
 	})
 
 	cfg := &config.Config{
@@ -161,6 +179,7 @@ func testServerOn(t *testing.T, pool *pgxpool.Pool) (*httptest.Server, *pgxpool.
 		Release:       "test",
 		// Photographs go to a directory that disappears with the test.
 		AttachmentsDir: t.TempDir(),
+		ExportDir:      exportDir,
 	}
 	srv, err := New(pool, slog.New(slog.NewTextHandler(io.Discard, nil)), cfg, shopA)
 	if err != nil {
@@ -171,6 +190,7 @@ func testServerOn(t *testing.T, pool *pgxpool.Pool) (*httptest.Server, *pgxpool.
 		t.Fatalf("routes: %v", err)
 	}
 	ts := httptest.NewServer(handler)
+	testExportDirs.Store(ts.URL, exportDir)
 	t.Cleanup(ts.Close)
 	return ts, pool
 }

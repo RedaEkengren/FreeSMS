@@ -20,9 +20,13 @@ type Config struct {
 	HTTPAddr       string
 	BaseURL        string
 	AttachmentsDir string
-	DefaultLocale  string
-	LogLevel       string
-	Release        string
+	// Where a whole-shop export is written. It holds every customer the shop
+	// has had, so the operator chooses where, and it is never served from
+	// anywhere but the owner's own download.
+	ExportDir     string
+	DefaultLocale string
+	LogLevel      string
+	Release       string
 
 	// Which shop this installation serves. Empty means: resolve it, and
 	// require exactly one to exist.
@@ -54,6 +58,7 @@ func Load() (*Config, error) {
 		HTTPAddr:           envOr("HTTP_ADDR", ":8080"),
 		BaseURL:            os.Getenv("BASE_URL"),
 		AttachmentsDir:     envOr("ATTACHMENTS_DIR", "/var/lib/freesms/attachments"),
+		ExportDir:          envOr("EXPORT_DIR", "/var/lib/freesms/exports"),
 		DefaultLocale:      envOr("DEFAULT_LOCALE", "en"),
 		LogLevel:           envOr("LOG_LEVEL", "info"),
 		Release:            envOr("RELEASE", "dev"),

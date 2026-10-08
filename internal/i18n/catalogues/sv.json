@@ -1423,6 +1423,24 @@
     },
     "Track rod end, left front": {
       "other": "Styrled, vänster fram"
+    },
+    "Take everything with you": {
+      "other": "Ta med dig allt"
+    },
+    "One file with the whole workshop -- customers, vehicles and their history, jobs, invoices as issued, inspections with their photographs, stock and clocked time -- as CSV that another system can read without this one.": {
+      "other": "En fil med hela verkstaden – kunder, fordon och deras historik, jobb, fakturor som de utfärdades, kontroller med foton, lager och stämplad tid – som CSV som ett annat system kan läsa utan det här."
+    },
+    "Export the whole workshop": {
+      "other": "Exportera hela verkstaden"
+    },
+    "Download": {
+      "other": "Ladda ner"
+    },
+    "failed": {
+      "other": "misslyckades"
+    },
+    "being written": {
+      "other": "skrivs"
     }
   }
 }

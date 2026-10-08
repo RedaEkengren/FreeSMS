@@ -53,6 +53,7 @@ type pageData struct {
 	JobParts      []workshop.JobPart
 	Contacts      []workshop.CustomerContact
 	Status        workshop.CustomerStatus
+	ShopExports   []workshop.ShopExport
 	FinalCheck    workshop.FinalCheck
 	FinalSetting  workshop.FinalCheckSettings
 	MyLocale      string
