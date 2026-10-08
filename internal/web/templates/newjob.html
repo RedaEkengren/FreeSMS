@@ -2,6 +2,7 @@
 <h1>{{.T "Take in a vehicle"}}</h1>
 {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
 <form method="post" action="/jobs/new" data-keep="intake">
+  {{if .Form.BookingID}}<input type="hidden" name="booking_id" value="{{.Form.BookingID}}">{{end}}
   <label>
     <span>{{.T "Registration"}}</span>
     <input name="registration" value="{{.Form.Registration}}"

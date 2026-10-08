@@ -1441,6 +1441,118 @@
     },
     "being written": {
       "other": "skrivs"
+    },
+    "Bookings": {
+      "other": "Bokningar"
+    },
+    "Previous week": {
+      "other": "Förra veckan"
+    },
+    "Next week": {
+      "other": "Nästa vecka"
+    },
+    "Week of %s": {
+      "other": "Veckan från %s"
+    },
+    "Find a booking: registration, name or what it is for": {
+      "other": "Hitta en bokning: regnummer, namn eller vad den gäller"
+    },
+    "booked": {
+      "other": "bokad"
+    },
+    "in the shop": {
+      "other": "inne på verkstaden"
+    },
+    "parts to get in": {
+      "other": "delar att få in"
+    },
+    "work longer than the slot": {
+      "other": "arbetet längre än tiden"
+    },
+    "Not given to anybody": {
+      "other": "Inte tilldelad"
+    },
+    "no plate yet": {
+      "other": "inget regnummer än"
+    },
+    "New booking": {
+      "other": "Ny bokning"
+    },
+    "Day": {
+      "other": "Dag"
+    },
+    "At": {
+      "other": "Klockan"
+    },
+    "Minutes": {
+      "other": "Minuter"
+    },
+    "Work expected, hours": {
+      "other": "Väntat arbete, timmar"
+    },
+    "Not given to anybody yet": {
+      "other": "Inte tilldelad än"
+    },
+    "What it is for": {
+      "other": "Vad den gäller"
+    },
+    "Phone": {
+      "other": "Telefon"
+    },
+    "Parts to get in before it comes": {
+      "other": "Delar att få in innan den kommer"
+    },
+    "Book it": {
+      "other": "Boka"
+    },
+    "When": {
+      "other": "När"
+    },
+    "Work expected": {
+      "other": "Väntat arbete"
+    },
+    "longer than the slot": {
+      "other": "längre än tiden"
+    },
+    "to get in before it comes": {
+      "other": "att få in innan den kommer"
+    },
+    "Booked": {
+      "other": "Bokad"
+    },
+    "The car is here: take it in": {
+      "other": "Bilen är här: ta in den"
+    },
+    "Move it": {
+      "other": "Flytta den"
+    },
+    "It did not come": {
+      "other": "Den kom inte"
+    },
+    "Cancel, because": {
+      "other": "Avboka, för att"
+    },
+    "Cancel the booking": {
+      "other": "Avboka"
+    },
+    "The job it became": {
+      "other": "Jobbet den blev"
+    },
+    "What happened to it": {
+      "other": "Vad som hänt"
+    },
+    "Back to the week": {
+      "other": "Tillbaka till veckan"
+    },
+    "moved": {
+      "other": "flyttad"
+    },
+    "no_show": {
+      "other": "kom inte"
+    },
+    "%d booking": {
+      "one": "%d bokning",
+      "other": "%d bokningar"
     }
   }
 }

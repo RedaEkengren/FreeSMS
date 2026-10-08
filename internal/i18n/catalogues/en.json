@@ -61,6 +61,10 @@
     "%d thing approved by the customer, not priced": {
       "one": "%d thing approved by the customer, not priced",
       "other": "%d things approved by the customer, not priced"
+    },
+    "%d booking": {
+      "one": "%d booking",
+      "other": "%d bookings"
     }
   }
 }

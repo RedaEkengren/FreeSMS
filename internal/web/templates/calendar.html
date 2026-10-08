@@ -1,0 +1,80 @@
+{{define "content"}}
+<h1>{{.T "Bookings"}}</h1>
+
+{{with .Planner}}
+<div class="row">
+  <a href="/calendar?week={{.Prev}}">&larr; {{$.T "Previous week"}}</a>
+  <strong>{{$.T "Week of %s" ($.Date .Monday "2 Jan")}}</strong>
+  <a href="/calendar?week={{.Next}}">{{$.T "Next week"}} &rarr;</a>
+</div>
+
+<form class="mt-s" method="get" action="/calendar">
+  <label><span>{{$.T "Find a booking: registration, name or what it is for"}}</span>
+    <input name="q" value="{{.Query}}" autocomplete="off"></label>
+</form>
+{{if .Searched}}
+<ul class="lines">
+  {{range .Found}}
+  <li><a href="/bookings/{{.ID}}"><b>{{.Registration}}</b> {{.What}}</a>
+    <div class="waiting">{{$.Date ($.Local .Starts) "Mon 2 Jan 15:04"}}{{if .CustomerName}} &middot; {{.CustomerName}}{{end}} &middot; {{$.T .Status}}</div></li>
+  {{else}}<li class="empty">{{$.T "Nothing matched."}}</li>{{end}}
+</ul>
+{{end}}
+
+{{/* What a block's colour means, said once. Red is not used: on this
+     system red is urgency and nothing else. */}}
+<p class="legend">
+  <span class="pb">{{$.T "booked"}}</span>
+  <span class="pb pb-arrived">{{$.T "in the shop"}}</span>
+  <span class="pb pb-parts">{{$.T "parts to get in"}}</span>
+  <span class="pb pb-over">{{$.T "work longer than the slot"}}</span>
+</p>
+
+{{range .Days}}
+<h2>{{$.Date .Date "Mon 2 Jan"}} <span class="waiting">&middot; {{$.N "%d booking" .Count}}</span></h2>
+<div class="planner-scroll">
+<div class="planner">
+  <div class="pl-name"></div>
+  {{range $.Planner.HourMarks}}<div class="pl-hour">{{printf "%02d" .}}</div>{{end}}
+  {{range .Lanes}}
+  <div class="pl-name">{{if .Row.Name}}{{.Row.Name}}{{else}}{{$.T "Not given to anybody"}}{{end}}</div>
+  <div class="pl-lane">
+    {{range .Blocks}}
+    <a class="pb {{printf "cs-%d" .Start}} {{printf "cd-%d" .Span}}{{if eq .Booking.Status "arrived"}} pb-arrived{{else if .Booking.Overbooked}} pb-over{{else if .Booking.PartsNeeded}} pb-parts{{end}}" href="/bookings/{{.Booking.ID}}">
+      <span class="pb-time">{{$.Date ($.Local .Booking.Starts) "15:04"}}&ndash;{{$.Date ($.Local .Booking.Ends) "15:04"}}{{if .Clipped}} &hellip;{{end}}</span>
+      <b>{{if .Booking.Registration}}{{.Booking.Registration}}{{else}}{{$.T "no plate yet"}}{{end}}</b>
+      <span>{{.Booking.What}}</span>
+    </a>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+</div>
+{{end}}
+
+<h2>{{$.T "New booking"}}</h2>
+<form method="post" action="/calendar" data-keep="booking">
+  <div class="pair">
+    <label><span>{{$.T "Day"}}</span><input type="date" name="date" required></label>
+    <label><span>{{$.T "At"}}</span><input type="time" name="time" value="08:00" step="900" required></label>
+  </div>
+  <div class="pair">
+    <label><span>{{$.T "Minutes"}}</span><input name="minutes" value="60" inputmode="numeric" required></label>
+    <label><span>{{$.T "Work expected, hours"}}</span><input name="estimate_hours" inputmode="decimal"></label>
+  </div>
+  <label><span>{{$.T "Technician"}}</span>
+    <select name="technician_id"><option value="">{{$.T "Not given to anybody yet"}}</option>
+      {{range .Rows}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></label>
+  <div class="pair">
+    <label><span>{{$.T "Registration"}}</span><input name="registration" autocapitalize="characters"></label>
+    <label><span>{{$.T "What it is for"}}</span><input name="what" required></label>
+  </div>
+  <div class="pair">
+    <label><span>{{$.T "Customer"}}</span><input name="customer_name"></label>
+    <label><span>{{$.T "Phone"}}</span><input name="customer_phone" type="tel"></label>
+  </div>
+  <label class="tick"><input type="checkbox" name="parts_needed" value="yes"><span>{{$.T "Parts to get in before it comes"}}</span></label>
+  <button type="submit">{{$.T "Book it"}}</button>
+</form>
+{{end}}
+{{end}}

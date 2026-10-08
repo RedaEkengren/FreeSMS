@@ -1,0 +1,55 @@
+{{define "content"}}
+{{with .Booking}}
+<div class="row">
+  <span class="plate">{{if .Registration}}{{.Registration}}{{else}}{{$.T "no plate yet"}}{{end}}</span>
+  <span class="tag">{{$.T .Status}}</span>
+</div>
+<p>{{.What}}</p>
+<dl>
+  <dt>{{$.T "When"}}</dt><dd>{{$.Date ($.Local .Starts) "Mon 2 Jan 15:04"}}&ndash;{{$.Date ($.Local .Ends) "15:04"}}</dd>
+  <dt>{{$.T "Technician"}}</dt><dd>{{if .Technician}}{{.Technician}}{{else}}{{$.T "Not given to anybody yet"}}{{end}}</dd>
+  {{if .EstimateMinutes}}<dt>{{$.T "Work expected"}}</dt><dd>{{$.Num .EstimateHours}} h{{if .Overbooked}} <span class="tag warranty">{{$.T "longer than the slot"}}</span>{{end}}</dd>{{end}}
+  {{if .PartsNeeded}}<dt>{{$.T "Parts"}}</dt><dd>{{$.T "to get in before it comes"}}</dd>{{end}}
+  {{if .CustomerName}}<dt>{{$.T "Customer"}}</dt><dd>{{.CustomerName}}{{if .CustomerPhone}} &middot; <a href="tel:{{.CustomerPhone}}">{{.CustomerPhone}}</a>{{end}}</dd>{{end}}
+  <dt>{{$.T "Booked"}}</dt><dd>{{$.Date ($.Local .CreatedAt) "Mon 2 Jan 15:04"}} &middot; {{.CreatedBy}}</dd>
+</dl>
+
+{{if eq .Status "booked"}}
+{{/* The car has come: take it in from here, so the booking points at the
+     job and nothing is typed twice. */}}
+<p><a class="button" href="/jobs/new?booking={{.ID}}">{{$.T "The car is here: take it in"}}</a></p>
+
+<h2>{{$.T "Move it"}}</h2>
+<form method="post" action="/bookings/{{.ID}}">
+  <input type="hidden" name="action" value="move">
+  <div class="pair">
+    <label><span>{{$.T "Day"}}</span><input type="date" name="date" value="{{$.Date ($.Local .Starts) "2006-01-02"}}" required></label>
+    <label><span>{{$.T "At"}}</span><input type="time" name="time" value="{{$.Date ($.Local .Starts) "15:04"}}" step="900" required></label>
+  </div>
+  <label><span>{{$.T "Minutes"}}</span><input name="minutes" value="{{.SlotMinutes}}" inputmode="numeric" required></label>
+  <label><span>{{$.T "Technician"}}</span>
+    <select name="technician_id"><option value="">{{$.T "Not given to anybody yet"}}</option>
+      {{range $.Planner.Rows}}<option value="{{.ID}}" {{if eq .ID $.Booking.TechnicianID}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
+  <input type="hidden" name="what" value="{{.What}}">
+  <button type="submit" class="secondary">{{$.T "Move it"}}</button>
+</form>
+<div class="actions mt-m">
+  <form method="post" action="/bookings/{{.ID}}"><input type="hidden" name="action" value="no_show"><button type="submit" class="secondary">{{$.T "It did not come"}}</button></form>
+  <form method="post" action="/bookings/{{.ID}}"><input type="hidden" name="action" value="cancel">
+    <label><span>{{$.T "Cancel, because"}}</span><input name="reason"></label>
+    <button type="submit" class="secondary">{{$.T "Cancel the booking"}}</button></form>
+</div>
+{{else if .WorkOrderID}}
+<p><a href="/jobs/{{.WorkOrderID}}">{{$.T "The job it became"}}</a></p>
+{{end}}
+
+<h2>{{$.T "What happened to it"}}</h2>
+<ul class="lines">
+  {{range $.BookingEvents}}
+  <li><div class="row"><span>{{$.T .Event}}{{with .Starts}} &middot; {{$.Date ($.Local .) "Mon 2 Jan 15:04"}}{{end}}{{if .Note}} &middot; {{.Note}}{{end}}</span>
+    <span class="waiting">{{$.Date ($.Local .At) "2 Jan 15:04"}} &middot; {{.By}}</span></div></li>
+  {{end}}
+</ul>
+<p class="mt-l"><a href="/calendar?week={{$.Date ($.Local .Starts) "2006-01-02"}}">{{$.T "Back to the week"}}</a></p>
+{{end}}
+{{end}}

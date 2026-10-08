@@ -68,10 +68,19 @@ func (s *Server) handleNewJobForm(w http.ResponseWriter, r *http.Request) {
 			"Taking a vehicle in is done at the front desk.")
 		return
 	}
+	// Taken in from a booking: what the customer said on the telephone is
+	// already typed.
+	var form intakeForm
+	if id := r.URL.Query().Get("booking"); id != "" {
+		if b, _, err := workshop.BookingByID(r.Context(), s.pool, session.Scope, id); err == nil && b.Status == "booked" {
+			form = intakeForm{Registration: b.Registration, Complaint: b.What, BookingID: b.ID}
+		}
+	}
 	s.render(w, r, http.StatusOK, "newjob", pageData{
 		Title:     "Take in a vehicle",
 		Session:   session,
 		CanLookUp: s.canLookUp(),
+		Form:      form,
 	})
 }
 
@@ -80,6 +89,7 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 
 	form := intakeForm{
 		Registration: strings.TrimSpace(r.FormValue("registration")),
+		BookingID:    strings.TrimSpace(r.FormValue("booking_id")),
 		OdometerKm:   strings.TrimSpace(r.FormValue("odometer_km")),
 		Complaint:    strings.TrimSpace(r.FormValue("complaint")),
 	}
@@ -138,6 +148,13 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The booking ends here, pointing at the job it became. A booking moved
+	// or cancelled meanwhile is not a reason to refuse the car.
+	if form.BookingID != "" {
+		if err := workshop.ArriveBooking(r.Context(), s.pool, session.Scope, form.BookingID, id); err != nil {
+			s.log.Warn("booking not marked arrived", "booking", form.BookingID, "error", err)
+		}
+	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
 }

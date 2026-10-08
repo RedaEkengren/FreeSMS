@@ -472,3 +472,68 @@ a.brand { font-weight: 600; text-decoration: none; color: inherit; }
 
 /* The customer's page says one thing first: whether to come. */
 .status-big { font-size: 1.375rem; font-weight: 700; margin: 0; }
+
+/* The planner. A day is half-hour columns from 07:00 to 18:00, one row per
+   technician; a block's columns are its wall clock. Placed by class, since
+   the content security policy refuses style attributes. On a phone the day
+   scrolls sideways inside its own box; the page never does. */
+.planner-scroll { overflow-x: auto; margin: 0.5rem 0 1rem; }
+.planner { display: grid; grid-template-columns: 7.5rem repeat(11, minmax(4.5rem, 1fr)); gap: 2px 0; min-width: 48rem; }
+.pl-name { font-size: 0.875rem; font-weight: 600; padding: 0.4rem 0.5rem 0.4rem 0; align-self: center; }
+.pl-hour { font-size: 0.75rem; color: var(--muted); border-left: 1px solid var(--border); padding-left: 0.25rem; }
+.pl-lane { grid-column: 2 / -1; display: grid; grid-template-columns: repeat(22, 1fr); gap: 2px;
+  min-height: 3.25rem; background: var(--surface); border: 1px solid var(--border); border-radius: 0.375rem; }
+.pb { display: flex; flex-direction: column; gap: 0.1rem; overflow: hidden; text-decoration: none;
+  background: var(--accent); color: var(--accent-text); border-radius: 0.3rem; padding: 0.25rem 0.4rem; font-size: 0.8125rem; line-height: 1.25; }
+.pb b { font-weight: 700; letter-spacing: 0.02em; }
+.pb-time { font-variant-numeric: tabular-nums; opacity: 0.85; font-size: 0.75rem; }
+/* Legible on its own fill: dark text on the light ones. */
+.pb-arrived { background: #dff3e6; color: #0a5c2a; }
+.pb-parts { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 2px var(--attention); }
+.pb-over { background: #ffedd5; color: #7c2d12; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.8125rem; }
+.legend .pb { display: inline-flex; padding: 0.15rem 0.5rem; }
+.cs-0 { grid-column-start: 1; }
+.cs-1 { grid-column-start: 2; }
+.cs-2 { grid-column-start: 3; }
+.cs-3 { grid-column-start: 4; }
+.cs-4 { grid-column-start: 5; }
+.cs-5 { grid-column-start: 6; }
+.cs-6 { grid-column-start: 7; }
+.cs-7 { grid-column-start: 8; }
+.cs-8 { grid-column-start: 9; }
+.cs-9 { grid-column-start: 10; }
+.cs-10 { grid-column-start: 11; }
+.cs-11 { grid-column-start: 12; }
+.cs-12 { grid-column-start: 13; }
+.cs-13 { grid-column-start: 14; }
+.cs-14 { grid-column-start: 15; }
+.cs-15 { grid-column-start: 16; }
+.cs-16 { grid-column-start: 17; }
+.cs-17 { grid-column-start: 18; }
+.cs-18 { grid-column-start: 19; }
+.cs-19 { grid-column-start: 20; }
+.cs-20 { grid-column-start: 21; }
+.cs-21 { grid-column-start: 22; }
+.cd-1 { grid-column-end: span 1; }
+.cd-2 { grid-column-end: span 2; }
+.cd-3 { grid-column-end: span 3; }
+.cd-4 { grid-column-end: span 4; }
+.cd-5 { grid-column-end: span 5; }
+.cd-6 { grid-column-end: span 6; }
+.cd-7 { grid-column-end: span 7; }
+.cd-8 { grid-column-end: span 8; }
+.cd-9 { grid-column-end: span 9; }
+.cd-10 { grid-column-end: span 10; }
+.cd-11 { grid-column-end: span 11; }
+.cd-12 { grid-column-end: span 12; }
+.cd-13 { grid-column-end: span 13; }
+.cd-14 { grid-column-end: span 14; }
+.cd-15 { grid-column-end: span 15; }
+.cd-16 { grid-column-end: span 16; }
+.cd-17 { grid-column-end: span 17; }
+.cd-18 { grid-column-end: span 18; }
+.cd-19 { grid-column-end: span 19; }
+.cd-20 { grid-column-end: span 20; }
+.cd-21 { grid-column-end: span 21; }
+.cd-22 { grid-column-end: span 22; }

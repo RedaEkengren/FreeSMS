@@ -36,6 +36,7 @@ var ExportTables = []string{
 	"inspection_decisions", "attachments", "invoices", "invoice_lines", "invoice_payments",
 	"invoice_series", "accounting_exports", "ledger_accounts", "parts", "part_codes",
 	"stock_movements", "price_bands", "labour_times", "erasures", "shop_exports",
+	"bookings", "booking_events",
 }
 
 // exportQueries are tables exported with chosen columns, because one of

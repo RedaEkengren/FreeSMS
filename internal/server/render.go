@@ -54,6 +54,9 @@ type pageData struct {
 	Contacts      []workshop.CustomerContact
 	Status        workshop.CustomerStatus
 	ShopExports   []workshop.ShopExport
+	Planner       plannerPage
+	Booking       workshop.Booking
+	BookingEvents []workshop.BookingEvent
 	FinalCheck    workshop.FinalCheck
 	FinalSetting  workshop.FinalCheckSettings
 	MyLocale      string
@@ -144,6 +147,8 @@ type intakeForm struct {
 	Registration string
 	OdometerKm   string
 	Complaint    string
+	// The booking the car came for, so taking it in ends the booking.
+	BookingID string
 
 	// Setup reuses this struct rather than carrying a second one through
 	// every page: the fields are disjoint and no template reads both.
@@ -314,7 +319,7 @@ func (d pageData) Plural(key string, count int) string {
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "shop", "customer", "checklists", "part", "staff", "account", "receivables", "setup", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "shop", "customer", "checklists", "part", "staff", "account", "receivables", "setup", "error"}
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).Funcs(templateFuncs).ParseFS(web.Templates,
