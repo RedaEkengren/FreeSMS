@@ -49,7 +49,7 @@ test('the planner shows who is away, a shut day and more cars than lifts', async
   await capacity(page, 'lifts', { lifts: '1' });
   await book(page, day, '09:00', 'CAP 001');
   await book(page, day, '09:30', 'CAP 002');
-  await capacity(page, 'away', { user_id: 'tech', date: day, reason: 'sick' });
+  await capacity(page, 'away', { user_id: 'tech', date: day, reason: 'holiday' });
   await capacity(page, 'shut', { date: after, reason: 'Inventering' });
 
   await page.goto(`/calendar?week=${day}`);

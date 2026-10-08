@@ -252,6 +252,7 @@
     <button type="button" role="tab" data-tab="2">Klar när?</button>
     <button type="button" role="tab" data-tab="3">Kundens länk</button>
     <button type="button" role="tab" data-tab="4">Två skärmar</button>
+    <button type="button" role="tab" data-tab="5">Planeringen</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -259,7 +260,7 @@
   <p class="lede">Teknikern ser något mer som behöver göras och säger till receptionen, från gropen. Nätet är borta. Det sparas i telefonen, väntar, och skickas en gång när nätet kommer tillbaka.</p>
 
   <div class="an-wrap" data-loop="29" data-still="23">
-    <div class="an-canvas" role="img" aria-label="Animering: en tekniker skriver att bromsbeläggen bak är nere på 2 millimeter och trycker {{t "Tell the front desk"}} medan telefonen saknar wifi. Telefonen säger: {{t "No connection. This is being held and will be sent when there is one."}} {{n "%d thing is waiting to be sent." 1}} Passet hinner gå ut medan det väntar; telefonen öppnar på inloggningen och skickar inget förrän samma person loggat in igen. Då skickas det en gång, och receptionens tavla visar {{n "%d thing noticed, not priced" 1}} på bilen.">
+    <div class="an-canvas" role="img" aria-label="Animering: en tekniker skriver att bromsbeläggen bak är nere på 2 millimeter och trycker {{t "Tell the front desk"}} medan telefonen saknar wifi. Telefonen säger: {{t "No connection. This is being held and will be sent when there is one."}} {{n "%d thing is waiting to be sent." 1}} Passet hinner gå ut medan det väntar; telefonen öppnar på inloggningen och skickar inget förrän samma person loggat in igen. Då skickas det en gång, och receptionens tavla visar utan omladdning {{n "%d thing noticed, not priced" 1}} på bilen.">
 
       <div class="an-card wf-phone">
         <div class="wf-status">
@@ -296,9 +297,7 @@
 
       <div class="an-card wf-desk">
         <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}} &middot; {{t "In the shop"}}</span><span class="wf-example">Exempel</span></div>
-        <!-- The board does not refresh itself: somebody reloads it. Shown as
-             it happens rather than as a page that updates on its own. -->
-        <div class="wf-reload an-fade" data-t="20.2,20.9">Laddar om&hellip;</div>
+        <!-- The board brings itself up to date (#98): nobody reloads it. -->
         <div class="wf-body">
           <div class="wf-card">
             <div class="wf-plate">ABC 123</div>
@@ -323,7 +322,7 @@
       <div class="an-cap" data-t="9.8,13.2">Låst skärm, stängd flik: det ligger kvar och väntar.</div>
       <div class="an-cap" data-t="13.4,18.2">Nätet är tillbaka, men passet hann gå ut. Inget skickas förrän samma person loggat in igen.</div>
       <div class="an-cap" data-t="18.4,21.6">Inloggad. Det skickas, exakt en gång.</div>
-      <div class="an-cap" data-t="21.8,28.6">Receptionen laddar om tavlan, ser det och kan ringa kunden.</div>
+      <div class="an-cap" data-t="21.8,28.6">Receptionens tavla visar det direkt. Ingen behöver ladda om.</div>
     </div>
   </div>
   <p class="truth">Orden i scenen är produktens egna: sidan genereras från samma språkkatalog och samma kod som FreeSMS skärmar. Flödet körs mot den riktiga produkten i en webbläsare vid varje ändring av koden &ndash; <a href="{{test "e2e/tests/07-scene-wifi.spec.ts" "the wifi goes down in the pit, and the front desk still hears about it"}}">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
@@ -563,6 +562,50 @@
     </div>
   </div>
   <p class="truth">Vilken roll som får kundens uppgifter avgörs av produktens egen behörighetskod, och sidan genereras inte om scenen säger något annat. Flödet körs mot den riktiga produkten i en webbläsare, som också kontrollerar att namnet inte ens finns i mekanikerns sidkälla &ndash; <a href="{{test "e2e/tests/10-scene-two-screens.spec.ts" "one job opened by the technician and the front desk shows the customer to one of them"}}">läs testet</a>. Registreringsnummer, bilar, kunder och namn är <span class="wf-example">exempel</span>.</p>
+</section>
+
+{{/* ── Scene 6: the planner ──────────────────────────────────────────── */}}
+<section class="scene pane" role="tabpanel">
+  <h2>Planeringen vet vem som är på plats</h2>
+  <p class="lede">En bokning håller en tid utan att hitta på ett jobb. Planeringen ser personer och liftar som olika gränser, och säger till &ndash; den flyttar ingenting själv. Vem som tar bilen bestämmer en människa.</p>
+
+  <div class="an-wrap" data-loop="17" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: två bilar är bokade på Erik samtidigt och märks {{t "two cars at once"}}. Verkstaden har en lift, och dagen säger {{t "More cars than lifts %s" "09:30–10:00"}}. Erik är {{t "on holiday"}}: raden blir randig och bokningarna säger {{t "needs somebody else"}}. Nästa dag är verkstaden stängd för inventering.">
+
+      <div class="an-card pn-day an-pop" data-t="0">
+        <div class="an-head"><span class="an-dots"></span><span>{{t "Bookings"}} &middot; {{date (at "2026-10-20 00:00") "Mon 2 Jan"}}</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="pn-note an-fade" data-t="4.6">{{t "More cars than lifts %s" "09:30–10:00"}}</div>
+          <div class="pn-hours"><span></span><span>07</span><span>08</span><span>09</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span></div>
+          <div class="pn-row">
+            <div class="pn-name">Erik<span class="pn-away an-fade" data-t="8.4">{{t "on holiday"}}</span></div>
+            <div class="pn-lane">
+              <div class="pn-hatch an-fade" data-t="8.4"></div>
+              <div class="pn-block pn-a an-fade" data-t="0,1.8"><span class="pn-time">09:00–10:00</span><b>CAP 001</b></div>
+              <div class="pn-block pn-short pn-a an-fade" data-t="1.8"><span class="pn-time">09:00–10:00</span><b>CAP 001</b>
+                <span class="pn-say an-fade" data-t="1.8,8.4">{{t "two cars at once"}}</span><span class="pn-say an-fade" data-t="8.4">{{t "needs somebody else"}}</span></div>
+              <div class="pn-block pn-b an-fade" data-t="0,1.8"><span class="pn-time">09:30–10:30</span><b>CAP 002</b></div>
+              <div class="pn-block pn-short pn-b an-fade" data-t="1.8"><span class="pn-time">09:30–10:30</span><b>CAP 002</b>
+                <span class="pn-say an-fade" data-t="1.8,8.4">{{t "two cars at once"}}</span><span class="pn-say an-fade" data-t="8.4">{{t "needs somebody else"}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-card pn-next an-pop" data-t="11.6">
+        <div class="an-head"><span class="an-dots"></span><span>{{t "Bookings"}} &middot; {{date (at "2026-10-21 00:00") "Mon 2 Jan"}}</span></div>
+        <div class="wf-body">
+          <div class="pn-note">{{t "The workshop is shut: %s" "Inventering"}}</div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,4.4">Två bilar bokade på Erik, samtidigt.</div>
+      <div class="an-cap" data-t="4.6,8.2">En lift. Planeringen säger till när bilarna inte får plats.</div>
+      <div class="an-cap" data-t="8.4,11.4">Erik är ledig. Bokningarna ligger kvar och visar att de behöver någon annan.</div>
+      <div class="an-cap" data-t="11.6,16.6">Stängd dag: där går det inte att boka.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: liftarna sätts, bilarna bokas, Erik markeras ledig, dagen stängs &ndash; och en bokning på den stängda dagen nekas &ndash; <a href="{{test "e2e/tests/13-planner-capacity.spec.ts" "the planner shows who is away, a shut day and more cars than lifts"}}">läs testet</a>. Registreringsnummer och namn är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

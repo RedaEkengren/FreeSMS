@@ -101,8 +101,6 @@
 .wf-plate { font-weight: 800; letter-spacing: .05em; font-size: 15px; }
 .wf-noticed { margin-top: 4px; color: #c2410c; font-weight: 700; }
 .wf-other { opacity: .7; }
-.wf-reload { position: absolute; left: 0; right: 0; top: 37px; bottom: 0; background: rgba(255,255,255,.85);
-  display: grid; place-items: center; font-weight: 700; color: #5b6270; z-index: 4; }
 /* Invented data is said to be invented: a plate, a customer, a technician. */
 .wf-example { display: inline-block; font-size: 10px; font-style: normal; text-transform: uppercase; letter-spacing: .06em;
   color: #9a3412; background: #ffedd5; border: 1px solid #fdba74; border-radius: 4px; padding: 0 5px; line-height: 16px; }
@@ -245,3 +243,33 @@
 .an-m .wj-dots { gap: 6px; }
 .an-m .wj-dot { width: 8px; height: 8px; }
 .an-m .wj-dot.wj-on { margin-left: -14px; }
+
+/* The planner scene: a day as the planner draws it, eleven hours from 07:00,
+   a block placed by its wall clock as a share of the lane. */
+.pn-day { left: 40px; top: 24px; width: 880px; height: 300px; }
+.pn-next { left: 40px; top: 344px; width: 880px; height: 120px; }
+.pn-note { border-left: 3px solid #c2410c; padding: 4px 10px; margin: 2px 0 10px; font-size: 13px; }
+.pn-hours, .pn-row { display: grid; grid-template-columns: 110px 1fr; }
+.pn-hours { grid-template-columns: 110px repeat(11, 1fr); font-size: 10.5px; color: #9aa3b2; margin-bottom: 4px; }
+.pn-hours span + span { border-left: 1px solid #e3e6eb; padding-left: 3px; }
+.pn-name { font-size: 13px; font-weight: 700; align-self: center; }
+.pn-away { display: block; font-weight: 400; color: #5b6270; font-size: 12px; }
+.pn-lane { position: relative; height: 150px; background: #fff; border: 1px solid #d3d7de; border-radius: 8px; overflow: hidden; }
+.pn-hatch { position: absolute; inset: 0; background: repeating-linear-gradient(135deg, #fff 0 6px, #e3e6eb 6px 8px); }
+.pn-block { position: absolute; display: grid; grid-template-areas: "time" "plate" "say"; gap: 1px; width: 9.09%; min-width: 132px;
+  background: #1f2328; color: #fff; border-radius: 6px; padding: 5px 7px; font-size: 11.5px; line-height: 1.25; }
+.pn-a { left: 18.18%; top: 6px; }
+.pn-b { left: 22.73%; top: 78px; }
+.pn-time { opacity: .85; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+/* The two things a block can say share one place: one fades out as the
+   other fades in, and neither pushes the block taller. */
+.pn-say { grid-area: say; font-size: 10.5px; }
+.an-m .pn-day { left: 16px; top: 16px; width: 488px; height: 360px; }
+.an-m .pn-next { left: 16px; top: 392px; width: 488px; height: 120px; }
+.an-m .pn-hours, .an-m .pn-row { grid-template-columns: 60px 1fr; }
+.an-m .pn-hours { grid-template-columns: 60px repeat(11, 1fr); font-size: 9px; }
+.an-m .pn-lane { height: 190px; }
+.an-m .pn-block { min-width: 124px; }
+.an-m .pn-b { top: 96px; }
+/* As the planner marks it: somebody is missing. A dashed edge, not a colour. */
+.pn-short { background: #fff; color: #14171c; outline: 2px dashed #c2410c; outline-offset: -2px; }

@@ -249,6 +249,7 @@
     <button type="button" role="tab" data-tab="2">Ready when?</button>
     <button type="button" role="tab" data-tab="3">The customer&rsquo;s link</button>
     <button type="button" role="tab" data-tab="4">Two screens</button>
+    <button type="button" role="tab" data-tab="5">The planner</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -256,7 +257,7 @@
   <p class="lede">The technician sees something else that needs doing and tells the front desk, from the pit. There is no connection. It is kept in the phone, waits, and is sent once when the connection is back.</p>
 
   <div class="an-wrap" data-loop="29" data-still="23">
-    <div class="an-canvas" role="img" aria-label="Animation: a technician writes that the rear brake pads are down to 2 millimetres and presses Tell the front desk while the phone has no wifi. The phone says: No connection. This is being held and will be sent when there is one. 1 thing is waiting to be sent. The session runs out while it waits; the phone opens on the sign-in page and sends nothing until the same person has signed in again. Then it is sent once, and the front desk&rsquo;s board shows 1 thing noticed, not priced on the car.">
+    <div class="an-canvas" role="img" aria-label="Animation: a technician writes that the rear brake pads are down to 2 millimetres and presses Tell the front desk while the phone has no wifi. The phone says: No connection. This is being held and will be sent when there is one. 1 thing is waiting to be sent. The session runs out while it waits; the phone opens on the sign-in page and sends nothing until the same person has signed in again. Then it is sent once, and the front desk&rsquo;s board shows, without a reload, 1 thing noticed, not priced on the car.">
 
       <div class="an-card wf-phone">
         <div class="wf-status">
@@ -293,7 +294,6 @@
       <div class="an-card wf-desk">
         <div class="an-head"><span class="an-dots"></span><span>Front desk &middot; In the shop</span><span class="wf-example">Example</span></div>
         
-        <div class="wf-reload an-fade an-off" data-t="20.2,20.9">Reloading&hellip;</div>
         <div class="wf-body">
           <div class="wf-card">
             <div class="wf-plate">ABC 123</div>
@@ -318,7 +318,7 @@
       <div class="an-cap an-off" data-t="9.8,13.2">Screen locked, tab closed: it stays, and waits.</div>
       <div class="an-cap an-off" data-t="13.4,18.2">The connection is back, but the session ran out. Nothing is sent until the same person signs in again.</div>
       <div class="an-cap an-off" data-t="18.4,21.6">Signed in. It is sent, exactly once.</div>
-      <div class="an-cap" data-t="21.8,28.6">The front desk reloads the board, sees it, and can ring the customer.</div>
+      <div class="an-cap" data-t="21.8,28.6">The front desk&rsquo;s board shows it at once. Nobody reloads.</div>
     </div>
   </div>
   <p class="truth">The words in the scene are the product&rsquo;s own: the page is generated from the same catalogue and the same code as FreeSMS&rsquo;s screens. The flow runs against the real product in a browser on every change to the code &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/07-scene-wifi.spec.ts">read the test</a>. Registrations, cars, customers and names are <span class="wf-example">examples</span>.</p>
@@ -616,6 +616,50 @@
     </div>
   </div>
   <p class="truth">Which role is given the customer&rsquo;s details is decided by the product&rsquo;s own permission code, and the page is not generated if the scene says otherwise. The flow runs against the real product in a browser, which also checks that the name is not even in the technician&rsquo;s page source &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/10-scene-two-screens.spec.ts">read the test</a>. Registrations, cars, customers and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+
+<section class="scene pane" role="tabpanel">
+  <h2>The planner knows who is in</h2>
+  <p class="lede">A booking holds a slot without inventing a job. The planner treats people and lifts as different limits, and says so &ndash; it moves nothing by itself. Who takes the car is a person&rsquo;s decision.</p>
+
+  <div class="an-wrap" data-loop="17" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: two cars are booked on Erik at the same time and marked two cars at once. The workshop has one lift, and the day says More cars than lifts 09:30–10:00. Erik is on holiday: his row is hatched and the bookings say needs somebody else. The next day the workshop is shut for a stock take.">
+
+      <div class="an-card pn-day an-pop" data-t="0">
+        <div class="an-head"><span class="an-dots"></span><span>Bookings &middot; Tue 20 Oct</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="pn-note an-fade" data-t="4.6">More cars than lifts 09:30–10:00</div>
+          <div class="pn-hours"><span></span><span>07</span><span>08</span><span>09</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span></div>
+          <div class="pn-row">
+            <div class="pn-name">Erik<span class="pn-away an-fade" data-t="8.4">on holiday</span></div>
+            <div class="pn-lane">
+              <div class="pn-hatch an-fade" data-t="8.4"></div>
+              <div class="pn-block pn-a an-fade an-off" data-t="0,1.8"><span class="pn-time">09:00–10:00</span><b>CAP 001</b></div>
+              <div class="pn-block pn-short pn-a an-fade" data-t="1.8"><span class="pn-time">09:00–10:00</span><b>CAP 001</b>
+                <span class="pn-say an-fade an-off" data-t="1.8,8.4">two cars at once</span><span class="pn-say an-fade" data-t="8.4">needs somebody else</span></div>
+              <div class="pn-block pn-b an-fade an-off" data-t="0,1.8"><span class="pn-time">09:30–10:30</span><b>CAP 002</b></div>
+              <div class="pn-block pn-short pn-b an-fade" data-t="1.8"><span class="pn-time">09:30–10:30</span><b>CAP 002</b>
+                <span class="pn-say an-fade an-off" data-t="1.8,8.4">two cars at once</span><span class="pn-say an-fade" data-t="8.4">needs somebody else</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-card pn-next an-pop" data-t="11.6">
+        <div class="an-head"><span class="an-dots"></span><span>Bookings &middot; Wed 21 Oct</span></div>
+        <div class="wf-body">
+          <div class="pn-note">The workshop is shut: Stock take</div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,4.4">Two cars booked on Erik, at the same time.</div>
+      <div class="an-cap an-off" data-t="4.6,8.2">One lift. The planner says when the cars do not fit.</div>
+      <div class="an-cap an-off" data-t="8.4,11.4">Erik is off. The bookings stay, and show they need somebody else.</div>
+      <div class="an-cap" data-t="11.6,16.6">A shut day: nothing can be booked on it.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product&rsquo;s catalogue when the page is generated. The flow runs against the real product in a browser: the lifts are set, the cars booked, Erik marked away, the day shut &ndash; and a booking on the shut day refused &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/13-planner-capacity.spec.ts">read the test</a>. Registrations and names are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

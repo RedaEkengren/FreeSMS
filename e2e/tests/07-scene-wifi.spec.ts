@@ -25,10 +25,19 @@ test.describe.serial('the wifi scene', () => {
     await page.getByRole('button', { name: 'Start clock' }).click();
 
     let phone = page;
+    // The front desk's board, open on the counter the whole time.
+    const deskCtx = await browser.newContext();
+    const board = await deskCtx.newPage();
     try {
       // A Swedish workshop: the sign-in page speaks the workshop's language.
       await shopLanguage(browser, 'sv');
       await readIn(phone, 'sv');
+      await signIn(board, desk);
+      await readIn(board, 'sv');
+      await board.goto('/board');
+      const card = board.locator('a.card', { hasText: /WIF\s?123/ });
+      await expect(card).toContainText(`${tech.name} jobbar på den`);
+      await board.evaluate(() => { (window as any).__notReloaded = true; });
       await phone.goto(job);
       await expect(phone.getByText('Under arbete').first()).toBeVisible();
       await expect(phone.getByRole('button', { name: 'Stoppa klockan' })).toBeVisible();
@@ -59,17 +68,14 @@ test.describe.serial('the wifi scene', () => {
       await signIn(phone, tech);
       await phone.goto(job);
       await expect(phone.locator('#held')).toBeHidden();
-      await leave(phone);
 
-      // The front desk reloads the board and sees it, once.
-      await signIn(phone, desk);
-      await readIn(phone, 'sv');
-      await phone.goto('/board');
-      const card = phone.locator('a.card', { hasText: /WIF\s?123/ });
+      // The board on the counter shows it, once, without anybody reloading.
       await expect(card).toContainText('1 sak upptäckt, inte prissatt');
-      await expect(card).toContainText(`${tech.name} jobbar på den`);
+      expect(await board.evaluate(() => (window as any).__notReloaded)).toBe(true);
     } finally {
       // The rest of the suite reads English.
+      await readIn(board, '').catch(() => {});
+      await deskCtx.close();
       await shopLanguage(browser, 'en');
       await context.setOffline(false);
       await readIn(phone, '');
