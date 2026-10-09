@@ -1850,6 +1850,27 @@
     },
     "Not sent": {
       "other": "Inte skickat"
+    },
+    "Light or dark": {
+      "other": "Ljust eller mörkt"
+    },
+    "Show this system": {
+      "other": "Visa systemet"
+    },
+    "as this device is set": {
+      "other": "som enheten är inställd"
+    },
+    "light": {
+      "other": "ljust"
+    },
+    "dark": {
+      "other": "mörkt"
+    },
+    "Yours, wherever you sign in. Printing is always light.": {
+      "other": "Ditt val, var du än loggar in. Utskrifter är alltid ljusa."
+    },
+    "light, dark, or the device's": {
+      "other": "ljust, mörkt eller enhetens"
     }
   }
 }

@@ -26,6 +26,19 @@
   --attention: #c2410c;
   --danger: #c0261f;
 
+  /* The planner's light fills, with text that reads on them: a car in the
+     shop, and work longer than its slot. */
+  --ok-fill: #dff3e6;
+  --ok-ink: #0a5c2a;
+  --note-fill: #ffedd5;
+  --note-ink: #7c2d12;
+  /* Text on the attention colour: white on the dark orange, and dark on the
+     light orange dark mode uses. */
+  --on-attention: #ffffff;
+  /* A label is paper, and is drawn as paper on any screen. Never themed. */
+  --paper: #ffffff;
+  --paper-ink: #000000;
+
   /* A tap target below this is missed by a gloved finger. */
   --tap: 3rem;
   --radius: 0.625rem;
@@ -47,6 +60,11 @@
     --running: #35d07f;
     --attention: #fb923c;
     --danger: #ff6b5e;
+    --ok-fill: #12351f;
+    --ok-ink: #7ee2a6;
+    --note-fill: #3a2410;
+    --note-ink: #fdba74;
+    --on-attention: #14171c;
   }
 }
 :root[data-theme="dark"] {
@@ -60,7 +78,43 @@
   --running: #35d07f;
   --attention: #fb923c;
   --danger: #ff6b5e;
+  --ok-fill: #12351f;
+  --ok-ink: #7ee2a6;
+  --note-fill: #3a2410;
+  --note-ink: #fdba74;
+  --on-attention: #14171c;
 }
+
+/* A person's own choice also decides the form controls, the scrollbars and
+   the date picker, which follow color-scheme rather than the variables. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+/* Paper is never dark: an invoice printed from a dark screen comes out black
+   on white. Last of the themes, so it wins over both kinds of dark. */
+@media print {
+  :root, :root[data-theme], :root:not([data-theme="light"]) {
+    color-scheme: light;
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --border: #d3d7de;
+    --text: #14171c;
+    --muted: #5b6270;
+    --accent: #1f2328;
+    --accent-text: #ffffff;
+    --running: #0a7d37;
+    --attention: #c2410c;
+    --danger: #c0261f;
+    --ok-fill: #dff3e6;
+    --ok-ink: #0a5c2a;
+    --note-fill: #ffedd5;
+    --note-ink: #7c2d12;
+    --on-attention: #ffffff;
+  }
+}
+
+/* ── End of the themes. Below here every colour is a variable above, so a
+   screen cannot be right in light and wrong in dark. A test holds it. ── */
 
 * { box-sizing: border-box; }
 
@@ -295,7 +349,7 @@ form.suggestion { background: var(--surface); border: 1px solid var(--border); b
 form.scan input { font-family: ui-monospace, Menlo, monospace; font-size: 1.125rem; }
 
 .labels { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 0.5rem; }
-.label { border: 1px solid var(--border); border-radius: 0.25rem; padding: 0.5rem; text-align: center; background: #fff; color: #000; }
+.label { border: 1px solid var(--border); border-radius: 0.25rem; padding: 0.5rem; text-align: center; background: var(--paper); color: var(--paper-ink); }
 .label svg { width: 100%; height: auto; }
 .label .code { font-family: ui-monospace, Menlo, monospace; font-weight: 700; letter-spacing: 0.05em; }
 .label .name { font-size: 0.75rem; }
@@ -488,9 +542,9 @@ a.brand { font-weight: 600; text-decoration: none; color: inherit; }
 .pb b { font-weight: 700; letter-spacing: 0.02em; }
 .pb-time { font-variant-numeric: tabular-nums; opacity: 0.85; font-size: 0.75rem; }
 /* Legible on its own fill: dark text on the light ones. */
-.pb-arrived { background: #dff3e6; color: #0a5c2a; }
+.pb-arrived { background: var(--ok-fill); color: var(--ok-ink); }
 .pb-parts { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 2px var(--attention); }
-.pb-over { background: #ffedd5; color: #7c2d12; }
+.pb-over { background: var(--note-fill); color: var(--note-ink); }
 /* Somebody is missing: the row's person is away, or has two cars at once.
    A dashed edge rather than a colour, so it reads on top of any status. */
 .pb-short { background: var(--surface); color: var(--text); outline: 2px dashed var(--attention); outline-offset: -2px; }
@@ -549,7 +603,7 @@ form.inline { display: inline; }
 /* How many things are waiting for the person signed in. Empty is nothing. */
 .count:empty { display: none; }
 .count { display: inline-block; min-width: 1.25rem; padding: 0 .35rem; margin-left: .15rem; border-radius: 999px;
-  background: var(--attention); color: #fff; font-size: .75rem; font-weight: 700; line-height: 1.25rem; text-align: center; }
+  background: var(--attention); color: var(--on-attention); font-size: .75rem; font-weight: 700; line-height: 1.25rem; text-align: center; }
 
 /* The rota: a week of everybody's hours. Scrolls sideways in its own box on
    a phone; the page never does. */

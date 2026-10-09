@@ -5,11 +5,20 @@
    and an accent for a headline is not a warning. The scenes keep
    the product's colours, because they are drawn after it. */
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
   --bg: #f6f7f9; --card: #fff; --line: #e3e6eb; --text: #14171c; --muted: #5b6270;
-  --ink: #1f2328; --ok: #0a7d37;
+  --ink: #1f2328; --ok: #0a7d37; --ok-fill: #effaf2; --ok-line: #c7ecd2;
   --brand: #d92d20; --brand-hot: #f2542d; --brand-dark: #b42318; --brand-soft: #fde8e6;
   --radius: 16px; --shadow: 0 1px 2px rgba(20,23,28,.04), 0 8px 24px rgba(20,23,28,.06);
+}
+/* The visitor's own setting. The scenes stay light: they are pictures of the
+   product's screens, like screenshots on a dark page. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1116; --card: #171b22; --line: #2b313b; --text: #f0f2f5; --muted: #9aa3b2;
+    --ink: #2a303a; --ok: #35d07f; --ok-fill: #12351f; --ok-line: #1e5a36; --brand-soft: #3a1714;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -109,8 +118,8 @@ header nav .gh:hover { background: var(--brand); color: #fff; transform: transla
 .stat b { display: block; font-weight: 800; font-size: 1.9rem; letter-spacing: -.02em; line-height: 1.1; }
 .stat span { color: var(--muted); font-size: .9rem; }
 .checks { list-style: none; padding: 0; margin: 0 auto; display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; }
-.checks li { display: inline-flex; align-items: center; gap: .45rem; background: #effaf2; color: var(--ok);
-  border: 1px solid #c7ecd2; border-radius: 99px; padding: .45rem .95rem; font-weight: 600; font-size: .9rem; }
+.checks li { display: inline-flex; align-items: center; gap: .45rem; background: var(--ok-fill); color: var(--ok);
+  border: 1px solid var(--ok-line); border-radius: 99px; padding: .45rem .95rem; font-weight: 600; font-size: .9rem; }
 .checks li::before { content: "✓"; font-weight: 800; }
 @media (max-width: 720px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
 

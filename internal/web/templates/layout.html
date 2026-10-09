@@ -1,5 +1,7 @@
 {{define "layout"}}<!doctype html>
-<html lang="{{.Locale}}">
+{{/* The person's own light or dark, written in by the server so the page
+     never shows the other first. Nobody signed in follows the device. */}}
+<html lang="{{.Locale}}"{{with .Session.Theme}} data-theme="{{.}}"{{end}}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">

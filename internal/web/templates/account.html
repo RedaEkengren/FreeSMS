@@ -18,6 +18,17 @@
   <p class="waiting">{{.T "Off unless you turn it on. A browser plays it only once you have touched the page."}}</p>
   <button type="submit">{{.T "Save"}}</button>
 </form>
+<h2>{{.T "Light or dark"}}</h2>
+<form method="post" action="/account/theme">
+  <label><span>{{.T "Show this system"}}</span>
+    <select name="theme">
+      <option value="">{{.T "as this device is set"}}</option>
+      <option value="light" {{if eq .Session.Theme "light"}}selected{{end}}>{{.T "light"}}</option>
+      <option value="dark" {{if eq .Session.Theme "dark"}}selected{{end}}>{{.T "dark"}}</option>
+    </select></label>
+  <p class="waiting">{{.T "Yours, wherever you sign in. Printing is always light."}}</p>
+  <button type="submit">{{.T "Save"}}</button>
+</form>
 <h2>{{.T "Change your password"}}</h2>
 <form method="post" action="/account/password">
   <label><span>{{.T "Your current password"}}</span>

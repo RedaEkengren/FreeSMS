@@ -356,6 +356,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /mine/count", s.requireSession(s.handleMineCount))
 	mux.HandleFunc("POST /account/password", s.requireSession(s.handleChangePassword))
 	mux.HandleFunc("POST /account/language", s.requireSession(s.handleMyLanguage))
+	mux.HandleFunc("POST /account/theme", s.requireSession(s.handleMyTheme))
 	mux.HandleFunc("GET /checklists", s.requireSession(s.handleChecklists))
 	mux.HandleFunc("POST /checklists", s.requireSession(s.handleSaveChecklist))
 	mux.HandleFunc("GET /checklists/{id}", s.requireSession(s.handleChecklists))

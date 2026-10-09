@@ -104,3 +104,24 @@ func SetMyLocale(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, lo
 		return nil
 	})
 }
+
+// Themes are the choices a person has besides following their device.
+var Themes = []string{"light", "dark"}
+
+// SetMyTheme is the caller's own choice of light or dark; "" follows the
+// device, and is stored as null so that it keeps following it.
+func SetMyTheme(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, theme string) error {
+	if theme != "" && theme != "light" && theme != "dark" {
+		return fmt.Errorf("%w: light, dark, or the device's", ErrInvalid)
+	}
+	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `UPDATE users SET theme = nullif($2, '') WHERE id = $1`, scope.UserID, theme)
+		if err != nil {
+			return fmt.Errorf("save own theme: %w", err)
+		}
+		if tag.RowsAffected() != 1 {
+			return ErrNotFound
+		}
+		return nil
+	})
+}

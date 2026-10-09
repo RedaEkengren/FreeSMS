@@ -32,6 +32,7 @@ var everyRole = map[string]string{
 	"FinalCheckFor":  "whether the work is signed off, which the technician needs before saying it is ready; no customer data",
 	"ChangePassword": "the caller's own password, checked against the current one",
 	"MyLocale":       "the caller's own language", "SetMyLocale": "the caller's own language",
+	"SetMyTheme": "the caller's own light or dark",
 	"AlertSound": "the caller's own setting", "SetAlertSound": "the caller's own setting",
 	"ScheduleFor": "the caller's own schedule and clocked hours", "MarkScheduleSeen": "the caller's own schedule",
 	// Each role is given its own kind of item, decided inside by role; the

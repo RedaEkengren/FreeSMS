@@ -111,6 +111,15 @@ func (s *Server) accountPage(r *http.Request, session auth.Session) pageData {
 	}
 }
 
+// handleMyTheme sets the caller's light or dark. Blank follows the device.
+func (s *Server) handleMyTheme(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	if s.handoverError(w, r, workshop.SetMyTheme(r.Context(), s.pool, session.Scope, r.FormValue("theme"))) {
+		return
+	}
+	http.Redirect(w, r, "/account", http.StatusSeeOther)
+}
+
 // handleMyLanguage sets the language the caller reads in. Blank is the
 // workshop's.
 func (s *Server) handleMyLanguage(w http.ResponseWriter, r *http.Request) {
