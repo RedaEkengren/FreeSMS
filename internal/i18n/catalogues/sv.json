@@ -1349,6 +1349,12 @@
     "The final check failed. Put right what it found, then check again.": {
       "other": "Slutkontrollen underkändes. Åtgärda det den hittade och kontrollera igen."
     },
+    "The final check has checkpoints without a result:": {
+      "other": "Slutkontrollen har kontrollpunkter utan resultat:"
+    },
+    "The final check has nothing on it, so it does not show the work was checked.": {
+      "other": "Slutkontrollen har inga kontrollpunkter och visar därför inte att arbetet kontrollerats."
+    },
     "The final check has to be done by somebody other than whoever did the work.": {
       "other": "Slutkontrollen ska göras av någon annan än den som gjorde jobbet."
     },

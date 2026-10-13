@@ -113,7 +113,7 @@
 <div id="live-move" data-live="job:{{.Job.ID}}">
 {{/* Where the shop requires a final check, "ready" waits for it. */}}
 {{if and .FinalCheck.Required (eq .Job.State "in_progress")}}
-<p class="waiting">{{if .FinalCheck.Done}}{{.T "Final check done by %s." .FinalCheck.By}}{{else}}<span class="tag warranty">{{.T "Final check"}}</span> {{.T .FinalCheck.Missing}}{{end}}</p>
+<p class="waiting">{{if .FinalCheck.Done}}{{.T "Final check done by %s." .FinalCheck.By}}{{else}}<span class="tag warranty">{{.T "Final check"}}</span> {{.T .FinalCheck.Missing}}{{range $i, $l := .FinalCheck.Unanswered}}{{if $i}},{{end}} {{$l}}{{end}}{{end}}</p>
 {{end}}
 {{if .Next}}
 <h2>{{.T "Move it along"}}</h2>

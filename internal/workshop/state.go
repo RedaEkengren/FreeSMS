@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
@@ -327,6 +328,9 @@ func SetState(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID
 				return err
 			}
 			if fc.Required && !fc.Done {
+				if len(fc.Unanswered) > 0 {
+					return fmt.Errorf("%w: %s %s", ErrInvalid, fc.Missing, strings.Join(fc.Unanswered, ", "))
+				}
 				return fmt.Errorf("%w: %s", ErrInvalid, fc.Missing)
 			}
 		}

@@ -208,6 +208,12 @@ func CompleteInspection(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		return ErrNotFound
 	}
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		if err := unansweredFinalCheckTx(ctx, tx, inspectionID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
 		tag, err := tx.Exec(ctx,
 			`UPDATE inspections SET completed_at = now() WHERE id = $1 AND completed_at IS NULL`,
 			inspectionID)

@@ -63,8 +63,14 @@ func SaveFinalCheck(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if s.TemplateID != "" {
 			var active bool
-			if err := tx.QueryRow(ctx, `SELECT active FROM inspection_templates WHERE id = $1`, s.TemplateID).Scan(&active); err != nil || !active {
+			var items int
+			if err := tx.QueryRow(ctx, `
+				SELECT t.active, (SELECT count(*) FROM inspection_template_items i WHERE i.template_id = t.id)
+				FROM inspection_templates t WHERE t.id = $1`, s.TemplateID).Scan(&active, &items); err != nil || !active {
 				return fmt.Errorf("%w: no such checklist", ErrInvalid)
+			}
+			if items == 0 {
+				return fmt.Errorf("%w: a checklist with nothing on it cannot sign work off", ErrInvalid)
 			}
 		}
 		_, err := tx.Exec(ctx, `
@@ -81,6 +87,8 @@ type FinalCheck struct {
 	By       string
 	// Why it is not done, as a catalogue key, when it is required and is not.
 	Missing string
+	// The checkpoints still without a result, in the checklist's order.
+	Unanswered []string
 }
 
 // FinalCheckFor reads where a job stands.
@@ -117,12 +125,25 @@ func finalCheckTx(ctx context.Context, tx pgx.Tx, shopID, jobID string) (FinalCh
 	if err != nil {
 		return fc, fmt.Errorf("read final check: %w", err)
 	}
-	var failed int
-	if err := tx.QueryRow(ctx, `SELECT count(*) FROM inspection_items WHERE inspection_id = $1 AND status = 'fail'`,
-		inspectionID).Scan(&failed); err != nil {
+	// Read from the results, not from completed_at: a check finished before
+	// the shop required it, or finished before this rule, says nothing about
+	// the checkpoints nobody answered.
+	var items, failed int
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*), count(*) FILTER (WHERE status = 'fail'),
+		       coalesce(array_agg(label ORDER BY position) FILTER (WHERE status IS NULL), '{}')
+		FROM inspection_items WHERE inspection_id = $1`,
+		inspectionID).Scan(&items, &failed, &fc.Unanswered); err != nil {
 		return fc, fmt.Errorf("read final check items: %w", err)
 	}
+	// Attention passes on purpose: it means the part works and will need
+	// doing, which is something to tell the customer, not a reason to keep
+	// the car. Fail is the result that sends the job back.
 	switch {
+	case items == 0:
+		fc.Missing = "The final check has nothing on it, so it does not show the work was checked."
+	case len(fc.Unanswered) > 0:
+		fc.Missing = "The final check has checkpoints without a result:"
 	case failed > 0:
 		fc.Missing = "The final check failed. Put right what it found, then check again."
 	case s.ByAnother && assigned != nil && *assigned == performer:
@@ -131,6 +152,38 @@ func finalCheckTx(ctx context.Context, tx pgx.Tx, shopID, jobID string) (FinalCh
 		fc.Done, fc.By = true, by
 	}
 	return fc, nil
+}
+
+// unansweredFinalCheckTx refuses to finish the shop's final check while a
+// checkpoint has no result, or when it has no checkpoints at all. Finishing
+// it is saying the work was checked; any other checklist may be finished
+// part answered, as it always could.
+//
+// The offline queue replays in the order things were done, so answers sent
+// before the finish arrive before it. If they do not, the finish is refused
+// and shows in the queue's refused list rather than signing off early.
+func unansweredFinalCheckTx(ctx context.Context, tx pgx.Tx, inspectionID string) error {
+	var final bool
+	var items int
+	var unanswered []string
+	if err := tx.QueryRow(ctx, `
+		SELECT s.final_check_template_id IS NOT DISTINCT FROM i.template_id,
+		       (SELECT count(*) FROM inspection_items it WHERE it.inspection_id = i.id),
+		       coalesce((SELECT array_agg(it.label ORDER BY it.position) FROM inspection_items it
+		                 WHERE it.inspection_id = i.id AND it.status IS NULL), '{}')
+		FROM inspections i JOIN shops s ON s.id = i.shop_id
+		WHERE i.id = $1`, inspectionID).Scan(&final, &items, &unanswered); err != nil {
+		return fmt.Errorf("read final check items: %w", err)
+	}
+	switch {
+	case !final:
+		return nil
+	case items == 0:
+		return fmt.Errorf("%w: the final check has nothing on it, so it does not show the work was checked", ErrInvalid)
+	case len(unanswered) > 0:
+		return fmt.Errorf("%w: these checkpoints have no result yet: %s", ErrInvalid, strings.Join(unanswered, ", "))
+	}
+	return nil
 }
 
 // findingsFromFinalCheckTx turns a completed final check's failed items into
