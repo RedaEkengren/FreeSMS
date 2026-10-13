@@ -110,14 +110,25 @@ func finalCheckTx(ctx context.Context, tx pgx.Tx, shopID, jobID string) (FinalCh
 	fc := FinalCheck{Required: true}
 	var inspectionID, performer, by string
 	var assigned *string
+	var workAfter bool
+	// A check certifies the work done before it started. Work after that --
+	// the car back from ready onto a lift, a part taken out to it, a line of
+	// work added -- is work it did not see. A fee, a price, a phone number
+	// are not work on the car and leave it standing.
 	err = tx.QueryRow(ctx, `
-		SELECT i.id, i.performed_by, coalesce(p.display_name, ''), w.assigned_to
+		SELECT i.id, i.performed_by, coalesce(p.display_name, ''), w.assigned_to,
+		       exists(SELECT 1 FROM work_order_state_changes c
+		              WHERE c.work_order_id = w.id AND c.from_state = 'ready' AND c.at > i.started_at)
+		    OR exists(SELECT 1 FROM stock_movements m
+		              WHERE m.work_order_id = w.id AND m.kind = 'consumed' AND m.moved_at > i.started_at)
+		    OR exists(SELECT 1 FROM work_order_lines l
+		              WHERE l.work_order_id = w.id AND l.kind IN ('labour', 'part', 'sublet') AND l.created_at > i.started_at)
 		FROM inspections i
 		JOIN work_orders w ON w.id = i.work_order_id
 		LEFT JOIN users u ON u.id = i.performed_by
 		LEFT JOIN people p ON p.id = u.person_id
 		WHERE i.work_order_id = $1 AND i.template_id = $2 AND i.completed_at IS NOT NULL
-		ORDER BY i.completed_at DESC LIMIT 1`, jobID, s.TemplateID).Scan(&inspectionID, &performer, &by, &assigned)
+		ORDER BY i.completed_at DESC LIMIT 1`, jobID, s.TemplateID).Scan(&inspectionID, &performer, &by, &assigned, &workAfter)
 	if errors.Is(err, pgx.ErrNoRows) {
 		fc.Missing = "The final check has not been done."
 		return fc, nil
@@ -140,6 +151,8 @@ func finalCheckTx(ctx context.Context, tx pgx.Tx, shopID, jobID string) (FinalCh
 	// doing, which is something to tell the customer, not a reason to keep
 	// the car. Fail is the result that sends the job back.
 	switch {
+	case workAfter:
+		fc.Missing = "There has been work on the car since the final check. Check it again."
 	case items == 0:
 		fc.Missing = "The final check has nothing on it, so it does not show the work was checked."
 	case len(fc.Unanswered) > 0:

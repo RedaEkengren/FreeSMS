@@ -23,7 +23,7 @@ func InScope(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fn fun
 	if err := scope.Validate(); err != nil {
 		return err
 	}
-	return InShop(ctx, pool, scope.ShopID, fn)
+	return inShop(ctx, pool, scope.ShopID, scope.UserID, fn)
 }
 
 // InShop is InScope without a user.
@@ -37,6 +37,10 @@ func InScope(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fn fun
 // is the narrow path that runs before a role exists, and the isolation it
 // provides is the same.
 func InShop(ctx context.Context, pool *pgxpool.Pool, shopID string, fn func(context.Context, pgx.Tx) error) error {
+	return inShop(ctx, pool, shopID, "", fn)
+}
+
+func inShop(ctx context.Context, pool *pgxpool.Pool, shopID, userID string, fn func(context.Context, pgx.Tx) error) error {
 	if shopID == "" {
 		return access.ErrNoScope
 	}
@@ -63,7 +67,12 @@ func InShop(ctx context.Context, pool *pgxpool.Pool, shopID string, fn func(cont
 	// set_config rather than SET, because SET does not accept bind parameters
 	// and building the statement by hand would put a value from a session
 	// cookie into SQL text. The third argument makes it transaction-local.
-	if _, err := tx.Exec(ctx, `SELECT set_config('app.current_shop', $1, true)`, shopID); err != nil {
+	//
+	// The user goes with it, for the records a trigger writes on their
+	// behalf -- who moved a job -- and never for a permission: those are
+	// checked in Go, against the scope, before anything is written.
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.current_shop', $1, true), set_config('app.current_user', $2, true)`,
+		shopID, userID); err != nil {
 		return fmt.Errorf("set shop scope: %w", err)
 	}
 

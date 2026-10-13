@@ -280,3 +280,104 @@ func TestAnEmptyChecklistDoesNotSignWorkOff(t *testing.T) {
 		t.Errorf("ready on an empty final check: %v", err)
 	}
 }
+
+// A final check signs off the work done before it, not work done after.
+// Back to work from ready, the next ready needs a check of its own -- and
+// the old one stays in the job's history as it was.
+func TestAFinalCheckDoesNotCoverWorkAfterIt(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	addTechnician(t, pool)
+	requireFinalCheck(t, pool, false)
+	job := working(t, pool)
+	move(t, pool, job, workshop.StateInProgress)
+
+	finalCheck(t, pool, technician(), job, false)
+	if err := workshop.SetState(ctx, pool, technician(), job, workshop.StateReady); err != nil {
+		t.Fatalf("ready after a passed check: %v", err)
+	}
+	if err := workshop.SetState(ctx, pool, advisor(), job, workshop.StateInProgress); err != nil {
+		t.Fatalf("back to work: %v", err)
+	}
+	err := workshop.SetState(ctx, pool, technician(), job, workshop.StateReady)
+	if !errors.Is(err, workshop.ErrInvalid) {
+		t.Fatalf("ready again on the check from before it went back: %v", err)
+	}
+	if fc, _ := workshop.FinalCheckFor(ctx, pool, technician(), job); fc.Done || fc.Missing == "" {
+		t.Errorf("final check = %+v, want not done", fc)
+	}
+
+	// An older pass does not stand behind a newer fail.
+	finalCheck(t, pool, technician(), job, true)
+	if err := workshop.SetState(ctx, pool, technician(), job, workshop.StateReady); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("ready on a failed check with a passed one before it: %v", err)
+	}
+	finalCheck(t, pool, technician(), job, false)
+	if err := workshop.SetState(ctx, pool, technician(), job, workshop.StateReady); err != nil {
+		t.Errorf("ready after a fresh pass: %v", err)
+	}
+
+	insp, err := workshop.InspectionsFor(ctx, pool, technician(), job)
+	if err != nil || len(insp) != 3 {
+		t.Fatalf("the job's checks: %d, %v; want all three kept", len(insp), err)
+	}
+	if insp[0].CompletedAt == nil || insp[0].PerformedBy != "A Technician" || insp[0].Items[0].Status != "pass" {
+		t.Errorf("the first check lost its record: %+v", insp[0])
+	}
+	// The way back is a row, with who took it.
+	var back int
+	var by string
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `
+			SELECT count(*), coalesce(max(changed_by::text), '') FROM work_order_state_changes
+			WHERE work_order_id = $1 AND from_state = 'ready' AND to_state = 'in_progress'`, job).Scan(&back, &by)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if back != 1 || by != advisor().UserID {
+		t.Errorf("going back to work recorded %d times, by %q", back, by)
+	}
+}
+
+// Work added while the job is still in progress counts the same: a part
+// taken out, or a line of work, after the check started. A fee is not work
+// on the car and leaves the check standing.
+func TestWorkAddedAfterTheCheckNeedsTheCheckAgain(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	addTechnician(t, pool)
+	stockShelf(t, pool, 6)
+	requireFinalCheck(t, pool, false)
+
+	for _, c := range []struct {
+		name  string
+		after func(job string) error
+		again bool
+	}{
+		{"a part taken out", func(job string) error {
+			return workshop.TakeOut(ctx, pool, technician(), job, stockedPart, 1)
+		}, true},
+		{"a line of labour", func(job string) error {
+			return workshop.AddLine(ctx, pool, advisor(), job, workshop.NewLine{Kind: "labour",
+				Description: "Byte av bromsskiva", QuantityMilli: 1000, UnitPriceMinor: 80000, VATRateBasis: 2500})
+		}, true},
+		{"a fee", func(job string) error {
+			return workshop.AddLine(ctx, pool, advisor(), job, workshop.NewLine{Kind: "fee",
+				Description: "Miljöavgift", QuantityMilli: 1000, UnitPriceMinor: 5000, VATRateBasis: 2500})
+		}, false},
+	} {
+		job := working(t, pool)
+		move(t, pool, job, workshop.StateInProgress)
+		finalCheck(t, pool, technician(), job, false)
+		if err := c.after(job); err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		err := workshop.SetState(ctx, pool, technician(), job, workshop.StateReady)
+		if c.again && !errors.Is(err, workshop.ErrInvalid) {
+			t.Errorf("ready on a check from before %s: %v", c.name, err)
+		}
+		if !c.again && err != nil {
+			t.Errorf("%s undid the check: %v", c.name, err)
+		}
+	}
+}

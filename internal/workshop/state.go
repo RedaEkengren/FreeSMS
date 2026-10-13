@@ -295,8 +295,12 @@ func AvailableStates(from State, hasWork bool) []State {
 func SetState(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string, to State) error {
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var from State
+		// Locked before anything is decided. Adding a line or taking a part
+		// out to the job holds a key share lock on this row until it
+		// commits, which this waits for; the final check below then reads
+		// work that has been committed, not work about to be.
 		if err := tx.QueryRow(ctx,
-			`SELECT state FROM work_orders WHERE id = $1`, jobID).Scan(&from); err != nil {
+			`SELECT state FROM work_orders WHERE id = $1 FOR UPDATE`, jobID).Scan(&from); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrNotFound
 			}

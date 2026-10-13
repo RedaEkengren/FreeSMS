@@ -1349,6 +1349,9 @@
     "The final check failed. Put right what it found, then check again.": {
       "other": "Slutkontrollen underkändes. Åtgärda det den hittade och kontrollera igen."
     },
+    "There has been work on the car since the final check. Check it again.": {
+      "other": "Bilen har arbetats på sedan slutkontrollen. Gör den igen."
+    },
     "The final check has checkpoints without a result:": {
       "other": "Slutkontrollen har kontrollpunkter utan resultat:"
     },
