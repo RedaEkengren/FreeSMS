@@ -150,8 +150,8 @@ func TestACarBookedOnATechnicianWaitsForThemWhenItComesIn(t *testing.T) {
 	if got := waiting(t, technician(), "booked_on_you"); len(got) != 0 {
 		t.Fatalf("a booking with no car is waiting: %+v", got)
 	}
-	job := newJob(t, pool)
-	if err := workshop.ArriveBooking(ctx, pool, advisor(), id, job); err != nil {
+	job, _, err := workshop.TakeInBooking(ctx, pool, advisor(), id, "ABC 12D", "Service", nil, workshop.Details{})
+	if err != nil {
 		t.Fatal(err)
 	}
 	if got := waiting(t, technician(), "booked_on_you"); len(got) != 1 || got[0].JobID != job {

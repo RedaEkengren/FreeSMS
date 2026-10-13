@@ -60,108 +60,181 @@ func TakeInWith(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, reg
 		return "", fmt.Errorf("%w: say what is wrong with it", ErrInvalid)
 	}
 
-	normalised := NormaliseRegistration(registration)
 	var jobID string
-
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		var vehicleID string
-
-		if normalised != "" {
-			err := tx.QueryRow(ctx, `
-				SELECT vehicle_id FROM vehicle_registrations
-				WHERE normalised = $1 AND valid_to IS NULL`, normalised).Scan(&vehicleID)
-			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-				return fmt.Errorf("look up registration: %w", err)
-			}
-		}
-
-		if vehicleID == "" {
-			// Unknown vehicle, or none given. Either way a row is created: the
-			// alternative is refusing to take the car in, and the car is
-			// already here.
-			if err := tx.QueryRow(ctx, `
-				INSERT INTO vehicles (shop_id, make, model, model_year, engine, vin)
-				VALUES ($1, nullif($2,''), nullif($3,''), $4, nullif($5,''), nullif($6,''))
-				RETURNING id`,
-				scope.ShopID, strings.TrimSpace(d.Make), strings.TrimSpace(d.Model),
-				d.ModelYear, strings.TrimSpace(d.Engine), strings.TrimSpace(d.VIN),
-			).Scan(&vehicleID); err != nil {
-				return fmt.Errorf("create vehicle: %w", err)
-			}
-			if normalised != "" {
-				if _, err := tx.Exec(ctx, `
-					INSERT INTO vehicle_registrations (shop_id, vehicle_id, registration, normalised)
-					VALUES ($1, $2, $3, $4)`,
-					scope.ShopID, vehicleID, strings.TrimSpace(registration), normalised); err != nil {
-					return fmt.Errorf("record registration: %w", err)
-				}
-			}
-		}
-
-		var customerID *string
-		var owner string
-		err := tx.QueryRow(ctx, `
-			SELECT customer_id FROM vehicle_ownership
-			WHERE vehicle_id = $1 AND owned_to IS NULL`, vehicleID).Scan(&owner)
-		if err == nil {
-			customerID = &owner
-		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("look up owner: %w", err)
-		}
-
-		// Order numbers are per shop and taken as the next one up. Proper
-		// gap-free numbering under concurrency is the invoice numbering work;
-		// a work order number is a label, not an accounting record, and two
-		// people taking in cars at the same instant will collide on the unique
-		// index and the second one retries. Do not copy this for invoices.
-		var number int64
-		if err := tx.QueryRow(ctx,
-			`SELECT coalesce(max(number), 0) + 1 FROM work_orders`).Scan(&number); err != nil {
-			return fmt.Errorf("next number: %w", err)
-		}
-
-		if err := tx.QueryRow(ctx, `
-			INSERT INTO work_orders (shop_id, number, vehicle_id, customer_id, complaint, state, created_by)
-			VALUES ($1, $2, $3, $4, $5, 'draft', $6)
-			RETURNING id`,
-			scope.ShopID, number, vehicleID, customerID, strings.TrimSpace(complaint), scope.UserID,
-		).Scan(&jobID); err != nil {
-			return fmt.Errorf("open job: %w", err)
-		}
-
-		// Taking a car in is the car being left with us: the first row of
-		// where it is, so a later collection and return read as what they are.
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO vehicle_presence (shop_id, work_order_id, event, recorded_by)
-			VALUES ($1, $2, 'left', $3)`, scope.ShopID, jobID, scope.UserID); err != nil {
-			return fmt.Errorf("record the car left: %w", err)
-		}
-
-		if odometerKm != nil {
-			// Recorded even when it is lower than the last reading, and
-			// flagged rather than refused: a replaced cluster is legitimate,
-			// and a rolled-back odometer is something the shop wants on
-			// record.
-			var decreasing bool
-			if err := tx.QueryRow(ctx, `
-				SELECT exists(
-				    SELECT 1 FROM odometer_readings
-				    WHERE vehicle_id = $1 AND km > $2
-				    ORDER BY read_at DESC LIMIT 1)`,
-				vehicleID, *odometerKm).Scan(&decreasing); err != nil {
-				return fmt.Errorf("compare odometer: %w", err)
-			}
-			if _, err := tx.Exec(ctx, `
-				INSERT INTO odometer_readings (shop_id, vehicle_id, km, source, decreasing)
-				VALUES ($1, $2, $3, 'drop_off', $4)`,
-				scope.ShopID, vehicleID, *odometerKm, decreasing); err != nil {
-				return fmt.Errorf("record odometer: %w", err)
-			}
-		}
-		return nil
+		var err error
+		jobID, err = takeInTx(ctx, tx, scope, registration, complaint, odometerKm, d)
+		return err
 	})
 	if err != nil {
 		return "", err
+	}
+	return jobID, nil
+}
+
+// ErrBookingEnded is a booking cancelled or marked as not coming while its
+// intake form was open. The car may well be at the counter; taking it in is
+// then a walk-in, and a decision for whoever is standing there.
+var ErrBookingEnded = errors.New("workshop: the booking was cancelled or marked as not coming")
+
+// TakeInBooking takes in the car a booking was for, and ends the booking
+// pointing at the job, in one transaction: a job with no booking, or a
+// booking pointing at nothing, cannot be left behind by a failure between
+// the two.
+//
+// The booking is locked first, so a second intake of it -- another tab,
+// another person, a replay after the answer was lost -- waits for the first
+// and then finds it arrived. It gets the first one's job back, with already
+// set, and nothing is written twice. One job per booking, not per car: the
+// same car may have several jobs, and taking it in without the booking is
+// always possible.
+//
+// A booking moved while the form was open is still the booking, and is taken
+// in. One that is not there, malformed, or another shop's is ErrNotFound and
+// one cancelled or marked as not coming is ErrBookingEnded -- never a new job
+// in its name.
+func TakeInBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, bookingID, registration, complaint string, odometerKm *int64, d Details) (jobID string, already bool, err error) {
+	if !scope.Role.SeesCustomerPersonalData() {
+		return "", false, access.ErrForbidden
+	}
+	if strings.TrimSpace(complaint) == "" {
+		return "", false, fmt.Errorf("%w: say what is wrong with it", ErrInvalid)
+	}
+	if !looksLikeUUID(bookingID) {
+		return "", false, ErrNotFound
+	}
+	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var status string
+		var existing *string
+		err := tx.QueryRow(ctx, `SELECT status, work_order_id FROM bookings WHERE id = $1 FOR UPDATE`,
+			bookingID).Scan(&status, &existing)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("read booking: %w", err)
+		}
+		switch {
+		case status == "arrived" && existing != nil:
+			jobID, already = *existing, true
+			return nil
+		case status != "booked":
+			return ErrBookingEnded
+		}
+		if jobID, err = takeInTx(ctx, tx, scope, registration, complaint, odometerKm, d); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE bookings SET status = 'arrived', work_order_id = $2,
+			       vehicle_id = (SELECT vehicle_id FROM work_orders WHERE id = $2)
+			WHERE id = $1`, bookingID, jobID); err != nil {
+			return fmt.Errorf("arrive booking: %w", err)
+		}
+		return bookingEventTx(ctx, tx, scope, bookingID, "arrived", nil, nil, "")
+	})
+	if err != nil {
+		return "", false, err
+	}
+	return jobID, already, nil
+}
+
+// takeInTx opens the job, inside whatever transaction the caller holds.
+func takeInTx(ctx context.Context, tx pgx.Tx, scope access.Scope, registration, complaint string, odometerKm *int64, d Details) (string, error) {
+	normalised := NormaliseRegistration(registration)
+	var jobID string
+	var vehicleID string
+
+	if normalised != "" {
+		err := tx.QueryRow(ctx, `
+			SELECT vehicle_id FROM vehicle_registrations
+			WHERE normalised = $1 AND valid_to IS NULL`, normalised).Scan(&vehicleID)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return "", fmt.Errorf("look up registration: %w", err)
+		}
+	}
+
+	if vehicleID == "" {
+		// Unknown vehicle, or none given. Either way a row is created: the
+		// alternative is refusing to take the car in, and the car is
+		// already here.
+		if err := tx.QueryRow(ctx, `
+			INSERT INTO vehicles (shop_id, make, model, model_year, engine, vin)
+			VALUES ($1, nullif($2,''), nullif($3,''), $4, nullif($5,''), nullif($6,''))
+			RETURNING id`,
+			scope.ShopID, strings.TrimSpace(d.Make), strings.TrimSpace(d.Model),
+			d.ModelYear, strings.TrimSpace(d.Engine), strings.TrimSpace(d.VIN),
+		).Scan(&vehicleID); err != nil {
+			return "", fmt.Errorf("create vehicle: %w", err)
+		}
+		if normalised != "" {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO vehicle_registrations (shop_id, vehicle_id, registration, normalised)
+				VALUES ($1, $2, $3, $4)`,
+				scope.ShopID, vehicleID, strings.TrimSpace(registration), normalised); err != nil {
+				return "", fmt.Errorf("record registration: %w", err)
+			}
+		}
+	}
+
+	var customerID *string
+	var owner string
+	err := tx.QueryRow(ctx, `
+		SELECT customer_id FROM vehicle_ownership
+		WHERE vehicle_id = $1 AND owned_to IS NULL`, vehicleID).Scan(&owner)
+	if err == nil {
+		customerID = &owner
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return "", fmt.Errorf("look up owner: %w", err)
+	}
+
+	// Order numbers are per shop and taken as the next one up. Proper
+	// gap-free numbering under concurrency is the invoice numbering work;
+	// a work order number is a label, not an accounting record, and two
+	// people taking in cars at the same instant will collide on the unique
+	// index and the second one retries. Do not copy this for invoices.
+	var number int64
+	if err := tx.QueryRow(ctx,
+		`SELECT coalesce(max(number), 0) + 1 FROM work_orders`).Scan(&number); err != nil {
+		return "", fmt.Errorf("next number: %w", err)
+	}
+
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO work_orders (shop_id, number, vehicle_id, customer_id, complaint, state, created_by)
+		VALUES ($1, $2, $3, $4, $5, 'draft', $6)
+		RETURNING id`,
+		scope.ShopID, number, vehicleID, customerID, strings.TrimSpace(complaint), scope.UserID,
+	).Scan(&jobID); err != nil {
+		return "", fmt.Errorf("open job: %w", err)
+	}
+
+	// Taking a car in is the car being left with us: the first row of
+	// where it is, so a later collection and return read as what they are.
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO vehicle_presence (shop_id, work_order_id, event, recorded_by)
+		VALUES ($1, $2, 'left', $3)`, scope.ShopID, jobID, scope.UserID); err != nil {
+		return "", fmt.Errorf("record the car left: %w", err)
+	}
+
+	if odometerKm != nil {
+		// Recorded even when it is lower than the last reading, and
+		// flagged rather than refused: a replaced cluster is legitimate,
+		// and a rolled-back odometer is something the shop wants on
+		// record.
+		var decreasing bool
+		if err := tx.QueryRow(ctx, `
+			SELECT exists(
+			    SELECT 1 FROM odometer_readings
+			    WHERE vehicle_id = $1 AND km > $2
+			    ORDER BY read_at DESC LIMIT 1)`,
+			vehicleID, *odometerKm).Scan(&decreasing); err != nil {
+			return "", fmt.Errorf("compare odometer: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO odometer_readings (shop_id, vehicle_id, km, source, decreasing)
+			VALUES ($1, $2, $3, 'drop_off', $4)`,
+			scope.ShopID, vehicleID, *odometerKm, decreasing); err != nil {
+			return "", fmt.Errorf("record odometer: %w", err)
+		}
 	}
 	return jobID, nil
 }

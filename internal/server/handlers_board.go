@@ -129,9 +129,31 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	id, err := workshop.TakeInWith(r.Context(), s.pool, session.Scope,
-		form.Registration, form.Complaint, odometer, details)
+	var id string
+	var err error
+	if form.BookingID != "" {
+		// The job and the end of the booking in one go. A second submission
+		// of the same booking is answered with the job the first one made.
+		id, _, err = workshop.TakeInBooking(r.Context(), s.pool, session.Scope,
+			form.BookingID, form.Registration, form.Complaint, odometer, details)
+	} else {
+		id, err = workshop.TakeInWith(r.Context(), s.pool, session.Scope,
+			form.Registration, form.Complaint, odometer, details)
+	}
 	switch {
+	case errors.Is(err, workshop.ErrBookingEnded), errors.Is(err, workshop.ErrNotFound) && form.BookingID != "":
+		// Not a job in the booking's name. The form comes back as it was
+		// typed, without the booking: sent again, it is a walk-in, and that
+		// is a decision the person at the counter makes knowing it.
+		msg := "That booking is not there any more. Send the form again to take the car in without it."
+		if errors.Is(err, workshop.ErrBookingEnded) {
+			msg = "That booking was cancelled or marked as not coming while the form was open. Send the form again to take the car in without it."
+		}
+		form.BookingID = ""
+		s.render(w, r, http.StatusConflict, "newjob", pageData{
+			Title: "Take in a vehicle", Session: session, CanLookUp: s.canLookUp(), Form: form, Error: msg,
+		})
+		return
 	case errors.Is(err, access.ErrForbidden):
 		s.renderError(w, r, http.StatusForbidden, "Not for your role",
 			"Taking a vehicle in is done at the front desk.")
@@ -148,13 +170,6 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The booking ends here, pointing at the job it became. A booking moved
-	// or cancelled meanwhile is not a reason to refuse the car.
-	if form.BookingID != "" {
-		if err := workshop.ArriveBooking(r.Context(), s.pool, session.Scope, form.BookingID, id); err != nil {
-			s.log.Warn("booking not marked arrived", "booking", form.BookingID, "error", err)
-		}
-	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
 }

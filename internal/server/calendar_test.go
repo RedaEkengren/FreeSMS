@@ -1,12 +1,16 @@
 package server
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/RedaEkengren/FreeSMS/internal/database"
+	"github.com/jackc/pgx/v5"
 )
 
 // Booked at the counter, seen on the week, taken in when the car comes --
@@ -116,5 +120,75 @@ func TestCapacityIsSetAndShownOnThePlanner(t *testing.T) {
 	}
 	if strings.Contains(string(body), `value="shut"`) {
 		t.Error("the front desk is offered a form only the owner may use")
+	}
+}
+
+// The same booking sent twice -- two tabs, or the offline queue replaying a
+// submission whose answer was lost -- lands on the same job. A booking
+// cancelled while the form was open comes back as a walk-in to decide on.
+func TestTakingABookingInTwiceGoesToTheSameJob(t *testing.T) {
+	ts, pool := testServer(t)
+	desk := signIn(t, ts, advisorEmail)
+	post := func(form url.Values) (int, string) {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/jobs/new", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", ts.URL)
+		client := *desk
+		client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		if loc := resp.Header.Get("Location"); loc != "" {
+			return resp.StatusCode, loc
+		}
+		return resp.StatusCode, string(b)
+	}
+	ctx := context.Background()
+	newBooking := func() string {
+		t.Helper()
+		var id string
+		if err := database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+			return tx.QueryRow(ctx, `
+				INSERT INTO bookings (shop_id, starts_at, ends_at, registration, what, created_by)
+				VALUES ($1, now(), now() + interval '1 hour', 'BKG 123', 'Service', $2) RETURNING id`,
+				shopA, advisorUser).Scan(&id)
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+
+	id := newBooking()
+	form := url.Values{"registration": {"BKG 123"}, "complaint": {"Service"}, "booking_id": {id}}
+	s1, first := post(form)
+	s2, second := post(form)
+	if s1 != http.StatusSeeOther || s2 != http.StatusSeeOther || first != second {
+		t.Errorf("two submissions answered %d %q and %d %q; want the same job", s1, first, s2, second)
+	}
+	var jobs int
+	database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT count(*) FROM work_orders WHERE complaint = 'Service'`).Scan(&jobs)
+	})
+	if jobs != 1 {
+		t.Errorf("%d jobs from one booking", jobs)
+	}
+
+	cancelled := newBooking()
+	database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE bookings SET status = 'cancelled' WHERE id = $1`, cancelled)
+		return err
+	})
+	form.Set("booking_id", cancelled)
+	status, body := post(form)
+	if status != http.StatusConflict || !strings.Contains(body, "cancelled") || strings.Contains(body, `name="booking_id"`) {
+		t.Errorf("a cancelled booking answered %d:\n%s", status, firstLines(body, 30))
+	}
+	form.Set("booking_id", "not-a-booking")
+	if status, _ := post(form); status != http.StatusConflict {
+		t.Errorf("a malformed booking answered %d", status)
 	}
 }

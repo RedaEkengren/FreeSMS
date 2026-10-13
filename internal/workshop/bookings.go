@@ -207,30 +207,6 @@ func closeBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 	})
 }
 
-// ArriveBooking records that the booked car came and was taken in as a work
-// order. The booking is not the order: it ends here, pointing at it.
-func ArriveBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id, workOrderID string) error {
-	if !scope.Role.SeesCustomerPersonalData() {
-		return access.ErrForbidden
-	}
-	if !looksLikeUUID(id) || !looksLikeUUID(workOrderID) {
-		return ErrNotFound
-	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `
-			UPDATE bookings SET status = 'arrived', work_order_id = $2,
-			       vehicle_id = (SELECT vehicle_id FROM work_orders WHERE id = $2)
-			WHERE id = $1 AND status = 'booked'`, id, workOrderID)
-		if err != nil {
-			return fmt.Errorf("arrive booking: %w", err)
-		}
-		if tag.RowsAffected() == 0 {
-			return ErrNotFound
-		}
-		return bookingEventTx(ctx, tx, scope, id, "arrived", nil, nil, "")
-	})
-}
-
 func bookingEventTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id, event string, starts, ends *time.Time, note string) error {
 	_, err := tx.Exec(ctx, `
 		INSERT INTO booking_events (shop_id, booking_id, event, starts_at, ends_at, note, by_user)

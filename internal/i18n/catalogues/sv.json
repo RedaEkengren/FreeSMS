@@ -1337,6 +1337,12 @@
     "If money is still owed, why close it anyway": {
       "other": "Om pengar fortfarande är obetalda: varför avsluta ändå"
     },
+    "That booking is not there any more. Send the form again to take the car in without it.": {
+      "other": "Bokningen finns inte längre. Skicka formuläret igen för att ta in bilen utan den."
+    },
+    "That booking was cancelled or marked as not coming while the form was open. Send the form again to take the car in without it.": {
+      "other": "Bokningen avbokades eller markerades som uteblivet medan formuläret var öppet. Skicka formuläret igen för att ta in bilen utan den."
+    },
     "Final check": {
       "other": "Slutkontroll"
     },
