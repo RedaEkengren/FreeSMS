@@ -125,8 +125,10 @@ func addLineTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID string,
 		line.UnitPriceMinor = *price
 	}
 
-	// Before approval, the line is part of the quote. After it, it is not --
-	// unless the customer approved this very thing.
+	// Before approval, the line is part of the quote and is not approved: it
+	// becomes approved when the customer's yes is recorded, in setStateTx. A
+	// line written here used to be stamped approved on the spot, which made a
+	// declined quote indistinguishable from agreed work.
 	preApproval := state == StateDraft || state == StateEstimated || state == StateAwaitingApproval
 
 	var position int
@@ -149,14 +151,13 @@ func addLineTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID string,
 		   unit_price_minor, estimated_unit_price_minor, vat_rate_bp, cost_bearer,
 		   approved_at, labour_time_id, part_id, inspection_item_id, customer_decision_id)
 		VALUES ($1, $2, $3, $4, $5, ($6::bigint)::numeric / 1000, $7, $8, $9, $10,
-		        CASE WHEN $11::timestamptz IS NOT NULL THEN $11::timestamptz
-		             WHEN $12 THEN now() ELSE NULL END,
-		        nullif($13, '')::uuid, nullif($14, '')::uuid,
-		        nullif($15, '')::uuid, nullif($16, '')::uuid)`
+		        $11::timestamptz,
+		        nullif($12, '')::uuid, nullif($13, '')::uuid,
+		        nullif($14, '')::uuid, nullif($15, '')::uuid)`
 	if _, err := tx.Exec(ctx, insert,
 		scope.ShopID, jobID, position, line.Kind, strings.TrimSpace(line.Description),
 		line.QuantityMilli, line.UnitPriceMinor, estimated, line.VATRateBasis,
-		line.CostBearer, src.approvedAt, preApproval, line.LabourTimeID, line.PartID,
+		line.CostBearer, src.approvedAt, line.LabourTimeID, line.PartID,
 		src.itemID, src.decisionID); err != nil {
 		if isUniqueViolation(err, "work_order_lines_one_per_item") {
 			return ErrAlreadyALine

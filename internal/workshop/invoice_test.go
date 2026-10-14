@@ -534,6 +534,11 @@ func TestAnOrderCannotBecomeInvoicedWithoutADocument(t *testing.T) {
 			move(t, pool, id, workshop.StateEstimated, workshop.StateAwaitingApproval,
 				workshop.StateApproved, workshop.StateInProgress, workshop.StateReady)
 		case workshop.StateDeclined:
+			// The diagnosis was done before the customer said no; without
+			// that, a declined order has nothing to charge for.
+			if err := workshop.MarkPerformed(ctx, pool, advisor(), id, 1, true); err != nil {
+				t.Fatalf("MarkPerformed: %v", err)
+			}
 			move(t, pool, id, workshop.StateEstimated, workshop.StateAwaitingApproval,
 				workshop.StateDeclined)
 		}

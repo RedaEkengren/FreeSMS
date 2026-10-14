@@ -133,7 +133,7 @@ func Summary(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, from, 
 			SELECT coalesce(sum(l.quantity), 0)
 			FROM work_order_lines l
 			JOIN invoices i ON i.work_order_id = l.work_order_id AND i.credit_of_id IS NULL
-			WHERE l.kind = 'labour' AND l.cost_bearer = 'customer'
+			WHERE l.kind = 'labour' AND l.cost_bearer = 'customer' AND l.declined_at IS NULL
 			  AND i.issued_at >= $1 AND i.issued_at < $2`
 		if err := tx.QueryRow(ctx, billed, from, to).Scan(&d.HoursBilled); err != nil {
 			return fmt.Errorf("read billed hours: %w", err)
@@ -186,7 +186,7 @@ func Summary(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, from, 
 			    SELECT l.work_order_id, sum(l.quantity) AS hours
 			    FROM work_order_lines l
 			    JOIN invoices i ON i.work_order_id = l.work_order_id AND i.credit_of_id IS NULL
-			    WHERE l.kind = 'labour' AND l.cost_bearer = 'customer'
+			    WHERE l.kind = 'labour' AND l.cost_bearer = 'customer' AND l.declined_at IS NULL
 			      AND i.issued_at >= $1 AND i.issued_at < $2
 			    GROUP BY l.work_order_id
 			), worked AS (

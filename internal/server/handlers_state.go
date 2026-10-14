@@ -28,6 +28,19 @@ func (s *Server) handleSetState(w http.ResponseWriter, r *http.Request) {
 	if to == workshop.StateClosed {
 		// Closing by hand asks why when money is still owed.
 		err = workshop.CloseJob(r.Context(), s.pool, session.Scope, id, r.FormValue("reason"))
+	} else if to == workshop.StateDeclined {
+		// A customer saying no is billed for what was already done, so the
+		// lines ticked as performed travel with the decline.
+		var performed []int
+		for _, v := range r.Form["performed"] {
+			n, convErr := strconv.Atoi(v)
+			if convErr != nil {
+				s.renderError(w, r, http.StatusBadRequest, "Not accepted", "That is not a line.")
+				return
+			}
+			performed = append(performed, n)
+		}
+		err = workshop.Decline(r.Context(), s.pool, session.Scope, id, performed)
 	} else {
 		err = workshop.SetState(r.Context(), s.pool, session.Scope, id, to)
 	}
@@ -67,6 +80,34 @@ func (s *Server) handleSetState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
+}
+
+// handleMarkPerformed says that the work on a line is done, or that it is not.
+func (s *Server) handleMarkPerformed(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id := r.PathValue("id")
+	position, convErr := strconv.Atoi(r.PathValue("position"))
+	if convErr != nil {
+		http.NotFound(w, r)
+		return
+	}
+	err := workshop.MarkPerformed(r.Context(), s.pool, session.Scope, id, position, r.FormValue("performed") != "no")
+	switch {
+	case errors.Is(err, access.ErrForbidden):
+		s.renderError(w, r, http.StatusForbidden, "Not for your role", "")
+		return
+	case errors.Is(err, workshop.ErrNotFound):
+		s.renderError(w, r, http.StatusNotFound, "Not found", "No such line on this job.")
+		return
+	case errors.Is(err, workshop.ErrInvalid):
+		s.renderError(w, r, http.StatusConflict, "Not changed", trimInvalid(err))
+		return
+	case err != nil:
+		s.log.Error("mark performed", "error", err)
+		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		return
+	}
 	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
 }
 

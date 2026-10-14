@@ -293,71 +293,83 @@ func AvailableStates(from State, hasWork bool) []State {
 // advances an approved job to in_progress, and doing that with a bare UPDATE
 // is how the second answer to "what is legal" gets written.
 func SetState(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string, to State) error {
+	// Which move belongs to which role is decided per transition, in
+	// setStateInScopeTx once the state it starts from is known. Here, only
+	// that the role is one at all.
+	if !scope.Role.Valid() {
+		return access.ErrForbidden
+	}
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		var from State
-		// Locked before anything is decided. Adding a line or taking a part
-		// out to the job holds a key share lock on this row until it
-		// commits, which this waits for; the final check below then reads
-		// work that has been committed, not work about to be.
-		if err := tx.QueryRow(ctx,
-			`SELECT state FROM work_orders WHERE id = $1 FOR UPDATE`, jobID).Scan(&from); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrNotFound
-			}
-			return fmt.Errorf("read state: %w", err)
+		return setStateInScopeTx(ctx, tx, scope, jobID, to)
+	})
+}
+
+// setStateInScopeTx is SetState inside a transaction somebody else opened, so
+// that Decline can mark what was performed in the same one.
+func setStateInScopeTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID string, to State) error {
+	var from State
+	// Locked before anything is decided. Adding a line or taking a part
+	// out to the job holds a key share lock on this row until it
+	// commits, which this waits for; the final check below then reads
+	// work that has been committed, not work about to be.
+	if err := tx.QueryRow(ctx,
+		`SELECT state FROM work_orders WHERE id = $1 FOR UPDATE`, jobID).Scan(&from); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
 		}
-		// Invoicing is a document, not a state change. setStateTx is left
-		// alone: Issue reaches it from inside the transaction that writes the
-		// invoice, allocates the number and takes the parts off the shelf, and
-		// those four things commit together or not at all.
-		if to == StateInvoiced && from != StateInvoiced {
-			return ErrNeedsDocument
+		return fmt.Errorf("read state: %w", err)
+	}
+	// Invoicing is a document, not a state change. setStateTx is left
+	// alone: Issue reaches it from inside the transaction that writes the
+	// invoice, allocates the number and takes the parts off the shelf, and
+	// those four things commit together or not at all.
+	if to == StateInvoiced && from != StateInvoiced {
+		return ErrNeedsDocument
+	}
+	// Closing by hand goes through CloseJob, which asks why when money is
+	// still owed.
+	if to == StateClosed {
+		return fmt.Errorf("%w: close it with CloseJob", ErrInvalid)
+	}
+	if from != to && !MayTransition(scope.Role, from, to) {
+		if CanTransition(from, to) {
+			return access.ErrForbidden
 		}
-		// Closing by hand goes through CloseJob, which asks why when money is
-		// still owed.
-		if to == StateClosed {
-			return fmt.Errorf("%w: close it with CloseJob", ErrInvalid)
-		}
-		if from != to && !MayTransition(scope.Role, from, to) {
-			if CanTransition(from, to) {
-				return access.ErrForbidden
-			}
-			return ErrIllegalTransition{From: from, To: to}
-		}
-		// A shop that signs work off with a final check does not have a car
-		// ready without one, whichever way the move arrives.
-		if to == StateReady {
-			fc, err := finalCheckTx(ctx, tx, scope.ShopID, jobID)
-			if err != nil {
-				return err
-			}
-			if fc.Required && !fc.Done {
-				if len(fc.Unanswered) > 0 {
-					return fmt.Errorf("%w: %s %s", ErrInvalid, fc.Missing, strings.Join(fc.Unanswered, ", "))
-				}
-				return fmt.Errorf("%w: %s", ErrInvalid, fc.Missing)
-			}
-		}
-		if err := setStateTx(ctx, tx, jobID, to); err != nil {
+		return ErrIllegalTransition{From: from, To: to}
+	}
+	// A shop that signs work off with a final check does not have a car
+	// ready without one, whichever way the move arrives.
+	if to == StateReady {
+		fc, err := finalCheckTx(ctx, tx, scope.ShopID, jobID)
+		if err != nil {
 			return err
 		}
-
-		// Handing the car back is the one moment somebody is certainly
-		// finished with it, so it is the moment their clock stops. Left
-		// running it goes until they happen to clock onto something else,
-		// which on a Friday afternoon is never -- and then Monday's first
-		// clock-in closes a seventy-hour entry and flags it for somebody to
-		// correct.
-		//
-		// Only the caller's clock. A second technician on the same gearbox has
-		// not finished because this one handed the keys over.
-		if to == StateReady && scope.UserID != "" {
-			if err := stopClockOn(ctx, tx, scope.UserID, jobID); err != nil {
-				return err
+		if fc.Required && !fc.Done {
+			if len(fc.Unanswered) > 0 {
+				return fmt.Errorf("%w: %s %s", ErrInvalid, fc.Missing, strings.Join(fc.Unanswered, ", "))
 			}
+			return fmt.Errorf("%w: %s", ErrInvalid, fc.Missing)
 		}
-		return nil
-	})
+	}
+	if err := setStateTx(ctx, tx, jobID, to); err != nil {
+		return err
+	}
+
+	// Handing the car back is the one moment somebody is certainly
+	// finished with it, so it is the moment their clock stops. Left
+	// running it goes until they happen to clock onto something else,
+	// which on a Friday afternoon is never -- and then Monday's first
+	// clock-in closes a seventy-hour entry and flags it for somebody to
+	// correct.
+	//
+	// Only the caller's clock. A second technician on the same gearbox has
+	// not finished because this one handed the keys over.
+	if to == StateReady && scope.UserID != "" {
+		if err := stopClockOn(ctx, tx, scope.UserID, jobID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func setStateTx(ctx context.Context, tx pgx.Tx, jobID string, to State) error {
@@ -396,8 +408,9 @@ func setStateTx(ctx context.Context, tx pgx.Tx, jobID string, to State) error {
 	if to == StateCancelled {
 		var hasWork bool
 		if err := tx.QueryRow(ctx, `
-			SELECT exists(SELECT 1 FROM time_entries   WHERE work_order_id = $1)
-			    OR exists(SELECT 1 FROM work_order_lines WHERE work_order_id = $1)`,
+			SELECT exists(SELECT 1 FROM time_entries WHERE work_order_id = $1)
+			    OR exists(SELECT 1 FROM work_order_lines WHERE work_order_id = $1 AND performed_at IS NOT NULL)
+			    OR exists(SELECT 1 FROM stock_movements WHERE work_order_id = $1 AND kind = 'consumed')`,
 			jobID).Scan(&hasWork); err != nil {
 			return fmt.Errorf("check for work: %w", err)
 		}
@@ -420,6 +433,30 @@ func setStateTx(ctx context.Context, tx pgx.Tx, jobID string, to State) error {
 		        closed_at = CASE WHEN $1 IN ('closed', 'cancelled') THEN now() ELSE NULL END
 		 WHERE id = $2`, to, jobID); err != nil {
 		return fmt.Errorf("set state: %w", err)
+	}
+
+	switch to {
+	case StateApproved:
+		// The customer's yes is recorded now, and it covers the quote as it
+		// stands. Lines written later are not in it.
+		if _, err := tx.Exec(ctx, `
+			UPDATE work_order_lines SET approved_at = now(), updated_at = now()
+			WHERE work_order_id = $1 AND approved_at IS NULL AND declined_at IS NULL`, jobID); err != nil {
+			return fmt.Errorf("approve the quote: %w", err)
+		}
+	case StateDeclined:
+		// What was not done is not owed. What was -- marked performed, or a
+		// part already taken out to the job -- stays, and is what the invoice
+		// of a declined job is made of.
+		if _, err := tx.Exec(ctx, `
+			UPDATE work_order_lines l SET declined_at = now(), updated_at = now()
+			WHERE l.work_order_id = $1 AND l.performed_at IS NULL AND l.declined_at IS NULL
+			  AND NOT (l.part_id IS NOT NULL AND EXISTS (
+			        SELECT 1 FROM stock_movements m
+			        WHERE m.work_order_id = l.work_order_id AND m.part_id = l.part_id AND m.kind = 'consumed'))`,
+			jobID); err != nil {
+			return fmt.Errorf("decline the unperformed lines: %w", err)
+		}
 	}
 	return nil
 }

@@ -63,6 +63,7 @@ var swept = map[string]string{
 	"GET /jobs/{id}":                              "sweep",
 	"POST /jobs/{id}/state":                       "sweep",
 	"POST /jobs/{id}/lines":                       "sweep",
+	"POST /jobs/{id}/lines/{position}/performed":  "sweep",
 	"POST /jobs/{id}/invoice":                     "sweep",
 	"POST /jobs/{id}/credit":                      "sweep",
 	"POST /jobs/{id}/inspect":                     "sweep",
@@ -124,6 +125,7 @@ func fill(pattern string) (method, path string) {
 		"/stock/parts/{id}": "/stock/parts/" + partB,
 		"/staff/{id}":       "/staff/bbbbbbbb-0000-0000-0000-0000000000bb",
 		"{itemID}":          itemB,
+		"{position}":        "1",
 		"{key}":             photoB,
 	} {
 		path = strings.ReplaceAll(path, from, to)

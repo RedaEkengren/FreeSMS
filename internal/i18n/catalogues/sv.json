@@ -1376,6 +1376,18 @@
     "The technician it was booked for is not working here any more. Choose who takes it.": {
       "other": "Mekanikern som bokningen gjordes för arbetar inte här längre. Välj vem som tar den."
     },
+    "quoted": {
+      "other": "offererad"
+    },
+    "Mark done": {
+      "other": "Markera utförd"
+    },
+    "Not done": {
+      "other": "Inte utförd"
+    },
+    "What was done before the customer said no? It is invoiced; the rest is not.": {
+      "other": "Vad var gjort innan kunden sa nej? Det faktureras, resten inte."
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

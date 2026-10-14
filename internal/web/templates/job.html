@@ -121,6 +121,17 @@
   {{range .Next}}
   <form class="m-0" method="post" action="/jobs/{{$.Job.ID}}/state" data-offline>
     <input type="hidden" name="state" value="{{.}}">
+    {{/* Saying no with work done on the car: which lines were performed are
+         what the invoice is made of, so the desk ticks them here rather than
+         discovering at invoicing that everything or nothing is billed. */}}
+    {{if and (eq (print .) "declined") $.Lines (or (eq $.Job.State "approved") (eq $.Job.State "in_progress") (eq $.Job.State "awaiting_parts"))}}
+    <fieldset class="mb-s">
+      <legend>{{$.T "What was done before the customer said no? It is invoiced; the rest is not."}}</legend>
+      {{range $.Lines}}{{if eq .CostBearer "customer"}}
+      <label class="check"><input type="checkbox" name="performed" value="{{.Position}}"{{if .PerformedAt}} checked{{end}}> {{.Description}}</label>
+      {{end}}{{end}}
+    </fieldset>
+    {{end}}
     {{/* A job closes itself once the car is collected and the invoice
          settled. By hand, with money still owed, it needs a reason. */}}
     {{if eq (print .) "closed"}}<label><span>{{$.T "If money is still owed, why close it anyway"}}</span><input name="reason" maxlength="500"></label>{{end}}
@@ -426,7 +437,17 @@
     <tr>
       <td>
         {{.Description}}
-        {{if not .Approved}}<span class="tag warranty">{{$.T "added after approval"}}</span>{{end}}
+        {{if eq .Status "declined"}}<span class="tag warranty">{{$.T "declined"}}</span>
+        {{else}}
+          {{if not .Approved}}{{if or (eq $.Job.State "draft") (eq $.Job.State "estimated") (eq $.Job.State "awaiting_approval")}}<span class="tag">{{$.T "quoted"}}</span>{{else}}<span class="tag warranty">{{$.T "added after approval"}}</span>{{end}}{{end}}
+          {{if .PerformedAt}}<span class="tag">{{$.T "done"}}</span>{{end}}
+        {{end}}
+        {{if or $.Session.Scope.Role.SeesCustomerPersonalData (eq $.Session.Scope.Role "technician")}}{{if not (or (eq $.Job.State "invoiced") (eq $.Job.State "closed") (eq $.Job.State "cancelled"))}}
+        <form class="m-0 inline" method="post" action="/jobs/{{$.Job.ID}}/lines/{{.Position}}/performed">
+          {{if .PerformedAt}}<input type="hidden" name="performed" value="no"><button type="submit" class="secondary">{{$.T "Not done"}}</button>
+          {{else}}<input type="hidden" name="performed" value="yes"><button type="submit" class="secondary">{{$.T "Mark done"}}</button>{{end}}
+        </form>
+        {{end}}{{end}}
         {{if ne .CostBearer "customer"}}<span class="tag warranty">{{$.T "warranty: %s" .CostBearer}}</span>{{end}}
         {{if .PriceChanged}}<span class="tag warranty">{{$.T "quoted %s" ($.MoneyOrBlank .EstimatedMinor)}}</span>{{end}}
       </td>

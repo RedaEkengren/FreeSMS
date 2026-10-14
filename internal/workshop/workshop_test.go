@@ -127,6 +127,9 @@ func TestCancellingAnOrderWithWorkIsRefused(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("AddLine: %v", err)
 	}
+	if err := workshop.MarkPerformed(ctx, pool, advisor(), id, 1, true); err != nil {
+		t.Fatalf("MarkPerformed: %v", err)
+	}
 
 	err := workshop.SetState(ctx, pool, advisor(), id, workshop.StateCancelled)
 	if !errors.Is(err, workshop.ErrWouldLoseWork) {

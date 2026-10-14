@@ -91,6 +91,8 @@ type Line struct {
 	QuantityMilli  int64
 	CostBearer     string
 	ApprovedAt     *time.Time
+	DeclinedAt     *time.Time
+	PerformedAt    *time.Time
 	UnitPriceMinor int64
 	EstimatedMinor *int64
 	VATRateBasis   int
@@ -142,6 +144,20 @@ func (l Line) Net() string { return money.Format(l.NetMinor()) }
 // shows as unapproved, which is the only honest thing to put in front of
 // somebody being asked to pay for it.
 func (l Line) Approved() bool { return l.ApprovedAt != nil }
+
+// Status is where the line stands: offered, agreed, done, or turned down. A
+// line the shop added after the customer agreed is "added" until it is done.
+func (l Line) Status() string {
+	switch {
+	case l.DeclinedAt != nil:
+		return "declined"
+	case l.PerformedAt != nil:
+		return "performed"
+	case l.ApprovedAt != nil:
+		return "approved"
+	}
+	return "quoted"
+}
 
 // PriceChanged reports whether the line is being charged at something other
 // than what was quoted.
@@ -257,7 +273,7 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 			       -- would put a floating point value in the middle of a
 			       -- calculation the rest of this system avoids them in.
 			       (quantity * 1000)::bigint,
-			       cost_bearer, approved_at,
+			       cost_bearer, approved_at, declined_at, performed_at,
 			       unit_price_minor, estimated_unit_price_minor, vat_rate_bp
 			FROM work_order_lines WHERE work_order_id = $1 ORDER BY position`, id)
 		if err != nil {
@@ -267,7 +283,7 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 		for rows.Next() {
 			var l Line
 			if err := rows.Scan(&l.Position, &l.Kind, &l.Description, &l.QuantityMilli,
-				&l.CostBearer, &l.ApprovedAt, &l.UnitPriceMinor, &l.EstimatedMinor,
+				&l.CostBearer, &l.ApprovedAt, &l.DeclinedAt, &l.PerformedAt, &l.UnitPriceMinor, &l.EstimatedMinor,
 				&l.VATRateBasis); err != nil {
 				return fmt.Errorf("scan line: %w", err)
 			}
