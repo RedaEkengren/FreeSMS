@@ -95,7 +95,7 @@ func TestMovingCancellingAndArrivingAreRecorded(t *testing.T) {
 		t.Errorf("search found %+v, %v", found, err)
 	}
 
-	job, _, err := workshop.TakeInBooking(ctx, pool, advisor(), id, "XYZ 789", "Däckbyte", nil, workshop.Details{})
+	job, _, err := workshop.TakeInBooking(ctx, pool, advisor(), workshop.BookingIntake{BookingID: id, Registration: "XYZ 789", Complaint: "Däckbyte"})
 	if err != nil {
 		t.Fatalf("TakeInBooking: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestABookingKnowsWhetherItsJobIsStillOpen(t *testing.T) {
 	ctx := context.Background()
 	id, _ := workshop.CreateBooking(ctx, pool, advisor(), workshop.NewBooking{
 		Starts: at("2026-10-15", 8, 0), Ends: at("2026-10-15", 9, 0), What: "Service"})
-	job, _, err := workshop.TakeInBooking(ctx, pool, advisor(), id, "ABC 12D", "Service", nil, workshop.Details{})
+	job, _, err := workshop.TakeInBooking(ctx, pool, advisor(), workshop.BookingIntake{BookingID: id, Registration: "ABC 12D", Complaint: "Service"})
 	if err != nil {
 		t.Fatal(err)
 	}

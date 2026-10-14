@@ -192,3 +192,79 @@ func TestTakingABookingInTwiceGoesToTheSameJob(t *testing.T) {
 		t.Errorf("a malformed booking answered %d", status)
 	}
 }
+
+// The intake of a booked car shows what the booking knew and asks the desk
+// to confirm it; what is confirmed is on the job straight away.
+func TestTheIntakeOfABookingAsksWhoPaysAndWhoDoesTheWork(t *testing.T) {
+	ts, pool := testServer(t)
+	desk := signIn(t, ts, advisorEmail)
+	ctx := context.Background()
+	const tech = "aaaaaaaa-0000-0000-0000-000000000002"
+	var booking, sameNumber, sameName string
+	if err := database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx, `
+			INSERT INTO bookings (shop_id, starts_at, ends_at, registration, customer_name, customer_phone, technician_id, what, created_by)
+			VALUES ($1, now(), now() + interval '1 hour', 'NEW 777', 'Greta Gäst', '070-777 66 55', $2, 'Service', $3) RETURNING id`,
+			shopA, tech, advisorUser).Scan(&booking); err != nil {
+			return err
+		}
+		for _, c := range []struct {
+			name, phone string
+			id          *string
+		}{{"Greta Telefon", "070-777 66 55", &sameNumber}, {"Greta Gäst", "070-000 11 22", &sameName}} {
+			var person string
+			if err := tx.QueryRow(ctx, `INSERT INTO people (shop_id, display_name, phone) VALUES ($1, $2, $3) RETURNING id`,
+				shopA, c.name, c.phone).Scan(&person); err != nil {
+				return err
+			}
+			if err := tx.QueryRow(ctx, `INSERT INTO customers (shop_id, kind, person_id) VALUES ($1, 'private', $2) RETURNING id`,
+				shopA, person).Scan(c.id); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	_, form := page(t, desk, ts.URL+"/jobs/new?booking="+booking)
+	for _, want := range []string{"Greta Gäst", "070-777 66 55", `value="new"`,
+		`value="existing:` + sameNumber + `"`, `value="existing:` + sameName + `"`, "same number", "similar name",
+		`<option value="` + tech + `" selected>`} {
+		if !strings.Contains(form, want) {
+			t.Errorf("the intake form lacks %q", want)
+		}
+	}
+	if strings.Contains(form, `value="new" checked`) || strings.Contains(form, `existing:`+sameNumber+`" checked`) {
+		t.Error("a customer was chosen for the desk")
+	}
+
+	status, job := func() (int, string) {
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/jobs/new", strings.NewReader(url.Values{
+			"registration": {"NEW 777"}, "complaint": {"Service"}, "booking_id": {booking},
+			"customer": {"existing:" + sameNumber}, "technician_id": {tech}}.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", ts.URL)
+		client := *desk
+		client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode, resp.Header.Get("Location")
+	}()
+	if status != http.StatusSeeOther {
+		t.Fatalf("taking it in answered %d", status)
+	}
+	if _, body := page(t, desk, ts.URL+job); !strings.Contains(body, "Greta Telefon") {
+		t.Error("the job does not show the customer who was confirmed")
+	}
+	var assigned string
+	database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT assigned_to::text FROM work_orders WHERE id = $1`, strings.TrimPrefix(job, "/jobs/")).Scan(&assigned)
+	})
+	if assigned != tech {
+		t.Errorf("the job is assigned to %q, want the booked technician", assigned)
+	}
+}

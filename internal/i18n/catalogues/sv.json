@@ -1343,6 +1343,39 @@
     "That booking was cancelled or marked as not coming while the form was open. Send the form again to take the car in without it.": {
       "other": "Bokningen avbokades eller markerades som uteblivet medan formuläret var öppet. Skicka formuläret igen för att ta in bilen utan den."
     },
+    "Who pays and who is rung": {
+      "other": "Vem som betalar och vem som rings"
+    },
+    "The booking says:": {
+      "other": "Bokningen anger:"
+    },
+    "no name": {
+      "other": "inget namn"
+    },
+    "Decide later. The job says it has no customer until somebody does.": {
+      "other": "Bestäm senare. Jobbet visar att det saknar kund tills någon gör det."
+    },
+    "A new customer, made from the booking": {
+      "other": "En ny kund, skapad från bokningen"
+    },
+    "same number": {
+      "other": "samma nummer"
+    },
+    "similar name": {
+      "other": "liknande namn"
+    },
+    "Also record them as the car's owner": {
+      "other": "Registrera dem också som bilens ägare"
+    },
+    "Who does the work": {
+      "other": "Vem som gör jobbet"
+    },
+    "Nobody yet": {
+      "other": "Ingen ännu"
+    },
+    "The technician it was booked for is not working here any more. Choose who takes it.": {
+      "other": "Mekanikern som bokningen gjordes för arbetar inte här längre. Välj vem som tar den."
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

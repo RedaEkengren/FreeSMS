@@ -142,49 +142,57 @@ func CreateCustomer(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 
 	var id string
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		// A private customer is a person. A company may have one as a contact,
-		// and may not: a haulier's invoices go to the company whether or not
-		// anybody there has introduced themselves.
-		var personID *string
-		contact := strings.TrimSpace(n.ContactName)
-		if n.Kind == "private" {
-			contact = n.Name
-		}
-		if contact != "" {
-			var pid string
-			if err := tx.QueryRow(ctx, `
-				INSERT INTO people (shop_id, display_name, phone, email)
-				VALUES ($1, $2, nullif($3,''), nullif($4,''))
-				RETURNING id`,
-				scope.ShopID, contact,
-				strings.TrimSpace(n.Phone), strings.TrimSpace(n.Email)).Scan(&pid); err != nil {
-				return fmt.Errorf("create person: %w", err)
-			}
-			personID = &pid
-		}
-
-		var company *string
-		if n.Kind == "company" {
-			company = &n.Name
-		}
-
-		err := tx.QueryRow(ctx, `
-			INSERT INTO customers
-			  (shop_id, kind, person_id, company_name, org_number, vat_number,
-			   address_line1, address_line2, postal_code, city)
-			VALUES ($1,$2,$3,$4,nullif($5,''),nullif($6,''),
-			        nullif($7,''),nullif($8,''),nullif($9,''),nullif($10,''))
-			RETURNING id`,
-			scope.ShopID, n.Kind, personID, company,
-			strings.TrimSpace(n.OrgNumber), strings.TrimSpace(n.VATNumber),
-			strings.TrimSpace(n.AddressLine1), strings.TrimSpace(n.AddressLine2),
-			strings.TrimSpace(n.PostalCode), strings.TrimSpace(n.City)).Scan(&id)
-		if err != nil {
-			return fmt.Errorf("create customer: %w", err)
-		}
-		return nil
+		var err error
+		id, err = createCustomerTx(ctx, tx, scope, n)
+		return err
 	})
 	return id, err
+}
+
+// createCustomerTx makes the customer inside the caller's transaction.
+func createCustomerTx(ctx context.Context, tx pgx.Tx, scope access.Scope, n NewCustomer) (string, error) {
+	var id string
+	// A private customer is a person. A company may have one as a contact,
+	// and may not: a haulier's invoices go to the company whether or not
+	// anybody there has introduced themselves.
+	var personID *string
+	contact := strings.TrimSpace(n.ContactName)
+	if n.Kind == "private" {
+		contact = n.Name
+	}
+	if contact != "" {
+		var pid string
+		if err := tx.QueryRow(ctx, `
+			INSERT INTO people (shop_id, display_name, phone, email)
+			VALUES ($1, $2, nullif($3,''), nullif($4,''))
+			RETURNING id`,
+			scope.ShopID, contact,
+			strings.TrimSpace(n.Phone), strings.TrimSpace(n.Email)).Scan(&pid); err != nil {
+			return "", fmt.Errorf("create person: %w", err)
+		}
+		personID = &pid
+	}
+
+	var company *string
+	if n.Kind == "company" {
+		company = &n.Name
+	}
+
+	err := tx.QueryRow(ctx, `
+		INSERT INTO customers
+		  (shop_id, kind, person_id, company_name, org_number, vat_number,
+		   address_line1, address_line2, postal_code, city)
+		VALUES ($1,$2,$3,$4,nullif($5,''),nullif($6,''),
+		        nullif($7,''),nullif($8,''),nullif($9,''),nullif($10,''))
+		RETURNING id`,
+		scope.ShopID, n.Kind, personID, company,
+		strings.TrimSpace(n.OrgNumber), strings.TrimSpace(n.VATNumber),
+		strings.TrimSpace(n.AddressLine1), strings.TrimSpace(n.AddressLine2),
+		strings.TrimSpace(n.PostalCode), strings.TrimSpace(n.City)).Scan(&id)
+	if err != nil {
+		return "", fmt.Errorf("create customer: %w", err)
+	}
+	return id, nil
 }
 
 // AssignCustomer says who is paying for an order, and optionally records them
@@ -236,23 +244,28 @@ func AssignCustomer(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		if !alsoOwner {
 			return nil
 		}
-		// Ownership is a ledger: the old period is closed rather than
-		// overwritten, because "who owned it in March" is a question the
-		// vehicle's history has to be able to answer.
-		if _, err := tx.Exec(ctx, `
-			UPDATE vehicle_ownership SET owned_to = now()
-			 WHERE vehicle_id = $1 AND owned_to IS NULL AND customer_id <> $2`,
-			vehicleID, customerID); err != nil {
-			return fmt.Errorf("close the previous ownership: %w", err)
-		}
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO vehicle_ownership (shop_id, vehicle_id, customer_id)
-			SELECT $1, $2, $3
-			 WHERE NOT EXISTS (SELECT 1 FROM vehicle_ownership
-			                    WHERE vehicle_id = $2 AND customer_id = $3 AND owned_to IS NULL)`,
-			scope.ShopID, vehicleID, customerID); err != nil {
-			return fmt.Errorf("record ownership: %w", err)
-		}
-		return nil
+		return recordOwnerTx(ctx, tx, scope, vehicleID, customerID)
 	})
+}
+
+// recordOwnerTx makes a customer the vehicle's owner from now.
+func recordOwnerTx(ctx context.Context, tx pgx.Tx, scope access.Scope, vehicleID, customerID string) error {
+	// Ownership is a ledger: the old period is closed rather than
+	// overwritten, because "who owned it in March" is a question the
+	// vehicle's history has to be able to answer.
+	if _, err := tx.Exec(ctx, `
+		UPDATE vehicle_ownership SET owned_to = now()
+		 WHERE vehicle_id = $1 AND owned_to IS NULL AND customer_id <> $2`,
+		vehicleID, customerID); err != nil {
+		return fmt.Errorf("close the previous ownership: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO vehicle_ownership (shop_id, vehicle_id, customer_id)
+		SELECT $1, $2, $3
+		 WHERE NOT EXISTS (SELECT 1 FROM vehicle_ownership
+		                    WHERE vehicle_id = $2 AND customer_id = $3 AND owned_to IS NULL)`,
+		scope.ShopID, vehicleID, customerID); err != nil {
+		return fmt.Errorf("record ownership: %w", err)
+	}
+	return nil
 }

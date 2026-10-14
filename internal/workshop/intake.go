@@ -77,6 +77,28 @@ func TakeInWith(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, reg
 // then a walk-in, and a decision for whoever is standing there.
 var ErrBookingEnded = errors.New("workshop: the booking was cancelled or marked as not coming")
 
+// BookingIntake is a booked car being taken in, with what the desk decided
+// about it.
+type BookingIntake struct {
+	BookingID, Registration, Complaint string
+	OdometerKm                         *int64
+	Details                            Details
+
+	// Who pays. "" decides nothing: the car's owner, if it has one, and
+	// otherwise a job that says it has no customer yet. "new" makes a private
+	// customer from the booking's name and number; "existing" is CustomerID,
+	// chosen by the desk -- a similar name is never enough to choose for
+	// them. AlsoOwner records that customer as the car's owner too, which is
+	// a separate fact and is never implied.
+	Customer   string
+	CustomerID string
+	AlsoOwner  bool
+
+	// Who does the work, confirmed. Empty gives it to nobody; the booked
+	// technician is offered by the form, not assumed here.
+	TechnicianID string
+}
+
 // TakeInBooking takes in the car a booking was for, and ends the booking
 // pointing at the job, in one transaction: a job with no booking, or a
 // booking pointing at nothing, cannot be left behind by a failure between
@@ -93,21 +115,37 @@ var ErrBookingEnded = errors.New("workshop: the booking was cancelled or marked 
 // in. One that is not there, malformed, or another shop's is ErrNotFound and
 // one cancelled or marked as not coming is ErrBookingEnded -- never a new job
 // in its name.
-func TakeInBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, bookingID, registration, complaint string, odometerKm *int64, d Details) (jobID string, already bool, err error) {
+func TakeInBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in BookingIntake) (jobID string, already bool, err error) {
 	if !scope.Role.SeesCustomerPersonalData() {
 		return "", false, access.ErrForbidden
 	}
-	if strings.TrimSpace(complaint) == "" {
+	if strings.TrimSpace(in.Complaint) == "" {
 		return "", false, fmt.Errorf("%w: say what is wrong with it", ErrInvalid)
 	}
-	if !looksLikeUUID(bookingID) {
+	if !looksLikeUUID(in.BookingID) {
 		return "", false, ErrNotFound
 	}
+	switch in.Customer {
+	case "", "new":
+	case "existing":
+		if !looksLikeUUID(in.CustomerID) {
+			return "", false, fmt.Errorf("%w: choose which customer", ErrInvalid)
+		}
+	default:
+		return "", false, fmt.Errorf("%w: %q is not a way to say who pays", ErrInvalid, in.Customer)
+	}
+	if in.TechnicianID != "" && !looksLikeUUID(in.TechnicianID) {
+		return "", false, fmt.Errorf("%w: choose who does the work", ErrInvalid)
+	}
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		var status string
+		var status, name, phone, bookedTech, bookedTechName string
 		var existing *string
-		err := tx.QueryRow(ctx, `SELECT status, work_order_id FROM bookings WHERE id = $1 FOR UPDATE`,
-			bookingID).Scan(&status, &existing)
+		err := tx.QueryRow(ctx, `
+			SELECT b.status, b.work_order_id, coalesce(b.customer_name, ''), coalesce(b.customer_phone, ''),
+			       coalesce(b.technician_id::text, ''), coalesce(tp.display_name, '')
+			FROM bookings b
+			LEFT JOIN users tu ON tu.id = b.technician_id LEFT JOIN people tp ON tp.id = tu.person_id
+			WHERE b.id = $1 FOR UPDATE OF b`, in.BookingID).Scan(&status, &existing, &name, &phone, &bookedTech, &bookedTechName)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
@@ -121,16 +159,87 @@ func TakeInBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		case status != "booked":
 			return ErrBookingEnded
 		}
-		if jobID, err = takeInTx(ctx, tx, scope, registration, complaint, odometerKm, d); err != nil {
+
+		// Who does the work, checked before anything is written. Somebody
+		// who has left since the booking is not given it; the desk chooses
+		// another, and the booking says what happened.
+		var techName, note string
+		if in.TechnicianID != "" {
+			err := tx.QueryRow(ctx, `
+				SELECT p.display_name FROM users u JOIN people p ON p.id = u.person_id
+				WHERE u.id = $1 AND u.active AND u.role = 'technician'`, in.TechnicianID).Scan(&techName)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("%w: that technician is not working here", ErrInvalid)
+			}
+			if err != nil {
+				return fmt.Errorf("read technician: %w", err)
+			}
+		}
+		if in.TechnicianID != bookedTech {
+			switch {
+			case in.TechnicianID == "":
+				note = "Booked for " + bookedTechName + "; not given to anybody at intake"
+			case bookedTech == "":
+				note = "Given to " + techName + " at intake"
+			default:
+				note = "Booked for " + bookedTechName + "; given to " + techName + " at intake"
+			}
+		}
+
+		var customerID string
+		switch in.Customer {
+		case "new":
+			// Made from what the booking holds, so nothing is retyped. The
+			// desk can correct it on the customer's own page.
+			if strings.TrimSpace(name) == "" {
+				return fmt.Errorf("%w: the booking has no name to make a customer from", ErrInvalid)
+			}
+			if customerID, err = createCustomerTx(ctx, tx, scope, NewCustomer{Kind: "private", Name: name, Phone: phone}); err != nil {
+				return err
+			}
+		case "existing":
+			// One of ours: row level security makes a foreign identifier
+			// match nothing, and that is a refusal, not a null.
+			var ok bool
+			if err := tx.QueryRow(ctx, `SELECT exists(SELECT 1 FROM customers WHERE id = $1)`, in.CustomerID).Scan(&ok); err != nil {
+				return fmt.Errorf("check customer: %w", err)
+			}
+			if !ok {
+				return ErrNotFound
+			}
+			customerID = in.CustomerID
+		}
+
+		if jobID, err = takeInTx(ctx, tx, scope, in.Registration, in.Complaint, in.OdometerKm, in.Details); err != nil {
 			return err
+		}
+		if customerID != "" {
+			var vehicleID string
+			if err := tx.QueryRow(ctx, `UPDATE work_orders SET customer_id = $2 WHERE id = $1 RETURNING vehicle_id`,
+				jobID, customerID).Scan(&vehicleID); err != nil {
+				return fmt.Errorf("assign customer: %w", err)
+			}
+			// The payer and the owner are two facts, written apart: the
+			// owner is only changed when the desk says so.
+			if in.AlsoOwner {
+				if err := recordOwnerTx(ctx, tx, scope, vehicleID, customerID); err != nil {
+					return err
+				}
+			}
+		}
+		if in.TechnicianID != "" {
+			if _, err := tx.Exec(ctx, `UPDATE work_orders SET assigned_to = $2 WHERE id = $1`, jobID, in.TechnicianID); err != nil {
+				return fmt.Errorf("assign technician: %w", err)
+			}
 		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE bookings SET status = 'arrived', work_order_id = $2,
+			       technician_id = nullif($3, '')::uuid,
 			       vehicle_id = (SELECT vehicle_id FROM work_orders WHERE id = $2)
-			WHERE id = $1`, bookingID, jobID); err != nil {
+			WHERE id = $1`, in.BookingID, jobID, in.TechnicianID); err != nil {
 			return fmt.Errorf("arrive booking: %w", err)
 		}
-		return bookingEventTx(ctx, tx, scope, bookingID, "arrived", nil, nil, "")
+		return bookingEventTx(ctx, tx, scope, in.BookingID, "arrived", nil, nil, note)
 	})
 	if err != nil {
 		return "", false, err

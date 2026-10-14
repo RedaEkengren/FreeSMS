@@ -26,6 +26,7 @@
     <span>{{.T "What is wrong"}}</span>
     <input name="complaint" value="{{.Form.Complaint}}" required>
   </label>
+  {{if .Intake}}{{template "booked" .}}{{end}}
   <button type="submit">{{.T "Open the job"}}</button>
 </form>
 {{if .CanLookUp}}
@@ -46,4 +47,36 @@
   <label><span>{{.T "Engine"}}</span><input name="engine" value="{{.Lookup.Engine}}"></label>
 </div>
 <label><span>{{.T "Chassis number"}}</span><input name="vin" value="{{.Lookup.VIN}}"></label>
+{{end}}
+
+{{/* What the booking knew, for the desk to confirm. Nothing here is chosen
+     for them: a similar name is a suggestion, and the owner of the car is
+     only changed by ticking it. */}}
+{{define "booked"}}
+{{$p := .}}{{with .Intake}}{{$i := .}}
+<fieldset>
+  <legend>{{$p.T "Who pays and who is rung"}}</legend>
+  <p class="waiting">{{$p.T "The booking says:"}} {{if .Booking.CustomerName}}<strong>{{.Booking.CustomerName}}</strong>{{else}}{{$p.T "no name"}}{{end}}{{if .Booking.CustomerPhone}}, {{.Booking.CustomerPhone}}{{end}}</p>
+  <label><input type="radio" name="customer" value="" {{if not .Customer}}checked{{end}}>
+    <span>{{$p.T "Decide later. The job says it has no customer until somebody does."}}</span></label>
+  {{if .Booking.CustomerName}}
+  <label><input type="radio" name="customer" value="new" {{if eq .Customer "new"}}checked{{end}}>
+    <span>{{$p.T "A new customer, made from the booking"}}</span></label>
+  {{end}}
+  {{range .Matches}}
+  <label><input type="radio" name="customer" value="existing:{{.ID}}" {{if eq $i.Customer (printf "existing:%s" .ID)}}checked{{end}}>
+    <span>{{.Name}}{{if .Phone}}, {{.Phone}}{{end}} <span class="tag">{{if .SameNumber}}{{$p.T "same number"}}{{else}}{{$p.T "similar name"}}{{end}}</span></span></label>
+  {{end}}
+  <label><input type="checkbox" name="also_owner" value="1" {{if .AlsoOwner}}checked{{end}}>
+    <span>{{$p.T "Also record them as the car's owner"}}</span></label>
+</fieldset>
+<label>
+  <span>{{$p.T "Who does the work"}}</span>
+  <select name="technician_id">
+    <option value="">{{$p.T "Nobody yet"}}</option>
+    {{range .Technicians}}<option value="{{.ID}}" {{if eq .ID $i.TechnicianID}}selected{{end}}>{{.Name}}</option>{{end}}
+  </select>
+</label>
+{{if .TechnicianGone}}<p class="waiting">{{$p.T "The technician it was booked for is not working here any more. Choose who takes it."}}</p>{{end}}
+{{end}}
 {{end}}

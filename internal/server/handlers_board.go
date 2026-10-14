@@ -71,9 +71,11 @@ func (s *Server) handleNewJobForm(w http.ResponseWriter, r *http.Request) {
 	// Taken in from a booking: what the customer said on the telephone is
 	// already typed.
 	var form intakeForm
+	var intake *intakeBooking
 	if id := r.URL.Query().Get("booking"); id != "" {
 		if b, _, err := workshop.BookingByID(r.Context(), s.pool, session.Scope, id); err == nil && b.Status == "booked" {
 			form = intakeForm{Registration: b.Registration, Complaint: b.What, BookingID: b.ID}
+			intake = s.intakeFor(r, session.Scope, b, "", b.TechnicianID, false)
 		}
 	}
 	s.render(w, r, http.StatusOK, "newjob", pageData{
@@ -81,7 +83,53 @@ func (s *Server) handleNewJobForm(w http.ResponseWriter, r *http.Request) {
 		Session:   session,
 		CanLookUp: s.canLookUp(),
 		Form:      form,
+		Intake:    intake,
 	})
+}
+
+// intakeFor gathers what the desk is asked to confirm for a booked car: the
+// customers it might be, found by the number and the name the booking holds,
+// and the technicians who can take the job. A failed lookup shortens the
+// lists; the car can still be taken in.
+func (s *Server) intakeFor(r *http.Request, scope access.Scope, b workshop.Booking, customer, technician string, alsoOwner bool) *intakeBooking {
+	in := &intakeBooking{Booking: b, Customer: customer, TechnicianID: technician, AlsoOwner: alsoOwner}
+	seen := map[string]bool{}
+	for _, q := range []struct {
+		text   string
+		number bool
+	}{{b.CustomerPhone, true}, {b.CustomerName, false}} {
+		if strings.TrimSpace(q.text) == "" {
+			continue
+		}
+		found, err := workshop.FindCustomers(r.Context(), s.pool, scope, q.text)
+		if err != nil {
+			s.log.Error("find customers for a booking", "error", err)
+			continue
+		}
+		for _, c := range found {
+			if !seen[c.ID] {
+				seen[c.ID] = true
+				in.Matches = append(in.Matches, intakeMatch{Customer: c, SameNumber: q.number})
+			}
+		}
+	}
+	rows, err := workshop.PlannerRows(r.Context(), s.pool, scope)
+	if err != nil {
+		s.log.Error("technicians for an intake", "error", err)
+	}
+	in.Technicians = rows
+	if technician != "" {
+		in.TechnicianGone = true
+		for _, t := range rows {
+			if t.ID == technician {
+				in.TechnicianGone = false
+			}
+		}
+		if in.TechnicianGone {
+			in.TechnicianID = ""
+		}
+	}
+	return in
 }
 
 func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
@@ -92,6 +140,28 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 		BookingID:    strings.TrimSpace(r.FormValue("booking_id")),
 		OdometerKm:   strings.TrimSpace(r.FormValue("odometer_km")),
 		Complaint:    strings.TrimSpace(r.FormValue("complaint")),
+	}
+
+	choice, chosen := strings.CutPrefix(r.FormValue("customer"), "existing:")
+	if chosen {
+		choice = "existing"
+	} else {
+		choice = map[string]string{"new": "new"}[r.FormValue("customer")]
+	}
+	alsoOwner := r.FormValue("also_owner") != ""
+	technician := strings.TrimSpace(r.FormValue("technician_id"))
+	// The form as it came, with the booking's choices, for sending it back.
+	again := func(status int, message string) {
+		var intake *intakeBooking
+		if form.BookingID != "" {
+			if b, _, err := workshop.BookingByID(r.Context(), s.pool, session.Scope, form.BookingID); err == nil {
+				intake = s.intakeFor(r, session.Scope, b, r.FormValue("customer"), technician, alsoOwner)
+			}
+		}
+		s.render(w, r, status, "newjob", pageData{
+			Title: "Take in a vehicle", Session: session, Form: form, Intake: intake,
+			CanLookUp: s.canLookUp(), Error: message,
+		})
 	}
 
 	var odometer *int64
@@ -105,10 +175,7 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 		}, form.OdometerKm)
 		km, err := strconv.ParseInt(digits, 10, 64)
 		if err != nil || digits == "" {
-			s.render(w, r, http.StatusBadRequest, "newjob", pageData{
-				Title: "Take in a vehicle", Session: session, Form: form,
-				Error: "The odometer reading should be a number of kilometres.",
-			})
+			again(http.StatusBadRequest, "The odometer reading should be a number of kilometres.")
 			return
 		}
 		odometer = &km
@@ -134,8 +201,12 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 	if form.BookingID != "" {
 		// The job and the end of the booking in one go. A second submission
 		// of the same booking is answered with the job the first one made.
-		id, _, err = workshop.TakeInBooking(r.Context(), s.pool, session.Scope,
-			form.BookingID, form.Registration, form.Complaint, odometer, details)
+		id, _, err = workshop.TakeInBooking(r.Context(), s.pool, session.Scope, workshop.BookingIntake{
+			BookingID: form.BookingID, Registration: form.Registration, Complaint: form.Complaint,
+			OdometerKm: odometer, Details: details,
+			Customer: choice, CustomerID: strings.TrimPrefix(r.FormValue("customer"), "existing:"),
+			AlsoOwner: alsoOwner, TechnicianID: technician,
+		})
 	} else {
 		id, err = workshop.TakeInWith(r.Context(), s.pool, session.Scope,
 			form.Registration, form.Complaint, odometer, details)
@@ -159,10 +230,7 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 			"Taking a vehicle in is done at the front desk.")
 		return
 	case errors.Is(err, workshop.ErrInvalid):
-		s.render(w, r, http.StatusBadRequest, "newjob", pageData{
-			Title: "Take in a vehicle", Session: session, Form: form,
-			Error: strings.TrimPrefix(err.Error(), "workshop: invalid: "),
-		})
+		again(http.StatusBadRequest, strings.TrimPrefix(err.Error(), "workshop: invalid: "))
 		return
 	case err != nil:
 		s.log.Error("take in", "error", err)

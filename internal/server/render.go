@@ -143,6 +143,8 @@ type pageData struct {
 	// cannot do anything.
 	CanLookUp bool
 	Form      intakeForm
+	// What a booked car's intake asks the desk to confirm; nil for a walk-in.
+	Intake *intakeBooking
 
 	// Setup, staff and the account page.
 	MinPassword int
@@ -152,6 +154,26 @@ type pageData struct {
 	StaffForm staffForm
 	Roles     []access.Role
 	Changed   bool
+}
+
+// intakeBooking is the booking behind an intake, with the people the desk
+// may confirm or pick from. Nothing in it is chosen for them.
+type intakeBooking struct {
+	Booking workshop.Booking
+	// Customers who might be the one on the telephone, and why each is offered.
+	Matches     []intakeMatch
+	Technicians []workshop.PlannerRow
+	// Who the form starts on, and what was chosen if it comes back.
+	Customer     string
+	TechnicianID string
+	AlsoOwner    bool
+	// The booked technician is no longer working here.
+	TechnicianGone bool
+}
+
+type intakeMatch struct {
+	workshop.Customer
+	SameNumber bool
 }
 
 // intakeForm keeps what was typed when a submission is sent back with an
