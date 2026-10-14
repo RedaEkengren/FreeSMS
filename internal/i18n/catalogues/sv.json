@@ -1388,6 +1388,106 @@
     "What was done before the customer said no? It is invoiced; the rest is not.": {
       "other": "Vad var gjort innan kunden sa nej? Det faktureras, resten inte."
     },
+    "Quote": {
+      "other": "Offert"
+    },
+    "Version %d": {
+      "other": "Version %d"
+    },
+    "including VAT": {
+      "other": "inklusive moms"
+    },
+    "agreed": {
+      "other": "godkänd"
+    },
+    "The customer said yes": {
+      "other": "Kunden sa ja"
+    },
+    "on their link": {
+      "other": "på sin länk"
+    },
+    "by telephone": {
+      "other": "per telefon"
+    },
+    "written down by %s": {
+      "other": "nedskrivet av %s"
+    },
+    "agreed to %s": {
+      "other": "gick med på %s"
+    },
+    "Waiting for the customer's answer.": {
+      "other": "Väntar på kundens svar."
+    },
+    "Nothing has been put to the customer yet.": {
+      "other": "Inget har lagts fram för kunden än."
+    },
+    "Put the new lines to the customer": {
+      "other": "Lägg fram de nya raderna för kunden"
+    },
+    "Put the quote to the customer": {
+      "other": "Lägg fram offerten för kunden"
+    },
+    "The customer answered by telephone or at the counter? Write it down.": {
+      "other": "Svarade kunden per telefon eller i disken? Skriv ner det."
+    },
+    "By telephone": {
+      "other": "Per telefon"
+    },
+    "At the counter": {
+      "other": "I disken"
+    },
+    "Amount they agreed to, including VAT": {
+      "other": "Belopp de gick med på, inklusive moms"
+    },
+    "They said yes": {
+      "other": "De sa ja"
+    },
+    "They said no": {
+      "other": "De sa nej"
+    },
+    "yes": {
+      "other": "ja"
+    },
+    "no": {
+      "other": "nej"
+    },
+    "The workshop changed the quote while you were reading it. This is the new one.": {
+      "other": "Verkstaden ändrade offerten medan du läste. Det här är den nya."
+    },
+    "Excluding VAT": {
+      "other": "Exklusive moms"
+    },
+    "Total including VAT": {
+      "other": "Totalt inklusive moms"
+    },
+    "You said yes to this on %s. You can change it.": {
+      "other": "Du sa ja till det här %s. Du kan ändra dig."
+    },
+    "You said no to this on %s. You can change it.": {
+      "other": "Du sa nej till det här %s. Du kan ändra dig."
+    },
+    "That quote has been replaced": {
+      "other": "Offerten har ersatts"
+    },
+    "A newer version of the quote has been put to the customer. Open the job and answer that one.": {
+      "other": "En nyare version av offerten har lagts fram för kunden. Öppna jobbet och svara på den."
+    },
+    "Quotes and the customer's answers are the front desk's.": {
+      "other": "Offerter och kundens svar hör till disken."
+    },
+    "No agreement recorded": {
+      "other": "Inget godkännande registrerat"
+    },
+    "That amount did not parse": {
+      "other": "Beloppet gick inte att läsa"
+    },
+    "Write what the customer agreed to pay, including VAT: 1 562,50.": {
+      "other": "Skriv vad kunden gick med på att betala, inklusive moms: 1 562,50."
+    },
+    "%d line has no agreement yet": {
+      "one": "%d rad saknar godkännande",
+      "other": "%d rader saknar godkännande"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

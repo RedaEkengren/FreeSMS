@@ -390,7 +390,7 @@ func consumeForInvoice(ctx context.Context, tx pgx.Tx, scope access.Scope, workO
 		         SELECT -sum(m.quantity) FROM stock_movements m
 		         WHERE m.work_order_id = $1 AND m.part_id = l.part_id AND m.kind IN ('consumed', 'put_back')), 0)
 		FROM work_order_lines l
-		WHERE l.work_order_id = $1 AND l.part_id IS NOT NULL AND l.quantity > 0 AND l.declined_at IS NULL
+		WHERE l.work_order_id = $1 AND l.part_id IS NOT NULL AND l.quantity > 0 AND l.declined_at IS NULL AND (l.approved_at IS NOT NULL OR l.customer_decision_id IS NULL)
 		GROUP BY l.part_id`, workOrderID)
 	if err != nil {
 		return fmt.Errorf("read the job's parts: %w", err)
@@ -475,6 +475,7 @@ func chargeableLines(ctx context.Context, tx pgx.Tx, workOrderID string) ([]invo
 		       unit_price_minor, vat_rate_bp
 		FROM work_order_lines
 		WHERE work_order_id = $1 AND cost_bearer = 'customer' AND declined_at IS NULL
+		  AND (approved_at IS NOT NULL OR customer_decision_id IS NULL)
 		ORDER BY position`, workOrderID)
 	if err != nil {
 		return nil, fmt.Errorf("read lines: %w", err)

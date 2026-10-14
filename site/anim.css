@@ -319,3 +319,7 @@
 .ml-big { font-size: 17px; margin-top: 10px; }
 .an-m .ml-desk { left: 16px; top: 16px; width: 488px; height: 250px; }
 .an-m .ml-phone { left: 135px; top: 282px; height: 330px; }
+/* The quote the customer is asked about, over the finding they said yes to. */
+.cl-quote { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background: #fff; padding: 14px 14px 0; }
+.cl-qrow { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; margin: 5px 0; }
+.cl-qrow > span:first-child { flex: 1; min-width: 0; }

@@ -317,6 +317,8 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /jobs/new/lookup", s.requireSession(s.handleVehicleLookup))
 	mux.HandleFunc("GET /jobs/{id}", s.requireSession(s.handleJob))
 	mux.HandleFunc("POST /jobs/{id}/state", s.requireSession(s.handleSetState))
+	mux.HandleFunc("POST /jobs/{id}/quote", s.requireSession(s.handlePresentQuote))
+	mux.HandleFunc("POST /jobs/{id}/quote/{quoteID}/answer", s.requireSession(s.handleQuoteAnswer))
 	mux.HandleFunc("POST /jobs/{id}/lines/{position}/performed", s.requireSession(s.handleMarkPerformed))
 	mux.HandleFunc("POST /jobs/{id}/lines", s.requireSession(s.handleAddLine))
 	mux.HandleFunc("POST /jobs/{id}/invoice", s.requireSession(s.handleInvoice))
@@ -375,6 +377,7 @@ func (s *Server) routes() (http.Handler, error) {
 	// authorisation, and it authorises exactly one inspection.
 	mux.HandleFunc("GET /i/{token}", s.handleSharedInspection)
 	mux.HandleFunc("GET /k/{token}", s.handleCustomerStatus)
+	mux.HandleFunc("POST /k/{token}/quote/{quoteID}", s.handleCustomerQuote)
 	mux.HandleFunc("POST /i/{token}/items/{itemID}", s.handleSharedDecision)
 	mux.HandleFunc("GET /i/{token}/photos/{key}", s.handleSharedPhoto)
 

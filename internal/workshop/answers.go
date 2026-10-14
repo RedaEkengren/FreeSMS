@@ -96,8 +96,10 @@ func CustomerAnswers(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 
 // PriceAnswer makes an item the customer approved into a line on its job.
 //
-// The line is approved as of the customer's answer, whatever state the order
-// is in, and carries which answer it was priced on. An item becomes one line:
+// The line is not approved by the answer: the customer said yes to the work
+// on a page that showed no price. It carries which answer it was priced on,
+// waits for a quote to put the price to them, and is not invoiced until they
+// have agreed to it. An item becomes one line:
 // two people pricing it at once get one line and ErrAlreadyALine.
 func PriceAnswer(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID, itemID string, line NewLine) error {
 	if !scope.Role.SeesCustomerPersonalData() {
@@ -146,7 +148,7 @@ func PriceAnswer(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 			return fmt.Errorf("%w: the customer has not approved this", ErrInvalid)
 		}
 		return addLineTx(ctx, tx, scope, jobID, line, lineSource{
-			itemID: itemID, decisionID: decisionID, approvedAt: &decidedAt,
+			itemID: itemID, decisionID: decisionID,
 		})
 	})
 }

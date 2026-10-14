@@ -339,6 +339,11 @@ func setStateInScopeTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID
 	}
 	// A shop that signs work off with a final check does not have a car
 	// ready without one, whichever way the move arrives.
+	if to == StateApproved {
+		if err := approvalGateTx(ctx, tx, jobID); err != nil {
+			return err
+		}
+	}
 	if to == StateReady {
 		fc, err := finalCheckTx(ctx, tx, scope.ShopID, jobID)
 		if err != nil {
@@ -436,14 +441,6 @@ func setStateTx(ctx context.Context, tx pgx.Tx, jobID string, to State) error {
 	}
 
 	switch to {
-	case StateApproved:
-		// The customer's yes is recorded now, and it covers the quote as it
-		// stands. Lines written later are not in it.
-		if _, err := tx.Exec(ctx, `
-			UPDATE work_order_lines SET approved_at = now(), updated_at = now()
-			WHERE work_order_id = $1 AND approved_at IS NULL AND declined_at IS NULL`, jobID); err != nil {
-			return fmt.Errorf("approve the quote: %w", err)
-		}
 	case StateDeclined:
 		// What was not done is not owed. What was -- marked performed, or a
 		// part already taken out to the job -- stays, and is what the invoice

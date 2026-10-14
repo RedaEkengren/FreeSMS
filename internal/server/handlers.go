@@ -126,10 +126,43 @@ func (s *Server) handleCustomerStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.render(w, r, http.StatusOK, "status", pageData{
-		Locale: s.shopLocale(r),
-		Title:  "Your car",
-		Status: st,
+		Locale:       s.shopLocale(r),
+		Title:        "Your car",
+		Status:       st,
+		QuoteChanged: r.URL.Query().Get("changed") != "",
 	})
+}
+
+// handleCustomerQuote is the customer's own yes or no to a quote. Bound to the
+// version they were shown: an answer to one that has since been replaced is
+// not taken for the newer, and they are sent to look at it.
+func (s *Server) handleCustomerQuote(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+	err := workshop.QuoteAnswerFromLink(r.Context(), s.pool, s.shop(), token,
+		r.PathValue("quoteID"), r.FormValue("decision"))
+	switch {
+	case err == nil:
+		http.Redirect(w, r, "/k/"+token, http.StatusSeeOther)
+	case errors.Is(err, workshop.ErrQuoteSuperseded):
+		http.Redirect(w, r, "/k/"+token+"?changed=1", http.StatusSeeOther)
+	case errors.Is(err, workshop.ErrShareNotUsable), errors.Is(err, workshop.ErrNotFound):
+		s.render(w, r, http.StatusNotFound, "status", pageData{
+			Locale: s.shopLocale(r),
+			Title:  "This link is no longer open",
+			Error:  "Ask the workshop for a new one.",
+		})
+	case errors.Is(err, workshop.ErrInvalid):
+		s.render(w, r, http.StatusBadRequest, "status", pageData{
+			Locale: s.shopLocale(r),
+			Title:  "That did not go through", Error: "Open the link again and try once more.",
+		})
+	default:
+		s.log.Error("customer quote", "error", err)
+		s.render(w, r, http.StatusInternalServerError, "status", pageData{
+			Locale: s.shopLocale(r),
+			Title:  "Something went wrong", Error: "Try again shortly.",
+		})
+	}
 }
 
 func (s *Server) renderJob(w http.ResponseWriter, r *http.Request, linkURL string) {
@@ -277,6 +310,25 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 		}
 	}
 
+	// The quote the customer was shown and what they answered: the desk's.
+	var quote workshop.QuoteView
+	if session.Scope.Role.SeesCustomerPersonalData() {
+		if quote, err = workshop.QuoteFor(r.Context(), s.pool, session.Scope, id); err != nil {
+			s.log.Error("read quote", "error", err)
+		}
+		// A button that is always refused is not shown: approval is recorded
+		// as the customer's answer, not pressed.
+		if !quote.CanApprove {
+			kept := next[:0]
+			for _, st := range next {
+				if st != workshop.StateApproved {
+					kept = append(kept, st)
+				}
+			}
+			next = kept
+		}
+	}
+
 	// Only the front desk sees documents; a technician has no use for them
 	// and they carry the customer's name.
 	var invoices []workshop.Invoice
@@ -315,6 +367,7 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 		Requests:    requests,
 		Findings:    findings,
 		Answers:     answers,
+		Quote:       quote,
 		Presence:    presence,
 		JobParts:    jobParts,
 		Contacts:    contacts,

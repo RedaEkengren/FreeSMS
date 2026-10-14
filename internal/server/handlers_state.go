@@ -59,6 +59,9 @@ func (s *Server) handleSetState(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, workshop.ErrNoCustomer):
 		s.renderError(w, r, http.StatusConflict, "Nobody to bill", err.Error())
 		return
+	case errors.Is(err, workshop.ErrNeedsApproval):
+		s.renderError(w, r, http.StatusConflict, "No agreement recorded", err.Error())
+		return
 	case errors.Is(err, workshop.ErrWouldLoseWork):
 		// Worth a page rather than a flash: it is a refusal with a reason and
 		// a different action to take, not a slip of the finger.
@@ -404,4 +407,65 @@ func (s *Server) handleJobParts(w http.ResponseWriter, r *http.Request) {
 		Parts:     parts,
 		PartQuery: r.URL.Query().Get("q"),
 	})
+}
+
+// handlePresentQuote puts the lines the customer has not answered to them as
+// the next numbered version.
+func (s *Server) handlePresentQuote(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id := r.PathValue("id")
+	_, err := workshop.PresentQuote(r.Context(), s.pool, session.Scope, id)
+	if s.quoteError(w, r, err) {
+		return
+	}
+	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
+}
+
+// handleQuoteAnswer writes down a yes or no the customer gave by telephone or
+// at the counter, with the amount they agreed to.
+func (s *Server) handleQuoteAnswer(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id := r.PathValue("id")
+	answer := workshop.QuoteAnswer{
+		Decision: r.FormValue("decision"),
+		Via:      r.FormValue("via"),
+		Note:     r.FormValue("note"),
+	}
+	if answer.Decision == "approved" {
+		amount, err := parseMinorUnits(r.FormValue("agreed"))
+		if err != nil || strings.TrimSpace(r.FormValue("agreed")) == "" {
+			s.renderError(w, r, http.StatusBadRequest, "That amount did not parse",
+				"Write what the customer agreed to pay, including VAT: 1 562,50.")
+			return
+		}
+		answer.AgreedGrossMinor = amount
+	}
+	err := workshop.RecordQuoteAnswer(r.Context(), s.pool, session.Scope, id, r.PathValue("quoteID"), answer)
+	if s.quoteError(w, r, err) {
+		return
+	}
+	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
+}
+
+// quoteError answers for the errors the quote operations share, and reports
+// whether it did.
+func (s *Server) quoteError(w http.ResponseWriter, r *http.Request, err error) bool {
+	switch {
+	case err == nil:
+		return false
+	case errors.Is(err, access.ErrForbidden):
+		s.renderError(w, r, http.StatusForbidden, "Not for your role",
+			"Quotes and the customer's answers are the front desk's.")
+	case errors.Is(err, workshop.ErrNotFound):
+		s.renderError(w, r, http.StatusNotFound, "Not found", "No such job.")
+	case errors.Is(err, workshop.ErrQuoteSuperseded):
+		s.renderError(w, r, http.StatusConflict, "That quote has been replaced",
+			"A newer version of the quote has been put to the customer. Open the job and answer that one.")
+	case errors.Is(err, workshop.ErrInvalid):
+		s.renderError(w, r, http.StatusBadRequest, "Not accepted", trimInvalid(err))
+	default:
+		s.log.Error("quote", "error", err)
+		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+	}
+	return true
 }

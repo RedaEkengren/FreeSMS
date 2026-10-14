@@ -205,7 +205,7 @@ func TotalsWith(lines []Line, extra []SurchargeLine) money.Totals {
 	priced := make([]money.Line, 0, len(lines)+len(extra))
 	for _, l := range lines {
 		priced = append(priced, money.Line{QuantityMilli: l.QuantityMilli, UnitPriceMinor: l.UnitPriceMinor,
-			VATRateBasis: l.VATRateBasis, ChargedToCustomer: l.CostBearer == "customer"})
+			VATRateBasis: l.VATRateBasis, ChargedToCustomer: l.Billable()})
 	}
 	for _, l := range extra {
 		priced = append(priced, money.Line{QuantityMilli: 1000, UnitPriceMinor: l.NetMinor,

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { owner, tech, desk, signIn, signOut, leave, readIn } from './helpers';
+import { owner, tech, desk, signIn, signOut, leave, readIn, getApproved } from './helpers';
 
 // The marketing page's morning scene, performed against the real product in
 // Swedish: taken in, worked on without the customer, invoiced, and handed to
@@ -44,9 +44,7 @@ test.describe.serial('the morning scene', () => {
       await page.fill('input[form=add-line][name=quantity]', '1,5');
       await page.fill('input[form=add-line][name=unit_price]', '895');
       await page.locator('button[form=add-line]').click();
-      for (const action of ['Prissätt den', 'Fråga kunden', 'Markera som godkänd']) {
-        await page.getByRole('button', { name: action }).click();
-      }
+      await getApproved(page, 'sv');
       await expect(page.getByText('Godkänd, inte påbörjad').first()).toBeVisible();
     } finally {
       await readIn(page, '');

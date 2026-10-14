@@ -496,6 +496,67 @@
 </table>
 </div>
 
+{{/* What the customer was shown, and what they answered to it. The answer
+     belongs to a numbered version of the quote, so the amount they agreed to
+     is on the record whatever happens to the lines afterwards. */}}
+{{if .Session.Scope.Role.SeesCustomerPersonalData}}
+<div id="live-quote" data-live="job:{{.Job.ID}}">
+<h2>{{.T "Quote"}}</h2>
+{{with .Quote.Latest}}
+  <div class="row">
+    <span>{{$.T "Version %d" .Version}} &middot; {{$.Date ($.Local .PresentedAt) "2 Jan 15:04"}}</span>
+    <span>{{$.Money .GrossMinor}} <span class="waiting">{{$.T "including VAT"}}</span></span>
+  </div>
+  {{with .Decision}}
+  <p class="waiting">
+    {{if eq .Decision "approved"}}<span class="tag">{{$.T "agreed"}}</span> {{$.T "The customer said yes"}}{{else}}<span class="tag warranty">{{$.T "declined"}}</span> {{$.T "The customer said no"}}{{end}}
+    {{if eq .Via "link"}}{{$.T "on their link"}}{{else if eq .Via "phone"}}{{$.T "by telephone"}}{{else}}{{$.T "at the counter"}}{{end}}
+    {{$.Date ($.Local .DecidedAt) "2 Jan 15:04"}}{{if .RecordedBy}} &middot; {{$.T "written down by %s" .RecordedBy}}{{end}}{{if .AgreedGrossMinor}} &middot; {{$.T "agreed to %s" ($.Money .AgreedMinor)}}{{end}}
+    {{if .Note}}&middot; {{.Note}}{{end}}
+  </p>
+  {{else}}
+  <p class="waiting">{{$.T "Waiting for the customer's answer."}}</p>
+  {{end}}
+{{else}}
+  <p class="waiting">{{.T "Nothing has been put to the customer yet."}}</p>
+{{end}}
+
+{{if .Quote.Pending}}
+<p><span class="tag warranty">{{.N "%d line has no agreement yet" .Quote.Pending}}</span></p>
+<form class="my" method="post" action="/jobs/{{.Job.ID}}/quote">
+  <button type="submit">{{if .Quote.Latest}}{{.T "Put the new lines to the customer"}}{{else}}{{.T "Put the quote to the customer"}}{{end}}</button>
+</form>
+{{end}}
+
+{{with .Quote.Latest}}
+<form class="my" method="post" action="/jobs/{{$.Job.ID}}/quote/{{.ID}}/answer">
+  <p class="waiting">{{$.T "The customer answered by telephone or at the counter? Write it down."}}</p>
+  <div class="pair">
+    <label><span>{{$.T "How"}}</span>
+      <select name="via"><option value="phone">{{$.T "By telephone"}}</option><option value="counter">{{$.T "At the counter"}}</option></select></label>
+    <label><span>{{$.T "Amount they agreed to, including VAT"}}</span>
+      <input name="agreed" inputmode="decimal" placeholder="{{$.Money .GrossMinor}}"></label>
+  </div>
+  <label><span>{{$.T "Note"}}</span><input name="note" maxlength="500"></label>
+  {{/* Enter in a field must not answer for the customer. */}}
+  <button type="submit" disabled hidden aria-hidden="true" tabindex="-1"></button>
+  <div class="actions mt-s">
+    <button name="decision" value="approved">{{$.T "They said yes"}}</button>
+    <button name="decision" value="declined" class="secondary">{{$.T "They said no"}}</button>
+  </div>
+</form>
+{{end}}
+
+{{if .Quote.Decisions}}
+<ul class="lines">
+  {{range .Quote.Decisions}}
+  <li class="waiting">{{$.T "Version %d" .Version}} &middot; {{if eq .Decision "approved"}}{{$.T "yes"}}{{else}}{{$.T "no"}}{{end}} &middot; {{if eq .Via "link"}}{{$.T "on their link"}}{{else if eq .Via "phone"}}{{$.T "by telephone"}}{{else}}{{$.T "at the counter"}}{{end}} &middot; {{$.Date ($.Local .DecidedAt) "2 Jan 15:04"}}{{if .RecordedBy}} &middot; {{.RecordedBy}}{{end}}</li>
+  {{end}}
+</ul>
+{{end}}
+</div>
+{{end}}
+
 <div id="live-docs" data-live="job:{{.Job.ID}}">
 {{if .Invoices}}
 <h2>{{.T "Documents"}}</h2>

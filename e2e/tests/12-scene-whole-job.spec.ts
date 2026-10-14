@@ -1,5 +1,5 @@
 import { test, expect, Page, BrowserContext } from '@playwright/test';
-import { owner, tech, desk, signIn, leave } from './helpers';
+import { owner, tech, desk, signIn, leave, getApproved } from './helpers';
 
 // The site's main scene, one job from start to finish, performed against the
 // real product in Swedish. Every role in its own browser, the customer in one
@@ -95,9 +95,7 @@ test.describe.serial('the whole job scene', () => {
       await d.fill('input[form=add-line][name=quantity]', '1');
       await d.fill('input[form=add-line][name=unit_price]', '895');
       await d.locator('button[form=add-line]').click();
-      for (const action of ['Prissätt den', 'Fråga kunden', 'Markera som godkänd']) {
-        await d.getByRole('button', { name: action }).click();
-      }
+      await getApproved(d, 'sv');
 
       // The technician starts, inspects and photographs.
       await t.goto(job);
@@ -128,6 +126,22 @@ test.describe.serial('the whole job scene', () => {
       const answer = d.locator('li', { hasText: 'Bromsar fram: Bakre beläggen nere på 2 mm' }).filter({ has: d.locator('form') });
       await answer.locator('input[name=unit_price]').fill('1290');
       await answer.getByRole('button', { name: 'Gör det till en rad' }).click();
+
+      // The customer said yes to the work without a price. The price is put
+      // to them now, and their yes to it is what the line is billed on.
+      await expect(d.locator('table.lines-table')).toContainText('Bromsar fram: Bakre beläggen nere på 2 mm');
+      await d.getByRole('button', { name: 'Lägg fram de nya raderna för kunden' }).click();
+      await d.getByRole('button', { name: 'Gör en länk till kunden' }).click();
+      const priceLink = new URL(await d.locator('#share-url').inputValue());
+      await phone.goto(new URL(priceLink.pathname, d.url()).toString());
+      await expect(phone.getByText('Bromsar fram: Bakre beläggen nere på 2 mm')).toBeVisible();
+      await expect(phone.getByText('1 290,00 kr').first()).toBeVisible();
+      await expect(phone.getByText('1 612,50 kr')).toBeVisible();
+      await phone.getByRole('button', { name: 'Ja, gör det' }).click();
+      await expect(phone.getByText(/Du sa ja till det här/)).toBeVisible();
+      await d.goto(job);
+      await expect(d.locator('#live-quote')).toContainText('Kunden sa ja');
+      await expect(d.locator('#live-quote')).toContainText('på sin länk');
 
       // The part is not on the shelf: asked for, and the job waits.
       await t.goto(job);

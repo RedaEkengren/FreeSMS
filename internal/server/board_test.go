@@ -416,7 +416,7 @@ func TestAmountsFollowTheReadersLanguage(t *testing.T) {
 
 // The document has to be reachable and has to be refused, both by HTTP.
 func TestAnIssuedInvoiceCanBeLookedAt(t *testing.T) {
-	ts, _ := testServer(t)
+	ts, pool := testServer(t)
 	advisor := signIn(t, ts, advisorEmail)
 
 	post(t, advisor, ts.URL+"/jobs/"+jobA+"/lines", url.Values{
@@ -424,6 +424,9 @@ func TestAnIssuedInvoiceCanBeLookedAt(t *testing.T) {
 		"quantity": {"2.5"}, "unit_price": {"895.00"}, "vat_rate": {"25"},
 	})
 	for _, state := range []string{"estimated", "awaiting_approval", "approved", "in_progress", "ready"} {
+		if state == "approved" {
+			agreeAtTheCounter(t, ts.URL, jobA, advisor, pool)
+		}
 		post(t, advisor, ts.URL+"/jobs/"+jobA+"/state", url.Values{"state": {state}})
 	}
 	post(t, advisor, ts.URL+"/jobs/"+jobA+"/invoice", url.Values{})

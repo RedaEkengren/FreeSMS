@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { owner, desk, tech, signIn, signOut, collectAlerts, pricedJob, nameCustomer } from './helpers';
+import { owner, desk, tech, signIn, signOut, collectAlerts, pricedJob, nameCustomer, getApproved } from './helpers';
 
 // A JPEG small enough to write out: one white pixel. What the server checks
 // is that it is an image and what it stores is its bytes.
@@ -111,9 +111,7 @@ test.describe.serial('forms the queue has to get right', () => {
     for (const reg of ['DBL001', 'DBL002', 'DBL003']) {
       const job = await pricedJob(page, reg);
       await nameCustomer(page, `Kund ${reg}`);
-      for (const action of ['Price it', 'Ask the customer', 'Mark it approved']) {
-        await page.getByRole('button', { name: action }).click();
-      }
+      await getApproved(page);
       jobs.push(job);
     }
     await signOut(page);

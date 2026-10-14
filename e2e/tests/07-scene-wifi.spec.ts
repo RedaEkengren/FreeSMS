@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { tech, desk, signIn, signOut, leave, readIn, collectAlerts, pricedJob, shopLanguage } from './helpers';
+import { tech, desk, signIn, signOut, leave, readIn, collectAlerts, pricedJob, shopLanguage, getApproved } from './helpers';
 
 // The marketing page's first scene, performed against the real product.
 // site/src/index.html links this test, and the site generator refuses to
@@ -15,9 +15,7 @@ test.describe.serial('the wifi scene', () => {
     // the clock running.
     await signIn(page, desk);
     const job = await pricedJob(page, 'WIF123');
-    for (const action of ['Price it', 'Ask the customer', 'Mark it approved']) {
-      await page.getByRole('button', { name: action }).click();
-    }
+    await getApproved(page);
     await signOut(page);
     await signIn(page, tech);
     await page.goto(job);

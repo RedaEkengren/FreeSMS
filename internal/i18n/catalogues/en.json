@@ -54,6 +54,10 @@
       "one": "%d document",
       "other": "%d documents"
     },
+    "%d line has no agreement yet": {
+      "one": "%d line has no agreement yet",
+      "other": "%d lines have no agreement yet"
+    },
     "changed their mind %d time": {
       "one": "changed their mind %d time",
       "other": "changed their mind %d times"

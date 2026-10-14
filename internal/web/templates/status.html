@@ -23,6 +23,35 @@
   {{if .CarAway}}<p class="waiting">{{$.T "The car is with you."}}{{with .ExpectedBack}} {{$.T "We expect it back %s." ($.Date . "Mon 2 Jan")}}{{end}}</p>{{end}}
   </div>
 
+  {{with .Quote}}
+  {{/* What the workshop asks them to pay for, with every amount, so that a
+       yes is a yes to a number they have read. The answer goes to this
+       version; if the workshop has changed it since, it says so. */}}
+  <h2>{{$.T "Quote"}}</h2>
+  {{if $.QuoteChanged}}<p class="error">{{$.T "The workshop changed the quote while you were reading it. This is the new one."}}</p>{{end}}
+  <table class="lines-table">
+    <thead><tr><th>{{$.T "What"}}</th><th class="num">{{$.T "Quantity"}}</th><th class="num">{{$.T "Unit price"}}</th><th class="num">{{$.T "Amount"}}</th></tr></thead>
+    <tbody>
+    {{range .Lines}}
+      <tr><td>{{.Description}}</td><td class="num" data-label="{{$.T "Quantity"}}">{{$.Num .Quantity}}</td><td class="num" data-label="{{$.T "Unit price"}}">{{$.Money .UnitPriceMinor}}</td><td class="num" data-label="{{$.T "Amount"}}">{{$.Money .NetMinor}}</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  <dl>
+    <dt>{{$.T "Excluding VAT"}}</dt><dd>{{$.Money .NetMinor}}</dd>
+    <dt>{{$.T "VAT"}}</dt><dd>{{$.Money .VATMinor}}</dd>
+    <dt>{{$.T "Total including VAT"}}</dt><dd><strong>{{$.Money .GrossMinor}}</strong></dd>
+  </dl>
+  {{if eq .Answer "approved"}}<p class="waiting">{{$.T "You said yes to this on %s. You can change it." ($.Date ($.Local .AnsweredAt) "2 Jan 15:04")}}</p>
+  {{else if eq .Answer "declined"}}<p class="waiting">{{$.T "You said no to this on %s. You can change it." ($.Date ($.Local .AnsweredAt) "2 Jan 15:04")}}</p>{{end}}
+  <form method="post" action="/k/{{$.Status.Token}}/quote/{{.ID}}">
+    <div class="actions">
+      <button name="decision" value="approved">{{$.T "Yes, do it"}}</button>
+      <button name="decision" value="declined" class="secondary">{{$.T "No, leave it"}}</button>
+    </div>
+  </form>
+  {{end}}
+
   {{if .Invoiced}}
   <h2>{{$.T "Invoice %s" .InvoiceReference}}</h2>
   <dl>

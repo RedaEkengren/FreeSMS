@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { owner, tech, desk, signIn, signOut } from './helpers';
+import { owner, tech, desk, signIn, signOut, getApproved } from './helpers';
 
 // From an empty database to an invoice, through the forms and nothing else:
 // no seed data, no SQL, every relationship made the way a workshop makes it.
@@ -58,9 +58,7 @@ test.describe.serial('a morning, from an empty database', () => {
     await page.locator('button[form=add-line]').click();
     await expect(page.getByText('Byte av bromsskivor fram')).toBeVisible();
 
-    for (const action of ['Price it', 'Ask the customer', 'Mark it approved']) {
-      await page.getByRole('button', { name: action }).click();
-    }
+    await getApproved(page);
     await expect(page.getByText('Approved, not started')).toBeVisible();
     await signOut(page);
   });

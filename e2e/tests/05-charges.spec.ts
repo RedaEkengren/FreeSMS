@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { owner, desk, tech, signIn, signOut, nameCustomer } from './helpers';
+import { owner, desk, tech, signIn, signOut, nameCustomer, getApproved } from './helpers';
 
 // Förbrukningsmaterial and the invoicing fee, set by the owner, shown on the
 // job with the total, and on the invoice the same.
@@ -35,9 +35,7 @@ test.describe.serial('what an invoice adds', () => {
     await expect(totals).toContainText('67.13');
     await expect(totals).toContainText('Invoicing fee');
     await expect(totals).toContainText(/1,823\.29/);
-    for (const action of ['Price it', 'Ask the customer', 'Mark it approved']) {
-      await page.getByRole('button', { name: action }).click();
-    }
+    await getApproved(page);
     await signOut(page);
 
     await signIn(page, tech);

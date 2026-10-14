@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
@@ -85,13 +84,12 @@ func checkLine(line *NewLine) error {
 }
 
 // lineSource is where a line came from when it was not typed in: an item the
-// customer approved on their link. Empty for an ordinary line.
+// customer approved on their link. Empty for an ordinary line. Such a line is
+// not approved by that: the customer said yes to the work, on a page with no
+// prices, and agrees to the price when a quote puts it to them.
 type lineSource struct {
 	itemID     string
 	decisionID string
-	// When the customer said yes. Such a line is approved whatever state the
-	// order is in: the customer agreed to exactly this, in writing.
-	approvedAt *time.Time
 }
 
 // addLineTx adds a checked line inside a transaction.
@@ -149,15 +147,14 @@ func addLineTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID string,
 		INSERT INTO work_order_lines
 		  (shop_id, work_order_id, position, kind, description, quantity,
 		   unit_price_minor, estimated_unit_price_minor, vat_rate_bp, cost_bearer,
-		   approved_at, labour_time_id, part_id, inspection_item_id, customer_decision_id)
+		   labour_time_id, part_id, inspection_item_id, customer_decision_id)
 		VALUES ($1, $2, $3, $4, $5, ($6::bigint)::numeric / 1000, $7, $8, $9, $10,
-		        $11::timestamptz,
-		        nullif($12, '')::uuid, nullif($13, '')::uuid,
-		        nullif($14, '')::uuid, nullif($15, '')::uuid)`
+		        nullif($11, '')::uuid, nullif($12, '')::uuid,
+		        nullif($13, '')::uuid, nullif($14, '')::uuid)`
 	if _, err := tx.Exec(ctx, insert,
 		scope.ShopID, jobID, position, line.Kind, strings.TrimSpace(line.Description),
 		line.QuantityMilli, line.UnitPriceMinor, estimated, line.VATRateBasis,
-		line.CostBearer, src.approvedAt, line.LabourTimeID, line.PartID,
+		line.CostBearer, line.LabourTimeID, line.PartID,
 		src.itemID, src.decisionID); err != nil {
 		if isUniqueViolation(err, "work_order_lines_one_per_item") {
 			return ErrAlreadyALine

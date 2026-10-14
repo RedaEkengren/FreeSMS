@@ -103,3 +103,37 @@ export async function shopClock(page: Page, minutesFromNow: number): Promise<str
     return `${v('year')}-${v('month')}-${v('day')}T${v('hour')}:${v('minute')}`;
   }, minutesFromNow);
 }
+
+const counterWords = {
+  en: { present: /^(Put the quote to the customer|Put the new lines to the customer)$/, yes: 'They said yes',
+        said: 'The customer said yes', price: 'Price it', ask: 'Ask the customer', approve: 'Mark it approved' },
+  sv: { present: /^(Lägg fram offerten för kunden|Lägg fram de nya raderna för kunden)$/, yes: 'De sa ja',
+        said: 'Kunden sa ja', price: 'Prissätt den', ask: 'Fråga kunden', approve: 'Markera som godkänd' },
+};
+
+// What the customer is asked to pay is put to them, and their yes written
+// down at the counter for the amount the quote comes to. Reads the amount
+// off the page, in whatever language it is in, and types it the way a
+// person at the counter would.
+export async function agreeAtTheCounter(page: Page, lang: 'en' | 'sv' = 'en') {
+  const w = counterWords[lang];
+  await page.getByRole('button', { name: w.present }).click();
+  const field = page.locator('input[name=agreed]');
+  const raw = (await field.getAttribute('placeholder')) ?? '';
+  const digits = raw.replace(/[^\d.,]/g, '');
+  const cents = digits.match(/[.,](\d{2})$/);
+  const whole = digits.replace(/[.,]\d{2}$/, '').replace(/[.,]/g, '');
+  await field.fill(cents ? `${whole},${cents[1]}` : whole);
+  await page.getByRole('button', { name: w.yes }).click();
+  await expect(page.getByText(w.said).first()).toBeVisible();
+}
+
+// A priced job, taken through the state buttons to approved: the quote is put
+// to the customer and answered before the approval is offered.
+export async function getApproved(page: Page, lang: 'en' | 'sv' = 'en') {
+  const w = counterWords[lang];
+  await page.getByRole('button', { name: w.price }).click();
+  await page.getByRole('button', { name: w.ask }).click();
+  await agreeAtTheCounter(page, lang);
+  await page.getByRole('button', { name: w.approve }).click();
+}

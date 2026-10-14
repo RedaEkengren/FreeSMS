@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { desk, tech, signIn, signOut, leave, readIn, shopClock } from './helpers';
+import { desk, tech, signIn, signOut, leave, readIn, shopClock, getApproved } from './helpers';
 
 // The marketing page's "when is it ready?" scene, performed against the real
 // product, in Swedish as the scene is. site/src/index.html links this test.
@@ -21,9 +21,7 @@ test.describe.serial('the ready scene', () => {
     await page.fill('input[form=add-line][name=quantity]', '3');
     await page.fill('input[form=add-line][name=unit_price]', '895');
     await page.locator('button[form=add-line]').click();
-    for (const action of ['Price it', 'Ask the customer', 'Mark it approved']) {
-      await page.getByRole('button', { name: action }).click();
-    }
+    await getApproved(page);
     await signOut(page);
 
     // The technician starts it, as Erik does at twelve.

@@ -80,9 +80,31 @@ func newJob(t *testing.T, pool *pgxpool.Pool) string {
 	return id
 }
 
+// agree puts the job's unanswered lines to the customer and records their yes
+// at the counter, for the amount the quote comes to. A job with nothing for
+// the customer to pay has nothing to agree to, and this does nothing.
+func agree(t *testing.T, pool *pgxpool.Pool, id string) {
+	t.Helper()
+	ctx := context.Background()
+	q, err := workshop.PresentQuote(ctx, pool, advisor(), id)
+	if errors.Is(err, workshop.ErrInvalid) {
+		return
+	}
+	if err != nil {
+		t.Fatalf("PresentQuote: %v", err)
+	}
+	if err := workshop.RecordQuoteAnswer(ctx, pool, advisor(), id, q.ID, workshop.QuoteAnswer{
+		Decision: "approved", Via: "counter", AgreedGrossMinor: q.GrossMinor}); err != nil {
+		t.Fatalf("RecordQuoteAnswer: %v", err)
+	}
+}
+
 func move(t *testing.T, pool *pgxpool.Pool, id string, states ...workshop.State) {
 	t.Helper()
 	for _, s := range states {
+		if s == workshop.StateApproved {
+			agree(t, pool, id)
+		}
 		if err := workshop.SetState(context.Background(), pool, advisor(), id, s); err != nil {
 			t.Fatalf("SetState(%s): %v", s, err)
 		}

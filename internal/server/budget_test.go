@@ -36,8 +36,10 @@ var queryBudgets = map[string]int{
 	// and 100 when every read began and ended its own.
 	//
 	// The counter.
-	"desk GET /board":       16,
-	"desk GET /jobs/{id}":   33,
+	"desk GET /board": 16,
+	// 35: the quote the customer was shown and what they answered to it
+	// (two statements), which the counter reads on every live refresh.
+	"desk GET /jobs/{id}":   35,
 	"desk GET /receivables": 11,
 	"desk GET /parts":       11,
 	"desk GET /stock":       26,

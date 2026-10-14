@@ -53,6 +53,8 @@ type pageData struct {
 	JobParts      []workshop.JobPart
 	Contacts      []workshop.CustomerContact
 	Status        workshop.CustomerStatus
+	Quote         workshop.QuoteView
+	QuoteChanged  bool
 	ShopExports   []workshop.ShopExport
 	Planner       plannerPage
 	Booking       workshop.Booking

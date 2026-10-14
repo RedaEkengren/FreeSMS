@@ -1,5 +1,5 @@
 import { test, expect, Page, BrowserContext } from '@playwright/test';
-import { tech, desk, signIn } from './helpers';
+import { tech, desk, signIn, getApproved } from './helpers';
 
 // Telling the customer from the job page. The car is ready; the front desk
 // confirms the address and emails the link; the email arrives -- in a real
@@ -35,9 +35,7 @@ test('the customer is emailed the link from the job page, and it arrives', async
     await d.fill('input[form=add-line][name=description]', 'Service');
     await d.fill('input[form=add-line][name=unit_price]', '1500');
     await d.locator('button[form=add-line]').click();
-    for (const action of ['Price it', 'Ask the customer', 'Mark it approved']) {
-      await d.getByRole('button', { name: action }).click();
-    }
+    await getApproved(d);
 
     const t = await as(techCtx, tech);
     await t.goto(job);

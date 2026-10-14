@@ -1,5 +1,5 @@
 import { test, expect, Page, BrowserContext } from '@playwright/test';
-import { tech, desk, signIn, pricedJob } from './helpers';
+import { tech, desk, signIn, pricedJob, getApproved } from './helpers';
 
 // What is waiting for each person arrives on their screen by itself, and
 // leaves it when somebody deals with it. The site's "For me" scene shows
@@ -22,9 +22,7 @@ test('what is waiting for each person arrives by itself and leaves when it is de
   try {
     const d = await as(deskCtx, desk);
     const job = await pricedJob(d, 'FOR123');
-    for (const action of ['Price it', 'Ask the customer', 'Mark it approved']) {
-      await d.getByRole('button', { name: action }).click();
-    }
+    await getApproved(d);
 
     // The technician asks for a part, and keeps their list open.
     const t = await as(techCtx, tech);

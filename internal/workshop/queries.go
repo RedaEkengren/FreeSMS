@@ -85,14 +85,16 @@ func (j Job) AcceptsWork() bool { return State(j.State).AcceptsWork() }
 
 // Line is one line of a work order.
 type Line struct {
-	Position       int
-	Kind           string
-	Description    string
-	QuantityMilli  int64
-	CostBearer     string
-	ApprovedAt     *time.Time
-	DeclinedAt     *time.Time
-	PerformedAt    *time.Time
+	Position      int
+	Kind          string
+	Description   string
+	QuantityMilli int64
+	CostBearer    string
+	ApprovedAt    *time.Time
+	DeclinedAt    *time.Time
+	PerformedAt   *time.Time
+	// Priced from an answer the customer gave without seeing a price.
+	FromAnswer     bool
 	UnitPriceMinor int64
 	EstimatedMinor *int64
 	VATRateBasis   int
@@ -125,7 +127,7 @@ func TotalsFor(lines []Line) money.Totals {
 			QuantityMilli:     l.QuantityMilli,
 			UnitPriceMinor:    l.UnitPriceMinor,
 			VATRateBasis:      l.VATRateBasis,
-			ChargedToCustomer: l.CostBearer == "customer",
+			ChargedToCustomer: l.Billable(),
 		})
 	}
 	return money.Compute(priced)
@@ -144,6 +146,13 @@ func (l Line) Net() string { return money.Format(l.NetMinor()) }
 // shows as unapproved, which is the only honest thing to put in front of
 // somebody being asked to pay for it.
 func (l Line) Approved() bool { return l.ApprovedAt != nil }
+
+// Billable is whether an invoice made now would carry this line: the customer
+// pays for it, they did not decline it, and if it was priced from an answer
+// given without a price, they have since agreed to the price.
+func (l Line) Billable() bool {
+	return l.CostBearer == "customer" && l.DeclinedAt == nil && (l.ApprovedAt != nil || !l.FromAnswer)
+}
 
 // Status is where the line stands: offered, agreed, done, or turned down. A
 // line the shop added after the customer agreed is "added" until it is done.
@@ -273,7 +282,7 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 			       -- would put a floating point value in the middle of a
 			       -- calculation the rest of this system avoids them in.
 			       (quantity * 1000)::bigint,
-			       cost_bearer, approved_at, declined_at, performed_at,
+			       cost_bearer, approved_at, declined_at, performed_at, customer_decision_id IS NOT NULL,
 			       unit_price_minor, estimated_unit_price_minor, vat_rate_bp
 			FROM work_order_lines WHERE work_order_id = $1 ORDER BY position`, id)
 		if err != nil {
@@ -283,7 +292,7 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 		for rows.Next() {
 			var l Line
 			if err := rows.Scan(&l.Position, &l.Kind, &l.Description, &l.QuantityMilli,
-				&l.CostBearer, &l.ApprovedAt, &l.DeclinedAt, &l.PerformedAt, &l.UnitPriceMinor, &l.EstimatedMinor,
+				&l.CostBearer, &l.ApprovedAt, &l.DeclinedAt, &l.PerformedAt, &l.FromAnswer, &l.UnitPriceMinor, &l.EstimatedMinor,
 				&l.VATRateBasis); err != nil {
 				return fmt.Errorf("scan line: %w", err)
 			}

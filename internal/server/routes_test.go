@@ -54,15 +54,18 @@ var swept = map[string]string{
 	// The customer's link. Not a shop identifier: it is an unguessable token,
 	// and asking for it with a uuid is a different test -- the share tests
 	// cover an unknown, an expired and a revoked one.
-	"GET /i/{token}":                 "token, not an identifier",
-	"GET /k/{token}":                 "token, not an identifier",
-	"POST /i/{token}/items/{itemID}": "token, not an identifier",
-	"GET /i/{token}/photos/{key}":    "token, not an identifier",
+	"GET /i/{token}":                  "token, not an identifier",
+	"GET /k/{token}":                  "token, not an identifier",
+	"POST /k/{token}/quote/{quoteID}": "token, not an identifier",
+	"POST /i/{token}/items/{itemID}":  "token, not an identifier",
+	"GET /i/{token}/photos/{key}":     "token, not an identifier",
 
 	// Everything below takes an identifier and gets swept.
 	"GET /jobs/{id}":                              "sweep",
 	"POST /jobs/{id}/state":                       "sweep",
 	"POST /jobs/{id}/lines":                       "sweep",
+	"POST /jobs/{id}/quote":                       "sweep",
+	"POST /jobs/{id}/quote/{quoteID}/answer":      "sweep",
 	"POST /jobs/{id}/lines/{position}/performed":  "sweep",
 	"POST /jobs/{id}/invoice":                     "sweep",
 	"POST /jobs/{id}/credit":                      "sweep",
@@ -126,6 +129,7 @@ func fill(pattern string) (method, path string) {
 		"/staff/{id}":       "/staff/bbbbbbbb-0000-0000-0000-0000000000bb",
 		"{itemID}":          itemB,
 		"{position}":        "1",
+		"{quoteID}":         "cccccccc-0000-0000-0000-0000000000cc",
 		"{key}":             photoB,
 	} {
 		path = strings.ReplaceAll(path, from, to)

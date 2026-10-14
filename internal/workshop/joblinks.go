@@ -65,8 +65,9 @@ func CreateJobLink(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 // jobLinkLifetime is long enough for a job that waits a week for a part.
 const jobLinkLifetime = 30 * 24 * time.Hour
 
-// CustomerStatus is what the customer's link shows. Nothing about money
-// until the job is invoiced, and then no more than the invoice says.
+// CustomerStatus is what the customer's link shows. Money only in two places:
+// the quote they are asked to answer, with every amount that is in it, and
+// the invoice once there is one, no more than it says.
 type CustomerStatus struct {
 	ShopName     string
 	ShopPhone    string
@@ -77,6 +78,11 @@ type CustomerStatus struct {
 	Stage        string
 	CarAway      bool
 	ExpectedBack *time.Time
+
+	// The link itself, for the forms that answer a quote.
+	Token string
+	// The quote they are being asked about, or have answered; nil if none.
+	Quote *CustomerQuote
 
 	// Set once there is an invoice.
 	Invoiced         bool
@@ -95,7 +101,7 @@ func JobStatus(ctx context.Context, pool *pgxpool.Pool, shopID, token string) (C
 		return CustomerStatus{}, ErrShareNotUsable
 	}
 	sum := sha256.Sum256([]byte(token))
-	var st CustomerStatus
+	st := CustomerStatus{Token: token}
 	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
 		var jobID string
 		var state State
@@ -125,6 +131,23 @@ func JobStatus(ctx context.Context, pool *pgxpool.Pool, shopID, token string) (C
 			return err
 		}
 		st.CarAway, st.ExpectedBack = !p.Here, p.ExpectedBack
+
+		// The newest version, while the job is still open for answering: a
+		// finished job is not asked anything.
+		if !settled(state) && state != StateReady {
+			q, err := latestQuoteTx(ctx, tx, jobID)
+			if err != nil {
+				return err
+			}
+			if q != nil {
+				cq := &CustomerQuote{ID: q.ID, Version: q.Version, Lines: q.Lines,
+					NetMinor: q.NetMinor, VATMinor: q.VATMinor, GrossMinor: q.GrossMinor}
+				if q.Decision != nil {
+					cq.Answer, cq.AnsweredAt = q.Decision.Decision, q.Decision.DecidedAt
+				}
+				st.Quote = cq
+			}
+		}
 
 		var invoiceID string
 		err = tx.QueryRow(ctx, `

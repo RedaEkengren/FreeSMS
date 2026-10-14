@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { tech, desk, signIn, signOut, leave, readIn, pricedJob } from './helpers';
+import { tech, desk, signIn, signOut, leave, readIn, pricedJob, getApproved } from './helpers';
 
 // The marketing page's "one job, two screens" scene, performed against the
 // real product in Swedish. The scene claims the technician's page does not
@@ -17,9 +17,7 @@ test.describe.serial('the two screens scene', () => {
     await page.fill('form[action$="/customer"] input[name=phone]', phone);
     await page.getByRole('button', { name: 'Save and use' }).click();
     await expect(page).toHaveURL(job);
-    for (const action of ['Price it', 'Ask the customer', 'Mark it approved']) {
-      await page.getByRole('button', { name: action }).click();
-    }
+    await getApproved(page);
     await signOut(page);
     await signIn(page, tech);
     await page.goto(job);
