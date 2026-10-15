@@ -70,6 +70,13 @@ type BoardEntry struct {
 	Overdue bool
 }
 
+// NextStep is what happens next on this job, from what the board knows. The
+// board does not read quotes or who is on the job, so only the action and who
+// owns it are worth showing, not what is missing.
+func (b BoardEntry) NextStep() Step {
+	return NextStep(StepFacts{State: State(b.State), HasCustomer: b.HasCustomer, HasTechnician: true, HasPromise: true})
+}
+
 // Waiting says what the vehicle is waiting for, in words a person at a counter
 // would use. It returns the catalogue key, not the finished sentence, so the
 // board reads in the shop's language like every other screen; the page renders

@@ -71,6 +71,11 @@ type Job struct {
 	// expected back on ExpectedBack when anybody knows.
 	CarAway      bool
 	ExpectedBack *time.Time
+
+	// Whether a customer is recorded, which a technician may know without
+	// being told who. BookingID is the booking the car came for, if it did.
+	HasCustomer bool
+	BookingID   string
 }
 
 // StateLabel is the condition this job is in, as a catalogue key. The column
@@ -209,7 +214,9 @@ const jobColumns = `
 	            JOIN users u2  ON u2.id = t3.user_id
 	            JOIN people p2 ON p2.id = u2.person_id
 	           WHERE t3.work_order_id = w.id AND t3.ended_at IS NULL
-	             AND t3.user_id IS DISTINCT FROM $1), '') AS others_running,` + presenceColumns
+	             AND t3.user_id IS DISTINCT FROM $1), '') AS others_running,
+	(w.customer_id IS NOT NULL) AS has_customer,
+	coalesce((SELECT b.id::text FROM bookings b WHERE b.work_order_id = w.id LIMIT 1), '') AS booking_id,` + presenceColumns
 
 const jobFrom = `
 	FROM work_orders w
@@ -223,7 +230,7 @@ func scanJob(row pgx.Row) (Job, error) {
 		&j.Registration, &j.Make, &j.Model, &j.ModelYear,
 		&j.OpenedAt, &j.PromisedAt, &j.OdometerKm, &j.ClockStartedAt, &j.HasWork,
 		&j.AssignedTo, &j.AssignedToMe, &j.OpenRequests, &j.OpenFindings, &j.OthersRunning,
-		&j.CarAway, &j.ExpectedBack)
+		&j.HasCustomer, &j.BookingID, &j.CarAway, &j.ExpectedBack)
 	j.ClockRunning = j.ClockStartedAt != nil
 	return j, err
 }

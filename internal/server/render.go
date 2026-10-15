@@ -79,6 +79,7 @@ type pageData struct {
 	Lines         []workshop.Line
 	Board         []workshop.BoardEntry
 	Next          []workshop.State
+	Step          workshop.Step
 	Totals        money.Totals
 	Invoices      []workshop.Invoice
 	Document      workshop.Document
@@ -161,6 +162,8 @@ type pageData struct {
 // intakeBooking is the booking behind an intake, with the people the desk
 // may confirm or pick from. Nothing in it is chosen for them.
 type intakeBooking struct {
+	// Booked is false for a walk-in, which has no booking to read from.
+	Booked  bool
 	Booking workshop.Booking
 	// Customers who might be the one on the telephone, and why each is offered.
 	Matches     []intakeMatch
@@ -171,6 +174,10 @@ type intakeBooking struct {
 	AlsoOwner    bool
 	// The booked technician is no longer working here.
 	TechnicianGone bool
+	// A walk-in's new customer, as typed, and the promise as the control
+	// writes it.
+	NewName, NewPhone string
+	Promise           string
 }
 
 type intakeMatch struct {

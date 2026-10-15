@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
@@ -71,11 +72,11 @@ func (s *Server) handleNewJobForm(w http.ResponseWriter, r *http.Request) {
 	// Taken in from a booking: what the customer said on the telephone is
 	// already typed.
 	var form intakeForm
-	var intake *intakeBooking
+	intake := s.intakeFor(r, session.Scope, nil, "", "", false)
 	if id := r.URL.Query().Get("booking"); id != "" {
 		if b, _, err := workshop.BookingByID(r.Context(), s.pool, session.Scope, id); err == nil && b.Status == "booked" {
 			form = intakeForm{Registration: b.Registration, Complaint: b.What, BookingID: b.ID}
-			intake = s.intakeFor(r, session.Scope, b, "", b.TechnicianID, false)
+			intake = s.intakeFor(r, session.Scope, &b, "", b.TechnicianID, false)
 		}
 	}
 	s.render(w, r, http.StatusOK, "newjob", pageData{
@@ -91,25 +92,29 @@ func (s *Server) handleNewJobForm(w http.ResponseWriter, r *http.Request) {
 // customers it might be, found by the number and the name the booking holds,
 // and the technicians who can take the job. A failed lookup shortens the
 // lists; the car can still be taken in.
-func (s *Server) intakeFor(r *http.Request, scope access.Scope, b workshop.Booking, customer, technician string, alsoOwner bool) *intakeBooking {
-	in := &intakeBooking{Booking: b, Customer: customer, TechnicianID: technician, AlsoOwner: alsoOwner}
+func (s *Server) intakeFor(r *http.Request, scope access.Scope, booking *workshop.Booking, customer, technician string, alsoOwner bool) *intakeBooking {
+	in := &intakeBooking{Customer: customer, TechnicianID: technician, AlsoOwner: alsoOwner}
 	seen := map[string]bool{}
-	for _, q := range []struct {
-		text   string
-		number bool
-	}{{b.CustomerPhone, true}, {b.CustomerName, false}} {
-		if strings.TrimSpace(q.text) == "" {
-			continue
-		}
-		found, err := workshop.FindCustomers(r.Context(), s.pool, scope, q.text)
-		if err != nil {
-			s.log.Error("find customers for a booking", "error", err)
-			continue
-		}
-		for _, c := range found {
-			if !seen[c.ID] {
-				seen[c.ID] = true
-				in.Matches = append(in.Matches, intakeMatch{Customer: c, SameNumber: q.number})
+	if booking != nil {
+		b := *booking
+		in.Booked, in.Booking = true, b
+		for _, q := range []struct {
+			text   string
+			number bool
+		}{{b.CustomerPhone, true}, {b.CustomerName, false}} {
+			if strings.TrimSpace(q.text) == "" {
+				continue
+			}
+			found, err := workshop.FindCustomers(r.Context(), s.pool, scope, q.text)
+			if err != nil {
+				s.log.Error("find customers for a booking", "error", err)
+				continue
+			}
+			for _, c := range found {
+				if !seen[c.ID] {
+					seen[c.ID] = true
+					in.Matches = append(in.Matches, intakeMatch{Customer: c, SameNumber: q.number})
+				}
 			}
 		}
 	}
@@ -150,18 +155,34 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 	}
 	alsoOwner := r.FormValue("also_owner") != ""
 	technician := strings.TrimSpace(r.FormValue("technician_id"))
+	newName, newPhone := strings.TrimSpace(r.FormValue("new_name")), strings.TrimSpace(r.FormValue("new_phone"))
+	promiseText := strings.TrimSpace(r.FormValue("promised_at"))
 	// The form as it came, with the booking's choices, for sending it back.
 	again := func(status int, message string) {
-		var intake *intakeBooking
+		var booking *workshop.Booking
 		if form.BookingID != "" {
 			if b, _, err := workshop.BookingByID(r.Context(), s.pool, session.Scope, form.BookingID); err == nil {
-				intake = s.intakeFor(r, session.Scope, b, r.FormValue("customer"), technician, alsoOwner)
+				booking = &b
 			}
 		}
+		intake := s.intakeFor(r, session.Scope, booking, r.FormValue("customer"), technician, alsoOwner)
+		intake.NewName, intake.NewPhone, intake.Promise = newName, newPhone, promiseText
 		s.render(w, r, status, "newjob", pageData{
 			Title: "Take in a vehicle", Session: session, Form: form, Intake: intake,
 			CanLookUp: s.canLookUp(), Error: message,
 		})
+	}
+
+	// The promise is only what the desk typed. The booking's slot, the hours
+	// sold and a guess are all different things.
+	var promised *time.Time
+	if promiseText != "" {
+		t, err := parseWallClock(promiseText, s.shopLocation(r), "")
+		if err != nil {
+			again(http.StatusBadRequest, err.Error())
+			return
+		}
+		promised = &t
 	}
 
 	var odometer *int64
@@ -205,11 +226,15 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 			BookingID: form.BookingID, Registration: form.Registration, Complaint: form.Complaint,
 			OdometerKm: odometer, Details: details,
 			Customer: choice, CustomerID: strings.TrimPrefix(r.FormValue("customer"), "existing:"),
-			AlsoOwner: alsoOwner, TechnicianID: technician,
+			AlsoOwner: alsoOwner, TechnicianID: technician, PromisedAt: promised,
 		})
 	} else {
-		id, err = workshop.TakeInWith(r.Context(), s.pool, session.Scope,
-			form.Registration, form.Complaint, odometer, details)
+		id, err = workshop.TakeInWalkIn(r.Context(), s.pool, session.Scope, workshop.WalkIn{
+			Registration: form.Registration, Complaint: form.Complaint, OdometerKm: odometer, Details: details,
+			Customer: choice, CustomerID: strings.TrimPrefix(r.FormValue("customer"), "existing:"),
+			NewName: newName, NewPhone: newPhone, AlsoOwner: alsoOwner,
+			TechnicianID: technician, PromisedAt: promised,
+		})
 	}
 	switch {
 	case errors.Is(err, workshop.ErrBookingEnded), errors.Is(err, workshop.ErrNotFound) && form.BookingID != "":
@@ -221,8 +246,10 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 			msg = "That booking was cancelled or marked as not coming while the form was open. Send the form again to take the car in without it."
 		}
 		form.BookingID = ""
+		walkIn := s.intakeFor(r, session.Scope, nil, r.FormValue("customer"), technician, alsoOwner)
+		walkIn.NewName, walkIn.NewPhone, walkIn.Promise = newName, newPhone, promiseText
 		s.render(w, r, http.StatusConflict, "newjob", pageData{
-			Title: "Take in a vehicle", Session: session, CanLookUp: s.canLookUp(), Form: form, Error: msg,
+			Title: "Take in a vehicle", Session: session, CanLookUp: s.canLookUp(), Form: form, Intake: walkIn, Error: msg,
 		})
 		return
 	case errors.Is(err, access.ErrForbidden):
@@ -240,4 +267,20 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 
 	s.submitted(w, r)
 	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
+}
+
+// handleIntakeCustomers lists customers on file for the intake form's search,
+// as choices to be ticked. Nothing is chosen for the desk.
+func (s *Server) handleIntakeCustomers(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	if !session.Scope.Role.SeesCustomerPersonalData() {
+		s.renderError(w, r, http.StatusForbidden, "Not for your role",
+			"Taking a vehicle in is done at the front desk.")
+		return
+	}
+	found, err := workshop.FindCustomers(r.Context(), s.pool, session.Scope, r.URL.Query().Get("q"))
+	if err != nil {
+		s.log.Error("find customers for an intake", "error", err)
+	}
+	s.renderPartial(w, r, "newjob", "found", pageData{Session: session, Customers: found})
 }

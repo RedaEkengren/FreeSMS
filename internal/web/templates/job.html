@@ -7,6 +7,16 @@
 <p class="vehicle">{{.Job.Make}} {{.Job.Model}}{{if .Job.ModelYear}} {{.Job.ModelYear}}{{end}}</p>
 
 {{if .Job.Complaint}}<p>{{.Job.Complaint}}</p>{{end}}
+
+{{/* Where the job stands and what happens next. Worked out from the job each
+     time it is shown; what is missing blocks nothing here, it is only said. */}}
+<div class="next-step" id="next-step">
+  {{/* The stage itself is the State row below; saying it twice makes the
+       page read the same fact in two places. */}}
+  {{with .Step.Action}}<p><strong>{{$.T "Next:"}}</strong> {{$.T .}}{{with $.Step.Owner.Label}} <span class="tag">{{$.T .}}</span>{{end}}</p>{{end}}
+  {{with .Step.Missing}}<p class="waiting">{{$.T "Not known yet:"}} {{range $i, $m := .}}{{if $i}}, {{end}}{{$.T $m}}{{end}}</p>{{end}}
+  {{if and .Job.BookingID .Session.Scope.Role.SeesCustomerPersonalData}}<p class="waiting"><a href="/bookings/{{.Job.BookingID}}">{{.T "The booking this car came for"}}</a></p>{{end}}
+</div>
 </div>
 
 {{/* Each live-* part brings itself up to date while the page is open, when

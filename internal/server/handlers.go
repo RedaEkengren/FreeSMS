@@ -352,9 +352,23 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 		}
 	}
 
+	step := workshop.NextStep(workshop.StepFacts{
+		State:         workshop.State(job.State),
+		HasCustomer:   job.HasCustomer,
+		HasTechnician: job.AssignedTo != "",
+		HasPromise:    job.PromisedAt != nil,
+		QuoteKnown:    session.Scope.Role.SeesCustomerPersonalData(),
+		PendingLines:  quote.Pending,
+		QuoteOut:      quote.Latest != nil && quote.Latest.Decision == nil,
+		FinalRequired: finalCheck.Required,
+		FinalDone:     finalCheck.Done,
+		OpenRequests:  job.OpenRequests,
+	})
+
 	return pageData{
 		Title:       "Job",
 		Session:     session,
+		Step:        step,
 		Job:         job,
 		Progress:    progress,
 		Lines:       lines,

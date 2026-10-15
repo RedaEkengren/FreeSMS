@@ -26,7 +26,7 @@
     <span>{{.T "What is wrong"}}</span>
     <input name="complaint" value="{{.Form.Complaint}}" required>
   </label>
-  {{if .Intake}}{{template "booked" .}}{{end}}
+  {{template "booked" .}}
   <button type="submit">{{.T "Open the job"}}</button>
 </form>
 {{if .CanLookUp}}
@@ -49,16 +49,20 @@
 <label><span>{{.T "Chassis number"}}</span><input name="vin" value="{{.Lookup.VIN}}"></label>
 {{end}}
 
-{{/* What the booking knew, for the desk to confirm. Nothing here is chosen
-     for them: a similar name is a suggestion, and the owner of the car is
-     only changed by ticking it. */}}
+{{/* What is known about who pays and who does the work, for the desk to
+     confirm. Nothing here is chosen for them: a similar name is a suggestion,
+     and the owner of the car is only changed by ticking it. Everything can be
+     left for later; the job then says what it does not know. */}}
 {{define "booked"}}
 {{$p := .}}{{with .Intake}}{{$i := .}}
 <fieldset>
   <legend>{{$p.T "Who pays and who is rung"}}</legend>
+  {{if .Booked}}
   <p class="waiting">{{$p.T "The booking says:"}} {{if .Booking.CustomerName}}<strong>{{.Booking.CustomerName}}</strong>{{else}}{{$p.T "no name"}}{{end}}{{if .Booking.CustomerPhone}}, {{.Booking.CustomerPhone}}{{end}}</p>
+  {{end}}
   <label><input type="radio" name="customer" value="" {{if not .Customer}}checked{{end}}>
     <span>{{$p.T "Decide later. The job says it has no customer until somebody does."}}</span></label>
+  {{if .Booked}}
   {{if .Booking.CustomerName}}
   <label><input type="radio" name="customer" value="new" {{if eq .Customer "new"}}checked{{end}}>
     <span>{{$p.T "A new customer, made from the booking"}}</span></label>
@@ -66,6 +70,19 @@
   {{range .Matches}}
   <label><input type="radio" name="customer" value="existing:{{.ID}}" {{if eq $i.Customer (printf "existing:%s" .ID)}}checked{{end}}>
     <span>{{.Name}}{{if .Phone}}, {{.Phone}}{{end}} <span class="tag">{{if .SameNumber}}{{$p.T "same number"}}{{else}}{{$p.T "similar name"}}{{end}}</span></span></label>
+  {{end}}
+  {{else}}
+  <label><input type="radio" name="customer" value="new" {{if eq .Customer "new"}}checked{{end}}>
+    <span>{{$p.T "A new customer"}}</span></label>
+  <div class="pair">
+    <label><span>{{$p.T "Name"}}</span><input name="new_name" value="{{.NewName}}"></label>
+    <label><span>{{$p.T "Telephone"}}</span><input name="new_phone" value="{{.NewPhone}}" inputmode="tel"></label>
+  </div>
+  <label><span>{{$p.T "Or find one already on file"}}</span>
+    <input type="search" name="q" autocomplete="off"
+           hx-get="/jobs/new/customers" hx-trigger="input changed delay:300ms, search"
+           hx-target="#found" hx-swap="innerHTML"></label>
+  <div id="found"></div>
   {{end}}
   <label><input type="checkbox" name="also_owner" value="1" {{if .AlsoOwner}}checked{{end}}>
     <span>{{$p.T "Also record them as the car's owner"}}</span></label>
@@ -78,5 +95,20 @@
   </select>
 </label>
 {{if .TechnicianGone}}<p class="waiting">{{$p.T "The technician it was booked for is not working here any more. Choose who takes it."}}</p>{{end}}
+<label>
+  <span>{{$p.T "Promised ready"}}</span>
+  <input type="datetime-local" name="promised_at" value="{{.Promise}}">
+</label>
+<p class="waiting">{{$p.T "Only a time you have agreed with the customer. Left empty, the job says there is no promise yet."}}</p>
+{{end}}
+{{end}}
+
+{{define "found"}}
+{{$p := .}}
+{{range .Customers}}
+<label><input type="radio" name="customer" value="existing:{{.ID}}">
+  <span>{{.Name}}{{if .Phone}}, {{.Phone}}{{end}}</span></label>
+{{else}}
+<p class="waiting">{{$p.T "Nobody on file matches."}}</p>
 {{end}}
 {{end}}

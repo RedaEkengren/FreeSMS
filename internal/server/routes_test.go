@@ -41,7 +41,7 @@ var swept = map[string]string{
 	"GET /healthz": "", "GET /static/": "", "GET /setup": "", "POST /setup": "",
 	"GET /login": "", "POST /login": "", "POST /logout": "", "GET /{$}": "",
 	"GET /board": "", "GET /jobs/new": "", "POST /jobs/new": "",
-	"GET /jobs/new/lookup": "", "GET /figures": "", "GET /accounting": "",
+	"GET /jobs/new/lookup": "", "GET /jobs/new/customers": "", "GET /figures": "", "GET /accounting": "",
 	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/charges": "", "POST /shop/final-check": "",
 	"GET /privacy": "", "POST /privacy/export": "", "GET /events": "", "GET /mine": "", "GET /rota": "", "POST /hooks/46elks/{secret}": "", "POST /rota": "", "GET /schedule": "", "GET /mine/count": "", "POST /account/alert": "", "POST /account/theme": "", "GET /calendar": "", "POST /calendar": "", "POST /calendar/capacity": "", "GET /labour": "", "POST /labour": "",
 	"POST /labour/rate": "", "GET /time": "", "POST /time/correct": "",

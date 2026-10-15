@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
@@ -97,6 +98,11 @@ type BookingIntake struct {
 	// Who does the work, confirmed. Empty gives it to nobody; the booked
 	// technician is offered by the form, not assumed here.
 	TechnicianID string
+
+	// When the customer was told it will be ready. Only ever what the desk
+	// agreed: the booking's slot is not a promise, and the hours sold are
+	// not one either.
+	PromisedAt *time.Time
 }
 
 // TakeInBooking takes in the car a booking was for, and ends the booking
@@ -163,18 +169,11 @@ func TakeInBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		// Who does the work, checked before anything is written. Somebody
 		// who has left since the booking is not given it; the desk chooses
 		// another, and the booking says what happened.
-		var techName, note string
-		if in.TechnicianID != "" {
-			err := tx.QueryRow(ctx, `
-				SELECT p.display_name FROM users u JOIN people p ON p.id = u.person_id
-				WHERE u.id = $1 AND u.active AND u.role = 'technician'`, in.TechnicianID).Scan(&techName)
-			if errors.Is(err, pgx.ErrNoRows) {
-				return fmt.Errorf("%w: that technician is not working here", ErrInvalid)
-			}
-			if err != nil {
-				return fmt.Errorf("read technician: %w", err)
-			}
+		techName, err := technicianNameTx(ctx, tx, in.TechnicianID)
+		if err != nil {
+			return err
 		}
+		var note string
 		if in.TechnicianID != bookedTech {
 			switch {
 			case in.TechnicianID == "":
@@ -213,24 +212,8 @@ func TakeInBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		if jobID, err = takeInTx(ctx, tx, scope, in.Registration, in.Complaint, in.OdometerKm, in.Details); err != nil {
 			return err
 		}
-		if customerID != "" {
-			var vehicleID string
-			if err := tx.QueryRow(ctx, `UPDATE work_orders SET customer_id = $2 WHERE id = $1 RETURNING vehicle_id`,
-				jobID, customerID).Scan(&vehicleID); err != nil {
-				return fmt.Errorf("assign customer: %w", err)
-			}
-			// The payer and the owner are two facts, written apart: the
-			// owner is only changed when the desk says so.
-			if in.AlsoOwner {
-				if err := recordOwnerTx(ctx, tx, scope, vehicleID, customerID); err != nil {
-					return err
-				}
-			}
-		}
-		if in.TechnicianID != "" {
-			if _, err := tx.Exec(ctx, `UPDATE work_orders SET assigned_to = $2 WHERE id = $1`, jobID, in.TechnicianID); err != nil {
-				return fmt.Errorf("assign technician: %w", err)
-			}
+		if err := assignTx(ctx, tx, scope, jobID, customerID, in.AlsoOwner, in.TechnicianID, in.PromisedAt); err != nil {
+			return err
 		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE bookings SET status = 'arrived', work_order_id = $2,
@@ -245,6 +228,133 @@ func TakeInBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		return "", false, err
 	}
 	return jobID, already, nil
+}
+
+// technicianNameTx checks that a technician is working here and returns their
+// name. An empty identifier is nobody, which is allowed.
+func technicianNameTx(ctx context.Context, tx pgx.Tx, id string) (string, error) {
+	if id == "" {
+		return "", nil
+	}
+	var name string
+	err := tx.QueryRow(ctx, `
+		SELECT p.display_name FROM users u JOIN people p ON p.id = u.person_id
+		WHERE u.id = $1 AND u.active AND u.role = 'technician'`, id).Scan(&name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", fmt.Errorf("%w: that technician is not working here", ErrInvalid)
+	}
+	if err != nil {
+		return "", fmt.Errorf("read technician: %w", err)
+	}
+	return name, nil
+}
+
+// assignTx writes what the desk confirmed at intake onto the job: who pays,
+// who does the work and when it was promised. Each is optional; a job
+// without them says so and nothing is invented.
+func assignTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID, customerID string, alsoOwner bool, technicianID string, promised *time.Time) error {
+	if customerID != "" {
+		var vehicleID string
+		if err := tx.QueryRow(ctx, `UPDATE work_orders SET customer_id = $2 WHERE id = $1 RETURNING vehicle_id`,
+			jobID, customerID).Scan(&vehicleID); err != nil {
+			return fmt.Errorf("assign customer: %w", err)
+		}
+		// The payer and the owner are two facts, written apart: the owner is
+		// only changed when the desk says so.
+		if alsoOwner {
+			if err := recordOwnerTx(ctx, tx, scope, vehicleID, customerID); err != nil {
+				return err
+			}
+		}
+	}
+	if technicianID != "" {
+		if _, err := tx.Exec(ctx, `UPDATE work_orders SET assigned_to = $2 WHERE id = $1`, jobID, technicianID); err != nil {
+			return fmt.Errorf("assign technician: %w", err)
+		}
+	}
+	if promised != nil {
+		if _, err := tx.Exec(ctx, `UPDATE work_orders SET promised_at = $2 WHERE id = $1`, jobID, promised); err != nil {
+			return fmt.Errorf("record promise: %w", err)
+		}
+	}
+	return nil
+}
+
+// WalkIn is a car that came without a booking, with what the desk decided
+// about it. The customer is chosen the same way as for a booked car; with no
+// booking there is no name to make one from, so "new" carries what was typed.
+type WalkIn struct {
+	Registration, Complaint string
+	OdometerKm              *int64
+	Details                 Details
+
+	Customer     string // "", "new" or "existing"
+	CustomerID   string
+	NewName      string
+	NewPhone     string
+	AlsoOwner    bool
+	TechnicianID string
+	PromisedAt   *time.Time
+}
+
+// TakeInWalkIn opens a job for a car that arrived unannounced. Everything
+// beyond the complaint is optional: a car is taken in with whatever is known,
+// and the job says what is not.
+func TakeInWalkIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in WalkIn) (string, error) {
+	if !scope.Role.SeesCustomerPersonalData() {
+		return "", access.ErrForbidden
+	}
+	if strings.TrimSpace(in.Complaint) == "" {
+		return "", fmt.Errorf("%w: say what is wrong with it", ErrInvalid)
+	}
+	switch in.Customer {
+	case "":
+	case "new":
+		if strings.TrimSpace(in.NewName) == "" {
+			return "", fmt.Errorf("%w: a new customer needs a name", ErrInvalid)
+		}
+	case "existing":
+		if !looksLikeUUID(in.CustomerID) {
+			return "", fmt.Errorf("%w: choose which customer", ErrInvalid)
+		}
+	default:
+		return "", fmt.Errorf("%w: %q is not a way to say who pays", ErrInvalid, in.Customer)
+	}
+	if in.TechnicianID != "" && !looksLikeUUID(in.TechnicianID) {
+		return "", fmt.Errorf("%w: choose who does the work", ErrInvalid)
+	}
+	var jobID string
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		if _, err := technicianNameTx(ctx, tx, in.TechnicianID); err != nil {
+			return err
+		}
+		var customerID string
+		switch in.Customer {
+		case "new":
+			var err error
+			if customerID, err = createCustomerTx(ctx, tx, scope, NewCustomer{Kind: "private", Name: strings.TrimSpace(in.NewName), Phone: strings.TrimSpace(in.NewPhone)}); err != nil {
+				return err
+			}
+		case "existing":
+			var ok bool
+			if err := tx.QueryRow(ctx, `SELECT exists(SELECT 1 FROM customers WHERE id = $1)`, in.CustomerID).Scan(&ok); err != nil {
+				return fmt.Errorf("check customer: %w", err)
+			}
+			if !ok {
+				return ErrNotFound
+			}
+			customerID = in.CustomerID
+		}
+		var err error
+		if jobID, err = takeInTx(ctx, tx, scope, in.Registration, in.Complaint, in.OdometerKm, in.Details); err != nil {
+			return err
+		}
+		return assignTx(ctx, tx, scope, jobID, customerID, in.AlsoOwner, in.TechnicianID, in.PromisedAt)
+	})
+	if err != nil {
+		return "", err
+	}
+	return jobID, nil
 }
 
 // takeInTx opens the job, inside whatever transaction the caller holds.

@@ -1488,6 +1488,84 @@
       "one": "%d rad saknar godkännande",
       "other": "%d rader saknar godkännande"
     },
+    "Price the work": {
+      "other": "Prissätt arbetet"
+    },
+    "Send the estimate for approval": {
+      "other": "Skicka kostnadsförslaget för godkännande"
+    },
+    "Wait for the customer's answer, or write down what they said by telephone": {
+      "other": "Vänta på kundens svar, eller skriv ner vad de sa i telefon"
+    },
+    "Get the customer's answer": {
+      "other": "Hämta kundens svar"
+    },
+    "Start the work": {
+      "other": "Börja arbetet"
+    },
+    "Get the part that was asked for": {
+      "other": "Skaffa delen som efterfrågats"
+    },
+    "Do the final check": {
+      "other": "Gör slutkontrollen"
+    },
+    "Finish the work and mark it ready": {
+      "other": "Gör klart arbetet och markera det som färdigt"
+    },
+    "Tell the customer, hand the car over and invoice": {
+      "other": "Meddela kunden, lämna ut bilen och fakturera"
+    },
+    "Invoice what was done": {
+      "other": "Fakturera det som utfördes"
+    },
+    "Take the payment and close the job": {
+      "other": "Ta emot betalningen och stäng jobbet"
+    },
+    "the front desk": {
+      "other": "disken"
+    },
+    "the technician": {
+      "other": "teknikern"
+    },
+    "the customer": {
+      "other": "kunden"
+    },
+    "the parts desk": {
+      "other": "reservdelsdisken"
+    },
+    "no customer": {
+      "other": "ingen kund"
+    },
+    "nobody on it": {
+      "other": "ingen tekniker"
+    },
+    "no promised time": {
+      "other": "ingen utlovad tid"
+    },
+    "Not known yet:": {
+      "other": "Inte känt än:"
+    },
+    "The booking this car came for": {
+      "other": "Bokningen bilen kom för"
+    },
+    "A new customer": {
+      "other": "En ny kund"
+    },
+    "Or find one already on file": {
+      "other": "Eller sök bland dem som redan finns"
+    },
+    "Promised ready": {
+      "other": "Utlovad färdig"
+    },
+    "Only a time you have agreed with the customer. Left empty, the job says there is no promise yet.": {
+      "other": "Bara en tid ni kommit överens om med kunden. Lämnas den tom står det på jobbet att inget är utlovat än."
+    },
+    "Nobody on file matches.": {
+      "other": "Ingen i registret stämmer."
+    },
+    "Next:": {
+      "other": "Nästa:"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

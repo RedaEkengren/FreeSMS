@@ -315,6 +315,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /jobs/new", s.requireSession(s.handleNewJobForm))
 	mux.HandleFunc("POST /jobs/new", s.requireSession(s.handleNewJob))
 	mux.HandleFunc("GET /jobs/new/lookup", s.requireSession(s.handleVehicleLookup))
+	mux.HandleFunc("GET /jobs/new/customers", s.requireSession(s.handleIntakeCustomers))
 	mux.HandleFunc("GET /jobs/{id}", s.requireSession(s.handleJob))
 	mux.HandleFunc("POST /jobs/{id}/state", s.requireSession(s.handleSetState))
 	mux.HandleFunc("POST /jobs/{id}/quote", s.requireSession(s.handlePresentQuote))

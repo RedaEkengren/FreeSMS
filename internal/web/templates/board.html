@@ -15,6 +15,7 @@
     <div class="vehicle">{{$.Dot (printf "#%d" .Number) (printf "%s %s" .Make .Model) .CustomerName}}</div>
     {{if not .HasCustomer}}<div class="waiting">{{$.T "No customer recorded yet"}}</div>{{end}}
     <div class="waiting">{{$.T .Waiting .WaitingArg}}</div>
+    {{with .NextStep}}{{if .Action}}<div class="waiting">{{$.T "Next:"}} {{$.T .Action}} &middot; {{$.T .Owner.Label}}</div>{{end}}{{end}}
     {{with .Progress}}{{if or .Known .PromisedAt}}<div class="waiting">
       {{if .PromisedAt}}{{$.T "promised %s" ($.Date ($.Local .PromisedAt) "Mon 15:04")}}{{end}}
       {{if and .Known .PromisedAt}} &middot; {{end}}
