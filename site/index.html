@@ -257,6 +257,7 @@
     <button type="button" role="tab" data-tab="6">Till mig</button>
     <button type="button" role="tab" data-tab="7">Schemat</button>
     <button type="button" role="tab" data-tab="8">Till kunden</button>
+    <button type="button" role="tab" data-tab="9">Förfrågan</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -855,6 +856,66 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: mejlet går över SMTP till en riktig e-postserver, testet läser det som kom fram och öppnar länken i det som kunden skulle &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/17-scene-email.spec.ts">läs testet</a>. Sms genom 46elks, leveransrapporten och tysta timmar provas i serverns egna tester. Registreringsnummer, adresser och namn är <span class="wf-example">exempel</span>.</p>
+</section>
+
+
+<section class="scene pane" role="tabpanel">
+  <h2>Priset innan bilen kommer</h2>
+  <p class="lede">En kund frågar vad bromsarna skulle kosta, innan det finns en bil här. Disken lägger fram ett pris med villkor. Kunden läser varje belopp på sin länk och säger ja till en del, och det de godkände bokas och följer med in på jobbet &ndash; till priset de fick se, utan att något skrivs om.</p>
+
+  <div class="an-wrap" data-loop="30" data-still="26">
+    <div class="an-canvas" role="img" aria-label="Animering: disken startar en förfrågan om bromsar, lägger till två rader och lägger fram dem för kunden. I telefonen ser kunden varje belopp, avmarkerar skivorna och säger ja. Disken ser att den är delvis godkänd och bokar. När bilen kommer har jobbet bara det kunden godkände, till priset de fick se.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,11">
+              <div class="wf-h">Förfrågningar</div>
+              <div class="wf-field"><span class="lbl">Vad de frågar om</span><span data-type="0.4,1">Bromsar fram</span></div>
+              <div class="cl-qrow an-fade" data-t="1.8"><span>Byte av bromsbelägg</span><span>1 600,00 kr</span></div>
+              <div class="cl-qrow an-fade" data-t="2.8"><span>Bromsskivor, par</span><span>900,00 kr</span></div>
+              <span class="an-btn mo-btn an-fade" data-t="3.6">Lägg fram för kunden</span>
+              <div class="ml-row an-fade" data-t="4.6"><span>Version 1 &middot; Ett uppskattat pris</span><span class="rd-tag rd-risk">Skickad</span></div>
+            </div>
+            <div class="an-fade an-off" data-t="11,19">
+              <div class="wf-h">Bromsar fram</div>
+              <div class="ml-row"><span>Version 1 &middot; 3 125,00 kr</span><span class="rd-tag cl-on an-fade" data-t="11.4">Delvis godkänd</span></div>
+              <div class="cl-qrow an-fade" data-t="12"><span>gick med på 2 000,00 kr</span><span>på sin länk</span></div>
+              <div class="wf-h an-fade" data-t="13.4">Boka det de godkände</div>
+              <span class="an-btn mo-btn an-fade" data-t="14.4">Boka</span>
+              <div class="ml-row an-fade" data-t="16.2"><span>Bokningen som gjordes av den</span><span class="rd-tag cl-on">Bokad</span></div>
+            </div>
+            <div class="an-fade" data-t="19">
+              <div class="wf-card"><div class="wf-plate">ABC 123</div>
+                <div class="an-muted">Nästa: Prissätt arbetet</div>
+                <div class="cl-qrow"><span>Byte av bromsbelägg</span><span>1 600,00 kr</span></div>
+                <div class="an-muted">Förfrågan och priset de godkände</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-card wf-phone ml-phone an-pop an-off" data-t="5.6,11">
+        <div class="an-head"><span class="an-dots"></span><span>Kunden</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="wf-h">Bromsar fram</div>
+          <p class="ml-mail an-muted">Ett uppskattat pris &middot; gäller till 16 okt 2026</p>
+          <div class="cl-qrow"><span>Byte av bromsbelägg</span><span>1 600,00 kr</span></div>
+          <div class="cl-qrow"><span><span class="ml-box"><span class="an-fade an-off" data-t="0,8.4">&#10003;</span></span> Bromsskivor, par</span><span>900,00 kr</span></div>
+          <div class="cl-qrow"><b>Totalt inklusive moms</b><b>3 125,00 kr</b></div>
+          <div class="cl-answer an-fade an-off" data-t="5.6,9.6"><span class="an-btn">Ja, gör det</span> <span class="an-btn wf-secondary">Nej, låt den vara</span></div>
+          <div class="cl-said an-fade" data-t="9.6">Inte alla raderna.</div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,5.4">Disken startar en förfrågan med bara det de frågat om, och lägger fram ett pris.</div>
+      <div class="an-cap an-off" data-t="5.6,10.8">Kunden läser varje belopp och villkoren, avmarkerar skivorna och säger ja.</div>
+      <div class="an-cap an-off" data-t="11,18.8">Delvis godkänd, för beloppet de gick med på. Bokad från samma sida.</div>
+      <div class="an-cap" data-t="19,29.6">Bilen kommer. Jobbet har det de godkände, till priset de fick se, och pekar tillbaka på förfrågan.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog och beloppen ur dess pengakod när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/20-enquiry.spec.ts">läs testet</a>. Registreringsnummer, bilar och namn är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

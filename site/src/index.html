@@ -260,6 +260,7 @@
     <button type="button" role="tab" data-tab="6">Till mig</button>
     <button type="button" role="tab" data-tab="7">Schemat</button>
     <button type="button" role="tab" data-tab="8">Till kunden</button>
+    <button type="button" role="tab" data-tab="9">Förfrågan</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -801,6 +802,66 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: mejlet går över SMTP till en riktig e-postserver, testet läser det som kom fram och öppnar länken i det som kunden skulle &ndash; <a href="{{test "e2e/tests/17-scene-email.spec.ts" "the customer is emailed the link from the job page, and it arrives"}}">läs testet</a>. Sms genom 46elks, leveransrapporten och tysta timmar provas i serverns egna tester. Registreringsnummer, adresser och namn är <span class="wf-example">exempel</span>.</p>
+</section>
+
+
+<section class="scene pane" role="tabpanel">
+  <h2>Priset innan bilen kommer</h2>
+  <p class="lede">En kund frågar vad bromsarna skulle kosta, innan det finns en bil här. Disken lägger fram ett pris med villkor. Kunden läser varje belopp på sin länk och säger ja till en del, och det de godkände bokas och följer med in på jobbet &ndash; till priset de fick se, utan att något skrivs om.</p>
+
+  <div class="an-wrap" data-loop="30" data-still="26">
+    <div class="an-canvas" role="img" aria-label="Animering: disken startar en förfrågan om bromsar, lägger till två rader och lägger fram dem för kunden. I telefonen ser kunden varje belopp, avmarkerar skivorna och säger ja. Disken ser att den är delvis godkänd och bokar. När bilen kommer har jobbet bara det kunden godkände, till priset de fick se.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,11">
+              <div class="wf-h">{{t "Enquiries"}}</div>
+              <div class="wf-field"><span class="lbl">{{t "What they are asking about"}}</span><span data-type="0.4,1">Bromsar fram</span></div>
+              <div class="cl-qrow an-fade" data-t="1.8"><span>Byte av bromsbelägg</span><span>{{money 160000}}</span></div>
+              <div class="cl-qrow an-fade" data-t="2.8"><span>Bromsskivor, par</span><span>{{money 90000}}</span></div>
+              <span class="an-btn mo-btn an-fade" data-t="3.6">{{t "Put it to the customer"}}</span>
+              <div class="ml-row an-fade" data-t="4.6"><span>{{t "Version %d" 1}} &middot; {{t "An estimate"}}</span><span class="rd-tag rd-risk">{{t "Sent"}}</span></div>
+            </div>
+            <div class="an-fade" data-t="11,19">
+              <div class="wf-h">Bromsar fram</div>
+              <div class="ml-row"><span>{{t "Version %d" 1}} &middot; {{money 312500}}</span><span class="rd-tag cl-on an-fade" data-t="11.4">{{t "Partly accepted"}}</span></div>
+              <div class="cl-qrow an-fade" data-t="12"><span>{{t "agreed to %s" (money 200000)}}</span><span>{{t "on their link"}}</span></div>
+              <div class="wf-h an-fade" data-t="13.4">{{t "Book what they accepted"}}</div>
+              <span class="an-btn mo-btn an-fade" data-t="14.4">{{t "Book it"}}</span>
+              <div class="ml-row an-fade" data-t="16.2"><span>{{t "The booking made from it"}}</span><span class="rd-tag cl-on">{{t "Booked"}}</span></div>
+            </div>
+            <div class="an-fade" data-t="19">
+              <div class="wf-card"><div class="wf-plate">ABC 123</div>
+                <div class="an-muted">{{t "Next:"}} {{t "Price the work"}}</div>
+                <div class="cl-qrow"><span>Byte av bromsbelägg</span><span>{{money 160000}}</span></div>
+                <div class="an-muted">{{t "The enquiry and the price they accepted"}}</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-card wf-phone ml-phone an-pop" data-t="5.6,11">
+        <div class="an-head"><span class="an-dots"></span><span>Kunden</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="wf-h">Bromsar fram</div>
+          <p class="ml-mail an-muted">{{t "An estimate"}} &middot; {{t "stands until %s" (date (at "2026-10-16 12:00") "2 Jan 2006")}}</p>
+          <div class="cl-qrow"><span>Byte av bromsbelägg</span><span>{{money 160000}}</span></div>
+          <div class="cl-qrow"><span><span class="ml-box"><span class="an-fade" data-t="0,8.4">&#10003;</span></span> Bromsskivor, par</span><span>{{money 90000}}</span></div>
+          <div class="cl-qrow"><b>{{t "Total including VAT"}}</b><b>{{money 312500}}</b></div>
+          <div class="cl-answer an-fade" data-t="5.6,9.6"><span class="an-btn">{{t "Yes, do it"}}</span> <span class="an-btn wf-secondary">{{t "No, leave it"}}</span></div>
+          <div class="cl-said an-fade" data-t="9.6">{{t "Not all the lines."}}</div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,5.4">Disken startar en förfrågan med bara det de frågat om, och lägger fram ett pris.</div>
+      <div class="an-cap" data-t="5.6,10.8">Kunden läser varje belopp och villkoren, avmarkerar skivorna och säger ja.</div>
+      <div class="an-cap" data-t="11,18.8">Delvis godkänd, för beloppet de gick med på. Bokad från samma sida.</div>
+      <div class="an-cap" data-t="19,29.6">Bilen kommer. Jobbet har det de godkände, till priset de fick se, och pekar tillbaka på förfrågan.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog och beloppen ur dess pengakod när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare &ndash; <a href="{{test "e2e/tests/20-enquiry.spec.ts" "an enquiry becomes a booking and then a job at the price the customer was shown"}}">läs testet</a>. Registreringsnummer, bilar och namn är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

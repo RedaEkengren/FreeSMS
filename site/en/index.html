@@ -257,6 +257,7 @@
     <button type="button" role="tab" data-tab="6">For me</button>
     <button type="button" role="tab" data-tab="7">The rota</button>
     <button type="button" role="tab" data-tab="8">To the customer</button>
+    <button type="button" role="tab" data-tab="9">Enquiry</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -855,6 +856,66 @@
     </div>
   </div>
   <p class="truth">The words come from the product&rsquo;s catalogue when the page is generated. The flow runs against the real product in a browser: the email goes over SMTP to a real mail server, and the test reads what arrived and opens the link in it as the customer would &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/17-scene-email.spec.ts">read the test</a>. Texts through 46elks, the delivery report and quiet hours are tested by the server&rsquo;s own tests. Registrations, addresses and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+
+<section class="scene pane" role="tabpanel">
+  <h2>The price before the car arrives</h2>
+  <p class="lede">A customer asks what the brakes would cost, before there is a car here. The front desk puts a price to them with its terms. They read every amount on their own link and say yes to part of it, and what they accepted is booked and carried onto the job &ndash; at the price they were shown, with nothing typed twice.</p>
+
+  <div class="an-wrap" data-loop="30" data-still="26">
+    <div class="an-canvas" role="img" aria-label="Animation: the front desk starts an enquiry about brakes, adds two lines and puts them to the customer. On their phone the customer sees every amount, unticks the discs and says yes. The desk sees that it is partly accepted and books it. When the car arrives, the job has only what they accepted, at the price they were shown.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,11">
+              <div class="wf-h">Enquiries</div>
+              <div class="wf-field"><span class="lbl">What they are asking about</span><span data-type="0.4,1">Brakes at the front</span></div>
+              <div class="cl-qrow an-fade" data-t="1.8"><span>Replace brake pads</span><span>SEK 1,600.00</span></div>
+              <div class="cl-qrow an-fade" data-t="2.8"><span>Brake discs, pair</span><span>SEK 900.00</span></div>
+              <span class="an-btn mo-btn an-fade" data-t="3.6">Put it to the customer</span>
+              <div class="ml-row an-fade" data-t="4.6"><span>Version 1 &middot; An estimate</span><span class="rd-tag rd-risk">Sent</span></div>
+            </div>
+            <div class="an-fade an-off" data-t="11,19">
+              <div class="wf-h">Brakes at the front</div>
+              <div class="ml-row"><span>Version 1 &middot; SEK 3,125.00</span><span class="rd-tag cl-on an-fade" data-t="11.4">Partly accepted</span></div>
+              <div class="cl-qrow an-fade" data-t="12"><span>agreed to SEK 2,000.00</span><span>on their link</span></div>
+              <div class="wf-h an-fade" data-t="13.4">Book what they accepted</div>
+              <span class="an-btn mo-btn an-fade" data-t="14.4">Book it</span>
+              <div class="ml-row an-fade" data-t="16.2"><span>The booking made from it</span><span class="rd-tag cl-on">Booked</span></div>
+            </div>
+            <div class="an-fade" data-t="19">
+              <div class="wf-card"><div class="wf-plate">ABC 123</div>
+                <div class="an-muted">Next: Price the work</div>
+                <div class="cl-qrow"><span>Replace brake pads</span><span>SEK 1,600.00</span></div>
+                <div class="an-muted">The enquiry and the price they accepted</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-card wf-phone ml-phone an-pop an-off" data-t="5.6,11">
+        <div class="an-head"><span class="an-dots"></span><span>The customer</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="wf-h">Brakes at the front</div>
+          <p class="ml-mail an-muted">An estimate &middot; stands until 16 Oct 2026</p>
+          <div class="cl-qrow"><span>Replace brake pads</span><span>SEK 1,600.00</span></div>
+          <div class="cl-qrow"><span><span class="ml-box"><span class="an-fade an-off" data-t="0,8.4">&#10003;</span></span> Brake discs, pair</span><span>SEK 900.00</span></div>
+          <div class="cl-qrow"><b>Total including VAT</b><b>SEK 3,125.00</b></div>
+          <div class="cl-answer an-fade an-off" data-t="5.6,9.6"><span class="an-btn">Yes, do it</span> <span class="an-btn wf-secondary">No, leave it</span></div>
+          <div class="cl-said an-fade" data-t="9.6">Not all the lines.</div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,5.4">The desk starts an enquiry with only what they asked about, and puts a price to them.</div>
+      <div class="an-cap an-off" data-t="5.6,10.8">The customer reads every amount and the terms, unticks the discs and says yes.</div>
+      <div class="an-cap an-off" data-t="11,18.8">Partly accepted, for the amount they agreed to. Booked from the same page.</div>
+      <div class="an-cap" data-t="19,29.6">The car arrives. The job has what they accepted, at the price they were shown, and points back at the enquiry.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's language catalogue and the amounts from its money code when the page is generated. The flow runs against the real product in a browser &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/20-enquiry.spec.ts">read the test</a>. Registrations, cars and names are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>
