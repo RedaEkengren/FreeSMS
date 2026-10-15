@@ -61,6 +61,12 @@ func TestAWalkInIsAskedWhoPaysWhoDoesTheWorkAndWhenItIsPromised(t *testing.T) {
 		t.Errorf("a job with everything given still says something is unknown:\n%s", firstLines(body, 60))
 	}
 
+	// A name typed under "a new customer" is not dropped for want of a tick.
+	unticked := intake(t, ts.URL, desk, url.Values{"registration": {"ZZZ 004"}, "complaint": {"Smells"}, "new_name": {"Ulla Otickad"}})
+	if _, body := page(t, desk, ts.URL+unticked); !strings.Contains(body, "Ulla Otickad") {
+		t.Error("a name typed for a new customer was dropped")
+	}
+
 	// A promise that is not a time is sent back, and the form keeps the rest.
 	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/jobs/new", strings.NewReader(url.Values{
 		"registration": {"ZZZ 003"}, "complaint": {"Pulls left"}, "promised_at": {"tomorrow"}}.Encode()))
@@ -89,5 +95,21 @@ func TestAWalkInIsAskedWhoPaysWhoDoesTheWorkAndWhenItIsPromised(t *testing.T) {
 	// The search for a customer on file is the desk's.
 	if resp, err := tech.Get(ts.URL + "/jobs/new/customers?q=Anna"); err != nil || resp.StatusCode != http.StatusForbidden {
 		t.Errorf("a technician searching customers at intake: %v %v", resp, err)
+	}
+}
+
+// A job with lines that were only offered, and nothing done, can be cancelled;
+// the button is there exactly when SetState would allow it.
+func TestAJobWithOnlyOfferedLinesCanBeCancelledFromThePage(t *testing.T) {
+	ts, _ := testServer(t)
+	desk := signIn(t, ts, advisorEmail)
+	job := ts.URL + "/jobs/" + jobA
+	postStatus(t, desk, job+"/lines", url.Values{"kind": {"labour"}, "description": {"Clutch"}, "quantity": {"1"}, "unit_price": {"9000"}})
+	_, body := page(t, desk, job)
+	if !strings.Contains(body, `value="cancelled"`) {
+		t.Error("a job with lines and nothing done cannot be cancelled from its page")
+	}
+	if status := postStatus(t, desk, job+"/state", url.Values{"state": {"cancelled"}}); status != http.StatusSeeOther {
+		t.Errorf("cancelling it answered %d", status)
 	}
 }

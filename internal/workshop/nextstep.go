@@ -47,6 +47,10 @@ type StepFacts struct {
 	FinalRequired bool
 	FinalDone     bool
 	OpenRequests  int
+
+	// Nothing was performed, clocked or taken out: a declined job that is
+	// this has nothing to invoice, and is cancelled.
+	NothingDone bool
 }
 
 // Step is where a job stands and what happens next.
@@ -114,6 +118,9 @@ func NextStep(f StepFacts) Step {
 	case StateReady:
 		return set("Tell the customer, hand the car over and invoice", OwnerDesk)
 	case StateDeclined:
+		if f.NothingDone {
+			return set("Cancel the job: nothing was done", OwnerDesk)
+		}
 		return set("Invoice what was done", OwnerDesk)
 	case StateInvoiced:
 		return set("Take the payment and close the job", OwnerDesk)

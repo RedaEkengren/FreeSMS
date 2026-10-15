@@ -49,8 +49,11 @@ type Job struct {
 	ClockRunning   bool
 	ClockStartedAt *time.Time
 
-	// True when anything has been clocked or priced on the order. Cancelling
-	// such an order is refused, so the button is not offered.
+	// True when anything has been clocked, performed or taken out for the
+	// order -- the same test SetState refuses a cancellation on, so the
+	// button is offered exactly when it would be allowed. Lines that were only
+	// priced or offered are not work: a customer who said no to an estimate
+	// leaves a job with lines and nothing done.
 	HasWork bool
 
 	// Who the job belongs to today, and whether that is the caller. Not a
@@ -200,7 +203,8 @@ const jobColumns = `
 	  WHERE t.work_order_id = w.id AND t.user_id = $1 AND t.ended_at IS NULL
 	  LIMIT 1) AS clock_started_at,
 	(EXISTS (SELECT 1 FROM time_entries t2      WHERE t2.work_order_id = w.id)
-	      OR EXISTS (SELECT 1 FROM work_order_lines l WHERE l.work_order_id = w.id)) AS has_work,
+	      OR EXISTS (SELECT 1 FROM work_order_lines l WHERE l.work_order_id = w.id AND l.performed_at IS NOT NULL)
+	      OR EXISTS (SELECT 1 FROM stock_movements m WHERE m.work_order_id = w.id AND m.kind = 'consumed')) AS has_work,
 	coalesce((SELECT p.display_name FROM users au
 	           JOIN people p ON p.id = au.person_id
 	          WHERE au.id = w.assigned_to), '') AS assigned_to,

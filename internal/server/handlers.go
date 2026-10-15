@@ -353,6 +353,7 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 	}
 
 	step := workshop.NextStep(workshop.StepFacts{
+		NothingDone:   !job.HasWork,
 		State:         workshop.State(job.State),
 		HasCustomer:   job.HasCustomer,
 		HasTechnician: job.AssignedTo != "",

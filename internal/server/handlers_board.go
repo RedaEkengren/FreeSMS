@@ -157,6 +157,11 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 	technician := strings.TrimSpace(r.FormValue("technician_id"))
 	newName, newPhone := strings.TrimSpace(r.FormValue("new_name")), strings.TrimSpace(r.FormValue("new_phone"))
 	promiseText := strings.TrimSpace(r.FormValue("promised_at"))
+	// A name typed under "a new customer" is that choice, ticked or not: the
+	// alternative is dropping what somebody just typed without a word.
+	if choice == "" && form.BookingID == "" && newName != "" {
+		choice = "new"
+	}
 	// The form as it came, with the booking's choices, for sending it back.
 	again := func(status int, message string) {
 		var booking *workshop.Booking

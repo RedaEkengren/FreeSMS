@@ -44,6 +44,9 @@ func TestTheNextStepFollowsTheJob(t *testing.T) {
 			"Tell the customer, hand the car over and invoice", workshop.OwnerDesk},
 		{"declined is invoiced for what was done", with(full, func(f *workshop.StepFacts) { f.State = workshop.StateDeclined }),
 			"Invoice what was done", workshop.OwnerDesk},
+		{"declined with nothing done is cancelled", with(full, func(f *workshop.StepFacts) {
+			f.State, f.NothingDone = workshop.StateDeclined, true
+		}), "Cancel the job: nothing was done", workshop.OwnerDesk},
 		{"invoiced waits for the money", with(full, func(f *workshop.StepFacts) { f.State = workshop.StateInvoiced }),
 			"Take the payment and close the job", workshop.OwnerDesk},
 		{"closed has no next step", with(full, func(f *workshop.StepFacts) { f.State = workshop.StateClosed }), "", ""},

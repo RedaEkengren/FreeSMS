@@ -1,5 +1,5 @@
 import { test, expect, Page, BrowserContext } from '@playwright/test';
-import { owner, tech, desk, signIn, leave, getApproved } from './helpers';
+import { owner, tech, desk, signIn, leave, getApproved, shopClock } from './helpers';
 
 // The site's main scene, one job from start to finish, performed against the
 // real product in Swedish. Every role in its own browser, the customer in one
@@ -84,13 +84,17 @@ test.describe.serial('the whole job scene', () => {
       await d.goto('/jobs/new');
       await d.getByLabel('Registreringsnummer').fill('JOB777');
       await d.getByLabel('Vad är fel').fill('Gnisslar vid inbromsning');
+      // Who pays, who does the work and what was promised are asked at the
+      // counter, as the scene shows.
+      await d.locator('input[name=new_name]').fill(customer.name);
+      await d.locator('input[name=new_phone]').fill(customer.phone);
+      await d.locator('select[name=technician_id]').selectOption({ label: tech.name });
+      await d.locator('input[name=promised_at]').fill(await shopClock(d, 60 * 56));
       await d.getByRole('button', { name: 'Öppna jobbet' }).click();
       await expect(d).toHaveURL(/\/jobs\/[0-9a-f-]{36}$/);
       const job = d.url();
-      await d.getByRole('link', { name: 'Ange vem som betalar' }).click();
-      await d.fill('form[action$="/customer"] input[name=name]', customer.name);
-      await d.fill('form[action$="/customer"] input[name=phone]', customer.phone);
-      await d.getByRole('button', { name: 'Spara och använd' }).click();
+      await expect(d.locator('#next-step')).toContainText('Prissätt arbetet');
+      await expect(d.locator('#next-step')).not.toContainText('Inte känt än');
       await d.fill('input[form=add-line][name=description]', 'Felsökning bromsar');
       await d.fill('input[form=add-line][name=quantity]', '1');
       await d.fill('input[form=add-line][name=unit_price]', '895');

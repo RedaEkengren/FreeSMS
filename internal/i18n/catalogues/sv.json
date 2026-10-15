@@ -1566,6 +1566,9 @@
     "Next:": {
       "other": "Nästa:"
     },
+    "Cancel the job: nothing was done": {
+      "other": "Annullera jobbet: inget gjordes"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },
