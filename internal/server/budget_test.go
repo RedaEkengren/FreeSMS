@@ -27,7 +27,7 @@ import (
 var queryBudgets = map[string]int{
 	// The technician's screens, on the worst connection: these matter most.
 	"tech GET /":                         11,
-	"tech GET /jobs/{id}":                21,
+	"tech GET /jobs/{id}":                23,
 	"tech GET /time":                     11,
 	"tech GET /inspections/{inspection}": 12,
 	"tech GET /mine":                     12,
@@ -36,16 +36,22 @@ var queryBudgets = map[string]int{
 	// and 100 when every read began and ended its own.
 	//
 	// The counter.
-	"desk GET /board": 16,
+	// 21: the open jobs that need a decision about who or when (#113),
+	// one read in its own scope.
+	"desk GET /board": 21,
 	// 35: the quote the customer was shown and what they answered to it
 	// (two statements), which the counter reads on every live refresh.
-	"desk GET /jobs/{id}":   35,
+	"desk GET /jobs/{id}":   38,
 	"desk GET /receivables": 11,
 	"desk GET /parts":       11,
 	"desk GET /stock":       26,
-	"desk GET /calendar":    29,
-	"desk GET /mine":        13,
-	"desk GET /mine/count":  14,
+	"desk GET /calendar":    34, // #113: open jobs drawn from their plans, one read in its own scope
+	"desk GET /mine":        14,
+	"desk GET /mine/count":  15,
+	// #113: who is on the job and its plan (two statements, plus the clashes
+	// of the plan once there is one) on every job page, and the technicians
+	// to choose from on the desk's. "For me" and the header count read the
+	// open jobs nobody is on, one more.
 	// The desk's job page lists what was sent to the customer (#101): one.
 	// The calendar reads the rota for its lanes (#100): six more, once,
 	// whatever the history. "For me" asks whether the schedule changed: one.

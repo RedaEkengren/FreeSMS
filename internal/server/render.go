@@ -50,6 +50,10 @@ type pageData struct {
 	Languages     []workshop.Language
 	Answers       []workshop.CustomerAnswer
 	Presence      workshop.Presence
+	JobPlan       workshop.JobPlan
+	Backlog       []workshop.BacklogItem
+	PlanForm      planForm
+	PlanTechs     []workshop.PlannerRow
 	JobParts      []workshop.JobPart
 	Contacts      []workshop.CustomerContact
 	Status        workshop.CustomerStatus
@@ -375,7 +379,7 @@ func (d pageData) Plural(key string, count int) string {
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "enquiries", "enquiry", "proposal", "offer", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "shop", "customer", "checklists", "part", "staff", "account", "mine", "rota", "schedule", "receivables", "setup", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "planclash", "enquiries", "enquiry", "proposal", "offer", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "shop", "customer", "checklists", "part", "staff", "account", "mine", "rota", "schedule", "receivables", "setup", "error"}
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).Funcs(templateFuncs).ParseFS(web.Templates,
@@ -452,4 +456,21 @@ func (s *Server) renderError(w http.ResponseWriter, r *http.Request, status int,
 		Error:   message,
 		Session: sessionFrom(r.Context()),
 	})
+}
+
+// ClashSays is a plan's clash in the reader's language.
+func (d pageData) ClashSays(c workshop.Clash) string {
+	switch c.Kind {
+	case "closed":
+		return d.T("The shop is shut on %s: %s", c.Day, c.Detail)
+	case "absent":
+		return d.T("%s is away on %s", c.Who, c.Day)
+	case "off_rota":
+		return d.T("%s is not on the rota on %s", c.Who, c.Day)
+	case "off_shift":
+		return d.T("%s is outside their hours on %s", c.Who, c.Day)
+	case "double":
+		return d.T("%s already has %s then", c.Who, c.Detail)
+	}
+	return d.T("More cars than lifts: %s", c.Detail)
 }

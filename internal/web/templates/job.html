@@ -69,6 +69,75 @@
 {{end}}
 </div>
 
+<div id="live-plan" data-live="job:{{.Job.ID}}">
+{{/* Who is on the job and when the rest of it is to be done. Not the
+     promise to the customer and not the booking: moving this does not move
+     either. */}}
+<h2>{{.T "Who and when"}}</h2>
+{{if .JobPlan.On}}
+<ul class="plain">
+  {{range .JobPlan.On}}<li>{{.Name}}{{with .Reason}} <span class="waiting">&middot; {{.}}</span>{{end}}
+    {{if $.Session.Scope.Role.SeesCustomerPersonalData}}
+    <form class="inline" method="post" action="/jobs/{{$.Job.ID}}/staff">
+      <input type="hidden" name="action" value="release"><input type="hidden" name="user_id" value="{{.UserID}}">
+      <button type="submit" class="secondary">{{$.T "Take off the job"}}</button>
+    </form>{{end}}</li>
+  {{end}}
+</ul>
+{{else}}<p class="waiting"><span class="tag warranty">{{.T "Nobody is on it"}}</span></p>{{end}}
+{{if .JobPlan.Before}}<details><summary>{{.T "Who has been on it"}}</summary>
+  <ul class="plain">{{range .JobPlan.Before}}<li>{{.Name}} &middot; {{$.Date ($.Local .Since) "Mon 2 Jan"}} &ndash; {{$.Date ($.Local .Released) "Mon 2 Jan"}}{{with .Reason}} &middot; {{.}}{{end}}</li>{{end}}</ul>
+</details>{{end}}
+
+{{with .JobPlan.Current}}
+  {{if .Starts}}<p>{{$.T "Planned %s to %s" ($.Date ($.Local .Starts) "Mon 2 Jan 15:04") ($.Date ($.Local .Ends) "Mon 2 Jan 15:04")}}
+    {{with .RemainingMinutes}} &middot; {{$.T "%s h left" ($.Num $.JobPlan.Current.RemainingHours)}}{{end}}
+    &middot; {{if .OnLift}}{{$.T "on a lift"}}{{else}}{{$.T "not on a lift"}}{{end}}</p>
+  {{else}}<p class="waiting">{{$.T "No time planned yet"}}</p>{{end}}
+  {{if .Override}}<p class="waiting"><span class="tag warranty">{{$.T "Went ahead anyway"}}</span> {{.Override}}
+    {{range .Clashes}}<br>{{$.ClashSays .}}{{end}}</p>{{end}}
+{{else}}<p class="waiting">{{.T "No time planned yet"}}</p>{{end}}
+{{range .JobPlan.Clashes}}<p class="waiting"><span class="tag late">{{$.T "clash"}}</span> {{$.ClashSays .}}</p>{{end}}
+{{if .JobPlan.Earlier}}<details><summary>{{.T "Earlier plans"}}</summary>
+  <ul class="plain">{{range .JobPlan.Earlier}}<li>{{if .Starts}}{{$.Date ($.Local .Starts) "Mon 2 Jan 15:04"}} &ndash; {{$.Date ($.Local .Ends) "Mon 2 Jan 15:04"}}{{else}}{{$.T "No time planned yet"}}{{end}} &middot; {{.By}}</li>{{end}}</ul>
+</details>{{end}}
+
+{{if and .Session.Scope.Role.SeesCustomerPersonalData (not .Progress.Finished)}}
+<form class="mt-s" method="post" action="/jobs/{{.Job.ID}}/staff">
+  <input type="hidden" name="action" value="add">
+  <label><span>{{.T "Put a technician on it"}}</span>
+    <select name="user_id" required>{{range .PlanTechs}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></label>
+  <label><span>{{.T "Why (if it helps the next person)"}}</span><input name="reason" maxlength="300"></label>
+  <button type="submit" class="secondary">{{.T "Put on the job"}}</button>
+</form>
+{{if .JobPlan.On}}
+<form class="mt-s" method="post" action="/jobs/{{.Job.ID}}/staff">
+  <input type="hidden" name="action" value="reassign">
+  <label><span>{{.T "Hand it over from"}}</span>
+    <select name="from_id">{{range .JobPlan.On}}<option value="{{.UserID}}">{{.Name}}</option>{{end}}</select></label>
+  <label><span>{{.T "to"}}</span>
+    <select name="user_id" required>{{range .PlanTechs}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></label>
+  <label><span>{{.T "Why"}}</span><input name="reason" maxlength="300" placeholder="{{.T "off sick"}}"></label>
+  <button type="submit" class="secondary">{{.T "Hand it over"}}</button>
+</form>
+{{end}}
+<form class="mt-s" method="post" action="/jobs/{{.Job.ID}}/plan">
+  <input type="hidden" name="version" value="{{.JobPlan.Version}}">
+  <label><span>{{.T "Starts"}}</span><input type="datetime-local" name="starts" value="{{with .JobPlan.Current}}{{with .Starts}}{{($.Local .).Format "2006-01-02T15:04"}}{{end}}{{end}}"></label>
+  <label><span>{{.T "Ends"}}</span><input type="datetime-local" name="ends" value="{{with .JobPlan.Current}}{{with .Ends}}{{($.Local .).Format "2006-01-02T15:04"}}{{end}}{{end}}"></label>
+  <label><span>{{.T "Hours left"}}</span><input name="hours" inputmode="decimal" value="{{with .JobPlan.Current}}{{.RemainingHours}}{{end}}"></label>
+  <label><input type="checkbox" name="on_lift" value="1"{{if or (not .JobPlan.Current) .JobPlan.Current.OnLift}} checked{{end}}> <span>{{.T "It needs a lift"}}</span></label>
+  <label><span>{{.T "Note"}}</span><input name="note" maxlength="300" value="{{with .JobPlan.Current}}{{.Note}}{{end}}"></label>
+  <button type="submit" class="secondary">{{.T "Save the plan"}}</button>
+</form>
+{{with .JobPlan.Current}}{{if and .Ends (not $.Progress.Finished)}}
+<form class="mt-s" method="post" action="/jobs/{{$.Job.ID}}/plan/carry">
+  <input type="hidden" name="version" value="{{.Version}}">
+  <button type="submit" class="secondary">{{$.T "Carry it over to the next open day"}}</button>
+</form>{{end}}{{end}}
+{{end}}
+</div>
+
 <div id="live-ready" data-live="job:{{.Job.ID}}">
 {{/* When will it be ready: the promise, the hours sold and the time
      clocked, together. Not clamped past the estimate -- an order at 140
@@ -711,3 +780,4 @@
   </button>
 {{end}}
 {{end}}
+

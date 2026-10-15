@@ -1,6 +1,26 @@
 {{define "content"}}
 <h1>{{.T "In the shop"}}</h1>
 <div id="live-board" data-live="board">
+{{/* Open jobs that need a decision about who or when. Worked out each time;
+     it empties itself when somebody decides. */}}
+{{if .Backlog}}
+<section class="backlog" id="backlog">
+  <h2>{{.T "Needs a decision"}}</h2>
+  <ul class="plain">
+  {{range .Backlog}}
+    <li><a href="/jobs/{{.JobID}}"><span class="plate">{{if .Registration}}{{.Registration}}{{else}}{{$.T "no plate"}}{{end}}</span> #{{.Number}}</a>
+      {{if eq .Kind "unstaffed"}}<span class="tag warranty">{{$.T "Nobody is on it"}}</span>
+      {{else if eq .Kind "away"}}<span class="tag late">{{$.T "%s is away; it needs somebody else" .Who}}</span>
+      {{else}}<span class="tag late">{{$.T "The plan ran out and the job is still open"}}</span>
+        <form class="inline" method="post" action="/jobs/{{.JobID}}/plan/carry">
+          <input type="hidden" name="version" value="{{.Version}}">
+          <button type="submit" class="secondary">{{$.T "Carry it over to the next open day"}}</button>
+        </form>{{end}}
+    </li>
+  {{end}}
+  </ul>
+</section>
+{{end}}
 {{if not .Board}}
   <p class="empty">{{.T "Nothing open."}}</p>
 {{else}}

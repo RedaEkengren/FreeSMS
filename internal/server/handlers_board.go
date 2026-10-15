@@ -55,10 +55,16 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	backlog, err := workshop.Backlog(r.Context(), s.pool, session.Scope)
+	if err != nil {
+		s.log.Error("backlog", "error", err)
+	}
+
 	s.render(w, r, http.StatusOK, "board", pageData{
 		Title:   "In the shop",
 		Session: session,
 		Board:   entries,
+		Backlog: backlog,
 	})
 }
 

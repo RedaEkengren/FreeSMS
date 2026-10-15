@@ -261,6 +261,7 @@
     <button type="button" role="tab" data-tab="7">Schemat</button>
     <button type="button" role="tab" data-tab="8">Till kunden</button>
     <button type="button" role="tab" data-tab="9">Förfrågan</button>
+    <button type="button" role="tab" data-tab="10">Sjuk tekniker</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -862,6 +863,59 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog och beloppen ur dess pengakod när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare &ndash; <a href="{{test "e2e/tests/20-enquiry.spec.ts" "an enquiry becomes a booking and then a job at the price the customer was shown"}}">läs testet</a>. Registreringsnummer, bilar och namn är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>När någon är sjuk</h2>
+  <p class="lede">Erik ringer in sjuk, och han har ett jobb planerat för i dag. Disken ser det direkt, lämnar över jobbet till Tina med ett skäl och ser Erik kvar i historiken. Tiden han redan stämplat är hans. Ett jobb som tar två dagar flyttas utan att något bokas om.</p>
+
+  <div class="an-wrap" data-loop="26" data-still="9">
+    <div class="an-canvas" role="img" aria-label="Animering: på jobbet står Erik, planerad en dag. Erik är borta den dagen och disken ser en krock. Disken lämnar över till Tina med skälet sjuk. Hos Tina står det att jobbet är satt på henne. Planen tog slut med jobbet öppet, och disken för över den till nästa öppna dag.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,9">
+              <div class="wf-card"><div class="wf-plate">ABC 123</div></div>
+              <div class="wf-h">{{t "Who and when"}}</div>
+              <div class="cl-qrow"><span>Erik</span><span>{{t "Planned %s to %s" (date (at "2026-10-16 08:00") "Mon 2 Jan 15:04") (date (at "2026-10-16 16:00") "Mon 2 Jan 15:04")}}</span></div>
+              <div class="an-muted">{{t "%s h left" "8.0"}} &middot; {{t "on a lift"}}</div>
+              <div class="cl-qrow an-fade" data-t="2"><span><span class="rd-tag rd-risk">{{t "clash"}}</span> {{t "%s is away on %s" "Erik" "2026-10-16"}}</span><span></span></div>
+            </div>
+            <div class="an-fade" data-t="9,17">
+              <div class="wf-field"><span class="lbl">{{t "Hand it over from"}}</span><span>Erik</span></div>
+              <div class="wf-field"><span class="lbl">{{t "to"}}</span><span data-type="9.4,0.8">Tina</span></div>
+              <div class="wf-field"><span class="lbl">{{t "Why"}}</span><span data-type="10.4,0.8">sjuk</span></div>
+              <span class="an-btn mo-btn an-fade" data-t="11.8">{{t "Hand it over"}}</span>
+              <div class="cl-qrow an-fade" data-t="13"><span>Tina</span><span class="rd-tag cl-on">{{t "On it"}}</span></div>
+              <div class="an-muted an-fade" data-t="14.4">{{t "Who has been on it"}}: Erik &middot; sjuk</div>
+            </div>
+            <div class="an-fade" data-t="17">
+              <div class="wf-h">{{t "Needs a decision"}}</div>
+              <div class="cl-qrow"><span><b>ABC 123</b> &middot; #7</span><span class="rd-tag rd-risk">{{t "The plan ran out and the job is still open"}}</span></div>
+              <span class="an-btn mo-btn an-fade" data-t="19.4">{{t "Carry it over to the next open day"}}</span>
+              <div class="cl-qrow an-fade" data-t="21.6"><span>{{t "Planned %s to %s" (date (at "2026-10-19 08:00") "Mon 2 Jan 15:04") (date (at "2026-10-19 16:00") "Mon 2 Jan 15:04")}}</span><span class="rd-tag cl-on">{{t "Earlier plans"}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-card wf-phone ml-phone an-pop" data-t="13,26">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "technician"}} &middot; Tina</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="wf-h">{{t "For me"}} <span class="fm-count">1</span></div>
+          <div class="fm-item an-r" data-t="13.4,21.6"><b>ABC 123</b> &middot; #7<br>{{t "Put on you"}}</div>
+          <div class="fm-item an-r" data-t="21.6"><b>ABC 123</b> &middot; #7<br>{{t "The plan for your job has moved"}}</div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,8.8">Erik är planerad en dag. Han är sjuk den dagen, och disken ser krocken.</div>
+      <div class="an-cap" data-t="9,16.8">Jobbet lämnas över till Tina med ett skäl. Erik står kvar i historiken, och hans stämplade tid är hans.</div>
+      <div class="an-cap" data-t="17,25.6">Planen tog slut med jobbet öppet. Ett klick flyttar den, utan nytt jobb och utan ny bokning. Tina får veta.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: Erik markeras sjuk, krocken syns, jobbet lämnas över, Tina ser det i sin lista, en tvådagarsplan förs över och en bil som väntar på en del släpper sin lyft &ndash; <a href="{{test "e2e/tests/21-planning.spec.ts" "a sick technician, a two-day job and a car waiting for a part"}}">läs testet</a>. Registreringsnummer och namn är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

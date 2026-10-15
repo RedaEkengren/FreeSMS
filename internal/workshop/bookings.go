@@ -36,6 +36,10 @@ type Booking struct {
 	CreatedBy       string
 	// The car is in and its job is not finished yet.
 	JobOpen bool
+	// A block drawn from an open job's plan rather than a sold slot: the job
+	// it is for, and whether it needs a lift.
+	JobID   string
+	OffLift bool
 }
 
 // EstimateHours is the work expected, as a page writes hours.

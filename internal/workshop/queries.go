@@ -354,13 +354,9 @@ func ClockIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 			return err
 		}
 
-		// Picking a job up is what assigns it, when nobody has it. Asking
-		// somebody to assign themselves before starting is a step that gets
-		// skipped, and then the column is empty and useless.
-		if _, err := tx.Exec(ctx,
-			`UPDATE work_orders SET assigned_to = $1 WHERE id = $2 AND assigned_to IS NULL`,
-			scope.UserID, jobID); err != nil {
-			return fmt.Errorf("assign job: %w", err)
+		// Picking a job up is what assigns it, when nobody has it.
+		if err := claimIfNobodyTx(ctx, tx, scope, jobID); err != nil {
+			return err
 		}
 
 		tag, err := tx.Exec(ctx, `

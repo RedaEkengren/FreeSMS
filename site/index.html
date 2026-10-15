@@ -258,6 +258,7 @@
     <button type="button" role="tab" data-tab="7">Schemat</button>
     <button type="button" role="tab" data-tab="8">Till kunden</button>
     <button type="button" role="tab" data-tab="9">Förfrågan</button>
+    <button type="button" role="tab" data-tab="10">Sjuk tekniker</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -916,6 +917,59 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog och beloppen ur dess pengakod när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/20-enquiry.spec.ts">läs testet</a>. Registreringsnummer, bilar och namn är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>När någon är sjuk</h2>
+  <p class="lede">Erik ringer in sjuk, och han har ett jobb planerat för i dag. Disken ser det direkt, lämnar över jobbet till Tina med ett skäl och ser Erik kvar i historiken. Tiden han redan stämplat är hans. Ett jobb som tar två dagar flyttas utan att något bokas om.</p>
+
+  <div class="an-wrap" data-loop="26" data-still="9">
+    <div class="an-canvas" role="img" aria-label="Animering: på jobbet står Erik, planerad en dag. Erik är borta den dagen och disken ser en krock. Disken lämnar över till Tina med skälet sjuk. Hos Tina står det att jobbet är satt på henne. Planen tog slut med jobbet öppet, och disken för över den till nästa öppna dag.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,9">
+              <div class="wf-card"><div class="wf-plate">ABC 123</div></div>
+              <div class="wf-h">Vem och när</div>
+              <div class="cl-qrow"><span>Erik</span><span>Planerat fre 16 okt 08:00 till fre 16 okt 16:00</span></div>
+              <div class="an-muted">8.0 h kvar &middot; på en lyft</div>
+              <div class="cl-qrow an-fade" data-t="2"><span><span class="rd-tag rd-risk">krock</span> Erik är borta 2026-10-16</span><span></span></div>
+            </div>
+            <div class="an-fade" data-t="9,17">
+              <div class="wf-field"><span class="lbl">Lämna över från</span><span>Erik</span></div>
+              <div class="wf-field"><span class="lbl">till</span><span data-type="9.4,0.8">Tina</span></div>
+              <div class="wf-field"><span class="lbl">Varför</span><span data-type="10.4,0.8">sjuk</span></div>
+              <span class="an-btn mo-btn an-fade an-off" data-t="11.8">Lämna över</span>
+              <div class="cl-qrow an-fade an-off" data-t="13"><span>Tina</span><span class="rd-tag cl-on">Jobbar på den</span></div>
+              <div class="an-muted an-fade an-off" data-t="14.4">Vilka som har varit på det: Erik &middot; sjuk</div>
+            </div>
+            <div class="an-fade an-off" data-t="17">
+              <div class="wf-h">Behöver ett beslut</div>
+              <div class="cl-qrow"><span><b>ABC 123</b> &middot; #7</span><span class="rd-tag rd-risk">Planen tog slut och jobbet är fortfarande öppet</span></div>
+              <span class="an-btn mo-btn an-fade an-off" data-t="19.4">För över till nästa öppna dag</span>
+              <div class="cl-qrow an-fade an-off" data-t="21.6"><span>Planerat mån 19 okt 08:00 till mån 19 okt 16:00</span><span class="rd-tag cl-on">Tidigare planer</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-card wf-phone ml-phone an-pop an-off" data-t="13,26">
+        <div class="an-head"><span class="an-dots"></span><span>Mekaniker &middot; Tina</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="wf-h">Till mig <span class="fm-count">1</span></div>
+          <div class="fm-item an-r an-off" data-t="13.4,21.6"><b>ABC 123</b> &middot; #7<br>Satt på dig</div>
+          <div class="fm-item an-r an-off" data-t="21.6"><b>ABC 123</b> &middot; #7<br>Planen för ditt jobb har flyttats</div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,8.8">Erik är planerad en dag. Han är sjuk den dagen, och disken ser krocken.</div>
+      <div class="an-cap" data-t="9,16.8">Jobbet lämnas över till Tina med ett skäl. Erik står kvar i historiken, och hans stämplade tid är hans.</div>
+      <div class="an-cap an-off" data-t="17,25.6">Planen tog slut med jobbet öppet. Ett klick flyttar den, utan nytt jobb och utan ny bokning. Tina får veta.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: Erik markeras sjuk, krocken syns, jobbet lämnas över, Tina ser det i sin lista, en tvådagarsplan förs över och en bil som väntar på en del släpper sin lyft &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/21-planning.spec.ts">läs testet</a>. Registreringsnummer och namn är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

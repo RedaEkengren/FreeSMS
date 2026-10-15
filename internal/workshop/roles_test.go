@@ -27,6 +27,8 @@ var everyRole = map[string]string{
 	"ClockIn":             "the caller's own clock", "ClockOut": "the caller's own clock",
 	"MyTime":         "the caller's own hours",
 	"ProgressFor":    "hours and a time on a job, no customer data",
+	"PlanFor":        "who is on a job and when, which a technician needs for their own work; no customer data",
+	"Backlog":        "open jobs nobody is on, by number and registration; no customer data",
 	"PresenceFor":    "whether the car is here, which a technician needs before looking for it; no customer data",
 	"PartsOnJob":     "which parts are priced and taken out on a job: numbers and names, no cost, no customer data",
 	"FinalCheckFor":  "whether the work is signed off, which the technician needs before saying it is ready; no customer data",

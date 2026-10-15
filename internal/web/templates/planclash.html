@@ -1,0 +1,21 @@
+{{define "content"}}
+<h1>{{.T "This plan clashes"}}</h1>
+<p>{{.T "Nothing has been saved. The plan runs into this:"}}</p>
+<ul>{{range .PlanForm.Clashes}}<li>{{$.ClashSays .}}</li>{{end}}</ul>
+<p>{{.T "Go ahead only if you mean to, and say why. The reason is kept on the plan for whoever reads it next."}}</p>
+{{with .PlanForm}}
+<form method="post" action="/jobs/{{.JobID}}/plan{{if .Carry}}/carry{{end}}">
+  <input type="hidden" name="version" value="{{.Version}}">
+  {{if not .Carry}}
+  <input type="hidden" name="starts" value="{{.Starts}}">
+  <input type="hidden" name="ends" value="{{.Ends}}">
+  <input type="hidden" name="hours" value="{{.Hours}}">
+  {{if .OnLift}}<input type="hidden" name="on_lift" value="1">{{end}}
+  <input type="hidden" name="note" value="{{.Note}}">
+  {{end}}
+  <label><span>{{$.T "Why you are going ahead"}}</span><input name="override" required maxlength="300"></label>
+  <button type="submit">{{$.T "Go ahead anyway"}}</button>
+</form>
+<p class="mt-l"><a href="/jobs/{{.JobID}}">{{$.T "Back to the job"}}</a></p>
+{{end}}
+{{end}}

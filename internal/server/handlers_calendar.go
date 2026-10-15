@@ -43,6 +43,13 @@ func (s *Server) handleCalendar(w http.ResponseWriter, r *http.Request) {
 	if s.handoverError(w, r, err) {
 		return
 	}
+	// Jobs that are in the shop, drawn where their plan puts them, next to
+	// the slots sold for cars that are not here yet.
+	planned, err := workshop.PlannedJobs(r.Context(), s.pool, session.Scope, monday, end)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	bookings = workshop.PlannedBlocks(planned, bookings)
 	var found []workshop.Booking
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if q != "" {

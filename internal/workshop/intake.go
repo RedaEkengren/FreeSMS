@@ -273,8 +273,8 @@ func assignTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID, custome
 		}
 	}
 	if technicianID != "" {
-		if _, err := tx.Exec(ctx, `UPDATE work_orders SET assigned_to = $2 WHERE id = $1`, jobID, technicianID); err != nil {
-			return fmt.Errorf("assign technician: %w", err)
+		if err := assignTechnicianTx(ctx, tx, scope, jobID, technicianID, ""); err != nil {
+			return err
 		}
 	}
 	if promised != nil {

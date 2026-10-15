@@ -331,6 +331,9 @@ func (s *Server) routes() (http.Handler, error) {
 
 	mux.HandleFunc("POST /jobs/{id}/inspect", s.requireSession(s.handleStartInspection))
 	mux.HandleFunc("POST /jobs/{id}/promise", s.requireSession(s.handlePromise))
+	mux.HandleFunc("POST /jobs/{id}/staff", s.requireSession(s.handleStaffJob))
+	mux.HandleFunc("POST /jobs/{id}/plan", s.requireSession(s.handlePlan))
+	mux.HandleFunc("POST /jobs/{id}/plan/carry", s.requireSession(s.handleCarryOver))
 	mux.HandleFunc("POST /jobs/{id}/answers/{itemID}", s.requireSession(s.handlePriceAnswer))
 	mux.HandleFunc("POST /jobs/{id}/car", s.requireSession(s.handleCar))
 	mux.HandleFunc("POST /jobs/{id}/takeout", s.requireSession(s.handleTakeOut))

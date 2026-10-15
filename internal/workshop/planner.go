@@ -183,9 +183,23 @@ func markClashes(blocks []PlannerBlock) {
 // lifts, as wall-clock spans.
 func liftsOver(lanes []PlannerLane, lifts int) []string {
 	var count [PlannerSlots]int
+	// One car on several technicians' rows is one car on one lift.
+	seen := map[string]bool{}
 	for _, l := range lanes {
 		for _, b := range l.Blocks {
+			if b.Booking.OffLift {
+				continue
+			}
+			key := b.Booking.ID
+			if b.Booking.JobID != "" {
+				key = "job:" + b.Booking.JobID
+			}
 			for s := b.Start; s < b.Start+b.Span && s < PlannerSlots; s++ {
+				k := fmt.Sprintf("%s/%d", key, s)
+				if seen[k] {
+					continue
+				}
+				seen[k] = true
 				count[s]++
 			}
 		}

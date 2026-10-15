@@ -55,7 +55,7 @@
       <button type="submit" class="link">{{$.T "Here after all"}}</button></form>{{end}}{{end}}</div>
   <div class="pl-lane{{if .Away}} pl-away{{end}}">
     {{range .Blocks}}
-    <a class="pb {{printf "cs-%d" .Start}} {{printf "cd-%d" .Span}}{{if .Away}} pb-short{{else if .Clash}} pb-short{{else if .OffShift}} pb-short{{else if .Overrun}} pb-over{{else if .Late}} pb-late{{else if eq .Booking.Status "arrived"}} pb-arrived{{else if .Booking.Overbooked}} pb-over{{else if .Booking.PartsNeeded}} pb-parts{{end}}" href="/bookings/{{.Booking.ID}}">
+    <a class="pb {{printf "cs-%d" .Start}} {{printf "cd-%d" .Span}}{{if .Away}} pb-short{{else if .Clash}} pb-short{{else if .OffShift}} pb-short{{else if .Overrun}} pb-over{{else if .Late}} pb-late{{else if eq .Booking.Status "planned"}} pb-arrived{{else if eq .Booking.Status "arrived"}} pb-arrived{{else if .Booking.Overbooked}} pb-over{{else if .Booking.PartsNeeded}} pb-parts{{end}}" href="{{if .Booking.JobID}}/jobs/{{.Booking.JobID}}{{else}}/bookings/{{.Booking.ID}}{{end}}">
       <span class="pb-time">{{$.Date ($.Local .Booking.Starts) "15:04"}}&ndash;{{$.Date ($.Local .Booking.Ends) "15:04"}}{{if .Clipped}} &hellip;{{end}}</span>
       <b>{{if .Booking.Registration}}{{.Booking.Registration}}{{else}}{{$.T "no plate yet"}}{{end}}</b>
       <span>{{.Booking.What}}</span>

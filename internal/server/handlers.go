@@ -238,6 +238,17 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 		s.log.Error("read presence", "error", err)
 	}
 
+	jobPlan, err := workshop.PlanFor(r.Context(), s.pool, session.Scope, id)
+	if err != nil {
+		s.log.Error("read plan", "error", err)
+	}
+	var planTechs []workshop.PlannerRow
+	if session.Scope.Role.SeesCustomerPersonalData() {
+		if planTechs, err = workshop.PlannerRows(r.Context(), s.pool, session.Scope); err != nil {
+			s.log.Error("read technicians", "error", err)
+		}
+	}
+
 	// What the customer answered on their link: the front desk's to price.
 	// Not fetched for a technician at all, so there is nothing to hide.
 	var answers []workshop.CustomerAnswer
@@ -384,6 +395,8 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 		Answers:     answers,
 		Quote:       quote,
 		Presence:    presence,
+		JobPlan:     jobPlan,
+		PlanTechs:   planTechs,
 		JobParts:    jobParts,
 		Contacts:    contacts,
 		ShareURL:    linkURL,

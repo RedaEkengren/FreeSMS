@@ -52,6 +52,11 @@ var waitingSays = map[string]string{
 	"part_requested":     "A part was asked for: %s",
 	"taken_out_unpriced": "Taken out, not priced: %s",
 	"schedule_changed":   "Your schedule has changed",
+	"assigned_to_you":    "Put on you",
+	"plan_changed":       "The plan for your job has moved",
+	"unstaffed":          "Nobody is on it",
+	"tech_away":          "%s is away; it needs somebody else",
+	"plan_overdue":       "The plan ran out and the job is still open",
 }
 
 // Says is the item's catalogue key.
@@ -187,7 +192,18 @@ func technicianWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 			UNION ALL
 			SELECT 'booked_on_you', m.id, m.number, m.registration, ''
 			FROM mine m JOIN bookings b ON b.work_order_id = m.id
-			WHERE b.technician_id = $1 AND b.status = 'arrived' AND m.back_on IS NULL`, scope.UserID)
+			WHERE b.technician_id = $1 AND b.status = 'arrived' AND m.back_on IS NULL
+			UNION ALL
+			SELECT 'assigned_to_you', m.id, m.number, m.registration, ''
+			FROM mine m JOIN job_assignments a ON a.work_order_id = m.id AND a.user_id = $1 AND a.released_at IS NULL
+			WHERE a.assigned_by <> $1 AND a.assigned_at > coalesce(m.back_on, '-infinity')
+			  AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.work_order_id = m.id AND b.technician_id = $1 AND b.status = 'arrived')
+			UNION ALL
+			SELECT 'plan_changed', m.id, m.number, m.registration, ''
+			FROM mine m
+			JOIN job_assignments a ON a.work_order_id = m.id AND a.user_id = $1 AND a.released_at IS NULL
+			JOIN job_plans p ON p.work_order_id = m.id AND `+latestPlan+`
+			WHERE p.version > 1 AND p.by_user <> $1 AND p.at > a.assigned_at AND p.at > coalesce(m.back_on, '-infinity')`, scope.UserID)
 		if err != nil {
 			return fmt.Errorf("technician's list: %w", err)
 		}
@@ -292,6 +308,19 @@ func deskWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, la
 		}
 	}
 	var out []WaitingItem
+	backlog, err := Backlog(ctx, pool, scope)
+	if err != nil {
+		return nil, err
+	}
+	for _, b := range backlog {
+		kind := map[string]string{"unstaffed": "unstaffed", "away": "tech_away", "overdue": "plan_overdue"}[b.Kind]
+		// A draft nobody is on yet is the intake's business, not a queue
+		// item; work that has been agreed and has nobody is.
+		if b.Kind == "unstaffed" && b.State != StateApproved && b.State != StateInProgress && b.State != StateAwaitingParts {
+			continue
+		}
+		out = append(out, WaitingItem{Kind: kind, JobID: b.JobID, Number: b.Number, Registration: b.Registration, Text: b.Who})
+	}
 	for _, b := range board {
 		item := func(kind string, count int) {
 			out = append(out, WaitingItem{Kind: kind, JobID: b.ID, Number: b.Number, Registration: b.Registration, Count: count})
