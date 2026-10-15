@@ -1,0 +1,147 @@
+{{define "content"}}
+{{with .Enquiry}}
+<div class="row">
+  <h1>{{.Subject}}</h1>
+  <span class="tag">{{$.T .Status}}</span>
+</div>
+<dl>
+  <dt>{{$.T "Vehicle"}}</dt>
+  <dd>{{if .Registration}}{{.Registration}}{{end}}{{if and .Registration .Vehicle}} &middot; {{end}}{{.Vehicle}}{{if not (or .Registration .Vehicle)}}<span class="waiting">{{$.T "not known yet"}}</span>{{end}}</dd>
+  <dt>{{$.T "Customer"}}</dt>
+  <dd>{{if .CustomerName}}{{.CustomerName}}{{if .CustomerPhone}} &middot; <a href="tel:{{.CustomerPhone}}">{{.CustomerPhone}}</a>{{end}}{{else}}<span class="waiting">{{$.T "not known yet"}}</span>{{end}}</dd>
+  <dt>{{$.T "Asked"}}</dt><dd>{{$.Date ($.Local .CreatedAt) "Mon 2 Jan 15:04"}}</dd>
+</dl>
+<p class="waiting">{{$.T "Nothing here means the car has arrived, that work was done or that anything is owed."}}</p>
+
+<h2>{{$.T "The draft"}}</h2>
+{{if .Draft}}
+<table class="lines-table">
+  <thead><tr><th>{{$.T "What"}}</th><th class="num">{{$.T "Quantity"}}</th><th class="num">{{$.T "Unit price"}}</th><th class="num">{{$.T "Amount"}}</th><th></th></tr></thead>
+  <tbody>
+  {{range .Draft}}
+    <tr><td>{{.Description}} <span class="tag">{{$.T .Kind}}</span></td>
+      <td class="num" data-label="{{$.T "Quantity"}}">{{$.Num .Quantity}}</td>
+      <td class="num" data-label="{{$.T "Unit price"}}">{{$.Money .UnitPriceMinor}}</td>
+      <td class="num" data-label="{{$.T "Amount"}}">{{$.Money .NetMinor}}</td>
+      <td><form method="post" action="/enquiries/{{$.Enquiry.ID}}/lines/{{.Position}}/remove"><button type="submit" class="secondary">{{$.T "Remove"}}</button></form></td></tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="waiting">{{$.T "Nothing on the draft yet."}}</p>
+{{end}}
+
+<form class="my" method="post" action="/enquiries/{{.ID}}/lines" data-keep="enquiry-line">
+  <div class="pair">
+    <label><span>{{$.T "Kind"}}</span>
+      <select name="kind"><option value="labour">{{$.T "labour"}}</option><option value="part">{{$.T "part"}}</option><option value="sublet">{{$.T "sublet"}}</option><option value="fee">{{$.T "fee"}}</option></select></label>
+    <label><span>{{$.T "What"}}</span><input name="description" required></label>
+  </div>
+  <div class="pair">
+    <label><span>{{$.T "Quantity"}}</span><input name="quantity" value="1" inputmode="decimal" required></label>
+    <label><span>{{$.T "Unit price"}}</span><input name="unit_price" inputmode="decimal" required></label>
+  </div>
+  <button type="submit" class="secondary">{{$.T "Add to the draft"}}</button>
+</form>
+
+{{if not .BookingID}}
+<h2>{{$.T "Put it to the customer"}}</h2>
+<form class="my" method="post" action="/enquiries/{{.ID}}/quote">
+  <div class="pair">
+    <label><span>{{$.T "The price stands for, days"}}</span><input name="valid_days" value="14" inputmode="numeric"></label>
+    <label><span>{{$.T "The price is"}}</span>
+      <select name="price_kind"><option value="fixed">{{$.T "fixed"}}</option><option value="estimate">{{$.T "an estimate"}}</option></select></label>
+  </div>
+  <label><span>{{$.T "What a diagnosis may and may not find before they are asked again"}}</span><textarea name="limits" rows="2" maxlength="1000"></textarea></label>
+  <button type="submit">{{if .Latest}}{{$.T "Put a new version to the customer"}}{{else}}{{$.T "Put it to the customer"}}{{end}}</button>
+</form>
+{{end}}
+
+{{if .Versions}}
+<h2>{{$.T "What was put to the customer"}}</h2>
+{{range .Versions}}
+<div class="card">
+  <div class="row">
+    <span><strong>{{$.T "Version %d" .Version}}</strong> &middot; {{$.Date ($.Local .PresentedAt) "2 Jan 15:04"}}
+      {{if .Superseded}}<span class="tag warranty">{{$.T "replaced"}}</span>{{else if .Expired}}<span class="tag late">{{$.T "expired"}}</span>{{end}}</span>
+    <span>{{$.Money .GrossMinor}} <span class="waiting">{{$.T "including VAT"}}</span></span>
+  </div>
+  <p class="waiting">{{if eq .PriceKind "fixed"}}{{$.T "Fixed price"}}{{else}}{{$.T "An estimate"}}{{end}} &middot; {{$.T "stands until %s" ($.Date ($.Local .ValidUntil) "2 Jan")}}</p>
+  {{if .Limits}}<p class="waiting">{{.Limits}}</p>{{end}}
+  <ul class="lines">
+    {{range .Lines}}<li class="waiting">{{.Description}} &middot; {{$.Num .Quantity}} &times; {{$.Money .UnitPriceMinor}} = {{$.Money .NetMinor}}</li>{{end}}
+  </ul>
+  <p class="no-print"><a href="/enquiries/{{$.Enquiry.ID}}/quote/{{.Version}}/print">{{$.T "Print this version"}}</a></p>
+</div>
+{{end}}
+
+{{with .Answers}}
+<ul class="lines">
+  {{range .}}
+  <li class="waiting">{{$.T "Version %d" .Version}} &middot; {{if eq .Decision "approved"}}{{if .Partly}}{{$.T "yes to part"}}{{else}}{{$.T "yes"}}{{end}}{{else}}{{$.T "no"}}{{end}}
+    &middot; {{if eq .Via "link"}}{{$.T "on their link"}}{{else if eq .Via "phone"}}{{$.T "by telephone"}}{{else}}{{$.T "at the counter"}}{{end}}
+    &middot; {{$.Date ($.Local .DecidedAt) "2 Jan 15:04"}}{{if .RecordedBy}} &middot; {{$.T "written down by %s" .RecordedBy}}{{end}}
+    {{if eq .Decision "approved"}}&middot; {{$.T "agreed to %s" ($.Money .AgreedGrossMinor)}}{{end}}{{if .Note}} &middot; {{.Note}}{{end}}</li>
+  {{end}}
+</ul>
+{{end}}
+
+{{with .Latest}}{{if not .Expired}}
+<form class="my" method="post" action="/enquiries/{{$.Enquiry.ID}}/quote/{{.ID}}/answer">
+  <p class="waiting">{{$.T "The customer answered by telephone or at the counter? Write it down."}}</p>
+  {{range .Lines}}
+  <label class="tick"><input type="checkbox" name="declined" value="{{.Position}}"><span>{{$.T "Not this one:"}} {{.Description}}</span></label>
+  {{end}}
+  <div class="pair">
+    <label><span>{{$.T "How"}}</span>
+      <select name="via"><option value="phone">{{$.T "By telephone"}}</option><option value="counter">{{$.T "At the counter"}}</option></select></label>
+    <label><span>{{$.T "Amount they agreed to, including VAT"}}</span>
+      <input name="agreed" inputmode="decimal" placeholder="{{$.Money .GrossMinor}}"></label>
+  </div>
+  <label><span>{{$.T "Note"}}</span><input name="note" maxlength="500"></label>
+  {{/* Enter in a field must not answer for the customer. */}}
+  <button type="submit" disabled hidden aria-hidden="true" tabindex="-1"></button>
+  <div class="actions mt-s">
+    <button name="decision" value="approved">{{$.T "They said yes"}}</button>
+    <button name="decision" value="declined" class="secondary">{{$.T "They said no"}}</button>
+  </div>
+</form>
+{{end}}{{end}}
+
+{{if .ShopName}}
+<form class="my" method="post" action="/enquiries/{{.ID}}/link">
+  <button type="submit" class="secondary">{{$.T "Make a link for the customer"}}</button>
+</form>
+{{end}}
+{{if $.ShareURL}}
+<div class="card">
+  <p class="waiting">{{$.T "Send this to the customer. It is shown once."}}</p>
+  <input id="share-url" value="{{$.ShareURL}}" readonly data-select>
+</div>
+{{end}}
+{{end}}
+
+{{if .BookingID}}
+<h2>{{$.T "Booked"}}</h2>
+<p><a href="/bookings/{{.BookingID}}">{{$.T "The booking made from it"}}</a></p>
+{{else if .Answer}}{{if eq .Answer.Decision "approved"}}
+<h2>{{$.T "Book what they accepted"}}</h2>
+<form class="my" method="post" action="/enquiries/{{.ID}}/book" data-keep="enquiry-book">
+  <div class="pair">
+    <label><span>{{$.T "Day"}}</span><input type="date" name="date" required></label>
+    <label><span>{{$.T "At"}}</span><input type="time" name="time" value="08:00" step="900" required></label>
+  </div>
+  <div class="pair">
+    <label><span>{{$.T "Minutes"}}</span><input name="minutes" value="60" inputmode="numeric" required></label>
+    <label><span>{{$.T "Technician"}}</span>
+      <select name="technician_id"><option value="">{{$.T "Not given to anybody yet"}}</option>
+        {{range $.Planner.Rows}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></label>
+  </div>
+  <p class="waiting">{{$.T "Booking it does not make the car present. What they accepted comes with it, at the price they were shown."}}</p>
+  <button type="submit">{{$.T "Book it"}}</button>
+</form>
+{{end}}{{end}}
+{{end}}
+
+<p class="mt-l"><a href="/enquiries">{{.T "All enquiries"}}</a></p>
+{{end}}

@@ -16,6 +16,7 @@
   {{with .Step.Action}}<p><strong>{{$.T "Next:"}}</strong> {{$.T .}}{{with $.Step.Owner.Label}} <span class="tag">{{$.T .}}</span>{{end}}</p>{{end}}
   {{with .Step.Missing}}<p class="waiting">{{$.T "Not known yet:"}} {{range $i, $m := .}}{{if $i}}, {{end}}{{$.T $m}}{{end}}</p>{{end}}
   {{if and .Job.BookingID .Session.Scope.Role.SeesCustomerPersonalData}}<p class="waiting"><a href="/bookings/{{.Job.BookingID}}">{{.T "The booking this car came for"}}</a></p>{{end}}
+  {{if and .Job.EnquiryID .Session.Scope.Role.SeesCustomerPersonalData}}<p class="waiting"><a href="/enquiries/{{.Job.EnquiryID}}">{{.T "The enquiry and the price they accepted"}}</a></p>{{end}}
 </div>
 </div>
 

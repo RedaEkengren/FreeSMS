@@ -1,0 +1,31 @@
+{{define "content"}}
+<h1>{{.T "Enquiries"}}</h1>
+<p class="waiting">{{.T "A customer asking what something would cost, before there is a car here. Put a price to them, and book it when they say yes."}}</p>
+
+<form method="post" action="/enquiries" data-keep="enquiry">
+  <label><span>{{.T "What they are asking about"}}</span><input name="subject" required autofocus></label>
+  <div class="pair">
+    <label><span>{{.T "Registration"}}</span><input name="registration" autocapitalize="characters" autocorrect="off" spellcheck="false"></label>
+    <label><span>{{.T "Vehicle, if no registration"}}</span><input name="vehicle"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "Customer"}}</span><input name="customer_name"></label>
+    <label><span>{{.T "Phone"}}</span><input name="customer_phone" type="tel"></label>
+  </div>
+  <p class="waiting">{{.T "Only what is asked about is needed. The rest can be filled in when it is known."}}</p>
+  <button type="submit">{{.T "Start an enquiry"}}</button>
+</form>
+
+{{if .Enquiries}}
+<ul class="lines mt-l">
+  {{range .Enquiries}}
+  <li><div class="row">
+    <span><a href="/enquiries/{{.ID}}">{{.Subject}}</a>{{if .Registration}} &middot; {{.Registration}}{{end}}{{if .CustomerName}} &middot; {{.CustomerName}}{{end}}</span>
+    <span><span class="tag">{{$.T .Status}}</span> <span class="waiting">{{$.Date ($.Local .CreatedAt) "2 Jan"}}</span></span>
+  </div></li>
+  {{end}}
+</ul>
+{{else}}
+<p class="empty mt-l">{{.T "No enquiries yet."}}</p>
+{{end}}
+{{end}}

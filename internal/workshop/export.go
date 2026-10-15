@@ -37,7 +37,7 @@ var ExportTables = []string{
 	"invoice_series", "accounting_exports", "ledger_accounts", "parts", "part_codes",
 	"stock_movements", "price_bands", "labour_times", "erasures", "shop_exports",
 	"bookings", "booking_events", "staff_absences", "shop_closures", "rotas", "rota_hours", "shift_changes", "outbound_messages", "message_events",
-	"work_order_state_changes", "quotes", "quote_lines", "quote_decisions",
+	"work_order_state_changes", "quotes", "quote_lines", "quote_decisions", "enquiries", "enquiry_lines",
 }
 
 // exportQueries are tables exported with chosen columns, because one of
@@ -45,7 +45,7 @@ var ExportTables = []string{
 var exportQueries = map[string]string{
 	"users":             `SELECT id, shop_id, person_id, role, active, deactivated_at, locale, created_at FROM users`,
 	"inspection_shares": `SELECT id, shop_id, inspection_id, created_by, created_at, expires_at, revoked_at FROM inspection_shares`,
-	"job_links":         `SELECT id, shop_id, work_order_id, created_by, created_at, expires_at, revoked_at FROM job_links`,
+	"job_links":         `SELECT id, shop_id, work_order_id, enquiry_id, created_by, created_at, expires_at, revoked_at FROM job_links`,
 }
 
 // exportExcluded are the tables that do not go, and why.

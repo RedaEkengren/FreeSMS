@@ -1569,6 +1569,174 @@
     "Cancel the job: nothing was done": {
       "other": "Annullera jobbet: inget gjordes"
     },
+    "A customer asking what something would cost, before there is a car here. Put a price to them, and book it when they say yes.": {
+      "other": "En kund som frågar vad något skulle kosta, innan det finns en bil här. Lägg fram ett pris, och boka när de säger ja."
+    },
+    "About": {
+      "other": "Gäller"
+    },
+    "Add to the draft": {
+      "other": "Lägg till i utkastet"
+    },
+    "All enquiries": {
+      "other": "Alla förfrågningar"
+    },
+    "An estimate": {
+      "other": "Ett uppskattat pris"
+    },
+    "an estimate": {
+      "other": "ett uppskattat pris"
+    },
+    "Fixed price": {
+      "other": "Fast pris"
+    },
+    "fixed": {
+      "other": "fast"
+    },
+    "Asked": {
+      "other": "Frågade"
+    },
+    "Book what they accepted": {
+      "other": "Boka det de godkände"
+    },
+    "Booking it does not make the car present. What they accepted comes with it, at the price they were shown.": {
+      "other": "Att boka gör inte bilen närvarande. Det de godkände följer med, till priset de fick se."
+    },
+    "Enquiries": {
+      "other": "Förfrågningar"
+    },
+    "Enquiry": {
+      "other": "Förfrågan"
+    },
+    "For": {
+      "other": "Till"
+    },
+    "No enquiries yet.": {
+      "other": "Inga förfrågningar än."
+    },
+    "Not all the lines.": {
+      "other": "Inte alla raderna."
+    },
+    "Not this one:": {
+      "other": "Inte den här:"
+    },
+    "Nothing has been put to you yet.": {
+      "other": "Inget har lagts fram för dig än."
+    },
+    "Nothing here means the car has arrived, that work was done or that anything is owed.": {
+      "other": "Inget här betyder att bilen har kommit, att något arbete gjorts eller att något är skyldigt."
+    },
+    "Nothing on the draft yet.": {
+      "other": "Inget i utkastet än."
+    },
+    "Only what is asked about is needed. The rest can be filled in when it is known.": {
+      "other": "Bara vad det gäller behövs. Resten fylls i när det är känt."
+    },
+    "Print this version": {
+      "other": "Skriv ut den här versionen"
+    },
+    "Proposal": {
+      "other": "Förslag"
+    },
+    "Put a new version to the customer": {
+      "other": "Lägg fram en ny version för kunden"
+    },
+    "Put it to the customer": {
+      "other": "Lägg fram för kunden"
+    },
+    "Remove": {
+      "other": "Ta bort"
+    },
+    "Send this to the customer. It is shown once.": {
+      "other": "Skicka det här till kunden. Det visas en gång."
+    },
+    "Start an enquiry": {
+      "other": "Starta en förfrågan"
+    },
+    "The booking made from it": {
+      "other": "Bokningen som gjordes av den"
+    },
+    "The draft": {
+      "other": "Utkastet"
+    },
+    "The price": {
+      "other": "Priset"
+    },
+    "The price is": {
+      "other": "Priset är"
+    },
+    "The price stands for, days": {
+      "other": "Priset gäller i, dagar"
+    },
+    "The workshop changed the proposal while you were reading it, or it has stopped standing. This is the latest one.": {
+      "other": "Verkstaden ändrade förslaget medan du läste, eller så gäller det inte längre. Det här är det senaste."
+    },
+    "This link is personal to your enquiry and stops working after a while.": {
+      "other": "Den här länken är personlig för din förfrågan och slutar fungera efter en tid."
+    },
+    "This proposal has stopped standing. Ask the workshop for a new one.": {
+      "other": "Det här förslaget gäller inte längre. Be verkstaden om ett nytt."
+    },
+    "Untick what you do not want done.": {
+      "other": "Avmarkera det du inte vill ha gjort."
+    },
+    "Vehicle, if no registration": {
+      "other": "Fordon, om registreringsnummer saknas"
+    },
+    "What a diagnosis may and may not find before they are asked again": {
+      "other": "Vad en felsökning får och inte får hitta innan kunden frågas igen"
+    },
+    "What they are asking about": {
+      "other": "Vad de frågar om"
+    },
+    "What was put to the customer": {
+      "other": "Vad som lades fram för kunden"
+    },
+    "Work outside what is written here is agreed with you again before it is done.": {
+      "other": "Arbete utöver det som står här avtalas med dig igen innan det görs."
+    },
+    "Your proposal": {
+      "other": "Ditt förslag"
+    },
+    "expired": {
+      "other": "utgången"
+    },
+    "not known yet": {
+      "other": "inte känt än"
+    },
+    "replaced": {
+      "other": "ersatt"
+    },
+    "stands until %s": {
+      "other": "gäller till %s"
+    },
+    "yes to part": {
+      "other": "ja till en del"
+    },
+    "Draft": {
+      "other": "Utkast"
+    },
+    "Sent": {
+      "other": "Skickad"
+    },
+    "Accepted": {
+      "other": "Godkänd"
+    },
+    "Partly accepted": {
+      "other": "Delvis godkänd"
+    },
+    "Expired": {
+      "other": "Utgången"
+    },
+    "sublet": {
+      "other": "underentreprenad"
+    },
+    "fee": {
+      "other": "avgift"
+    },
+    "The enquiry and the price they accepted": {
+      "other": "Förfrågan och priset de godkände"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

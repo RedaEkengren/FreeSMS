@@ -215,6 +215,11 @@ func TakeInBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		if err := assignTx(ctx, tx, scope, jobID, customerID, in.AlsoOwner, in.TechnicianID, in.PromisedAt); err != nil {
 			return err
 		}
+		// A booking made from an accepted proposal brings its lines, agreed,
+		// at the price the customer was shown.
+		if err := carryAcceptedLinesTx(ctx, tx, scope.ShopID, jobID, in.BookingID); err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE bookings SET status = 'arrived', work_order_id = $2,
 			       technician_id = nullif($3, '')::uuid,

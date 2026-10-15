@@ -1,0 +1,33 @@
+{{define "content"}}
+{{with .Enquiry}}{{with $.Version}}
+<h1>{{$.T "Proposal"}}{{if $.Enquiry.Registration}} &middot; {{$.Enquiry.Registration}}{{end}}</h1>
+<p class="vehicle">{{$.Enquiry.ShopName}}{{if $.Enquiry.ShopPhone}} &middot; {{$.Enquiry.ShopPhone}}{{end}}</p>
+{{if $.Enquiry.ShopAddress}}<p class="waiting">{{$.Enquiry.ShopAddress}}</p>{{end}}
+<dl>
+  <dt>{{$.T "For"}}</dt><dd>{{if $.Enquiry.CustomerName}}{{$.Enquiry.CustomerName}}{{else}}&ndash;{{end}}</dd>
+  <dt>{{$.T "About"}}</dt><dd>{{$.Enquiry.Subject}}</dd>
+  {{if $.Enquiry.Vehicle}}<dt>{{$.T "Vehicle"}}</dt><dd>{{$.Enquiry.Vehicle}}</dd>{{end}}
+  <dt>{{$.T "Version %d" .Version}}</dt><dd>{{$.Date ($.Local .PresentedAt) "2 Jan 2006"}}</dd>
+  <dt>{{$.T "The price"}}</dt><dd>{{if eq .PriceKind "fixed"}}{{$.T "Fixed price"}}{{else}}{{$.T "An estimate"}}{{end}}, {{$.T "stands until %s" ($.Date ($.Local .ValidUntil) "2 Jan 2006")}}</dd>
+</dl>
+{{if .Limits}}<p>{{.Limits}}</p>{{end}}
+<table class="lines-table">
+  <thead><tr><th>{{$.T "What"}}</th><th class="num">{{$.T "Quantity"}}</th><th class="num">{{$.T "Unit price"}}</th><th class="num">{{$.T "Amount"}}</th></tr></thead>
+  <tbody>
+  {{range .Lines}}
+    <tr><td>{{.Description}}</td><td class="num" data-label="{{$.T "Quantity"}}">{{$.Num .Quantity}}</td><td class="num" data-label="{{$.T "Unit price"}}">{{$.Money .UnitPriceMinor}}</td><td class="num" data-label="{{$.T "Amount"}}">{{$.Money .NetMinor}}</td></tr>
+  {{end}}
+  </tbody>
+</table>
+<dl>
+  <dt>{{$.T "Excluding VAT"}}</dt><dd>{{$.Money .NetMinor}}</dd>
+  <dt>{{$.T "VAT"}}</dt><dd>{{$.Money .VATMinor}}</dd>
+  <dt>{{$.T "Total including VAT"}}</dt><dd><strong>{{$.Money .GrossMinor}}</strong></dd>
+</dl>
+<p class="waiting">{{$.T "Work outside what is written here is agreed with you again before it is done."}}</p>
+<div class="no-print">
+  <button type="button" class="secondary" data-print>{{$.T "Print"}}</button>
+  <p class="mt-l"><a href="/enquiries/{{$.Enquiry.ID}}">{{$.T "Back"}}</a></p>
+</div>
+{{end}}{{end}}
+{{end}}

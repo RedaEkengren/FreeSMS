@@ -79,6 +79,8 @@ type Job struct {
 	// being told who. BookingID is the booking the car came for, if it did.
 	HasCustomer bool
 	BookingID   string
+	// The enquiry the booking was made from, when it was.
+	EnquiryID string
 }
 
 // StateLabel is the condition this job is in, as a catalogue key. The column
@@ -220,7 +222,8 @@ const jobColumns = `
 	           WHERE t3.work_order_id = w.id AND t3.ended_at IS NULL
 	             AND t3.user_id IS DISTINCT FROM $1), '') AS others_running,
 	(w.customer_id IS NOT NULL) AS has_customer,
-	coalesce((SELECT b.id::text FROM bookings b WHERE b.work_order_id = w.id LIMIT 1), '') AS booking_id,` + presenceColumns
+	coalesce((SELECT b.id::text FROM bookings b WHERE b.work_order_id = w.id LIMIT 1), '') AS booking_id,
+	coalesce((SELECT b.enquiry_id::text FROM bookings b WHERE b.work_order_id = w.id LIMIT 1), '') AS enquiry_id,` + presenceColumns
 
 const jobFrom = `
 	FROM work_orders w
@@ -234,7 +237,7 @@ func scanJob(row pgx.Row) (Job, error) {
 		&j.Registration, &j.Make, &j.Model, &j.ModelYear,
 		&j.OpenedAt, &j.PromisedAt, &j.OdometerKm, &j.ClockStartedAt, &j.HasWork,
 		&j.AssignedTo, &j.AssignedToMe, &j.OpenRequests, &j.OpenFindings, &j.OthersRunning,
-		&j.HasCustomer, &j.BookingID, &j.CarAway, &j.ExpectedBack)
+		&j.HasCustomer, &j.BookingID, &j.EnquiryID, &j.CarAway, &j.ExpectedBack)
 	j.ClockRunning = j.ClockStartedAt != nil
 	return j, err
 }

@@ -1,0 +1,56 @@
+{{define "content"}}
+{{/* The customer's page for a proposal: every amount, what it stands on and
+     until when, and their answer. No account; the link is the key. */}}
+{{if .Error}}
+  <h1>{{.T .Title}}</h1>
+  <p class="error">{{.T .Error}}</p>
+{{else}}
+{{with .Offer}}
+  <h1>{{.Subject}}</h1>
+  <p class="vehicle">{{if .Registration}}{{.Registration}} &middot; {{end}}{{if .Vehicle}}{{.Vehicle}} &middot; {{end}}{{.ShopName}}</p>
+  {{if $.QuoteChanged}}<p class="error">{{$.T "The workshop changed the proposal while you were reading it, or it has stopped standing. This is the latest one."}}</p>{{end}}
+  {{with .Quote}}
+  <div class="card">
+    <p class="waiting">{{if eq .PriceKind "fixed"}}{{$.T "Fixed price"}}{{else}}{{$.T "An estimate"}}{{end}} &middot; {{$.T "stands until %s" ($.Date ($.Local .ValidUntil) "2 Jan 2006")}}</p>
+    {{if .Limits}}<p>{{.Limits}}</p>{{end}}
+  </div>
+  <table class="lines-table">
+    <thead><tr><th>{{$.T "What"}}</th><th class="num">{{$.T "Quantity"}}</th><th class="num">{{$.T "Unit price"}}</th><th class="num">{{$.T "Amount"}}</th></tr></thead>
+    <tbody>
+    {{range .Lines}}
+      <tr><td>{{.Description}}</td><td class="num" data-label="{{$.T "Quantity"}}">{{$.Num .Quantity}}</td><td class="num" data-label="{{$.T "Unit price"}}">{{$.Money .UnitPriceMinor}}</td><td class="num" data-label="{{$.T "Amount"}}">{{$.Money .NetMinor}}</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  <dl>
+    <dt>{{$.T "Excluding VAT"}}</dt><dd>{{$.Money .NetMinor}}</dd>
+    <dt>{{$.T "VAT"}}</dt><dd>{{$.Money .VATMinor}}</dd>
+    <dt>{{$.T "Total including VAT"}}</dt><dd><strong>{{$.Money .GrossMinor}}</strong></dd>
+  </dl>
+  {{with $.Offer.Answer}}
+    {{if eq .Decision "approved"}}<p class="waiting">{{$.T "You said yes to this on %s. You can change it." ($.Date ($.Local .DecidedAt) "2 Jan 15:04")}}{{if .Partly}} {{$.T "Not all the lines."}}{{end}}</p>
+    {{else}}<p class="waiting">{{$.T "You said no to this on %s. You can change it." ($.Date ($.Local .DecidedAt) "2 Jan 15:04")}}</p>{{end}}
+  {{end}}
+  {{if .Expired}}
+  <p class="error">{{$.T "This proposal has stopped standing. Ask the workshop for a new one."}}</p>
+  {{else}}
+  <form method="post" action="/o/{{$.Offer.Token}}/quote/{{.ID}}">
+    <p class="waiting">{{$.T "Untick what you do not want done."}}</p>
+    {{range .Lines}}<label class="tick"><input type="checkbox" name="keep" value="{{.Position}}" checked><span>{{.Description}}</span></label>{{end}}
+    <div class="actions">
+      <button name="decision" value="approved">{{$.T "Yes, do it"}}</button>
+      <button name="decision" value="declined" class="secondary">{{$.T "No, leave it"}}</button>
+    </div>
+  </form>
+  {{end}}
+  <p class="no-print"><button type="button" class="secondary" data-print>{{$.T "Print"}}</button></p>
+  {{else}}
+  <p class="waiting">{{$.T "Nothing has been put to you yet."}}</p>
+  {{end}}
+  {{if or .ShopPhone .ShopAddress}}
+  <p class="waiting mt-l">{{if .ShopAddress}}{{.ShopAddress}}{{end}}{{if and .ShopAddress .ShopPhone}} &middot; {{end}}{{if .ShopPhone}}<a href="tel:{{.ShopPhone}}">{{.ShopPhone}}</a>{{end}}</p>
+  {{end}}
+  <p class="waiting mt-xl">{{$.T "This link is personal to your enquiry and stops working after a while."}}</p>
+{{end}}
+{{end}}
+{{end}}

@@ -131,21 +131,31 @@ func CreateBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	}
 	var id string
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		if err := closedTx(ctx, tx, nb.Starts); err != nil {
-			return err
-		}
-		if err := tx.QueryRow(ctx, `
-			INSERT INTO bookings (shop_id, starts_at, ends_at, technician_id, registration, customer_name,
-			                      customer_phone, what, estimate_minutes, parts_needed, created_by)
-			VALUES ($1, $2, $3, nullif($4, '')::uuid, nullif($5, ''), nullif($6, ''), nullif($7, ''), $8, $9, $10, $11)
-			RETURNING id`,
-			scope.ShopID, nb.Starts, nb.Ends, nb.TechnicianID, nb.Registration, nb.CustomerName,
-			nb.CustomerPhone, nb.What, nb.EstimateMinutes, nb.PartsNeeded, scope.UserID).Scan(&id); err != nil {
-			return fmt.Errorf("create booking: %w", err)
-		}
-		return bookingEventTx(ctx, tx, scope, id, "booked", &nb.Starts, &nb.Ends, "")
+		var err error
+		id, err = createBookingTx(ctx, tx, scope, nb, "", "")
+		return err
 	})
 	return id, err
+}
+
+// createBookingTx writes the booking and its first event. A booking made from
+// an enquiry carries it and the accepted version along.
+func createBookingTx(ctx context.Context, tx pgx.Tx, scope access.Scope, nb NewBooking, enquiryID, quoteID string) (string, error) {
+	if err := closedTx(ctx, tx, nb.Starts); err != nil {
+		return "", err
+	}
+	var id string
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO bookings (shop_id, starts_at, ends_at, technician_id, registration, customer_name,
+		                      customer_phone, what, estimate_minutes, parts_needed, created_by, enquiry_id, quote_id)
+		VALUES ($1, $2, $3, nullif($4, '')::uuid, nullif($5, ''), nullif($6, ''), nullif($7, ''), $8, $9, $10, $11,
+		        nullif($12, '')::uuid, nullif($13, '')::uuid)
+		RETURNING id`,
+		scope.ShopID, nb.Starts, nb.Ends, nb.TechnicianID, nb.Registration, nb.CustomerName,
+		nb.CustomerPhone, nb.What, nb.EstimateMinutes, nb.PartsNeeded, scope.UserID, enquiryID, quoteID).Scan(&id); err != nil {
+		return "", fmt.Errorf("create booking: %w", err)
+	}
+	return id, bookingEventTx(ctx, tx, scope, id, "booked", &nb.Starts, &nb.Ends, "")
 }
 
 // MoveBooking gives a booking another time or another technician. A row of
