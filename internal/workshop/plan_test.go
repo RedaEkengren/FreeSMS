@@ -56,12 +56,12 @@ func TestASickTechnicianLeavesTheJobToSomebodyElseAndKeepsTheirHours(t *testing.
 	if err != nil || len(p.On) != 1 || p.On[0].UserID != techUserID {
 		t.Fatalf("picking the job up put them on it: %+v %v", p.On, err)
 	}
-	if _, err := workshop.PlanJob(ctx, pool, advisor(), job, plan(at("2026-10-15", 8, 0), at("2026-10-15", 16, 0), 0)); err != nil {
+	if _, err := workshop.PlanJob(ctx, pool, advisor(), job, plan(at("2030-03-04", 8, 0), at("2030-03-04", 16, 0), 0)); err != nil {
 		t.Fatalf("PlanJob: %v", err)
 	}
 
 	// They ring in sick.
-	if err := workshop.SetAbsence(ctx, pool, owner(), techUserID, at("2026-10-15", 0, 0), "sick"); err != nil {
+	if err := workshop.SetAbsence(ctx, pool, owner(), techUserID, at("2030-03-04", 0, 0), "sick"); err != nil {
 		t.Fatal(err)
 	}
 	p, _ = workshop.PlanFor(ctx, pool, advisor(), job)
@@ -117,7 +117,7 @@ func TestASickTechnicianLeavesTheJobToSomebodyElseAndKeepsTheirHours(t *testing.
 	if k := kindsOf(secondTechnician()); len(k) != 1 || k[0] != "assigned_to_you" {
 		t.Errorf("the new technician's queue: %v", k)
 	}
-	if _, err := workshop.PlanJob(ctx, pool, advisor(), job, plan(at("2026-10-16", 8, 0), at("2026-10-16", 16, 0), 1)); err != nil {
+	if _, err := workshop.PlanJob(ctx, pool, advisor(), job, plan(at("2030-03-05", 8, 0), at("2030-03-05", 16, 0), 1)); err != nil {
 		t.Fatal(err)
 	}
 	if k := kindsOf(secondTechnician()); len(k) != 2 || k[1] != "plan_changed" && k[0] != "plan_changed" {
