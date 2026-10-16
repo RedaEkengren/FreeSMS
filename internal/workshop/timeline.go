@@ -334,6 +334,28 @@ func timelineTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID string
 		return nil, err
 	}
 
+	// Work sent to a supplier. Where it is and what came of it is the shop
+	// floor's to know; cost, invoice and hand-over are the counter's.
+	if err := add(collect(ctx, tx, `
+		SELECT e.id::text, e.at, e.kind, o.supplier || ' · ' || o.item, coalesce(e.note, ''), coalesce(p.display_name, '')
+		FROM outsourced_events e JOIN outsourced_work o ON o.id = e.outsourced_id
+		LEFT JOIN users u ON u.id = e.by_user LEFT JOIN people p ON p.id = u.person_id
+		WHERE o.work_order_id = $1 AND (e.kind NOT IN ('cost', 'invoice', 'reconciled') OR $2)`, append(job, desk), func(r pgx.Rows) (Event, error) {
+		var e Event
+		var kind, what, note string
+		if err := r.Scan(&e.id, &e.At, &kind, &what, &note, &e.Actor); err != nil {
+			return e, err
+		}
+		e.Kind, e.Label, e.Arg, e.ArgKey, e.rank = "outsourced", "Supplier work: %s", OutsourcedKindLabel(kind), true, 1
+		e.Detail = what
+		if note != "" {
+			e.Detail += ": " + note
+		}
+		return e, nil
+	})); err != nil {
+		return nil, err
+	}
+
 	// State.
 	if err := add(collect(ctx, tx, `
 		SELECT c.id::text, c.at, c.to_state, coalesce(p.display_name, '')

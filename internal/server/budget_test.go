@@ -54,9 +54,11 @@ var queryBudgets = map[string]int{
 	"desk GET /stock":       26,
 	"desk GET /calendar":    34, // #113: open jobs drawn from their plans, one read in its own scope
 	// 15: the bookings whose message did not reach the customer, one read in its
-	// own scope, for the counter and the owner.
-	"desk GET /mine":       15,
-	"desk GET /mine/count": 16,
+	// own scope, for the counter and the owner. 16: work due back from a
+	// supplier and supplier invoices nobody handed on (#128), one read in its
+	// own scope; its events are read together, not one job at a time.
+	"desk GET /mine":       16,
+	"desk GET /mine/count": 17,
 	// #113: who is on the job and its plan (two statements, plus the clashes
 	// of the plan once there is one) on every job page, and the technicians
 	// to choose from on the desk's. "For me" and the header count read the

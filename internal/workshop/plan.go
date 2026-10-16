@@ -649,6 +649,16 @@ func othersOnTx(ctx context.Context, tx pgx.Tx, jobID, userID string, starts, en
 	return out, rows.Err()
 }
 
+// carAtSupplier is a car that was sent to a supplier and is not back: it is
+// not on a lift, whatever its plan says. Only the car itself; a part off it
+// leaves the lift occupied.
+const carAtSupplier = `
+	SELECT 1 FROM outsourced_work ow
+	WHERE ow.work_order_id = w.id AND ow.item_kind = 'vehicle'
+	  AND (SELECT e.kind FROM outsourced_events e
+	        WHERE e.outsourced_id = ow.id AND e.kind IN ('requested', 'sent', 'waiting', 'returned', 'checked', 'check_failed', 'cancelled')
+	        ORDER BY e.at DESC, e.id DESC LIMIT 1) IN ('sent', 'waiting')`
+
 // liftsClashTx finds the spans in a window where every lift is taken by
 // another car. A car takes a lift when its plan says so and it is here: a car
 // that went home for the night, or waits for a part with its plan off the
@@ -668,6 +678,7 @@ func liftsClashTx(ctx context.Context, tx pgx.Tx, jobID string, starts, ends tim
 		  AND p.starts_at < $3 AND p.ends_at > $2
 		  AND NOT coalesce((SELECT v.event IN ('collected', 'rebooked') FROM vehicle_presence v
 		                     WHERE v.work_order_id = w.id ORDER BY v.at DESC, v.id DESC LIMIT 1), false)
+		  AND NOT exists(`+carAtSupplier+`)
 		UNION ALL
 		SELECT greatest(b.starts_at, $2), least(b.ends_at, $3)
 		FROM bookings b

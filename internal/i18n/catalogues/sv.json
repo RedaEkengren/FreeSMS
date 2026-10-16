@@ -3622,6 +3622,156 @@
     "warranty": {
       "other": "garanti"
     },
+    "A supplier invoice nobody has handed on: %s": {
+      "other": "En leverantörsfaktura som ingen lämnat vidare: %s"
+    },
+    "Chased by": {
+      "other": "Bevakas av"
+    },
+    "Contact": {
+      "other": "Kontakt"
+    },
+    "Cost": {
+      "other": "Kostnad"
+    },
+    "Due back from a supplier and not here: %s": {
+      "other": "Skulle varit tillbaka från en leverantör, men är inte här: %s"
+    },
+    "Estimated": {
+      "other": "Uppskattat"
+    },
+    "Estimated cost": {
+      "other": "Uppskattad kostnad"
+    },
+    "Expected back": {
+      "other": "Väntas tillbaka"
+    },
+    "For the operation": {
+      "other": "För momentet"
+    },
+    "It is": {
+      "other": "Det är"
+    },
+    "Note, or what they report": {
+      "other": "Anteckning, eller vad de rapporterar"
+    },
+    "Nothing has been sent out on this job.": {
+      "other": "Inget har skickats ut på det här jobbet."
+    },
+    "Nothing is out with a supplier, and no supplier invoice is waiting.": {
+      "other": "Inget är hos en leverantör och ingen leverantörsfaktura väntar."
+    },
+    "Put on": {
+      "other": "Läggs på"
+    },
+    "Send it out": {
+      "other": "Skicka iväg det"
+    },
+    "Send something out": {
+      "other": "Skicka något till en leverantör"
+    },
+    "Supplier work: %s": {
+      "other": "Leverantörsarbete: %s"
+    },
+    "The customer is charged": {
+      "other": "Kunden debiteras"
+    },
+    "The job may be ready without it": {
+      "other": "Jobbet får bli klart utan det"
+    },
+    "The job may be ready without it.": {
+      "other": "Jobbet får bli klart utan det."
+    },
+    "Their invoice": {
+      "other": "Deras faktura"
+    },
+    "Their invoice number": {
+      "other": "Deras fakturanummer"
+    },
+    "What came of it": {
+      "other": "Vad det blev av det"
+    },
+    "What is sent": {
+      "other": "Vad som skickas"
+    },
+    "What they are to do": {
+      "other": "Vad de ska göra"
+    },
+    "Where it is": {
+      "other": "Var det är"
+    },
+    "Where the work is, apart from where the job stands and whether the car is on a lift. What comes back is not accepted until the shop says so.": {
+      "other": "Var arbetet är, skilt från hur jobbet står och om bilen står på en lyft. Det som kommer tillbaka är inte godkänt förrän verkstaden säger det."
+    },
+    "Work at suppliers": {
+      "other": "Arbete hos leverantörer"
+    },
+    "a part off the car": {
+      "other": "en del från bilen"
+    },
+    "asked for": {
+      "other": "efterfrågat"
+    },
+    "at the supplier": {
+      "other": "hos leverantören"
+    },
+    "back from them": {
+      "other": "tillbaka från dem"
+    },
+    "checked and accepted": {
+      "other": "kontrollerat och godkänt"
+    },
+    "checked, not good enough": {
+      "other": "kontrollerat, inte bra nog"
+    },
+    "cost recorded": {
+      "other": "kostnad antecknad"
+    },
+    "diagnosis only": {
+      "other": "enbart felsökning"
+    },
+    "handed to the accounts": {
+      "other": "lämnad till bokföringen"
+    },
+    "in the shop, not sent yet": {
+      "other": "i verkstaden, inte skickat än"
+    },
+    "invoice not handed on": {
+      "other": "faktura inte lämnad vidare"
+    },
+    "no work was done": {
+      "other": "inget arbete gjordes"
+    },
+    "not handed on": {
+      "other": "inte lämnad vidare"
+    },
+    "not the estimate": {
+      "other": "inte det uppskattade"
+    },
+    "note": {
+      "other": "anteckning"
+    },
+    "put on": {
+      "other": "lagt på"
+    },
+    "repaired": {
+      "other": "reparerat"
+    },
+    "replaced with another unit": {
+      "other": "ersatt med en annan enhet"
+    },
+    "supplier invoice noted": {
+      "other": "leverantörsfaktura antecknad"
+    },
+    "the car itself": {
+      "other": "själva bilen"
+    },
+    "waiting for them": {
+      "other": "väntar på dem"
+    },
+    "not ready": {
+      "other": "inte klart"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

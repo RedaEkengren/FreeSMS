@@ -30,6 +30,7 @@ var everyRole = map[string]string{
 	"PlanFor":            "who is on a job and when, which a technician needs for their own work; no customer data",
 	"Backlog":            "open jobs nobody is on, by number and registration; no customer data",
 	"TasksFor":           "the work list of a job: steps and who did them, no price and no customer data",
+	"OutsourcedFor":      "what is away at a supplier and when it is due back, which a technician needs to find the car or the part; money and invoice numbers are left out for any role but the counter and the parts desk",
 	"DeliveryDraft":      "what was done on a job -- lines performed, steps, parts, checks; no customer personal data",
 	"RecommendationsFor": "what the workshop suggests doing later on a job; no customer personal data",
 	"PresenceFor":        "whether the car is here, which a technician needs before looking for it; no customer data",

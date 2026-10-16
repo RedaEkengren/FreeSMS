@@ -108,6 +108,13 @@ func finalCheckTx(ctx context.Context, tx pgx.Tx, shopID, jobID string) (FinalCh
 		return FinalCheck{}, err
 	}
 	fc := FinalCheck{Required: true}
+	// A check of work that is still at a supplier certifies nothing.
+	if away, err := unresolvedOutsourcedTx(ctx, tx, jobID); err != nil {
+		return fc, err
+	} else if len(away) > 0 {
+		fc.Missing = "Work sent to a supplier is not back and checked yet."
+		return fc, nil
+	}
 	var inspectionID, performer, by string
 	var assigned *string
 	var workAfter bool
@@ -127,6 +134,8 @@ func finalCheckTx(ctx context.Context, tx pgx.Tx, shopID, jobID string) (FinalCh
 		              WHERE t.work_order_id = w.id AND t.line_id IS NULL AND t.status <> 'omitted' AND t.created_at > i.started_at)
 		    OR exists(SELECT 1 FROM job_task_events e
 		              WHERE e.work_order_id = w.id AND e.to_status = 'done' AND e.at > i.started_at)
+		    OR exists(SELECT 1 FROM outsourced_events oe JOIN outsourced_work o ON o.id = oe.outsourced_id
+		              WHERE o.work_order_id = w.id AND oe.kind IN ('sent', 'returned', 'checked') AND oe.at > i.started_at)
 		FROM inspections i
 		JOIN work_orders w ON w.id = i.work_order_id
 		LEFT JOIN users u ON u.id = i.performed_by

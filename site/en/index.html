@@ -271,6 +271,7 @@
     <button type="button" role="tab" data-tab="20">Closing the day</button>
     <button type="button" role="tab" data-tab="21">Booking confirmed</button>
     <button type="button" role="tab" data-tab="22">The car comes back</button>
+    <button type="button" role="tab" data-tab="23">Work at a supplier</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1417,6 +1418,41 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: a return visit is opened from an invoiced job, a position needs its reason, a supplier claim is rejected and argued, and a technician sees what was reported but no money &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/33-comeback.spec.ts">read the test</a>. Names and amounts are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>When the work is done somewhere else</h2>
+  <p class="lede">A sublet job is a line on the invoice, but the turbocharger that left on Tuesday and was promised for Friday shows up nowhere. Here it is a record of its own: what was sent, to whom, when it is expected, who is chasing it. Where it is is kept apart from the job's state and from whether the car is on a lift. Coming back is not being accepted &ndash; the shop says that itself, and only then can the job be ready.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: a turbocharger is sent to a supplier and runs late, which shows in the counter's queue. It comes back but the job cannot be ready until the shop has accepted it. The cost differs from the estimate and the supplier's invoice is handed on to the accounts.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">Work at suppliers</div>
+              <div class="cl-qrow"><span>#3 TUR 123 · Turbo-Verkstan: Turboaggregatet</span><span class="rd-tag rd-risk">overdue</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Work at suppliers</div>
+              <div class="cl-qrow"><span>#3 TUR 123 · Turbo-Verkstan: Turboaggregatet</span><span class="rd-tag">back from them</span></div>
+              <div class="cl-qrow an-fade" data-t="12"><span>Work at a supplier is not accepted</span><span class="rd-tag rd-risk">not ready</span></div>
+            </div>            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">Work at suppliers</div>
+              <div class="cl-qrow"><span>#3 TUR 123 · Turbo-Verkstan: Turboaggregatet</span><span class="rd-tag pass">checked and accepted</span></div>
+              <div class="cl-qrow"><span>Invoice F-8841 · SEK 4,700</span><span class="rd-tag">not handed on</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">The turbocharger was due back yesterday. It shows in the counter's queue and the owner's, with who is chasing it, and the technician sees where it is but no money.</div>
+      <div class="an-cap" data-t="8,15.8">It came back with a report. That is still not accepted: the job cannot be ready, and a final check made before it came back no longer counts.</div>
+      <div class="an-cap an-off" data-t="16,23.6">The shop accepts it. The cost differs from the estimate and that is said. The supplier's invoice number is noted until somebody hands it on &ndash; FreeSMS is no ledger.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: a turbocharger is sent, runs late, comes back, is accepted by the shop and not before, and the invoice is handed on &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/34-outsourced.spec.ts">read the test</a>. Names and amounts are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

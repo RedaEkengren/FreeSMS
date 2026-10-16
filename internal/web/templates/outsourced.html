@@ -1,0 +1,99 @@
+{{define "content"}}
+<div class="row">
+  <span class="plate">{{if .Job.Registration}}{{.Job.Registration}}{{else}}{{.T "no plate"}}{{end}}</span>
+  <span class="tag">#{{.Job.Number}}</span>
+</div>
+<h1>{{.T "Work at suppliers"}}</h1>
+<p class="waiting"><a href="/jobs/{{.Job.ID}}">{{.T "Back to the job"}}</a></p>
+<p class="waiting">{{.T "Where the work is, apart from where the job stands and whether the car is on a lift. What comes back is not accepted until the shop says so."}}</p>
+
+{{range .Outsourced}}
+<div class="row"><h2>{{.Supplier}} &middot; {{.Item}}</h2>
+  <span class="tag {{if eq .Status "checked"}}pass{{else if eq .Status "check_failed"}}late{{else}}warranty{{end}}">{{$.T .StatusLabel}}</span>
+  {{if .Overdue}}<span class="tag late">{{$.T "overdue"}}</span>{{end}}</div>
+<dl>
+  <dt>{{$.T "What they are to do"}}</dt><dd>{{.Scope}}</dd>
+  <dt>{{$.T "Where it is"}}</dt><dd>{{if .Away}}{{$.T "at the supplier"}}{{else if eq .Status "requested"}}{{$.T "in the shop, not sent yet"}}{{else if eq .Status "cancelled"}}{{$.T "cancelled"}}{{else}}{{$.T "in the shop"}}{{end}} &middot; {{if eq .ItemKind "vehicle"}}{{$.T "the car itself"}}{{else}}{{$.T "a part off the car"}}{{end}}</dd>
+  {{if .Contact}}<dt>{{$.T "Contact"}}</dt><dd>{{.Contact}}</dd>{{end}}
+  {{if .ExternalRef}}<dt>{{$.T "Their reference"}}</dt><dd>{{.ExternalRef}}</dd>{{end}}
+  <dt>{{$.T "Expected back"}}</dt><dd>{{if .ExpectedBack}}{{$.Date ($.Local .ExpectedBack) "Mon 2 Jan 2006"}}{{else}}&ndash;{{end}}</dd>
+  <dt>{{$.T "Chased by"}}</dt><dd>{{.Responsible}}</dd>
+  {{if .Outcome}}<dt>{{$.T "What came of it"}}</dt><dd>{{$.T .OutcomeLabel}}</dd>{{end}}
+  {{if .LineText}}<dt>{{$.T "For the operation"}}</dt><dd>{{.LineText}}</dd>{{end}}
+  {{if not .Required}}<dt>&nbsp;</dt><dd>{{$.T "The job may be ready without it."}}</dd>{{end}}
+  {{if .MoneyVisible}}
+  {{if .EstimateMinor}}<dt>{{$.T "Estimated"}}</dt><dd>{{$.Money .Estimate}}</dd>{{end}}
+  {{if .CostMinor}}<dt>{{$.T "Cost"}}</dt><dd>{{$.Money .Cost}}{{if .CostDiffers}} <span class="tag late">{{$.T "not the estimate"}}</span>{{end}}</dd>{{end}}
+  {{if .ChargeMinor}}<dt>{{$.T "The customer is charged"}}</dt><dd>{{$.Money .Charge}}</dd>{{end}}
+  {{if .InvoiceRef}}<dt>{{$.T "Their invoice"}}</dt><dd>{{.InvoiceRef}}{{if .InvoiceMinor}} &middot; {{$.Money .InvoiceAmount}}{{end}} <span class="tag {{if .Reconciled}}pass{{else}}warranty{{end}}">{{if .Reconciled}}{{$.T "handed to the accounts"}}{{else}}{{$.T "not handed on"}}{{end}}</span></dd>{{end}}
+  {{end}}
+</dl>
+
+{{if $.Session.Scope.Role.SeesParts}}
+<form method="post" action="/jobs/{{$.Job.ID}}/outsourced">
+  <input type="hidden" name="action" value="record">
+  <input type="hidden" name="item" value="{{.ID}}">
+  <div class="pair">
+    <label><span>{{$.T "What happened"}}</span>
+      <select name="kind">
+        {{range .NextSteps}}<option value="{{.Value}}">{{$.T .Label}}</option>{{end}}
+        <option value="note">{{$.T "note"}}</option>
+        {{if .MoneyVisible}}<option value="cost">{{$.T "cost recorded"}}</option>
+        <option value="invoice">{{$.T "supplier invoice noted"}}</option>
+        {{if .InvoiceWaiting}}<option value="reconciled">{{$.T "handed to the accounts"}}</option>{{end}}{{end}}
+        <option value="assigned">{{$.T "put on"}}</option>
+      </select></label>
+    <label><span>{{$.T "Note, or what they report"}}</span><input name="note" maxlength="500"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{$.T "What came of it"}}</span>
+      <select name="outcome">{{range $.Outcomes}}<option value="{{.Value}}">{{$.T .Label}}</option>{{end}}</select></label>
+    <label><span>{{$.T "Expected back"}}</span><input type="date" name="expected_back"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{$.T "Amount"}}</span><input name="amount" inputmode="decimal"></label>
+    <label><span>{{$.T "Their invoice number"}}</span><input name="invoice_ref" maxlength="100"></label>
+  </div>
+  <label><span>{{$.T "Put on"}}</span>
+    <select name="assignee"><option value="">&ndash;</option>{{range $.DeskPeople}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></label>
+  <button type="submit" class="secondary">{{$.T "Write it down"}}</button>
+</form>
+{{end}}
+
+<h3>{{$.T "History"}}</h3>
+<ul class="lines">
+{{range .Events}}<li><div class="row"><span>{{$.T .Label}}{{if .Outcome}} ({{$.T .OutcomeLabel}}){{end}}{{if .Note}}: {{.Note}}{{end}}{{if .InvoiceRef}}: {{.InvoiceRef}}{{end}}{{if .AmountMinor}} &middot; {{$.Money .Amount}}{{end}}{{if .Assignee}}: {{.Assignee}}{{end}}</span>
+  <span class="waiting">{{.By}} &middot; {{$.Date ($.Local .At) "2 Jan 15:04"}}</span></div></li>{{end}}
+</ul>
+{{else}}
+<p class="empty">{{.T "Nothing has been sent out on this job."}}</p>
+{{end}}
+
+{{if .Session.Scope.Role.SeesParts}}
+<h2>{{.T "Send something out"}}</h2>
+<form method="post" action="/jobs/{{.Job.ID}}/outsourced">
+  <input type="hidden" name="action" value="request">
+  <div class="pair">
+    <label><span>{{.T "Supplier"}}</span><input name="supplier" required maxlength="100"></label>
+    <label><span>{{.T "Contact"}}</span><input name="contact" maxlength="200"></label>
+  </div>
+  <label><span>{{.T "What they are to do"}}</span><input name="scope" required maxlength="500"></label>
+  <div class="pair">
+    <label><span>{{.T "What is sent"}}</span><input name="item" required maxlength="100"></label>
+    <label><span>{{.T "It is"}}</span>
+      <select name="item_kind"><option value="component">{{.T "a part off the car"}}</option><option value="vehicle">{{.T "the car itself"}}</option></select></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "Their reference"}}</span><input name="external_ref" maxlength="100"></label>
+    <label><span>{{.T "Expected back"}}</span><input type="date" name="expected_back"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "Estimated cost"}}</span><input name="estimate" inputmode="decimal"></label>
+    <label><span>{{.T "For the operation"}}</span>
+      <select name="line"><option value="">&ndash;</option>{{range .Lines}}{{if not .WithdrawnAt}}<option value="{{.ID}}">{{.Description}}</option>{{end}}{{end}}</select></label>
+  </div>
+  <label><span><input type="checkbox" name="optional" value="1"> {{.T "The job may be ready without it"}}</span></label>
+  <button type="submit">{{.T "Send it out"}}</button>
+</form>
+{{end}}
+{{end}}

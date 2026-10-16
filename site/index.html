@@ -271,6 +271,7 @@
     <button type="button" role="tab" data-tab="20">Dagens slut</button>
     <button type="button" role="tab" data-tab="21">Bokningen bekräftas</button>
     <button type="button" role="tab" data-tab="22">Bilen kommer tillbaka</button>
+    <button type="button" role="tab" data-tab="23">Arbete hos leverantör</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1417,6 +1418,41 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: ett återbesök öppnas från ett fakturerat jobb, ett ställningstagande kräver sin anledning, ett leverantörskrav avslås och drivs, och en tekniker ser vad som anmälts men inga pengar &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/33-comeback.spec.ts">läs testet</a>. Namn och belopp är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>När arbetet görs någon annanstans</h2>
+  <p class="lede">Ett sublet-arbete är en rad på fakturan, men turbon som åkte iväg i tisdags och lovades till fredag syns ingenstans. Här är den en egen post: vad som skickats, till vem, när den väntas, vem som bevakar den. Var den är hålls isär från jobbets läge och från om bilen står på en lyft. Att den kommer tillbaka är inte att den är godkänd &ndash; det säger verkstaden själv, och först då kan jobbet bli klart.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: en turbo skickas till en leverantör och blir försenad, vilket syns i disken kö. Den kommer tillbaka men jobbet kan inte bli klart förrän verkstaden godkänt den. Kostnaden avviker från uppskattningen och leverantörens faktura lämnas vidare till bokföringen.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">Arbete hos leverantörer</div>
+              <div class="cl-qrow"><span>#3 TUR 123 · Turbo-Verkstan: Turboaggregatet</span><span class="rd-tag rd-risk">förfallen</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Arbete hos leverantörer</div>
+              <div class="cl-qrow"><span>#3 TUR 123 · Turbo-Verkstan: Turboaggregatet</span><span class="rd-tag">tillbaka från dem</span></div>
+              <div class="cl-qrow an-fade" data-t="12"><span>Arbete hos leverantör är inte godkänt</span><span class="rd-tag rd-risk">inte klart</span></div>
+            </div>            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">Arbete hos leverantörer</div>
+              <div class="cl-qrow"><span>#3 TUR 123 · Turbo-Verkstan: Turboaggregatet</span><span class="rd-tag pass">kontrollerat och godkänt</span></div>
+              <div class="cl-qrow"><span>Faktura F-8841 · 4 700 kr</span><span class="rd-tag">inte lämnad vidare</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">Turbon skulle varit tillbaka igår. Det syns i disken och hos ägaren, med vem som bevakar den, och tekniken ser var den är men inga pengar.</div>
+      <div class="an-cap" data-t="8,15.8">Den kom tillbaka med en rapport. Det är fortfarande inte godkänt: jobbet kan inte bli klart, och en slutkontroll som gjordes innan gäller inte längre.</div>
+      <div class="an-cap an-off" data-t="16,23.6">Verkstaden godkänner. Kostnaden avviker från uppskattningen och det sägs. Leverantörens fakturanummer antecknas tills någon lämnat den vidare &ndash; FreeSMS är ingen reskontra.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: en turbo skickas, blir sen, kommer tillbaka, godkänns av verkstaden och inte förr, och fakturan lämnas vidare &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/34-outsourced.spec.ts">läs testet</a>. Namn och belopp är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

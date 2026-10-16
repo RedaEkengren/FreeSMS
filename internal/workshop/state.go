@@ -345,6 +345,15 @@ func setStateInScopeTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID
 		}
 	}
 	if to == StateReady {
+		// Work at a supplier is work not done until the shop has looked at
+		// what came back, with a final check or without one.
+		away, err := unresolvedOutsourcedTx(ctx, tx, jobID)
+		if err != nil {
+			return err
+		}
+		if len(away) > 0 {
+			return fmt.Errorf("%w: work with a supplier is not back and checked yet: %s", ErrInvalid, strings.Join(away, ", "))
+		}
 		// Work still on the list is work not done, whatever the final check
 		// says: the check certifies what was done, not what was left.
 		open, err := outstandingTasksTx(ctx, tx, jobID)

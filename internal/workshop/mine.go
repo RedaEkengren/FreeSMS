@@ -60,6 +60,8 @@ var waitingSays = map[string]string{
 	"tech_away":          "%s is away; it needs somebody else",
 	"plan_overdue":       "The plan ran out and the job is still open",
 	"booking_not_told":   "The customer was not reached about a booking: %s",
+	"outsourced_overdue": "Due back from a supplier and not here: %s",
+	"outsourced_invoice": "A supplier invoice nobody has handed on: %s",
 }
 
 // Says is the item's catalogue key.
@@ -123,6 +125,12 @@ func WaitingFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]
 		}
 	default:
 		return nil, access.ErrForbidden
+	}
+	// Everybody above the shop floor chases a supplier.
+	if scope.Role != access.RoleTechnician {
+		if err := add(outsourcedWaiting(ctx, pool, scope)); err != nil {
+			return nil, err
+		}
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Number < out[j].Number })
 	return out, nil

@@ -31,7 +31,7 @@
      default and the desk is the exception. */}}
 <div class="split">
 <div class="side">
-<p class="waiting"><a href="/jobs/{{.Job.ID}}/timeline">{{.T "What has happened, and where it stands"}}</a>{{if .Session.Scope.Role.SeesCustomerPersonalData}} &middot; <a href="/jobs/{{.Job.ID}}/summary">{{.T "Repair summary"}}</a> &middot; <a href="/jobs/{{.Job.ID}}/comeback">{{.T "Return visit"}}</a>{{if .Job.Returns}} <span class="tag late">{{.T "come back to: %s" ($.Num .Job.Returns)}}</span>{{end}}{{end}}</p>
+<p class="waiting"><a href="/jobs/{{.Job.ID}}/timeline">{{.T "What has happened, and where it stands"}}</a>{{if .Session.Scope.Role.SeesCustomerPersonalData}} &middot; <a href="/jobs/{{.Job.ID}}/summary">{{.T "Repair summary"}}</a> &middot; <a href="/jobs/{{.Job.ID}}/comeback">{{.T "Return visit"}}</a>{{if .Job.Returns}} <span class="tag late">{{.T "come back to: %s" ($.Num .Job.Returns)}}</span>{{end}}{{end}} &middot; <a href="/jobs/{{.Job.ID}}/outsourced">{{.T "Work at suppliers"}}</a></p>
 <div id="live-status" data-live="job:{{.Job.ID}}">
 <div id="clock">{{template "clock" .}}</div>
 {{if .Job.OthersRunning}}<p class="waiting">{{.T "%s still has a clock running on this job." .Job.OthersRunning}}</p>{{end}}

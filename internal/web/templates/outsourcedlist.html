@@ -1,0 +1,14 @@
+{{define "content"}}
+<h1>{{.T "Work at suppliers"}}</h1>
+{{if .Outsourced}}
+<ul class="lines">
+{{range .Outsourced}}
+<li><div class="row"><a href="/jobs/{{.JobID}}/outsourced">#{{.JobNumber}} {{.Plate}} &middot; {{.Supplier}}: {{.Item}}</a>
+  <span class="tag {{if eq .Status "check_failed"}}late{{else if eq .Status "checked"}}pass{{else}}warranty{{end}}">{{$.T .StatusLabel}}</span>
+  {{if .Overdue}}<span class="tag late">{{$.T "overdue"}}</span>{{end}}
+  {{if .InvoiceWaiting}}<span class="tag warranty">{{$.T "invoice not handed on"}}</span>{{end}}</div>
+  <p class="waiting">{{if .ExpectedBack}}{{$.T "Expected back"}} {{$.Date ($.Local .ExpectedBack) "Mon 2 Jan"}} &middot; {{end}}{{$.T "Chased by"}} {{.Responsible}}</p></li>
+{{end}}
+</ul>
+{{else}}<p class="empty">{{.T "Nothing is out with a supplier, and no supplier invoice is waiting."}}</p>{{end}}
+{{end}}
