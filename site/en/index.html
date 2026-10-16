@@ -265,6 +265,7 @@
     <button type="button" role="tab" data-tab="14">Handover</button>
     <button type="button" role="tab" data-tab="15">Deliveries</button>
     <button type="button" role="tab" data-tab="16">Collection</button>
+    <button type="button" role="tab" data-tab="17">The invoice, delivered</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1194,6 +1195,41 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: the brakes are done, the technician suggests something for later, the counter hands over to the customer's brother and then a corrected version &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/27-summary.spec.ts">read the test</a>. Names and work are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>The invoice arrives</h2>
+  <p class="lede">The counter confirms who the invoice is for and where it goes, and sends a link that opens that one document. The provider taking the message is not the customer reading it: only an opened link or a handover says that. Sent again, the first link closes, and what failed lands on a list to follow up.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: the invoice is sent as a link to the accounts department and first shows as handed to the provider. When the customer opens the link the status changes to opened by the customer. The invoice is sent again and the first link closes.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">Send a link</div>
+              <div class="cl-qrow"><span>Who it is for</span><span>Dagny's accounts department</span></div>
+              <div class="cl-qrow"><span>This is who the invoice is for, and this is where it should go</span><span></span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Delivery</div>
+              <div class="cl-qrow"><span>Dagny's accounts department</span><span class="rd-tag rd-risk an-fade an-off" data-t="8,12">handed to the provider</span><span class="rd-tag an-fade" data-t="12">opened by the customer</span></div>
+            </div>            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">Delivery</div>
+              <div class="cl-qrow"><span>Dagny's accounts department</span><span class="rd-tag">link closed</span></div>
+              <div class="cl-qrow"><span>Sending again closes the link in the earlier message.</span><span class="rd-tag rd-risk">link open</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">The counter says who the invoice is for. The car's owner, whoever booked and whoever pays need not be the same.</div>
+      <div class="an-cap" data-t="8,15.8">The message is handed to the provider, but not read. When the customer opens the link it says so, and not before.</div>
+      <div class="an-cap an-off" data-t="16,23.6">Sent again, the first link closes. What never arrived shows on a list, and a print at the counter counts as a delivery too.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser, against a real mail server: the invoice is sent, the customer opens the link, the counter sees it was opened, sends again, and the first link stops working &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/28-invoice-delivery.spec.ts">read the test</a>. Names and addresses are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

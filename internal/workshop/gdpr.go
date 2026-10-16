@@ -350,6 +350,14 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 			return fmt.Errorf("clear the notes: %w", err)
 		}
 
+		// Who a document was meant for, where it was sent to somebody by name.
+		if _, err := tx.Exec(ctx, `
+			UPDATE invoice_deliveries SET recipient_name = $2
+			WHERE invoice_id IN (SELECT i.id FROM invoices i JOIN work_orders w ON w.id = i.work_order_id
+			                     JOIN customers c ON c.id = w.customer_id WHERE c.person_id = $1)`, personID, ErasedName); err != nil {
+			return fmt.Errorf("clear the delivery log: %w", err)
+		}
+
 		// The numbers and addresses messages went to are theirs too, and no
 		// law asks for them to be kept.
 		if _, err := tx.Exec(ctx, `

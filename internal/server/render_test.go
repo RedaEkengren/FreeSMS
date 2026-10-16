@@ -12,7 +12,8 @@ import (
 // with one line in the log and nothing on the screen. That is how the invoice
 // document shipped broken for as long as it took to open it.
 //
-// layout is the frame every page is parsed with rather than a page of its own.
+// layout is the frame every page is parsed with rather than a page of its own,
+// and a file starting with an underscore is a block shared between pages.
 func TestEveryTemplateIsRegistered(t *testing.T) {
 	pages, err := parseTemplates()
 	if err != nil {
@@ -25,7 +26,7 @@ func TestEveryTemplateIsRegistered(t *testing.T) {
 	}
 	for _, e := range entries {
 		name := strings.TrimSuffix(e.Name(), ".html")
-		if name == "layout" || !strings.HasSuffix(e.Name(), ".html") {
+		if name == "layout" || strings.HasPrefix(name, "_") || !strings.HasSuffix(e.Name(), ".html") {
 			continue
 		}
 		if _, ok := pages[name]; !ok {

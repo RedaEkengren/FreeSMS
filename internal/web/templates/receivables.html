@@ -1,4 +1,15 @@
 {{define "content"}}
+{{if .Undelivered}}
+<h2>{{.T "Documents the customer is not known to have"}}</h2>
+<ul class="lines">
+  {{range .Undelivered}}
+  <li><div class="row">
+    <span><a href="/invoices/{{.InvoiceID}}">{{if .CreditNote}}{{$.T "Credit note"}}{{else}}{{$.T "Invoice"}}{{end}} {{.Reference}}</a> &middot; {{.Customer}}</span>
+    <span class="tag {{if eq .Why "failed"}}late{{else}}warranty{{end}}">{{if eq .Why "failed"}}{{$.T "did not go"}}{{else}}{{$.T "not delivered yet"}}{{end}}</span>
+  </div></li>
+  {{end}}
+</ul>
+{{end}}
 <h1>{{.T "Owed"}}</h1>
 <p class="waiting">{{.T "Every invoice with something owed either way, overdue first. Money owed back to a customer is listed too."}}</p>
 {{if not .Receivables}}

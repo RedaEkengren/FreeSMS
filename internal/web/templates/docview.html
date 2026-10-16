@@ -1,0 +1,25 @@
+{{define "content"}}
+{{/* The customer's copy of one document, on its own link. The document is what
+     was issued, in the words it was issued in; the balance below it is today's
+     and is kept apart so a document read in March does not change by April. */}}
+{{template "documentbody" $}}
+
+{{with .Balance}}{{if .InvoiceID}}
+<section class="no-print mt-l">
+<h2>{{$.T "Where it stands today"}}</h2>
+<dl>
+  <dt>{{$.T "Invoiced"}}</dt><dd>{{$.Money .GrossMinor}}</dd>
+  {{if .CreditedMinor}}<dt>{{$.T "Credited"}}</dt><dd>{{$.Money .CreditedMinor}}</dd>{{end}}
+  <dt>{{$.T "Paid"}}</dt><dd>{{$.Money .PaidMinor}}</dd>
+  <dt class="grand">{{if lt .OutstandingMinor 0}}{{$.T "Owed back to the customer"}}{{else}}{{$.T "Outstanding"}}{{end}}</dt>
+  <dd class="grand">{{$.Money .OutstandingMinor}}{{if .Settled}} <span class="tag">{{$.T "settled"}}</span>{{end}}</dd>
+  {{if gt .OutstandingMinor 0}}<dt>{{$.T "Due"}}</dt><dd>{{$.Date ($.Local .Due) "2 Jan 2006"}}</dd>{{end}}
+</dl>
+</section>
+{{end}}{{end}}
+
+<div class="no-print">
+  <button type="button" class="secondary" data-print>{{$.T "Print"}}</button>
+  <p class="waiting mt-l">{{$.T "This link opens this document only, and stops working after a while."}}</p>
+</div>
+{{end}}

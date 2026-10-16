@@ -2825,6 +2825,106 @@
     "held up": {
       "other": "hindrad"
     },
+    "%s: your credit note %s. {link}": {
+      "other": "%s: din kreditfaktura %s. {link}"
+    },
+    "%s: your invoice %s. {link}": {
+      "other": "%s: din faktura %s. {link}"
+    },
+    "Billed to %s.": {
+      "other": "Fakturerad till %s."
+    },
+    "Close every link to this document": {
+      "other": "Stäng alla länkar till det här dokumentet"
+    },
+    "Credit note %s from %s": {
+      "other": "Kreditfaktura %s från %s"
+    },
+    "Delivery": {
+      "other": "Leverans"
+    },
+    "Documents the customer is not known to have": {
+      "other": "Dokument som kunden inte vet har fått"
+    },
+    "Given to": {
+      "other": "Given till"
+    },
+    "Handed over another way": {
+      "other": "Överlämnad på annat sätt"
+    },
+    "Invoice %s from %s": {
+      "other": "Faktura %s från %s"
+    },
+    "Questions? Ring %s.": {
+      "other": "Frågor? Ring %s."
+    },
+    "Send a link": {
+      "other": "Skicka en länk"
+    },
+    "Send it": {
+      "other": "Skicka den"
+    },
+    "Send it again": {
+      "other": "Skicka den igen"
+    },
+    "Sending again closes the link in the earlier message.": {
+      "other": "Att skicka igen stänger länken i det tidigare meddelandet."
+    },
+    "Texts and emails are not set up here. Print it or hand it over, and record it below.": {
+      "other": "Sms och e-post är inte inställda här. Skriv ut den eller lämna över den och notera det nedan."
+    },
+    "This is who the invoice is for, and this is where it should go": {
+      "other": "Det här är vem fakturan gäller, och hit ska den gå"
+    },
+    "This link opens this document only, and stops working after a while.": {
+      "other": "Den här länken öppnar bara det här dokumentet och slutar fungera efter en tid."
+    },
+    "Where it stands today": {
+      "other": "Så ligger det till idag"
+    },
+    "Who it is for": {
+      "other": "Vem den är till"
+    },
+    "delivered to the phone or inbox": {
+      "other": "levererad till telefonen eller inkorgen"
+    },
+    "did not go": {
+      "other": "gick inte iväg"
+    },
+    "handed over": {
+      "other": "överlämnad"
+    },
+    "handed to the provider": {
+      "other": "lämnad till leverantören"
+    },
+    "link closed": {
+      "other": "länken stängd"
+    },
+    "link open": {
+      "other": "länken öppen"
+    },
+    "not delivered yet": {
+      "other": "inte levererad än"
+    },
+    "opened by the customer": {
+      "other": "öppnad av kunden"
+    },
+    "posted": {
+      "other": "postad"
+    },
+    "printed at the counter": {
+      "other": "utskriven i disken"
+    },
+    "trying again": {
+      "other": "försöker igen"
+    },
+    "waiting to be sent": {
+      "other": "väntar på att skickas"
+    },
+    "opened %d time": {
+      "one": "öppnad %d gång",
+      "other": "öppnad %d gånger"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

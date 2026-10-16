@@ -26,6 +26,7 @@ var MessageAbouts = map[string]string{
 	"ready":        "Your car is ready to collect",
 	"answer":       "We need your answer",
 	"waiting_part": "Waiting for a part",
+	"invoice":      "Your invoice",
 }
 
 // SendHours are when a message may go, as whole hours in the shop's zone:
@@ -137,21 +138,32 @@ func QueueMessage(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, m
 	}
 	var id string
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		err := tx.QueryRow(ctx, `
-			INSERT INTO outbound_messages (shop_id, work_order_id, about, channel, recipient, subject, body, not_before, created_by)
-			SELECT $1, w.id, $3, $4, $5, $6, $7, $8, $9 FROM work_orders w WHERE w.id = $2
-			RETURNING id`,
-			scope.ShopID, m.JobID, m.About, m.Channel, m.Recipient, m.Subject, m.Body, m.NotBefore, scope.UserID).Scan(&id)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNotFound
-		}
-		if err != nil {
-			return fmt.Errorf("queue message: %w", err)
-		}
-		_, err = tx.Exec(ctx, `INSERT INTO message_events (shop_id, message_id, event) VALUES ($1, $2, 'queued')`, scope.ShopID, id)
+		var err error
+		id, err = queueMessageTx(ctx, tx, scope, m)
 		return err
 	})
 	return id, err
+}
+
+// queueMessageTx puts the message in the queue inside the caller's
+// transaction, for a caller that has more to write alongside it.
+func queueMessageTx(ctx context.Context, tx pgx.Tx, scope access.Scope, m NewMessage) (string, error) {
+	var id string
+	err := tx.QueryRow(ctx, `
+		INSERT INTO outbound_messages (shop_id, work_order_id, about, channel, recipient, subject, body, not_before, created_by)
+		SELECT $1, w.id, $3, $4, $5, $6, $7, $8, $9 FROM work_orders w WHERE w.id = $2
+		RETURNING id`,
+		scope.ShopID, m.JobID, m.About, m.Channel, m.Recipient, m.Subject, m.Body, m.NotBefore, scope.UserID).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("queue message: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO message_events (shop_id, message_id, event) VALUES ($1, $2, 'queued')`, scope.ShopID, id); err != nil {
+		return "", fmt.Errorf("queue message: %w", err)
+	}
+	return id, nil
 }
 
 // MessagesFor lists a job's messages and what last happened to each.

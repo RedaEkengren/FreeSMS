@@ -44,8 +44,10 @@ var queryBudgets = map[string]int{
 	// 35: the quote the customer was shown and what they answered to it
 	// (two statements), which the counter reads on every live refresh.
 	// 39: the work list, as for the technician.
-	"desk GET /jobs/{id}":   39,
-	"desk GET /receivables": 11,
+	"desk GET /jobs/{id}": 39,
+	// 16: the documents the customer is not known to have, one read in its own
+	// scope (five round trips) on the page that is already about chasing.
+	"desk GET /receivables": 16,
 	"desk GET /parts":       11,
 	"desk GET /stock":       26,
 	"desk GET /calendar":    34, // #113: open jobs drawn from their plans, one read in its own scope

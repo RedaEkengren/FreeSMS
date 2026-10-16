@@ -265,6 +265,7 @@
     <button type="button" role="tab" data-tab="14">Överlämning</button>
     <button type="button" role="tab" data-tab="15">Leveranser</button>
     <button type="button" role="tab" data-tab="16">Överlämning till kund</button>
+    <button type="button" role="tab" data-tab="17">Fakturan hem</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1194,6 +1195,41 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: bromsarna blir klara, teknikern föreslår något för senare, disken lämnar över till kundens bror och sedan en rättad version &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/27-summary.spec.ts">läs testet</a>. Namn och arbeten är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>Fakturan kommer fram</h2>
+  <p class="lede">Disken bekräftar vem fakturan är till och vart den ska, och skickar en länk som öppnar just det dokumentet. Att leverantören tagit emot meddelandet är inte detsamma som att kunden läst det: bara en öppnad länk eller en överlämning säger det. Skickas den igen stängs den första länken, och det som misslyckats hamnar på en lista att följa upp.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: fakturan skickas som en länk till ekonomiavdelningen och visas först som lämnad till leverantören. När kunden öppnar länken ändras statusen till öppnad av kunden. Fakturan skickas igen och den första länken stängs.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">Skicka en länk</div>
+              <div class="cl-qrow"><span>Vem den är till</span><span>Dagnys ekonomiavdelning</span></div>
+              <div class="cl-qrow"><span>Det här är vem fakturan gäller, och hit ska den gå</span><span></span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Leverans</div>
+              <div class="cl-qrow"><span>Dagnys ekonomiavdelning</span><span class="rd-tag rd-risk an-fade an-off" data-t="8,12">lämnad till leverantören</span><span class="rd-tag an-fade" data-t="12">öppnad av kunden</span></div>
+            </div>            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">Leverans</div>
+              <div class="cl-qrow"><span>Dagnys ekonomiavdelning</span><span class="rd-tag">länken stängd</span></div>
+              <div class="cl-qrow"><span>Att skicka igen stänger länken i det tidigare meddelandet.</span><span class="rd-tag rd-risk">länken öppen</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">Disken säger vem fakturan är till. Bilens ägare, den som bokade och den som betalar behöver inte vara samma.</div>
+      <div class="an-cap" data-t="8,15.8">Meddelandet är lämnat till leverantören, men inte läst. När kunden öppnar länken står det, och först då.</div>
+      <div class="an-cap an-off" data-t="16,23.6">Skickas den igen stängs den första länken. Det som aldrig kom fram syns på en lista, och en utskrift i disken räknas också som en leverans.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare mot en riktig e-postserver: fakturan skickas, kunden öppnar länken, disken ser att den öppnats, skickar igen och den första länken slutar fungera &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/28-invoice-delivery.spec.ts">läs testet</a>. Namn och adresser är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

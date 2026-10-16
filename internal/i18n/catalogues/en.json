@@ -74,6 +74,10 @@
       "one": "moved %d time",
       "other": "moved %d times"
     },
+    "opened %d time": {
+      "one": "opened %d time",
+      "other": "opened %d times"
+    },
     "%d visit": {
       "one": "%d visit",
       "other": "%d visits"

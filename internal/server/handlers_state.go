@@ -367,13 +367,22 @@ func (s *Server) handleInvoiceDocument(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.log.Error("read balance", "error", err)
 	}
+	deliveries, err := workshop.DeliveriesFor(r.Context(), s.pool, session.Scope, doc.ID)
+	if err != nil {
+		s.log.Error("read deliveries", "error", err)
+	}
+	contact, _ := workshop.ContactFor(r.Context(), s.pool, session.Scope, doc.WorkOrderID)
 	s.render(w, r, http.StatusOK, "invoice", pageData{
-		Title:    doc.Reference(),
-		Session:  session,
-		Document: doc,
-		Balance:  balance,
-		Methods:  workshop.PaymentMethods,
-		Today:    time.Now().In(s.shopLocation(r)).Format("2006-01-02"),
+		Title:      doc.Reference(),
+		Session:    session,
+		Deliveries: deliveries,
+		Contact:    contact,
+		CanText:    s.sms != nil,
+		CanEmail:   s.email != nil,
+		Document:   doc,
+		Balance:    balance,
+		Methods:    workshop.PaymentMethods,
+		Today:      time.Now().In(s.shopLocation(r)).Format("2006-01-02"),
 	})
 }
 

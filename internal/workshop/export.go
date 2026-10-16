@@ -38,7 +38,7 @@ var ExportTables = []string{
 	"stock_movements", "price_bands", "labour_times", "erasures", "shop_exports",
 	"bookings", "booking_events", "staff_absences", "shop_closures", "rotas", "rota_hours", "shift_changes", "outbound_messages", "message_events",
 	"work_order_state_changes", "quotes", "quote_lines", "quote_decisions", "enquiries", "enquiry_lines", "job_assignments", "job_plans", "work_order_line_revisions", "job_tasks", "job_task_events", "record_changes", "customer_people", "job_notes",
-	"supplier_orders", "supplier_order_lines", "supplier_line_etas", "supplier_receipts", "supplier_returns", "job_recommendations", "delivery_summaries",
+	"supplier_orders", "supplier_order_lines", "supplier_line_etas", "supplier_receipts", "supplier_returns", "job_recommendations", "delivery_summaries", "invoice_deliveries",
 }
 
 // exportQueries are tables exported with chosen columns, because one of
@@ -46,6 +46,7 @@ var ExportTables = []string{
 var exportQueries = map[string]string{
 	"users":             `SELECT id, shop_id, person_id, role, active, deactivated_at, locale, created_at FROM users`,
 	"inspection_shares": `SELECT id, shop_id, inspection_id, created_by, created_at, expires_at, revoked_at FROM inspection_shares`,
+	"invoice_links":     `SELECT id, shop_id, invoice_id, created_by, created_at, expires_at, revoked_at, revoked_by, first_opened_at, last_opened_at, opens FROM invoice_links`,
 	"job_links":         `SELECT id, shop_id, work_order_id, enquiry_id, created_by, created_at, expires_at, revoked_at FROM job_links`,
 }
 

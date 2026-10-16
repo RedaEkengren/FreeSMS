@@ -1,0 +1,67 @@
+{{/* The issued document, as it was issued. Shared by the counter's page and the
+     customer's link, so the two cannot drift: what is read is what was sent. */}}
+{{define "documentbody"}}
+{{with .Document}}
+<article class="document">
+  <div class="row">
+    <div>
+      <h1>{{if .IsCreditNote}}{{$.T "Credit note"}}{{else}}{{$.T "Invoice"}}{{end}} {{.Reference}}</h1>
+      {{/* The seller as it was when this was issued, not as the shop is
+           today. Left out entirely on a document issued before the snapshot
+           existed, rather than printed as labels with blanks after them. */}}
+      {{with .Seller}}
+      {{if .Known}}
+      <div>{{.Name}}</div>
+      {{if .Address}}<div class="waiting">{{.Address}}</div>{{end}}
+      {{if .OrgNumber}}<div class="waiting">{{$.T "Company number"}} {{.OrgNumber}}</div>{{end}}
+      {{if .VATNumber}}<div class="waiting">{{$.T "VAT number"}} {{.VATNumber}}</div>{{end}}
+      {{if or .Phone .Email}}<div class="waiting">{{$.Dot .Phone .Email}}</div>{{end}}
+      {{end}}
+      {{end}}
+    </div>
+    <div class="waiting">
+      <div>{{$.Date ($.Local .IssuedAt) "2 Jan 2006"}}</div>
+      {{if .Seller.Known}}<div>{{$.T "Due"}} {{$.Date ($.Due .) "2 Jan 2006"}}</div>{{end}}
+    </div>
+  </div>
+
+  {{/* Both halves point at the other. A document that has been reversed and
+       does not say so is a document somebody chases. */}}
+  {{if .CreditOf}}<p class="waiting">{{$.T "Credits %s" .CreditOf}}</p>{{end}}
+  {{range .CreditedBy}}<p class="waiting">{{$.T "Credited by %s" .}}</p>{{end}}
+
+  <h2>{{$.T "Billed to"}}</h2>
+  <div>{{.CustomerName}}</div>
+  {{if .CustomerAddress}}<div class="waiting">{{.CustomerAddress}}</div>{{end}}
+  {{if .CustomerOrgNumber}}<div class="waiting">{{$.T "Company number"}} {{.CustomerOrgNumber}}</div>{{end}}
+  {{if .CustomerVATNumber}}<div class="waiting">{{$.T "VAT number"}} {{.CustomerVATNumber}}</div>{{end}}
+  {{if .Registration}}<div class="waiting">{{$.T "Vehicle"}} {{.Registration}}</div>{{end}}
+
+  <h2>{{$.T "Lines"}}</h2>
+  <ul class="lines">
+    {{range .Lines}}
+    <li>
+      <div class="row">
+        <span>{{.Description}}</span>
+        <span>{{$.Num .Quantity}} &times; {{$.Money .UnitPriceMinor}} = {{$.Money .NetMinor}}</span>
+      </div>
+    </li>
+    {{end}}
+  </ul>
+
+  <dl class="totals">
+    {{range .Bands}}
+    <dt>{{$.T "VAT"}} {{divide .RateBasisPoints 100}}%</dt><dd>{{$.Money .VATMinor}}</dd>
+    {{end}}
+    <dt>{{$.T "Net"}}</dt><dd>{{$.Money .NetMinor}}</dd>
+    <dt class="grand">{{$.T "Total"}}</dt><dd class="grand">{{$.Money .GrossMinor}}</dd>
+  </dl>
+
+  {{with .Seller}}
+  {{if .PaymentReference}}<p>{{$.T "Pay to %s" .PaymentReference}}{{if .PaymentTermsDays}}, {{$.N "%d day net" .PaymentTermsDays}}{{end}}</p>{{end}}
+  {{if .FTax}}<p class="waiting">{{$.T "Approved for F-tax"}}</p>{{end}}
+  {{end}}
+  {{if .IssuedBy}}<p class="waiting">{{$.T "Issued by %s" .IssuedBy}}</p>{{end}}
+</article>
+{{end}}
+{{end}}

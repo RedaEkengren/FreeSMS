@@ -62,7 +62,11 @@ func (s *Server) handleReceivables(w http.ResponseWriter, r *http.Request) {
 	if s.paymentError(w, r, err) {
 		return
 	}
-	s.render(w, r, http.StatusOK, "receivables", pageData{Title: "Owed", Session: session, Receivables: list})
+	undelivered, err := workshop.UndeliveredDocuments(r.Context(), s.pool, session.Scope, time.Now().AddDate(0, 0, -60))
+	if err != nil {
+		s.log.Error("read undelivered documents", "error", err)
+	}
+	s.render(w, r, http.StatusOK, "receivables", pageData{Title: "Owed", Session: session, Receivables: list, Undelivered: undelivered})
 }
 
 func (s *Server) paymentError(w http.ResponseWriter, r *http.Request, err error) bool {
