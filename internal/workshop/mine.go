@@ -241,7 +241,7 @@ func partsWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (
 			  AND coalesce((SELECT -sum(m.quantity) FROM stock_movements m
 			                WHERE m.work_order_id = w.id AND m.part_id = p.id AND m.kind IN ('consumed', 'put_back')), 0)
 			    > coalesce((SELECT sum(l.quantity) FROM work_order_lines l
-			                WHERE l.work_order_id = w.id AND l.part_id = p.id), 0)`)
+			                WHERE l.work_order_id = w.id AND l.part_id = p.id AND l.withdrawn_at IS NULL), 0)`)
 		if err != nil {
 			return fmt.Errorf("taken out, not priced: %w", err)
 		}

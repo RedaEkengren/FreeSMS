@@ -49,11 +49,11 @@ func PartsOnJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, job
 		rows, err := tx.Query(ctx, `
 			SELECT p.id, p.number, p.name, p.unit,
 			       coalesce((SELECT sum(l.quantity) FROM work_order_lines l
-			                 WHERE l.work_order_id = $1 AND l.part_id = p.id), 0)::float8,
+			                 WHERE l.work_order_id = $1 AND l.part_id = p.id AND l.withdrawn_at IS NULL), 0)::float8,
 			       coalesce((SELECT -sum(m.quantity) FROM stock_movements m
 			                 WHERE m.work_order_id = $1 AND m.part_id = p.id AND m.kind IN ('consumed', 'put_back')), 0)::float8
 			FROM parts p
-			WHERE p.id IN (SELECT part_id FROM work_order_lines WHERE work_order_id = $1 AND part_id IS NOT NULL
+			WHERE p.id IN (SELECT part_id FROM work_order_lines WHERE work_order_id = $1 AND part_id IS NOT NULL AND withdrawn_at IS NULL
 			               UNION
 			               SELECT part_id FROM stock_movements WHERE work_order_id = $1 AND kind IN ('consumed', 'put_back'))
 			ORDER BY p.number`, jobID)

@@ -259,6 +259,7 @@
     <button type="button" role="tab" data-tab="8">Till kunden</button>
     <button type="button" role="tab" data-tab="9">Förfrågan</button>
     <button type="button" role="tab" data-tab="10">Sjuk tekniker</button>
+    <button type="button" role="tab" data-tab="11">Rätta en rad</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -970,6 +971,46 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: Erik markeras sjuk, krocken syns, jobbet lämnas över, Tina ser det i sin lista, en tvådagarsplan förs över och en bil som väntar på en del släpper sin lyft &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/21-planning.spec.ts">läs testet</a>. Registreringsnummer och namn är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>När en rad är fel</h2>
+  <p class="lede">En rad har rätt text men fel pris, eller var aldrig meningen. Disken rättar den på sidan och ser först vad det blir. En dyrare rad kräver ett nytt ja; det gamla ja:et står kvar som det var. En felaktig rad dras tillbaka med ett skäl och finns kvar i historiken.</p>
+
+  <div class="an-wrap" data-loop="26" data-still="12">
+    <div class="an-canvas" role="img" aria-label="Animering: disken öppnar en godkänd rad, ändrar priset från 800 till 950 och ser först jobbets nya summa och att raden inte längre är godkänd. Efter sparandet väntar raden på kunden medan den andra raden behåller sitt godkännande. Till sist dras en rad tillbaka med skälet att kunden hade egna klossar.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,9">
+              <div class="wf-card"><div class="wf-plate">ABC 123</div></div>
+              <div class="cl-qrow"><span>Byte av bromsklossar</span><span>1 000,00 kr</span></div>
+              <div class="cl-qrow"><span>Kontrollera bromsvätska</span><span>375,00 kr</span></div>
+            </div>
+            <div class="an-fade" data-t="9,17">
+              <div class="wf-h">Kontrollera rättelsen</div>
+              <div class="cl-qrow"><span>Á-pris</span><span><s>800,00 kr</s> &rarr; <span data-type="9.4,0.8">950,00 kr</span></span></div>
+              <div class="cl-qrow"><span>Jobbet, med moms</span><span>1 375,00 kr &rarr; 1 562,50 kr</span></div>
+              <div class="cl-qrow an-fade an-off" data-t="12.4"><span><span class="rd-tag rd-risk">Raden är inte längre godkänd.</span></span><span></span></div>
+              <span class="an-btn mo-btn an-fade an-off" data-t="14.4">Spara rättelsen</span>
+            </div>
+            <div class="an-fade an-off" data-t="17">
+              <div class="cl-qrow"><span>Byte av bromsklossar</span><span class="rd-tag rd-risk">tillagd efter godkännande</span></div>
+              <div class="cl-qrow"><span>Kontrollera bromsvätska</span><span></span></div>
+              <div class="cl-qrow an-fade an-off" data-t="20.6"><span><s>Byte av bromsklossar</s> <span class="rd-tag">tillbakadragen</span></span><span>Kunden hade egna klossar</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,8.8">Priset på en godkänd rad var fel. Disken rättar det och ser först vad det blir för jobbet.</div>
+      <div class="an-cap" data-t="9,16.8">Raden kan kosta kunden mer än de sa ja till, så den är inte längre godkänd. Det gamla ja:et står kvar.</div>
+      <div class="an-cap an-off" data-t="17,25.6">Raden går tillbaka för att läggas fram igen. En rad som aldrig skulle funnits dras tillbaka med ett skäl, och finns kvar i historiken.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog och beloppen ur dess pengakod när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: priset rättas, godkännandet faller, den andra raden behåller sitt, två personer rättar samma rad och en rad dras tillbaka &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/22-line-corrections.spec.ts">läs testet</a>. Registreringsnummer, namn och belopp är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

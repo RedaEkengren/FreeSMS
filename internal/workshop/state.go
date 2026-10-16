@@ -447,7 +447,7 @@ func setStateTx(ctx context.Context, tx pgx.Tx, jobID string, to State) error {
 		// of a declined job is made of.
 		if _, err := tx.Exec(ctx, `
 			UPDATE work_order_lines l SET declined_at = now(), updated_at = now()
-			WHERE l.work_order_id = $1 AND l.performed_at IS NULL AND l.declined_at IS NULL
+			WHERE l.work_order_id = $1 AND l.performed_at IS NULL AND l.declined_at IS NULL AND l.withdrawn_at IS NULL
 			  AND NOT (l.part_id IS NOT NULL AND EXISTS (
 			        SELECT 1 FROM stock_movements m
 			        WHERE m.work_order_id = l.work_order_id AND m.part_id = l.part_id AND m.kind = 'consumed'))`,

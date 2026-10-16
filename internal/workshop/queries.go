@@ -108,6 +108,14 @@ type Line struct {
 	UnitPriceMinor int64
 	EstimatedMinor *int64
 	VATRateBasis   int
+
+	// Which version of the line this is, for telling an edit made against an
+	// older one apart from one made against this.
+	Revision int
+	// Entered by mistake and taken back. The row stays; nothing counts it.
+	WithdrawnAt     *time.Time
+	WithdrawnReason string
+	PartID          string
 }
 
 // Quantity renders thousandths as a decimal, trimming the noise: 1000 is "1",
@@ -161,13 +169,15 @@ func (l Line) Approved() bool { return l.ApprovedAt != nil }
 // pays for it, they did not decline it, and if it was priced from an answer
 // given without a price, they have since agreed to the price.
 func (l Line) Billable() bool {
-	return l.CostBearer == "customer" && l.DeclinedAt == nil && (l.ApprovedAt != nil || !l.FromAnswer)
+	return l.CostBearer == "customer" && l.DeclinedAt == nil && l.WithdrawnAt == nil && (l.ApprovedAt != nil || !l.FromAnswer)
 }
 
 // Status is where the line stands: offered, agreed, done, or turned down. A
 // line the shop added after the customer agreed is "added" until it is done.
 func (l Line) Status() string {
 	switch {
+	case l.WithdrawnAt != nil:
+		return "withdrawn"
 	case l.DeclinedAt != nil:
 		return "declined"
 	case l.PerformedAt != nil:
@@ -297,7 +307,8 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 			       -- calculation the rest of this system avoids them in.
 			       (quantity * 1000)::bigint,
 			       cost_bearer, approved_at, declined_at, performed_at, customer_decision_id IS NOT NULL,
-			       unit_price_minor, estimated_unit_price_minor, vat_rate_bp
+			       unit_price_minor, estimated_unit_price_minor, vat_rate_bp,
+			       revision, withdrawn_at, coalesce(withdrawn_reason, ''), coalesce(part_id::text, '')
 			FROM work_order_lines WHERE work_order_id = $1 ORDER BY position`, id)
 		if err != nil {
 			return fmt.Errorf("read lines: %w", err)
@@ -307,7 +318,7 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 			var l Line
 			if err := rows.Scan(&l.Position, &l.Kind, &l.Description, &l.QuantityMilli,
 				&l.CostBearer, &l.ApprovedAt, &l.DeclinedAt, &l.PerformedAt, &l.FromAnswer, &l.UnitPriceMinor, &l.EstimatedMinor,
-				&l.VATRateBasis); err != nil {
+				&l.VATRateBasis, &l.Revision, &l.WithdrawnAt, &l.WithdrawnReason, &l.PartID); err != nil {
 				return fmt.Errorf("scan line: %w", err)
 			}
 			lines = append(lines, l)

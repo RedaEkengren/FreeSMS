@@ -259,6 +259,7 @@
     <button type="button" role="tab" data-tab="8">To the customer</button>
     <button type="button" role="tab" data-tab="9">Enquiry</button>
     <button type="button" role="tab" data-tab="10">Off sick</button>
+    <button type="button" role="tab" data-tab="11">Correct a line</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -970,6 +971,46 @@
     </div>
   </div>
   <p class="truth">The words come from the product&rsquo;s language catalogue when the page is generated. The flow runs against the real product in a browser: Erik is marked sick, the clash shows, the job is handed over, Tina sees it in her list, a two-day plan is carried over and a car waiting for a part gives up its lift &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/21-planning.spec.ts">read the test</a>. Registrations and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>When a line is wrong</h2>
+  <p class="lede">A line has the right words and the wrong price, or was never meant to be there. The front desk corrects it on the page and sees what it comes to first. A dearer line needs a new yes; the old yes stays as it was. A mistaken line is withdrawn with a reason and stays in the history.</p>
+
+  <div class="an-wrap" data-loop="26" data-still="12">
+    <div class="an-canvas" role="img" aria-label="Animation: the front desk opens an approved line, changes the price from 800 to 950 and sees the job's new total first, and that the line is no longer agreed to. Once saved, the line waits for the customer while the other line keeps its approval. Finally a line is withdrawn with the reason that the customer had their own pads.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,9">
+              <div class="wf-card"><div class="wf-plate">ABC 123</div></div>
+              <div class="cl-qrow"><span>Byte av bromsklossar</span><span>SEK 1,000.00</span></div>
+              <div class="cl-qrow"><span>Kontrollera bromsvätska</span><span>SEK 375.00</span></div>
+            </div>
+            <div class="an-fade" data-t="9,17">
+              <div class="wf-h">Check the correction</div>
+              <div class="cl-qrow"><span>Unit price</span><span><s>SEK 800.00</s> &rarr; <span data-type="9.4,0.8">SEK 950.00</span></span></div>
+              <div class="cl-qrow"><span>The job, with VAT</span><span>SEK 1,375.00 &rarr; SEK 1,562.50</span></div>
+              <div class="cl-qrow an-fade an-off" data-t="12.4"><span><span class="rd-tag rd-risk">This line is no longer agreed to.</span></span><span></span></div>
+              <span class="an-btn mo-btn an-fade an-off" data-t="14.4">Save the correction</span>
+            </div>
+            <div class="an-fade an-off" data-t="17">
+              <div class="cl-qrow"><span>Byte av bromsklossar</span><span class="rd-tag rd-risk">added after approval</span></div>
+              <div class="cl-qrow"><span>Kontrollera bromsvätska</span><span></span></div>
+              <div class="cl-qrow an-fade an-off" data-t="20.6"><span><s>Byte av bromsklossar</s> <span class="rd-tag">withdrawn</span></span><span>Kunden hade egna klossar</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,8.8">The price on an approved line was wrong. The front desk corrects it and sees what it does to the job first.</div>
+      <div class="an-cap" data-t="9,16.8">The line could cost the customer more than they said yes to, so it is no longer agreed. The old yes stays.</div>
+      <div class="an-cap an-off" data-t="17,25.6">The line goes back to be put to them again. A line that should never have been there is withdrawn with a reason, and stays in the history.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue and the amounts from its money code when the page is generated. The flow runs against the real product in a browser: the price is corrected, the agreement falls, the other line keeps its own, two people correct the same line and one line is withdrawn &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/22-line-corrections.spec.ts">read the test</a>. Registration numbers, names and amounts are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

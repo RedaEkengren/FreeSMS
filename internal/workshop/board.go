@@ -174,7 +174,7 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 			         ) d ON true
 			         WHERE i.work_order_id = w.id AND d.decision = 'approved'
 			           AND NOT EXISTS (SELECT 1 FROM work_order_lines l
-			                           WHERE l.inspection_item_id = it.id)),` + presenceColumns + `,` + toldColumns + `,
+			                           WHERE l.inspection_item_id = it.id AND l.withdrawn_at IS NULL)),` + presenceColumns + `,` + toldColumns + `,
 			       coalesce((SELECT fp.display_name FROM inspections fi
 			                  JOIN shops fs ON fs.id = fi.shop_id AND fs.final_check_template_id = fi.template_id
 			                  JOIN users fu ON fu.id = fi.performed_by

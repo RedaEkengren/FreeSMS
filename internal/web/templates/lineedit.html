@@ -1,0 +1,108 @@
+{{define "content"}}
+{{with .LineForm}}
+{{if .Change}}
+{{/* Step two: what saving would do, and the button that does it. Nothing has
+     been written yet; this page ran the same code the save does and threw the
+     result away. */}}
+<h1>{{if .Withdraw}}{{$.T "Check the withdrawal"}}{{else}}{{$.T "Check the correction"}}{{end}}</h1>
+{{with .Change}}
+{{if .NoChange}}
+<p>{{$.T "Nothing differs from what the line says now. Nothing will be saved."}}</p>
+{{else}}
+<table class="lines-table">
+  <thead><tr><th></th><th>{{$.T "Before"}}</th><th>{{$.T "After"}}</th></tr></thead>
+  <tbody>
+    <tr><td>{{$.T "What"}}</td><td>{{.Before.Description}}</td><td>{{if $.LineForm.Withdraw}}<em>{{$.T "withdrawn"}}</em>{{else}}{{.After.Description}}{{end}}</td></tr>
+    {{if not $.LineForm.Withdraw}}
+    <tr><td>{{$.T "Quantity"}}</td><td class="num">{{$.Num .Before.Quantity}}</td><td class="num">{{$.Num .After.Quantity}}</td></tr>
+    <tr><td>{{$.T "Unit price"}}</td><td class="num">{{$.Money .Before.UnitPriceMinor}}</td><td class="num">{{$.Money .After.UnitPriceMinor}}</td></tr>
+    {{end}}
+    <tr><td>{{$.T "This line, with VAT"}}</td><td class="num">{{$.Money .LineGrossBefore}}</td><td class="num">{{$.Money .LineGrossAfter}}</td></tr>
+    <tr class="grand"><td>{{$.T "The job, with VAT"}}</td><td class="num">{{$.Money .JobGrossBefore}}</td><td class="num">{{$.Money .JobGrossAfter}}</td></tr>
+  </tbody>
+</table>
+
+<h2>{{$.T "The customer's agreement"}}</h2>
+{{if .ApprovalCleared}}
+<p><strong>{{$.T "This line is no longer agreed to."}}</strong>
+  {{$.T "It could cost the customer more than they said yes to, so it goes back to be put to them again. Their earlier yes stays on record as it was."}}</p>
+{{else if .KeepsApproval}}
+<p>{{$.T "The customer's yes still covers this line: it does not cost them more than they agreed to."}}</p>
+{{else if .WasApproved}}
+<p>{{$.T "The customer had said yes to this line. It is withdrawn; their yes stays on record as it was."}}</p>
+{{end}}
+{{if .Agreed}}<p>{{$.T "Still agreed:"}}</p><ul>{{range .Agreed}}<li>{{.}}</li>{{end}}</ul>{{end}}
+{{if .Waiting}}<p>{{$.T "Waiting for the customer:"}}</p><ul>{{range .Waiting}}<li>{{.}}</li>{{end}}</ul>{{end}}
+
+{{if .Stock}}
+<h2>{{$.T "The shelf"}}</h2>
+<ul>
+{{range .Stock}}
+  <li>{{.Number}} {{.Name}}: {{$.T "put aside"}} {{$.Num (.Qty .ReservedBeforeMilli)}} → {{$.Num (.Qty .ReservedAfterMilli)}}
+    {{if gt .TakenOutMilli 0}}, {{$.T "already taken out"}} {{$.Num (.Qty .TakenOutMilli)}}{{end}}
+    {{if .NotPriced}}<br><strong>{{$.T "Taken out to the car and no longer on the bill. Nothing is said to have come back; put it back from the job if it did."}}</strong>{{end}}</li>
+{{end}}
+</ul>
+{{end}}
+{{end}}
+{{end}}
+
+<form method="post" action="/jobs/{{.JobID}}/lines/{{.Position}}/{{if .Withdraw}}withdraw{{else}}edit{{end}}">
+  <input type="hidden" name="revision" value="{{.Revision}}">
+  <input type="hidden" name="description" value="{{.Description}}">
+  <input type="hidden" name="quantity" value="{{.Quantity}}">
+  <input type="hidden" name="unit_price" value="{{.UnitPrice}}">
+  <input type="hidden" name="vat" value="{{.VAT}}">
+  <input type="hidden" name="cost_bearer" value="{{.CostBearer}}">
+  <input type="hidden" name="part_id" value="{{.PartID}}">
+  <input type="hidden" name="reason" value="{{.Reason}}">
+  <input type="hidden" name="confirm" value="1">
+  <button type="submit">{{if .Withdraw}}{{$.T "Withdraw the line"}}{{else}}{{$.T "Save the correction"}}{{end}}</button>
+</form>
+{{else}}
+<h1>{{$.T "Correct a line"}}</h1>
+<p>{{$.T "Nothing is overwritten: every version is kept, with who made it and when. You see what it comes to before anything is saved."}}</p>
+<form method="post" action="/jobs/{{.JobID}}/lines/{{.Position}}/edit">
+  <input type="hidden" name="revision" value="{{.Revision}}">
+  <input type="hidden" name="part_id" value="{{.PartID}}">
+  <label><span>{{$.T "What"}}</span><input name="description" value="{{.Description}}" required></label>
+  <div class="pair">
+    <label><span>{{$.T "Quantity"}}</span><input name="quantity" value="{{.Quantity}}" inputmode="decimal"></label>
+    <label><span>{{$.T "Unit price"}}</span><input name="unit_price" value="{{.UnitPrice}}" inputmode="decimal"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{$.T "VAT, per cent"}}</span><input name="vat" value="{{.VAT}}" inputmode="decimal"></label>
+    <label><span>{{$.T "Who pays"}}</span>
+      <select name="cost_bearer">
+        <option value="customer" {{if eq .CostBearer "customer"}}selected{{end}}>{{$.T "The customer"}}</option>
+        <option value="supplier" {{if eq .CostBearer "supplier"}}selected{{end}}>{{$.T "The supplier (warranty)"}}</option>
+        <option value="shop" {{if eq .CostBearer "shop"}}selected{{end}}>{{$.T "The workshop"}}</option>
+      </select>
+    </label>
+  </div>
+  <label><span>{{$.T "Why (optional)"}}</span><input name="reason" maxlength="300"></label>
+  <button type="submit">{{$.T "See what it comes to"}}</button>
+</form>
+
+<h2>{{$.T "Take the line back"}}</h2>
+<p>{{$.T "For a line that should never have been there. It stays in the history; nothing counts it. Work that was done cannot be taken back."}}</p>
+<form method="post" action="/jobs/{{.JobID}}/lines/{{.Position}}/withdraw">
+  <input type="hidden" name="revision" value="{{.Revision}}">
+  <label><span>{{$.T "Why it is withdrawn"}}</span><input name="reason" required maxlength="300"></label>
+  <button type="submit" class="secondary">{{$.T "See what it changes"}}</button>
+</form>
+
+<h2>{{$.T "Versions"}}</h2>
+<ol class="versions">
+{{range .History}}
+  <li>{{$.T "Version"}} {{$.Num .Revision}}, {{$.Date ($.Local .At) "2 Jan 15:04"}}{{if .By}}, {{.By}}{{end}}:
+    {{.Values.Description}}, {{$.Num .Values.Quantity}} × {{$.Money .Values.UnitPriceMinor}}
+    {{if eq .Change "withdrawn"}}<strong>{{$.T "withdrawn"}}</strong>{{end}}
+    {{if .ApprovalCleared}}<em>{{$.T "agreement cleared"}}</em>{{end}}
+    {{if .Reason}}({{.Reason}}){{end}}</li>
+{{end}}
+</ol>
+{{end}}
+<p class="mt-l"><a href="/jobs/{{.JobID}}">{{$.T "Back to the job"}}</a></p>
+{{end}}
+{{end}}

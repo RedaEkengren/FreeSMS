@@ -209,7 +209,7 @@ func actualsFor(ctx context.Context, tx pgx.Tx, labourTimeID string) (ActualSpre
 		    JOIN work_order_lines l ON l.work_order_id = w.id AND l.labour_time_id = $1
 		    JOIN time_entries t ON t.work_order_id = w.id
 		    WHERE (SELECT count(*) FROM work_order_lines o
-		           WHERE o.work_order_id = w.id AND o.kind = 'labour') = 1
+		           WHERE o.work_order_id = w.id AND o.kind = 'labour' AND o.withdrawn_at IS NULL) = 1
 		      AND w.state IN ('ready', 'invoiced', 'closed')
 		      AND NOT EXISTS (SELECT 1 FROM time_entries r
 		                      WHERE r.work_order_id = w.id AND r.ended_at IS NULL)

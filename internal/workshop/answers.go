@@ -74,7 +74,7 @@ func CustomerAnswers(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 			    SELECT id, decision, decided_at, share_id FROM inspection_decisions
 			    WHERE item_id = it.id ORDER BY decided_at DESC, id DESC LIMIT 1
 			) d ON true
-			LEFT JOIN work_order_lines l ON l.inspection_item_id = it.id
+			LEFT JOIN work_order_lines l ON l.inspection_item_id = it.id AND l.withdrawn_at IS NULL
 			WHERE i.work_order_id = $1
 			ORDER BY i.started_at, it.position`, jobID)
 		if err != nil {
@@ -125,7 +125,7 @@ func PriceAnswer(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		var already bool
 		err := tx.QueryRow(ctx, `
 			SELECT d.decision, d.id, d.decided_at,
-			       EXISTS (SELECT 1 FROM work_order_lines l WHERE l.inspection_item_id = it.id)
+			       EXISTS (SELECT 1 FROM work_order_lines l WHERE l.inspection_item_id = it.id AND l.withdrawn_at IS NULL)
 			FROM inspection_items it
 			JOIN inspections i ON i.id = it.inspection_id
 			JOIN LATERAL (

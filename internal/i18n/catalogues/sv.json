@@ -1781,6 +1781,111 @@
     "Who is on this job, or when it is planned, changed while you were looking. Open the job again and decide from what it says now.": {"other": "Vem som är på jobbet, eller när det är planerat, ändrades medan du tittade. Öppna jobbet igen och bestäm utifrån vad det säger nu."},
     "The job is over": {"other": "Jobbet är över"},
     "A finished job cannot be planned.": {"other": "Ett avslutat jobb kan inte planeras."},
+    "Correct a line": {
+      "other": "Rätta en rad"
+    },
+    "Check the correction": {
+      "other": "Kontrollera rättelsen"
+    },
+    "Check the withdrawal": {
+      "other": "Kontrollera tillbakadragandet"
+    },
+    "Correct": {
+      "other": "Rätta"
+    },
+    "withdrawn": {
+      "other": "tillbakadragen"
+    },
+    "Nothing is overwritten: every version is kept, with who made it and when. You see what it comes to before anything is saved.": {
+      "other": "Inget skrivs över: varje version sparas, med vem som gjorde den och när. Du ser vad det blir innan något sparas."
+    },
+    "Nothing differs from what the line says now. Nothing will be saved.": {
+      "other": "Ingenting skiljer sig från vad raden säger nu. Inget sparas."
+    },
+    "Before": {
+      "other": "Före"
+    },
+    "After": {
+      "other": "Efter"
+    },
+    "This line, with VAT": {
+      "other": "Den här raden, med moms"
+    },
+    "The job, with VAT": {
+      "other": "Jobbet, med moms"
+    },
+    "The customer's agreement": {
+      "other": "Kundens godkännande"
+    },
+    "This line is no longer agreed to.": {
+      "other": "Raden är inte längre godkänd."
+    },
+    "It could cost the customer more than they said yes to, so it goes back to be put to them again. Their earlier yes stays on record as it was.": {
+      "other": "Den kan kosta kunden mer än de sa ja till, så den går tillbaka för att läggas fram igen. Det tidigare jaet står kvar i journalen som det var."
+    },
+    "The customer's yes still covers this line: it does not cost them more than they agreed to.": {
+      "other": "Kundens ja gäller fortfarande för raden: den kostar inte mer än de gick med på."
+    },
+    "The customer had said yes to this line. It is withdrawn; their yes stays on record as it was.": {
+      "other": "Kunden hade sagt ja till raden. Den dras tillbaka; jaet står kvar i journalen som det var."
+    },
+    "Still agreed:": {
+      "other": "Fortfarande godkänt:"
+    },
+    "Waiting for the customer:": {
+      "other": "Väntar på kunden:"
+    },
+    "The shelf": {
+      "other": "Hyllan"
+    },
+    "put aside": {
+      "other": "avsatt"
+    },
+    "already taken out": {
+      "other": "redan uttaget"
+    },
+    "Taken out to the car and no longer on the bill. Nothing is said to have come back; put it back from the job if it did.": {
+      "other": "Uttagen till bilen och inte längre på fakturan. Inget påstås ha kommit tillbaka; lämna tillbaka den från jobbet om den gjorde det."
+    },
+    "Withdraw the line": {
+      "other": "Dra tillbaka raden"
+    },
+    "Save the correction": {
+      "other": "Spara rättelsen"
+    },
+    "VAT, per cent": {
+      "other": "Moms, procent"
+    },
+    "The supplier (warranty)": {
+      "other": "Leverantören (garanti)"
+    },
+    "Why (optional)": {
+      "other": "Varför (valfritt)"
+    },
+    "See what it comes to": {
+      "other": "Se vad det blir"
+    },
+    "Take the line back": {
+      "other": "Ta tillbaka raden"
+    },
+    "For a line that should never have been there. It stays in the history; nothing counts it. Work that was done cannot be taken back.": {
+      "other": "För en rad som aldrig skulle ha funnits. Den står kvar i historiken; inget räknar den. Arbete som utförts kan inte tas tillbaka."
+    },
+    "Why it is withdrawn": {
+      "other": "Varför den dras tillbaka"
+    },
+    "See what it changes": {
+      "other": "Se vad det ändrar"
+    },
+    "Versions": {
+      "other": "Versioner"
+    },
+    "Version": {
+      "other": "Version"
+    },
+    "agreement cleared": {
+      "other": "godkännandet borttaget"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

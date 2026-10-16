@@ -315,7 +315,7 @@ func VehicleByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 		for idx := range v.History {
 			lines, err := tx.Query(ctx,
 				`SELECT description FROM work_order_lines
-				 WHERE work_order_id = $1 ORDER BY position`, v.History[idx].WorkOrderID)
+				 WHERE work_order_id = $1 AND withdrawn_at IS NULL ORDER BY position`, v.History[idx].WorkOrderID)
 			if err != nil {
 				return fmt.Errorf("read lines: %w", err)
 			}

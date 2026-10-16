@@ -105,7 +105,7 @@ func Hours(minutes int) string { return fmt.Sprintf("%.1f", float64(minutes)/60)
 // database's clock as AsOf so a running entry and the comparison agree.
 const progressColumns = `
 	coalesce((SELECT round(sum(l.quantity) * 60) FROM work_order_lines l
-	          WHERE l.work_order_id = w.id AND l.kind = 'labour'), 0)::int,
+	          WHERE l.work_order_id = w.id AND l.kind = 'labour' AND l.withdrawn_at IS NULL), 0)::int,
 	coalesce((SELECT round(sum(extract(epoch from coalesce(t.ended_at, now()) - t.started_at)) / 60)
 	          FROM time_entries t WHERE t.work_order_id = w.id), 0)::int,
 	EXISTS (SELECT 1 FROM time_entries t WHERE t.work_order_id = w.id AND t.ended_at IS NULL),

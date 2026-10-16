@@ -109,7 +109,7 @@ const pendingLines = `
 	SELECT id, kind, description, (quantity * 1000)::bigint, unit_price_minor, vat_rate_bp
 	FROM work_order_lines
 	WHERE work_order_id = $1 AND cost_bearer = 'customer'
-	  AND approved_at IS NULL AND declined_at IS NULL
+	  AND approved_at IS NULL AND declined_at IS NULL AND withdrawn_at IS NULL
 	ORDER BY position`
 
 func pendingTx(ctx context.Context, tx pgx.Tx, jobID string) ([]quotable, error) {
@@ -499,6 +499,19 @@ func QuoteAnswerFromLink(ctx context.Context, pool *pgxpool.Pool, shopID, token,
 // ones nobody has done yet. Earlier answers stay.
 func decideTx(ctx context.Context, tx pgx.Tx, shopID, jobID string, q *Quote, decision, via string,
 	by, linkID *string, agreed *int64, note string) error {
+	if decision == "approved" {
+		// A yes is to the lines as the customer was shown them. If one has
+		// since been corrected the quote is out of date, and the shop puts a
+		// new version forward rather than have the yes land on a number the
+		// job no longer has.
+		stale, err := quoteStaleTx(ctx, tx, q.ID)
+		if err != nil {
+			return err
+		}
+		if stale {
+			return ErrQuoteSuperseded
+		}
+	}
 	var id string
 	var at time.Time
 	if err := tx.QueryRow(ctx, `
@@ -545,7 +558,7 @@ func agreementTx(ctx context.Context, tx pgx.Tx, jobID string) (agreement, error
 		SELECT count(*) FILTER (WHERE approved_at IS NULL AND declined_at IS NULL),
 		       count(*) FILTER (WHERE declined_at IS NULL),
 		       count(*)
-		FROM work_order_lines WHERE work_order_id = $1 AND cost_bearer = 'customer'`, jobID).
+		FROM work_order_lines WHERE work_order_id = $1 AND cost_bearer = 'customer' AND withdrawn_at IS NULL`, jobID).
 		Scan(&pending, &live, &total); err != nil {
 		return agreement{}, fmt.Errorf("check the agreement: %w", err)
 	}
