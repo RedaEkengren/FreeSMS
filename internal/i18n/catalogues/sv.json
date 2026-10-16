@@ -4168,8 +4168,8 @@
     "Set up the workshop": {
       "other": "Ställ in verkstaden"
     },
-    "Somebody owns the backups and has tried restoring one. The steps are in DEPLOY.md. Write the name and number of whoever you ring when it breaks under Getting started.": {
-      "other": "Någon äger säkerhetskopiorna och har provat att återställa en. Stegen finns i DEPLOY.md. Skriv namn och nummer på den du ringer när det går sönder under Komma igång."
+    "Somebody owns the backups and has tried restoring one. The steps are in RUNBOOK.md, and the page for the hours without the system is OUTAGE.md. Write the name and number of whoever you ring when it breaks under Getting started.": {
+      "other": "Någon äger säkerhetskopiorna och har provat att återställa en. Stegen finns i RUNBOOK.md, och sidan för timmarna utan systemet är OUTAGE.md. Skriv namn och nummer på den du ringer när det går sönder under Komma igång."
     },
     "Start and stop the clock": {
       "other": "Starta och stoppa klockan"
@@ -6094,6 +6094,12 @@
     },
     "signing in, invoicing, payments, importing, and everything to do with a customer's details. If you try, nothing is sent and nothing is stored.": {
       "other": "att logga in, fakturera, betalningar, import och allt som rör en kunds uppgifter. Om du försöker skickas ingenting och ingenting sparas."
+    },
+    "%d accounts have that address": {
+      "other": "%d konton har den adressen"
+    },
+    "say whose password": {
+      "other": "säg vems lösenord"
     },
     "Final check": {
       "other": "Slutkontroll"

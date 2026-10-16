@@ -27,6 +27,10 @@ type Config struct {
 	DefaultLocale string
 	LogLevel      string
 	Release       string
+	// A long secret a monitor sends to read /ops/status. Empty disables the
+	// endpoint: a service that answers questions about its queue and its disk
+	// to anybody is telling an outsider where it is weak.
+	OpsToken string
 
 	// Which shop this installation serves. Empty means: resolve it, and
 	// require exactly one to exist.
@@ -79,6 +83,7 @@ func Load() (*Config, error) {
 		DefaultLocale:      envOr("DEFAULT_LOCALE", "en"),
 		LogLevel:           envOr("LOG_LEVEL", "info"),
 		Release:            envOr("RELEASE", "dev"),
+		OpsToken:           os.Getenv("OPS_TOKEN"),
 		ShopID:             os.Getenv("SHOP_ID"),
 		VehicleLookupURL:   os.Getenv("VEHICLE_LOOKUP_URL"),
 		VehicleLookupToken: os.Getenv("VEHICLE_LOOKUP_TOKEN"),
@@ -98,6 +103,9 @@ func Load() (*Config, error) {
 
 	if cfg.DatabaseURL == "" {
 		problems = append(problems, "DATABASE_URL is required")
+	}
+	if cfg.OpsToken != "" && len(cfg.OpsToken) < 24 {
+		problems = append(problems, "OPS_TOKEN must be at least 24 characters; make one with: openssl rand -hex 24")
 	}
 
 	// BASE_URL is worth validating rather than accepting. It ends up in links

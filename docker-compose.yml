@@ -43,6 +43,7 @@ services:
       DEFAULT_LOCALE: ${DEFAULT_LOCALE:-en}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       RELEASE: ${RELEASE:-dev}
+      OPS_TOKEN: ${OPS_TOKEN:-}
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
       SMTP_URL: ${SMTP_URL:-}

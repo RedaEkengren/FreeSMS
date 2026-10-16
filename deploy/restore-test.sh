@@ -40,47 +40,12 @@ done
 curl -fsS http://localhost:8080/healthz >/dev/null
 
 say "putting something in it worth losing"
-docker exec -i "$DB_CONTAINER" psql -U freesms -d freesms -v ON_ERROR_STOP=1 <<'SQL'
-BEGIN;
-SET LOCAL app.current_shop = '11111111-1111-1111-1111-111111111111';
-INSERT INTO shops (id, name, locale) VALUES
-  ('11111111-1111-1111-1111-111111111111', 'Restore Test AB', 'sv')
-  ON CONFLICT (id) DO UPDATE SET name = excluded.name;
-INSERT INTO people (id, shop_id, display_name) VALUES
-  ('22222222-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'Karin Restore')
-  ON CONFLICT (id) DO NOTHING;
-INSERT INTO customers (id, shop_id, kind, person_id) VALUES
-  ('33333333-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
-   'private', '22222222-0000-0000-0000-000000000001')
-  ON CONFLICT (id) DO NOTHING;
-INSERT INTO vehicles (id, shop_id, make, model) VALUES
-  ('44444444-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'Volvo', 'V70')
-  ON CONFLICT (id) DO NOTHING;
-INSERT INTO work_orders (id, shop_id, number, vehicle_id, customer_id, state) VALUES
-  ('55555555-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 9001,
-   '44444444-0000-0000-0000-000000000001', '33333333-0000-0000-0000-000000000001', 'ready')
-  ON CONFLICT (id) DO NOTHING;
-INSERT INTO invoice_series (shop_id, series, next_number) VALUES
-  ('11111111-1111-1111-1111-111111111111', 'R', 2)
-  ON CONFLICT DO NOTHING;
-INSERT INTO invoices
-  (id, shop_id, series, number, work_order_id, customer_name,
-   net_minor, vat_minor, gross_minor)
-VALUES
-  ('66666666-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
-   'R', 1, '55555555-0000-0000-0000-000000000001', 'Karin Restore',
-   123456, 30864, 154320)
-  ON CONFLICT (id) DO NOTHING;
-COMMIT;
-SQL
-
-# A photograph, which is the thing that cannot be typed again.
-docker run --rm -v "$ATTACHMENTS_VOLUME":/dst alpine \
-    sh -c 'mkdir -p /dst/ab && printf "not really a jpeg, but it is the bytes that matter" > /dst/ab/abcdef0123456789.jpg'
+./deploy/seed-books.sh
+PHOTO_KEY=abcdef0123456789abcdef0123456789
 
 BEFORE_GROSS="$(docker exec "$DB_CONTAINER" psql -U freesms -d freesms -At \
     -c "SELECT gross_minor FROM invoices WHERE id = '66666666-0000-0000-0000-000000000001'")"
-BEFORE_PHOTO="$(docker run --rm -v "$ATTACHMENTS_VOLUME":/src:ro alpine cat /src/ab/abcdef0123456789.jpg)"
+BEFORE_PHOTO="$(docker run --rm -v "$ATTACHMENTS_VOLUME":/src:ro alpine cat /src/ab/$PHOTO_KEY.jpg)"
 echo "invoice gross before: $BEFORE_GROSS"
 
 say "backing up"
@@ -110,7 +75,7 @@ AFTER_GROSS="$(docker exec "$DB_CONTAINER" psql -U freesms -d freesms -At \
     -c "SELECT gross_minor FROM invoices WHERE id = '66666666-0000-0000-0000-000000000001'")"
 AFTER_NAME="$(docker exec "$DB_CONTAINER" psql -U freesms -d freesms -At \
     -c "SELECT customer_name FROM invoices WHERE id = '66666666-0000-0000-0000-000000000001'")"
-AFTER_PHOTO="$(docker run --rm -v "$ATTACHMENTS_VOLUME":/src:ro alpine cat /src/ab/abcdef0123456789.jpg)"
+AFTER_PHOTO="$(docker run --rm -v "$ATTACHMENTS_VOLUME":/src:ro alpine cat /src/ab/$PHOTO_KEY.jpg)"
 
 fail=0
 [ "$AFTER_GROSS" = "$BEFORE_GROSS" ] || { echo "gross: $AFTER_GROSS, want $BEFORE_GROSS" >&2; fail=1; }
@@ -124,6 +89,13 @@ POLICIES="$(docker exec "$DB_CONTAINER" psql -U freesms -d freesms -At \
     -c "SELECT count(*) FROM pg_policies WHERE schemaname = 'public'")"
 [ "$POLICIES" -gt 0 ] || { echo "no row level security policies came back" >&2; fail=1; }
 echo "policies restored: $POLICIES"
+
+# Facts are not the same as a workshop you can trust. Ask the application to
+# read what came back: an unbroken series of invoices, totals that are their
+# lines, credits and reversals that point where they should, every photograph
+# on disk. This is the check a real restore is accepted by.
+say "verifying the books"
+docker compose exec -T app /freesms -verify || { echo "the restored data did not verify" >&2; fail=1; }
 
 [ "$fail" -eq 0 ] || { echo; echo "RESTORE TEST FAILED"; exit 1; }
 say "restore verified: the invoice, the customer, the photograph and $POLICIES policies"

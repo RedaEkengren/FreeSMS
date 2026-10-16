@@ -1,0 +1,31 @@
+# Continuous WAL archiving for the database, as an addition to the stack:
+#
+#   docker compose -f docker-compose.yml -f deploy/wal.compose.yml up -d
+#
+# Postgres writes every change to a log before the table files. This ships each
+# finished segment of that log to /wal, and the segment is closed at least every
+# archive_timeout seconds even on a quiet night, so what can be lost is bounded
+# by that and by how fast /wal leaves the machine. Something else must pull /wal
+# off the host (as the nightly dump is pulled, DEPLOY.md "Backups"): an archive
+# on the disk that died is not an archive.
+#
+# With a base backup (pg_basebackup) this is what lets a restore replay forward
+# to a chosen moment, not stop at last night's dump. RUNBOOK.md section 6.
+services:
+  db:
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_mode=on
+      # Never overwrite a segment already archived: a second, different file
+      # under the same name would silently corrupt a recovery.
+      - -c
+      - archive_command=test ! -f /wal/%f && cp %p /wal/%f
+      - -c
+      - archive_timeout=${WAL_ARCHIVE_TIMEOUT:-60}
+    volumes:
+      - wal-archive:/wal
+volumes:
+  wal-archive:

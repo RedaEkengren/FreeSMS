@@ -38,7 +38,7 @@ func registeredRoutes(t *testing.T) []string {
 // failures somebody hid.
 var swept = map[string]string{
 	// Nothing to substitute: these take no identifier at all.
-	"GET /healthz": "", "GET /static/": "", "GET /setup": "", "POST /setup": "",
+	"GET /healthz": "", "GET /ops/status": "token, not an identifier", "GET /static/": "", "GET /setup": "", "POST /setup": "",
 	"GET /login": "", "POST /login": "", "POST /logout": "", "GET /{$}": "",
 	"GET /board": "", "GET /jobs/new": "", "POST /jobs/new": "",
 	"GET /jobs/new/lookup": "", "GET /jobs/new/customers": "", "GET /figures": "", "GET /accounting": "",

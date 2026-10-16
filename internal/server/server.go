@@ -32,17 +32,19 @@ import (
 
 // Server holds everything a handler may need.
 type Server struct {
-	pool          *pgxpool.Pool
-	log           *slog.Logger
-	release       string
-	locale        string
-	exportDir     string
-	secureCookies bool
-	templates     map[string]*template.Template
-	photos        *storage.Store
-	baseURL       string
-	vehicleLookup vehicledata.Lookup
-	catalogues    *i18n.Catalogues
+	pool           *pgxpool.Pool
+	log            *slog.Logger
+	release        string
+	opsToken       string
+	attachmentsDir string
+	locale         string
+	exportDir      string
+	secureCookies  bool
+	templates      map[string]*template.Template
+	photos         *storage.Store
+	baseURL        string
+	vehicleLookup  vehicledata.Lookup
+	catalogues     *i18n.Catalogues
 
 	// Open screens, told when something they show has changed.
 	live          *live.Hub
@@ -227,6 +229,8 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 		live:             live.New(pool, log, liveStreams),
 		liveHeartbeat:    25 * time.Second,
 		release:          cfg.Release,
+		opsToken:         cfg.OpsToken,
+		attachmentsDir:   cfg.AttachmentsDir,
 		configuredShopID: cfg.ShopID,
 		locale:           locale,
 		photos:           photos,
@@ -295,6 +299,7 @@ func (s *Server) routes() (http.Handler, error) {
 	// Health is outside the session middleware on purpose: a health check must
 	// not depend on authentication working.
 	mux.HandleFunc("GET /healthz", s.handleHealth)
+	mux.HandleFunc("GET /ops/status", s.handleOpsStatus)
 
 	staticFS, err := fs.Sub(web.Static, "static")
 	if err != nil {

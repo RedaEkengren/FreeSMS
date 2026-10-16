@@ -105,3 +105,21 @@ func TestAMessageProviderNeedsWhatItNeeds(t *testing.T) {
 		}
 	}
 }
+
+// A monitor's secret is long, or it is not accepted: a short one is a password
+// to the service's weak points, and the error names the variable and not the value.
+func TestTheOpsTokenIsLongOrAbsent(t *testing.T) {
+	valid(t)
+	if cfg, err := Load(); err != nil || cfg.OpsToken != "" {
+		t.Fatalf("no token = %v, %q", err, cfg.OpsToken)
+	}
+	t.Setenv("OPS_TOKEN", "short-secret")
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "OPS_TOKEN") || strings.Contains(err.Error(), "short-secret") {
+		t.Errorf("a short token = %v", err)
+	}
+	t.Setenv("OPS_TOKEN", strings.Repeat("a", 24))
+	if cfg, err := Load(); err != nil || len(cfg.OpsToken) != 24 {
+		t.Errorf("a long token = %v", err)
+	}
+}

@@ -55,6 +55,25 @@ func main() {
 		return
 	}
 
+	if len(os.Args) > 1 && os.Args[1] == "-verify" {
+		if err := verify(); err != nil {
+			os.Stderr.WriteString("freesms: " + err.Error() + "\n")
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Lets a locked-out person back in, from the server:
+	//
+	//   printf '%s' 'a long new phrase' | docker compose exec -T app /freesms -reset-password owner@example.se
+	if len(os.Args) > 1 && os.Args[1] == "-reset-password" {
+		if err := resetPassword(os.Args[2:]); err != nil {
+			os.Stderr.WriteString("freesms: " + err.Error() + "\n")
+			os.Exit(1)
+		}
+		return
+	}
+
 	if err := run(); err != nil {
 		// Configuration errors arrive as a list, so print rather than log:
 		// slog would put the newlines inside a quoted field and make the list

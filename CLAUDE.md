@@ -165,6 +165,18 @@ not exist.
   using a jsiSIE-based import as `Bilen AB`. It has not been checked against
   a commercial package's import, which is the evidence still missing.
 
+- **Recovery is drilled on a developer machine, not on a production server.**
+  `deploy/drill.sh` loses a seeded "production" completely, restores the backup
+  into an isolated environment and has the application read it
+  (`freesms -verify`: unbroken invoice and payment series, totals that are their
+  lines, credits and reversals that point where they should, every photograph on
+  disk); `deploy/wal-drill.sh` replays a base backup and archived WAL to a chosen
+  moment and no further; `deploy/monitor.sh` rings through `ALERT_COMMAND`, and
+  `deploy/monitor-test.sh` makes each failure happen. Dated evidence is in
+  `drills/`. What is not proved, and is said so in `RUNBOOK.md`: a real server,
+  the off-host copy and its age, the alert reaching a person's own device, and
+  the recovery time and point agreed with the workshop.
+
 - **Nothing is deployed yet, and there is no `deploy.yml`.** A workflow naming
   `DEPLOY_HOST` and `DEPLOY_SSH_KEY` when the repository has neither is dead
   code that answers "is deployment automated?" with yes. `DEPLOY.md` describes

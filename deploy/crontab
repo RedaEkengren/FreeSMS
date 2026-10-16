@@ -1,0 +1,25 @@
+# The schedule a FreeSMS server runs. Install it for the user that runs the
+# stack, with:
+#
+#   crontab deploy/crontab
+#
+# after setting the paths and the secrets below. A server that comes back up
+# with the application and the database and nothing running these has no
+# backups and no alarm, and finds out on the day it matters.
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+BASE_URL=http://127.0.0.1:8080
+BACKUP_DIR=/home/freesms/backups/freesms
+OPS_TOKEN=
+# Where an alert goes. The message arrives on standard input.
+ALERT_COMMAND=mail -s "FreeSMS needs looking at" ops@example.se
+
+# Nightly, in the small hours. Pulled off the machine by something else
+# (see DEPLOY.md, "Backups"): a backup that lives only on the machine it is a
+# backup of is not one.
+17 3 * * *  cd /opt/freesms && ./deploy/backup.sh "$BACKUP_DIR" >> /var/log/freesms-backup.log 2>&1
+
+# Every five minutes: is the service up, are messages going, can a photograph
+# be written, is there a recent backup. Says so once when something is wrong
+# and once when it is over.
+*/5 * * * * cd /opt/freesms && ./deploy/monitor.sh

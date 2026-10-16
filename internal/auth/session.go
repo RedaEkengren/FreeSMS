@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -453,4 +454,78 @@ func admittedHash(ctx context.Context, password string) (string, error) {
 	}
 	defer release()
 	return HashPassword(password)
+}
+
+// ResetPasswordByEmail gives the person with this email address a new password
+// and ends their sessions, for the operator when the owner is locked out and
+// there is nobody left to do it from inside. It is run on the server, by
+// whoever has the server; there is no page for it, because a page that resets
+// an owner's password is an account takeover waiting for a bug.
+//
+// It will not guess: no such address, or an address that belongs to more than
+// one account, is refused. The failed sign-in attempts for the address are
+// cleared so the new password works at once.
+func ResetPasswordByEmail(ctx context.Context, pool *pgxpool.Pool, email, password string) (string, error) {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return "", fmt.Errorf("%w: say whose password", ErrRefused)
+	}
+	hash, err := admittedHash(ctx, password)
+	if err != nil {
+		return "", err
+	}
+	rows, err := pool.Query(ctx, `SELECT id::text FROM shops`)
+	if err != nil {
+		return "", fmt.Errorf("list shops: %w", err)
+	}
+	shops, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return "", err
+	}
+	type found struct{ shop, user, name string }
+	var all []found
+	for _, shop := range shops {
+		err := database.InShop(ctx, pool, shop, func(ctx context.Context, tx pgx.Tx) error {
+			r, err := tx.Query(ctx, `
+				SELECT u.id::text, p.display_name FROM users u JOIN people p ON p.id = u.person_id
+				WHERE p.email = $1 AND u.active`, email)
+			if err != nil {
+				return err
+			}
+			defer r.Close()
+			for r.Next() {
+				f := found{shop: shop}
+				if err := r.Scan(&f.user, &f.name); err != nil {
+					return err
+				}
+				all = append(all, f)
+			}
+			return r.Err()
+		})
+		if err != nil {
+			return "", fmt.Errorf("look for %s: %w", email, err)
+		}
+	}
+	switch len(all) {
+	case 0:
+		return "", ErrNoSuchUser
+	case 1:
+	default:
+		return "", fmt.Errorf("%w: %d accounts have that address", ErrRefused, len(all))
+	}
+	f := all[0]
+	err = database.InShop(ctx, pool, f.shop, func(ctx context.Context, tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `UPDATE users SET password_hash = $2 WHERE id = $1`, f.user, hash); err != nil {
+			return fmt.Errorf("set password: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, f.user); err != nil {
+			return fmt.Errorf("end sessions: %w", err)
+		}
+		_, err := tx.Exec(ctx, `DELETE FROM login_attempts WHERE email = $1`, email)
+		return err
+	})
+	if err != nil {
+		return "", err
+	}
+	return f.name, nil
 }

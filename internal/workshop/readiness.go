@@ -325,10 +325,10 @@ func setupTx(ctx context.Context, tx pgx.Tx, scope access.Scope, env ReadinessEn
 		look.State, look.Detail = "manual", []string{"No lookup: type the make and model when a car is taken in."}
 	}
 	add(look)
-	add(ReadinessTask{Key: "backups", Group: "Before the first customer", Title: "Who owns the backups", Required: true, Link: "/start/help/owner",
+	add(ReadinessTask{Key: "backups", Group: "Before the first customer", Title: "Who owns the backups", Required: true, Link: "/help/owner",
 		Why:    "A workshop cannot lose a day of invoices. Somebody has to own the backups and have tried getting them back. Write down who, and where the runbook is.",
 		CanSay: true, SayLabel: "This person owns the backups", NeedNote: true})
-	add(ReadinessTask{Key: "support", Group: "Before the first customer", Title: "Who to ring when it breaks", Required: true, Link: "/start/help/owner",
+	add(ReadinessTask{Key: "support", Group: "Before the first customer", Title: "Who to ring when it breaks", Required: true, Link: "/help/owner",
 		Why:    "A name and a number, written down before the day you need them.",
 		CanSay: true, SayLabel: "This is who we ring", NeedNote: true})
 

@@ -338,3 +338,61 @@ func TestYouCannotSwitchYourselfOff(t *testing.T) {
 		t.Errorf("a refused switch-off locked the user out: %v", err)
 	}
 }
+
+// An owner locked out of their own workshop, with nobody inside to let them
+// in: the operator, on the server, gives them a password that works at once
+// and ends whatever session somebody else might hold.
+func TestAnOperatorCanLetALockedOutPersonBackIn(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	token, _, err := Login(ctx, pool, shopID, email, pass, "old phone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Locked out by too many wrong guesses.
+	for i := 0; i < 20; i++ {
+		Login(ctx, pool, shopID, email, "not the password at all", "guesser")
+	}
+	if _, _, err := Login(ctx, pool, shopID, email, pass, "me"); err == nil {
+		t.Fatal("the account was not locked by repeated failures; the test is not testing anything")
+	}
+
+	name, err := ResetPasswordByEmail(ctx, pool, email, "a new and better phrase")
+	if err != nil || name != "A Technician" {
+		t.Fatalf("ResetPasswordByEmail = %q, %v", name, err)
+	}
+	if _, err := Authenticate(ctx, pool, shopID, token); err == nil {
+		t.Error("the old session survived the reset")
+	}
+	if _, _, err := Login(ctx, pool, shopID, email, pass, "old"); err == nil {
+		t.Error("the old password still works")
+	}
+	if _, _, err := Login(ctx, pool, shopID, email, "a new and better phrase", "new"); err != nil {
+		t.Errorf("the new password does not work straight away: %v", err)
+	}
+}
+
+func TestAResetDoesNotGuess(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	if _, err := ResetPasswordByEmail(ctx, pool, "nobody@example.test", "a long enough phrase"); !errors.Is(err, ErrNoSuchUser) {
+		t.Errorf("an address nobody has = %v", err)
+	}
+	if _, err := ResetPasswordByEmail(ctx, pool, email, "short"); !errors.Is(err, ErrRefused) {
+		t.Errorf("a password that is too short = %v", err)
+	}
+	if _, err := ResetPasswordByEmail(ctx, pool, "  ", "a long enough phrase"); !errors.Is(err, ErrRefused) {
+		t.Errorf("no address = %v", err)
+	}
+	// Deactivated people are not reset: signing in is not what they are for.
+	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE users SET active = false, deactivated_at = now() WHERE id = $1`, userID)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ResetPasswordByEmail(ctx, pool, email, "a long enough phrase"); !errors.Is(err, ErrNoSuchUser) {
+		t.Errorf("a deactivated account = %v", err)
+	}
+}

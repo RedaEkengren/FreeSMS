@@ -60,6 +60,20 @@ jobs:
       - name: Back up, destroy, restore, verify
         run: ./deploy/restore-test.sh
 
+      # The alarm, made to ring for each thing it watches. Needs only bash.
+      - name: The monitor rings
+        run: ./deploy/monitor-test.sh
+
+      # Continuous archiving and point-in-time recovery: a base backup and the
+      # archived log alone, replayed to a chosen moment and not past it.
+      - name: Point-in-time recovery
+        run: ./deploy/wal-drill.sh
+
+      # A whole loss and a recovery into an isolated environment, timed, with
+      # the application reading what came back.
+      - name: Recovery drill
+        run: ./deploy/drill.sh
+
       # The rollback DEPLOY.md describes, with real images: a release that
       # applied a migration, a failed health check, and the way back -- the
       # previous image for a migration marked safe, the pre-deploy dump for

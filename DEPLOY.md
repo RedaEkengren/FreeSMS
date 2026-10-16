@@ -134,10 +134,10 @@ SHA that gets deleted.
    service refuses to start if it cannot write there. Discovering this at the
    first photograph of the day, as `mkdir ...: permission denied`, is a long
    way from where the mistake was made.
-5. Install the schedule from `deploy/crontab` with the install script. A server
-   that comes back up with the application, the database and the certificates
-   restored, and nothing running the backups, fails silently and is discovered
-   on the day it matters.
+5. Install the schedule: set the paths and `OPS_TOKEN` in `deploy/crontab`, then
+   `crontab deploy/crontab`. A server that comes back up with the application,
+   the database and the certificates restored, and nothing running the backups
+   or the alarm, fails silently and is discovered on the day it matters.
 6. Start, and check the health endpoint reports the database healthy.
 
 ## Backups
@@ -163,4 +163,11 @@ SHA that gets deleted.
   restored is a hypothesis. Check row counts after the restore, not that the
   process exited zero.
 
-Nothing has been restored yet. That line stays until it has.
+Restores have been run on a developer machine and in CI, not on a production
+server: `deploy/restore-test.sh` on every push, and `deploy/drill.sh` for a full
+recovery into an isolated environment with the time and the data lost written
+down in `drills/`. How to restore, what the application checks about what came
+back (`freesms -verify`), the alarm (`deploy/monitor.sh`), the recovery targets
+and who to ring are in [RUNBOOK.md](RUNBOOK.md); the page for the workshop's
+own hours without the system is [OUTAGE.md](OUTAGE.md). The line that nothing
+has been restored on the real server stays until it has.
