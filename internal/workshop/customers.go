@@ -62,7 +62,7 @@ type NewCustomer struct {
 
 const customerColumns = `
 	c.id, c.kind,
-	coalesce(p.display_name, c.company_name, ''),
+	coalesce(CASE WHEN c.kind = 'company' THEN c.company_name END, p.display_name, ''),
 	coalesce(c.org_number, ''), coalesce(c.vat_number, ''),
 	coalesce(p.phone, ''), coalesce(p.email, ''),
 	coalesce(nullif(concat_ws(', ', c.address_line1, c.address_line2,
@@ -105,7 +105,7 @@ func FindCustomers(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		rows, err := tx.Query(ctx, `SELECT`+customerColumns+`
 			FROM customers c
 			LEFT JOIN people p ON p.id = c.person_id
-			WHERE p.erased_at IS NULL
+			WHERE p.erased_at IS NULL AND c.merged_into IS NULL
 			  AND (coalesce(p.display_name, c.company_name) ILIKE '%' || $1 || '%'
 			       OR c.org_number ILIKE $1 || '%'
 			       OR ($2 <> '' AND regexp_replace(coalesce(p.phone, ''), '\D', '', 'g') LIKE '%' || $2 || '%'))

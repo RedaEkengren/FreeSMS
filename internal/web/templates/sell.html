@@ -1,0 +1,34 @@
+{{define "content"}}
+<div class="row"><span class="plate">{{.Vehicle.Describe}}</span></div>
+<h1>{{.T "The vehicle was sold"}}</h1>
+{{if .Vehicle.OwnerName}}<p class="waiting">{{.T "Owned by %s at the moment." .Vehicle.OwnerName}}</p>{{end}}
+<p class="waiting">{{.T "The earlier owner's jobs stay with them. The new owner is shown what was done to the car, not who paid or what."}}</p>
+
+<form method="get" action="/vehicles/{{.Vehicle.ID}}/sell">
+  <label><span>{{.T "Find the new owner"}}</span>
+    <input name="q" value="{{.CustomerQuery}}" autocomplete="off" autofocus></label>
+  <button type="submit" class="secondary">{{.T "Look"}}</button>
+</form>
+
+{{if .CustomerQuery}}{{if not .Customers}}<p class="empty">{{.T "Nobody matched."}}</p>{{end}}{{end}}
+{{range .Customers}}
+<form class="card" method="post" action="/vehicles/{{$.Vehicle.ID}}/sell">
+  <input type="hidden" name="customer_id" value="{{.ID}}">
+  <div class="row"><span>{{.Name}}</span><span class="waiting">{{if .Phone}}{{.Phone}}{{end}}{{if .OrgNumber}} {{.OrgNumber}}{{end}}</span></div>
+  <div class="pair">
+    <label><span>{{$.T "Sold on"}}</span><input type="date" name="from" value="{{$.Today}}" max="{{$.Today}}"></label>
+    <label><span>{{$.T "Note"}}</span><input name="reason" maxlength="300"></label>
+  </div>
+  <button type="submit">{{$.T "They are the new owner"}}</button>
+</form>
+{{end}}
+
+<h2>{{.T "New owner not known yet"}}</h2>
+<form method="post" action="/vehicles/{{.Vehicle.ID}}/sell">
+  <div class="pair">
+    <label><span>{{.T "Sold on"}}</span><input type="date" name="from" value="{{.Today}}" max="{{.Today}}"></label>
+    <label><span>{{.T "Note"}}</span><input name="reason" maxlength="300"></label>
+  </div>
+  <button type="submit" class="secondary">{{.T "End their ownership"}}</button>
+</form>
+{{end}}

@@ -47,9 +47,18 @@ type PersonExport struct {
 	Jobs       []ExportedJob       `json:"jobs,omitempty"`
 	Invoices   []ExportedInvoice   `json:"invoices,omitempty"`
 	Employment *ExportedEmployment `json:"employment,omitempty"`
+	// What was corrected on their records, and when.
+	Corrections []ExportedCorrection `json:"corrections,omitempty"`
 
 	// Written out rather than left for somebody to infer.
 	Notes []string `json:"notes"`
+}
+
+type ExportedCorrection struct {
+	Field string    `json:"field"`
+	Was   string    `json:"was,omitempty"`
+	Now   string    `json:"now,omitempty"`
+	At    time.Time `json:"at"`
 }
 
 type ExportedAddress struct {
@@ -217,6 +226,22 @@ func ExportPerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 		}
 		invoices.Close()
 
+		fixes, err := tx.Query(ctx, `
+			SELECT field, coalesce(old_value, ''), coalesce(new_value, ''), at
+			FROM record_changes WHERE person_id = $1 ORDER BY at`, personID)
+		if err != nil {
+			return fmt.Errorf("read corrections: %w", err)
+		}
+		for fixes.Next() {
+			var c ExportedCorrection
+			if err := fixes.Scan(&c.Field, &c.Was, &c.Now, &c.At); err != nil {
+				fixes.Close()
+				return err
+			}
+			e.Corrections = append(e.Corrections, c)
+		}
+		fixes.Close()
+
 		// Somebody can be an employee and a customer at once, and an export
 		// that showed only one half would be incomplete in the way that
 		// matters.
@@ -309,6 +334,12 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 			return fmt.Errorf("clear addresses: %w", err)
 		}
 
+		// What they were before a correction is theirs too. The row stays and
+		// says something changed; what it was does not.
+		if _, err := tx.Exec(ctx, `UPDATE record_changes SET old_value = NULL, new_value = NULL WHERE person_id = $1`, personID); err != nil {
+			return fmt.Errorf("clear the change log: %w", err)
+		}
+
 		// The numbers and addresses messages went to are theirs too, and no
 		// law asks for them to be kept.
 		if _, err := tx.Exec(ctx, `
@@ -318,7 +349,7 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 			return fmt.Errorf("clear message recipients: %w", err)
 		}
 
-		const cleared = "Name, email address, telephone number and postal address, and where messages to them were sent."
+		const cleared = "Name, email address, telephone number and postal address, where messages to them were sent, and the earlier values in the log of corrections."
 		const kept = "Issued invoices, including the name and address they were addressed to, " +
 			"because Swedish bookkeeping law requires them for seven years after issue. " +
 			"The technical history of vehicles, which belongs to the vehicle rather than to a person. " +

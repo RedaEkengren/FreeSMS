@@ -115,6 +115,9 @@ func (s *Server) handoverError(w http.ResponseWriter, r *http.Request, err error
 		s.renderError(w, r, http.StatusForbidden, "Not for your role", "")
 	case errors.Is(err, workshop.ErrNotFound):
 		s.renderError(w, r, http.StatusNotFound, "Not found", "It is not there any more.")
+	case errors.Is(err, workshop.ErrRecordChanged):
+		s.renderError(w, r, http.StatusConflict, "Somebody else got there first",
+			"Open the record again to see what they changed, then make your change.")
 	case errors.Is(err, workshop.ErrInvalid):
 		s.renderError(w, r, http.StatusBadRequest, "Not accepted", trimInvalid(err))
 	default:

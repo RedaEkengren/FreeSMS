@@ -1987,6 +1987,152 @@
     "Make a list from the agreed work": {
       "other": "Gör en lista av det godkända arbetet"
     },
+    "Add a person": {
+      "other": "Lägg till en person"
+    },
+    "Company name": {
+      "other": "Företagets namn"
+    },
+    "Correct the plate": {
+      "other": "Rätta skylten"
+    },
+    "Customers": {
+      "other": "Kunder"
+    },
+    "Description, when it has no plate": {
+      "other": "Beskrivning, när den saknar skylt"
+    },
+    "Details": {
+      "other": "Uppgifter"
+    },
+    "End their ownership": {
+      "other": "Avsluta deras ägande"
+    },
+    "Find the new owner": {
+      "other": "Hitta den nya ägaren"
+    },
+    "Invoices already issued keep the name and address they went out with.": {
+      "other": "Fakturor som redan skickats behåller det namn och den adress de gick ut med."
+    },
+    "It changed plate": {
+      "other": "Den bytte skylt"
+    },
+    "It has a new plate": {
+      "other": "Den har fått ny skylt"
+    },
+    "Jobs": {
+      "other": "Jobb"
+    },
+    "Look": {
+      "other": "Sök"
+    },
+    "Main contact person": {
+      "other": "Huvudkontakt"
+    },
+    "Model year": {
+      "other": "Årsmodell"
+    },
+    "New owner not known yet": {
+      "other": "Den nya ägaren är inte känd än"
+    },
+    "No customers yet. They are made when a job is taken in.": {
+      "other": "Inga kunder än. De skapas när ett jobb tas emot."
+    },
+    "No job is billed to them.": {
+      "other": "Inget jobb faktureras dem."
+    },
+    "No vehicle is recorded as theirs.": {
+      "other": "Inget fordon är registrerat som deras."
+    },
+    "Nobody matched.": {
+      "other": "Ingen matchade."
+    },
+    "Open the one it became": {
+      "other": "Öppna den den blev"
+    },
+    "Owned by %s at the moment.": {
+      "other": "Ägs just nu av %s."
+    },
+    "People at the company": {
+      "other": "Personer på företaget"
+    },
+    "Plate": {
+      "other": "Skylt"
+    },
+    "Put the record right": {
+      "other": "Rätta uppgifterna"
+    },
+    "Records merged into this one": {
+      "other": "Poster som slagits ihop med den här"
+    },
+    "Role at the company": {
+      "other": "Roll på företaget"
+    },
+    "Save the changes": {
+      "other": "Spara ändringarna"
+    },
+    "Sold on": {
+      "other": "Såld den"
+    },
+    "Take off": {
+      "other": "Ta bort"
+    },
+    "The earlier owner's jobs stay with them. The new owner is shown what was done to the car, not who paid or what.": {
+      "other": "Den tidigare ägarens jobb stannar hos dem. Den nya ägaren ser vad som gjorts med bilen, inte vem som betalade eller hur mycket."
+    },
+    "The ones touched most recently.": {
+      "other": "De som rörts senast."
+    },
+    "The vehicle was sold": {
+      "other": "Fordonet såldes"
+    },
+    "They are the new owner": {
+      "other": "De är den nya ägaren"
+    },
+    "This record was found to be the same as another.": {
+      "other": "Den här posten visade sig vara samma som en annan."
+    },
+    "This vehicle was found to be the same as another.": {
+      "other": "Det här fordonet visade sig vara samma som ett annat."
+    },
+    "Typed wrong: the right registration": {
+      "other": "Felskrivet: rätt registreringsnummer"
+    },
+    "Vehicles": {
+      "other": "Fordon"
+    },
+    "What has been changed": {
+      "other": "Vad som ändrats"
+    },
+    "Why, if it is worth saying": {
+      "other": "Varför, om det är värt att säga"
+    },
+    "company": {
+      "other": "företag"
+    },
+    "merged": {
+      "other": "sammanslagen"
+    },
+    "owns it": {
+      "other": "äger den"
+    },
+    "person": {
+      "other": "person"
+    },
+    "saved": {
+      "other": "sparat"
+    },
+    "until %s": {
+      "other": "till %s"
+    },
+    "%d invoice issued": {
+      "one": "%d faktura utfärdad",
+      "other": "%d fakturor utfärdade"
+    },
+    "%d job": {
+      "one": "%d jobb",
+      "other": "%d jobb"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

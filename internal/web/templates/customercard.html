@@ -1,0 +1,114 @@
+{{define "content"}}
+{{with .CustomerCard}}
+<div class="row">
+  <h1>{{.Name}}</h1>
+  <span class="tag">{{if .Private}}{{$.T "person"}}{{else}}{{$.T "company"}}{{end}}</span>
+</div>
+
+{{if .MergedInto}}
+<p class="waiting"><span class="tag warranty">{{$.T "merged"}}</span> {{$.T "This record was found to be the same as another."}}
+  <a href="/customers/{{.MergedInto}}">{{$.T "Open the one it became"}}</a></p>
+{{else}}
+{{if $.Saved}}<p class="waiting"><span class="tag pass">{{$.T "saved"}}</span></p>{{end}}
+
+<h2>{{$.T "Details"}}</h2>
+<form method="post" action="/customers/{{.ID}}/edit">
+  <input type="hidden" name="revision" value="{{.Revision}}">
+  <label><span>{{if .Private}}{{$.T "Name"}}{{else}}{{$.T "Company name"}}{{end}}</span>
+    <input name="name" value="{{.Name}}" required></label>
+  {{if not .Private}}
+  <label><span>{{$.T "Main contact person"}}</span><input name="contact_name" value="{{.ContactName}}"></label>
+  {{end}}
+  <div class="pair">
+    <label><span>{{$.T "Telephone"}}</span><input name="phone" value="{{.Phone}}" inputmode="tel"></label>
+    <label><span>{{$.T "Email"}}</span><input name="email" value="{{.Email}}" inputmode="email"></label>
+  </div>
+  <label><span>{{$.T "Address"}}</span><input name="address_line1" value="{{.AddressLine1}}"></label>
+  <label><span>{{$.T "Address, second line"}}</span><input name="address_line2" value="{{.AddressLine2}}"></label>
+  <div class="pair">
+    <label><span>{{$.T "Postal code"}}</span><input name="postal_code" value="{{.PostalCode}}"></label>
+    <label><span>{{$.T "City"}}</span><input name="city" value="{{.City}}"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{$.T "Company number"}}</span><input name="org_number" value="{{.OrgNumber}}"></label>
+    <label><span>{{$.T "VAT number"}}</span><input name="vat_number" value="{{.VATNumber}}"></label>
+  </div>
+  <label><span>{{$.T "Why, if it is worth saying"}}</span><input name="reason" maxlength="300"></label>
+  <button type="submit">{{$.T "Save the changes"}}</button>
+</form>
+<p class="waiting">{{$.T "Invoices already issued keep the name and address they went out with."}}</p>
+
+{{if not .Private}}
+<h2>{{$.T "People at the company"}}</h2>
+{{if .People}}
+<ul class="lines">
+  {{range .People}}
+  <li>
+    <div class="row"><span>{{.Name}}{{if .Title}} &middot; {{.Title}}{{end}}</span>
+      <form method="post" action="/customers/{{$.CustomerCard.ID}}/people/{{.ID}}/remove">
+        <button type="submit" class="secondary">{{$.T "Take off"}}</button>
+      </form></div>
+    <div class="waiting">{{if .Phone}}{{.Phone}}{{end}}{{if .Email}} &middot; {{.Email}}{{end}}</div>
+  </li>
+  {{end}}
+</ul>
+{{end}}
+<form class="mt" method="post" action="/customers/{{.ID}}/people">
+  <div class="pair">
+    <label><span>{{$.T "Name"}}</span><input name="name" required></label>
+    <label><span>{{$.T "Role at the company"}}</span><input name="title" maxlength="80"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{$.T "Telephone"}}</span><input name="phone" inputmode="tel"></label>
+    <label><span>{{$.T "Email"}}</span><input name="email" inputmode="email"></label>
+  </div>
+  <button type="submit" class="secondary">{{$.T "Add a person"}}</button>
+</form>
+{{end}}
+{{end}}
+
+<h2>{{$.T "Vehicles"}}</h2>
+{{if not .Vehicles}}<p class="empty">{{$.T "No vehicle is recorded as theirs."}}</p>{{else}}
+<ul class="lines">
+  {{range .Vehicles}}
+  <li><div class="row">
+    <a href="/vehicles/{{.VehicleID}}"><span class="plate plate-small">{{if .Registration}}{{.Registration}}{{else}}{{$.T "no plate"}}{{end}}</span> {{.Make}} {{.Model}}</a>
+    {{if .Current}}<span class="tag pass">{{$.T "owns it"}}</span>{{else}}<span class="tag">{{$.T "until %s" ($.Date ($.Local .To) "2 Jan 2006")}}</span>{{end}}
+  </div></li>
+  {{end}}
+</ul>
+{{end}}
+
+<h2>{{$.T "Jobs"}}</h2>
+{{if not .Jobs}}<p class="empty">{{$.T "No job is billed to them."}}</p>{{else}}
+<ul class="lines">
+  {{range .Jobs}}
+  <li><div class="row">
+    <a href="/jobs/{{.ID}}">#{{.Number}} &middot; {{$.Date ($.Local .OpenedAt) "2 Jan 2006"}}{{if .Registration}} &middot; {{.Registration}}{{end}}</a>
+    <span class="tag">{{$.T .StateLabel}}</span>
+  </div></li>
+  {{end}}
+</ul>
+<p class="waiting">{{$.N "%d invoice issued" .Invoices}}</p>
+{{end}}
+
+{{if .Merged}}
+<h2>{{$.T "Records merged into this one"}}</h2>
+<ul class="lines">
+  {{range .Merged}}<li><div class="row"><a href="/customers/{{.ID}}">{{.Name}}</a><span class="tag">{{$.Date ($.Local .At) "2 Jan 2006"}}</span></div></li>{{end}}
+</ul>
+{{end}}
+
+{{if .Changes}}
+<h2>{{$.T "What has been changed"}}</h2>
+<ul class="lines">
+  {{range .Changes}}
+  <li>
+    <div class="row"><span>{{.Field}}</span><span class="waiting">{{$.Date ($.Local .At) "2 Jan 2006 15:04"}} &middot; {{.By}}</span></div>
+    <div class="waiting">{{if .Old}}{{.Old}}{{else}}&ndash;{{end}} &rarr; {{if .New}}{{.New}}{{else}}&ndash;{{end}}{{if .Reason}} &middot; {{.Reason}}{{end}}</div>
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{end}}
+{{end}}

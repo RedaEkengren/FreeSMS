@@ -1,0 +1,28 @@
+{{define "content"}}
+<h1>{{.T "Customers"}}</h1>
+<form method="get" action="/customers">
+  <label>
+    <span>{{.T "Name, telephone or company number"}}</span>
+    <input name="q" value="{{.CustomerQuery}}" autocomplete="off" autofocus>
+  </label>
+  <button type="submit">{{.T "Look"}}</button>
+</form>
+
+{{if not .Customers}}
+  <p class="empty">{{if .CustomerQuery}}{{.T "Nobody matched."}}{{else}}{{.T "No customers yet. They are made when a job is taken in."}}{{end}}</p>
+{{else}}
+  {{if not .CustomerQuery}}<p class="waiting">{{.T "The ones touched most recently."}}</p>{{end}}
+  {{range .Customers}}
+  <a class="card" href="/customers/{{.ID}}">
+    <div class="row">
+      <span>{{.Name}}</span>
+      <span class="tag">{{if .Private}}{{$.T "person"}}{{else}}{{$.T "company"}}{{end}}</span>
+    </div>
+    <div class="waiting">
+      {{if .Phone}}{{.Phone}}{{end}}{{if .Email}} &middot; {{.Email}}{{end}}{{if .OrgNumber}} &middot; {{.OrgNumber}}{{end}}
+      &middot; {{$.N "%d job" .Orders}}
+    </div>
+  </a>
+  {{end}}
+{{end}}
+{{end}}

@@ -90,11 +90,11 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 			       ON o.vehicle_id = v.id AND o.owned_to IS NULL
 			LEFT JOIN customers c ON c.id = o.customer_id
 			LEFT JOIN people cp   ON cp.id = c.person_id
-			WHERE ($1 <> '' AND m.normalised = $1)
+			WHERE v.merged_into IS NULL AND (($1 <> '' AND m.normalised = $1)
 			   OR ($1 <> '' AND upper(coalesce(v.vin, '')) LIKE '%' || $1 || '%')
 			   OR ($4 AND (cp.display_name ILIKE '%' || $2 || '%'
 			            OR c.company_name ILIKE '%' || $2 || '%'))
-			   OR ($2 <> '' AND v.label ILIKE '%' || $2 || '%')
+			   OR ($2 <> '' AND v.label ILIKE '%' || $2 || '%'))
 			-- A vehicle that matches on its current plate sorts above one that
 			-- matches on a plate it gave up, because the current holder is
 			-- almost always the one being looked for.
@@ -128,8 +128,12 @@ type Vehicle struct {
 	ModelYear    *int16
 	Engine       string
 	Label        string
+	Revision     int
+	// Set when this vehicle was merged into another.
+	MergedInto string
 
 	OwnerName     string
+	OwnerID       string
 	OwnedSince    *time.Time
 	History       []HistoryEntry
 	Readings      []Reading
@@ -224,11 +228,12 @@ func VehicleByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var ownedSince *time.Time
 		var owner string
+		var ownerID *string
 		const head = `
 			SELECT v.id, coalesce(r.registration, ''), coalesce(v.vin, ''),
 			       coalesce(v.make, ''), coalesce(v.model, ''), v.model_year,
 			       coalesce(v.engine, ''), coalesce(v.label, ''),
-			       coalesce(cp.display_name, c.company_name, ''), o.owned_from
+			       coalesce(cp.display_name, c.company_name, ''), o.owned_from, v.revision, coalesce(v.merged_into::text, ''), o.customer_id::text
 			FROM vehicles v
 			LEFT JOIN vehicle_registrations r
 			       ON r.vehicle_id = v.id AND r.valid_to IS NULL
@@ -238,7 +243,7 @@ func VehicleByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 			LEFT JOIN people cp   ON cp.id = c.person_id
 			WHERE v.id = $1`
 		err := tx.QueryRow(ctx, head, id).Scan(&v.ID, &v.Registration, &v.VIN,
-			&v.Make, &v.Model, &v.ModelYear, &v.Engine, &v.Label, &owner, &ownedSince)
+			&v.Make, &v.Model, &v.ModelYear, &v.Engine, &v.Label, &owner, &ownedSince, &v.Revision, &v.MergedInto, &ownerID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
@@ -248,6 +253,7 @@ func VehicleByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 		v.OwnedSince = ownedSince
 		if seesPeople {
 			v.OwnerName = owner
+			v.OwnerID = deref(ownerID)
 		}
 
 		// Every plate this vehicle has carried. A personalised plate that

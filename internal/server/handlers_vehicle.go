@@ -44,10 +44,17 @@ func (s *Server) handleVehicle(w http.ResponseWriter, r *http.Request) {
 	if s.handoverError(w, r, err) {
 		return
 	}
+	var changes []workshop.Change
+	if session.Scope.Role.SeesCustomerPersonalData() {
+		if changes, err = workshop.VehicleChanges(r.Context(), s.pool, session.Scope, vehicle.ID); err != nil {
+			s.log.Error("read vehicle changes", "error", err)
+		}
+	}
 	s.render(w, r, http.StatusOK, "vehicle", pageData{
-		Title:   vehicle.Describe(),
-		Session: session,
-		Vehicle: vehicle,
+		Title:          vehicle.Describe(),
+		Session:        session,
+		Vehicle:        vehicle,
+		VehicleChanges: changes,
 	})
 }
 

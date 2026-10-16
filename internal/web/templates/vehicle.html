@@ -6,8 +6,47 @@
 
 <dl>
   {{if .Vehicle.VIN}}<dt>Chassis number</dt><dd>{{.Vehicle.VIN}}</dd>{{end}}
-  {{if .Vehicle.OwnerName}}<dt>Owner</dt><dd>{{.Vehicle.OwnerName}}</dd>{{end}}
+  {{if .Vehicle.OwnerName}}<dt>Owner</dt><dd>{{if .Vehicle.OwnerID}}<a href="/customers/{{.Vehicle.OwnerID}}">{{.Vehicle.OwnerName}}</a>{{else}}{{.Vehicle.OwnerName}}{{end}}</dd>{{end}}
 </dl>
+
+{{if .Vehicle.MergedInto}}
+<p class="waiting"><span class="tag warranty">{{.T "merged"}}</span> {{.T "This vehicle was found to be the same as another."}}
+  <a href="/vehicles/{{.Vehicle.MergedInto}}">{{.T "Open the one it became"}}</a></p>
+{{else if .Session.Scope.Role.SeesCustomerPersonalData}}
+<h2>{{.T "Put the record right"}}</h2>
+<form method="post" action="/vehicles/{{.Vehicle.ID}}/edit">
+  <input type="hidden" name="revision" value="{{.Vehicle.Revision}}">
+  <div class="pair">
+    <label><span>{{.T "Make"}}</span><input name="make" value="{{.Vehicle.Make}}"></label>
+    <label><span>{{.T "Model"}}</span><input name="model" value="{{.Vehicle.Model}}"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "Model year"}}</span><input name="model_year" inputmode="numeric" value="{{if .Vehicle.ModelYear}}{{.Vehicle.ModelYear}}{{end}}"></label>
+    <label><span>{{.T "Engine"}}</span><input name="engine" value="{{.Vehicle.Engine}}"></label>
+  </div>
+  <label><span>{{.T "Chassis number"}}</span><input name="vin" value="{{.Vehicle.VIN}}" autocapitalize="characters" spellcheck="false"></label>
+  <label><span>{{.T "Description, when it has no plate"}}</span><input name="label" value="{{.Vehicle.Label}}"></label>
+  <label><span>{{.T "Why, if it is worth saying"}}</span><input name="reason" maxlength="300"></label>
+  <button type="submit">{{.T "Save the changes"}}</button>
+</form>
+
+<h2>{{.T "Plate"}}</h2>
+<form method="post" action="/vehicles/{{.Vehicle.ID}}/registration">
+  <input type="hidden" name="mode" value="correct">
+  <label><span>{{.T "Typed wrong: the right registration"}}</span><input name="registration" autocapitalize="characters" spellcheck="false" required></label>
+  <label><span>{{.T "Why, if it is worth saying"}}</span><input name="reason" maxlength="300"></label>
+  <button type="submit" class="secondary">{{.T "Correct the plate"}}</button>
+</form>
+<form class="mt" method="post" action="/vehicles/{{.Vehicle.ID}}/registration">
+  <input type="hidden" name="mode" value="change">
+  <div class="pair">
+    <label><span>{{.T "It has a new plate"}}</span><input name="registration" autocapitalize="characters" spellcheck="false" required></label>
+    <label><span>{{.T "From"}}</span><input type="date" name="from"></label>
+  </div>
+  <button type="submit" class="secondary">{{.T "It changed plate"}}</button>
+</form>
+<p class="waiting"><a href="/vehicles/{{.Vehicle.ID}}/sell">{{.T "The vehicle was sold"}}</a></p>
+{{end}}
 
 {{if gt (len .Vehicle.Registrations) 1}}
 <h2>Plates it has carried</h2>
@@ -19,6 +58,18 @@
       {{if .Current}}<span class="tag pass">now</span>
       {{else}}<span class="tag">until {{$.Date ($.Local .ValidTo) "2 Jan 2006"}}</span>{{end}}
     </div>
+  </li>
+  {{end}}
+</ul>
+{{end}}
+
+{{if .VehicleChanges}}
+<h2>{{.T "What has been changed"}}</h2>
+<ul class="lines">
+  {{range .VehicleChanges}}
+  <li>
+    <div class="row"><span>{{.Field}}</span><span class="waiting">{{$.Date ($.Local .At) "2 Jan 2006 15:04"}} &middot; {{.By}}</span></div>
+    <div class="waiting">{{if .Old}}{{.Old}}{{else}}&ndash;{{end}} &rarr; {{if .New}}{{.New}}{{else}}&ndash;{{end}}{{if .Reason}} &middot; {{.Reason}}{{end}}</div>
   </li>
   {{end}}
 </ul>
