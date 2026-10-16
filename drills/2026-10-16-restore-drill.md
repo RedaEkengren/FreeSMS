@@ -4,20 +4,20 @@
 
 | | |
 |---|---|
-| Revision | `6c701a0` (with uncommitted changes) |
+| Revision | `74122e3` |
 | Where | Linux 7.2.9-2-cachyos x86_64; Docker version 29.9.0 — a developer machine, **not** the production server |
-| Started | 2026-10-16T12:07:12Z |
-| Backup | dump 453177 bytes, photographs 212 bytes |
+| Started | 2026-10-16T12:35:09Z |
+| Backup | dump 453177 bytes, photographs 211 bytes |
 | Recovery time (empty stack to verified) | **31 s** (target: 4 h) |
-| Newest write found after the restore | 2026-10-16T12:07:07Z |
-| Data lost (disaster to newest restored write) | **4 s** — the nightly dump's window; with only a nightly dump the target is 24 h |
-| The write made after the backup | gone, as expected: yes |
+| Newest write found after the restore | 2026-10-16T12:35:04Z |
+| Disaster to newest restored write | **4 s** — the disaster here comes seconds after the backup. A real one finds the dump up to 24 h old with only a nightly dump (the target with continuous WAL archiving is 15 minutes) |
+| The job entered after the backup | not in the restored data, as it should not be: confirmed |
 | Photographs | restored and checked against the size stored with each row |
 
 ## What the application said about the restored data
 
 ```
-verified 2026-10-16T12:07:43Z; 61 migrations applied
+verified 2026-10-16T12:35:40Z; 61 migrations applied
 
 Restore Test AB (11111111-1111-1111-1111-111111111111)
   ok    invoice numbers: unbroken: R 1-1
@@ -28,10 +28,10 @@ Restore Test AB (11111111-1111-1111-1111-111111111111)
   ok    jobs and invoices: every invoiced job has its invoice and the other way round
   ok    approvals: every charged line on a finished job was approved
   ok    photographs: 1 on disk
-  newest write in the data: 2026-10-16T12:07:07Z
-  newest job: job 9001 2026-10-16T12:07:07Z
-  newest invoice: R-1 2026-10-16T12:07:07Z
-  newest state change: invoiced 2026-10-16T12:07:07Z
+  newest write in the data: 2026-10-16T12:35:04Z
+  newest job: job 9001 2026-10-16T12:35:04Z
+  newest invoice: R-1 2026-10-16T12:35:04Z
+  newest state change: invoiced 2026-10-16T12:35:04Z
 ```
 
 ## Health of the restored service
