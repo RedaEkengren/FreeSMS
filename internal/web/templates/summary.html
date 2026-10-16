@@ -1,0 +1,67 @@
+{{define "content"}}
+<div class="row">
+  <span class="plate">{{if .Job.Registration}}{{.Job.Registration}}{{else}}{{.T "no plate"}}{{end}}</span>
+  <span class="tag">#{{.Job.Number}}</span>
+</div>
+<h1>{{.T "Repair summary"}}</h1>
+<p class="waiting"><a href="/jobs/{{.Job.ID}}">{{.T "Back to the job"}}</a></p>
+
+{{if .Summaries}}
+<h2>{{.T "Handed over"}}</h2>
+<ul class="lines">
+  {{range .Summaries}}
+  <li><div class="row">
+    <a href="/jobs/{{$.Job.ID}}/summary/{{.Version}}">{{$.T "Version %d" .Version}} &middot; {{$.Date ($.Local .DeliveredAt) "2 Jan 15:04"}}</a>
+    <span class="waiting">{{$.T "to %s" .DeliveredTo}}</span>
+  </div></li>
+  {{end}}
+</ul>
+{{end}}
+
+<h2>{{.T "What it would say now"}}</h2>
+<p class="waiting">{{.T "Built from what was recorded as done. A quote is never listed as work done."}}</p>
+{{template "draft" .}}
+
+<h2>{{.T "Worth doing later"}}</h2>
+{{range .Recommendations}}{{if not .WithdrawnAt}}
+<div class="card">
+  <div class="row"><span>{{.Body}}</span>{{if .When}}<span class="waiting">{{.When}}</span>{{end}}</div>
+  <div class="waiting">{{.By}}</div>
+  <div class="actions mt-s">
+    {{if .EnquiryID}}<a class="button secondary" href="/enquiries/{{.EnquiryID}}">{{$.T "Open the enquiry"}}</a>
+    {{else}}<form method="post" action="/jobs/{{$.Job.ID}}/recommendations/{{.ID}}/enquiry"><button type="submit" class="secondary">{{$.T "Start an enquiry from it"}}</button></form>{{end}}
+    <form method="post" action="/jobs/{{$.Job.ID}}/recommendations/{{.ID}}/withdraw"><button type="submit" class="secondary">{{$.T "Take it back"}}</button></form>
+  </div>
+</div>
+{{end}}{{end}}
+<form class="mt" method="post" action="/jobs/{{.Job.ID}}/recommendations">
+  <div class="pair">
+    <label><span>{{.T "Suggest"}}</span><input name="body" maxlength="300" required></label>
+    <label><span>{{.T "When"}}</span><input name="when" maxlength="80"></label>
+  </div>
+  <button type="submit" class="secondary">{{.T "Add it"}}</button>
+</form>
+<p class="waiting">{{.T "A suggestion is not an approval and nobody is sent anything. An enquiry made from it is for you to follow up."}}</p>
+
+<h2>{{.T "Hand it over"}}</h2>
+<form method="post" action="/jobs/{{.Job.ID}}/summary">
+  <label><span>{{.T "Handed to"}}</span><input name="delivered_to" maxlength="100" required></label>
+  <label><span>{{.T "Odometer now, if read"}}</span><input name="odometer" inputmode="numeric"></label>
+  <label><span>{{.T "From the workshop to the customer"}}</span><textarea name="instructions" rows="4" maxlength="1500"></textarea></label>
+  <label><span>{{.T "Note for ourselves"}}</span><input name="note" maxlength="300"></label>
+  <button type="submit">{{if .Summaries}}{{.T "Hand over a corrected version"}}{{else}}{{.T "Hand it over"}}{{end}}</button>
+</form>
+<p class="waiting">{{.T "Handing the summary over does not tell the customer their car is ready and does not record that it left. Those are their own records."}}</p>
+{{end}}
+
+{{define "draft"}}
+{{with .Draft}}
+{{if .Completed}}<h3>{{$.T "What was done"}}</h3><ul class="lines">{{range .Completed}}<li>{{.Text}}</li>{{end}}</ul>{{end}}
+{{if .Parts}}<h3>{{$.T "Parts fitted"}}</h3><ul class="lines">{{range .Parts}}<li>{{.Name}} &times; {{.Count}}</li>{{end}}</ul>{{end}}
+{{if .Inspections}}<h3>{{$.T "Checks made"}}</h3><ul class="lines">{{range .Inspections}}<li>{{.Name}}: {{$.T "%d in order" .Passed}}{{if .Attention}}, {{$.T "%d to keep an eye on" .Attention}}{{end}}{{if .Failed}}, {{$.T "%d need doing" .Failed}}{{end}}</li>{{end}}</ul>{{end}}
+{{if .Declined}}<h3>{{$.T "Not done, because you said no"}}</h3><ul class="lines">{{range .Declined}}<li>{{.Text}}</li>{{end}}</ul>{{end}}
+{{if .Unfinished}}<h3>{{$.T "Agreed, not done yet"}}</h3><ul class="lines">{{range .Unfinished}}<li>{{.Text}}{{if .Why}} <span class="tag warranty">{{$.T .Why}}</span>{{end}}</li>{{end}}</ul>{{end}}
+{{if .Unresolved}}<h3>{{$.T "Noticed and not dealt with"}}</h3><ul class="lines">{{range .Unresolved}}<li>{{.Text}}</li>{{end}}</ul>{{end}}
+{{if .Empty}}<p class="empty">{{$.T "Nothing was recorded as done on this visit."}}</p>{{end}}
+{{end}}
+{{end}}

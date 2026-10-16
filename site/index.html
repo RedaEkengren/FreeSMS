@@ -264,6 +264,7 @@
     <button type="button" role="tab" data-tab="13">Kunduppgifter</button>
     <button type="button" role="tab" data-tab="14">Överlämning</button>
     <button type="button" role="tab" data-tab="15">Leveranser</button>
+    <button type="button" role="tab" data-tab="16">Överlämning till kund</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1156,6 +1157,43 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: teknikern ber om en del, lagret noterar beställningen och flyttar dagen, leveransen kommer i två omgångar, en del går tillbaka och krediteras &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/26-supply.spec.ts">läs testet</a>. Namn och beställningar är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>När bilen hämtas</h2>
+  <p class="lede">Kunden får inte bara en faktura. Verkstaden lämnar över vad som faktiskt gjorts, vad kunden sa nej till, vad som är kvar och vad verkstaden vill att de ska veta. Den byggs av det som registrerats som gjort, aldrig av en offert, och den påstår inte att bilen är säker. Den lämnas till den som hämtar, fryses, och en rättelse blir nästa version.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: en reparationssammanfattning med utfört arbete, ett arbete som är överenskommet men inte gjort, och något värt att göra senare. Den lämnas till kundens bror. När avgasen sedan blivit klar lämnas en rättad version som ersätter den första, som finns kvar.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">Reparationssammanfattning</div>
+              <div class="cl-qrow"><span>Vad som gjorts</span><span>Byte av bromsskivor fram</span></div>
+              <div class="cl-qrow"><span>Överenskommet, inte gjort än</span><span class="rd-tag rd-risk">Byte av avgasrör</span></div>
+              <div class="cl-qrow"><span>Värt att göra senare</span><span>Byt bakre bromsskivor</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Version 1</div>
+              <div class="cl-qrow"><span>till Karl</span><span class="rd-tag">Överlämnat</span></div>
+              <div class="cl-qrow"><span>Det här listar det arbete som registrerats. Det är inget påstående om att bilen är säker eller trafikduglig.</span><span></span></div>
+            </div>            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">Version 2</div>
+              <div class="cl-qrow"><span>ersätter version 1</span><span class="rd-tag rd-risk">en senare version har ersatt den här</span></div>
+              <div class="cl-qrow"><span>Byte av avgasrör</span><span class="rd-tag">Klar</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">Sammanfattningen byggs av det som registrerats som gjort. Det som är överenskommet men inte klart står för sig, och förslag för senare är bara förslag.</div>
+      <div class="an-cap" data-t="8,15.8">Den lämnas till den som hämtar bilen, inte nödvändigtvis kunden. Den säger inte att bilen är säker, och den frysts.</div>
+      <div class="an-cap an-off" data-t="16,23.6">Avgasen blir klar efteråt. En rättad version ersätter den första, som finns kvar precis som den lämnades.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: bromsarna blir klara, teknikern föreslår något för senare, disken lämnar över till kundens bror och sedan en rättad version &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/27-summary.spec.ts">läs testet</a>. Namn och arbeten är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

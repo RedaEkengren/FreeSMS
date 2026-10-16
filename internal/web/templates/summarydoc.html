@@ -1,0 +1,69 @@
+{{define "content"}}
+{{/* The summary as it was handed over. The same document for the counter and
+     for the customer on their link: it carries no prices, and says what was
+     recorded, not that the car is safe. */}}
+{{with .Summary}}
+{{with .Content}}
+<div class="row">
+  <h1>{{$.T "Repair summary"}}</h1>
+  <span class="plate">{{if .Registration}}{{.Registration}}{{else}}{{$.T "no plate"}}{{end}}</span>
+</div>
+<p class="vehicle">{{.Make}} {{.Model}}{{if $.SummaryShop}} &middot; {{$.SummaryShop}}{{end}}</p>
+<p class="waiting">
+  {{$.T "Version %d" $.Summary.Version}} &middot; {{$.Date ($.Local $.Summary.DeliveredAt) "2 Jan 2006 15:04"}}
+  {{if $.Summary.DeliveredBy}}&middot; {{$.T "handed over by %s" $.Summary.DeliveredBy}}{{end}}
+  &middot; {{$.T "to %s" $.Summary.DeliveredTo}}
+  {{if .OdometerIn}}&middot; {{$.T "in at %s km" ($.Num .OdometerIn)}}{{end}}{{if .OdometerOut}}{{if ne .OdometerOut .OdometerIn}} &middot; {{$.T "out at %s km" ($.Num .OdometerOut)}}{{end}}{{end}}
+</p>
+{{if $.Summary.Replaces}}<p class="waiting"><span class="tag warranty">{{$.T "replaces version %d" $.Summary.Replaces}}</span></p>{{end}}
+{{if $.Summary.Superseded}}<p class="waiting"><span class="tag late">{{$.T "a later version has replaced this one"}}</span></p>{{end}}
+
+{{if .Completed}}
+<h2>{{$.T "What was done"}}</h2>
+<ul class="lines">{{range .Completed}}<li><div class="row"><span>{{.Text}}</span>{{if .At}}<span class="waiting">{{$.Date ($.Local .At) "2 Jan"}}</span>{{end}}</div></li>{{end}}</ul>
+{{end}}
+{{if .Parts}}
+<h2>{{$.T "Parts fitted"}}</h2>
+<ul class="lines">{{range .Parts}}<li><div class="row"><span>{{.Name}}</span><span class="waiting">&times; {{.Count}}</span></div></li>{{end}}</ul>
+{{end}}
+{{if .Inspections}}
+<h2>{{$.T "Checks made"}}</h2>
+{{range .Inspections}}
+<div class="card">
+  <div class="row"><strong>{{.Name}}</strong>{{if .At}}<span class="waiting">{{$.Date ($.Local .At) "2 Jan"}}</span>{{end}}</div>
+  <div class="waiting">{{$.T "%d in order" .Passed}}{{if .Attention}} &middot; {{$.T "%d to keep an eye on" .Attention}}{{end}}{{if .Failed}} &middot; {{$.T "%d need doing" .Failed}}{{end}}</div>
+  {{if .Findings}}<ul class="lines mt-s">{{range .Findings}}<li>{{.Text}} <span class="tag {{if eq .Why "fail"}}late{{else}}warranty{{end}}">{{if eq .Why "fail"}}{{$.T "needs doing"}}{{else}}{{$.T "keep an eye on"}}{{end}}</span></li>{{end}}</ul>{{end}}
+</div>
+{{end}}
+{{end}}
+{{if .Declined}}
+<h2>{{$.T "Not done, because you said no"}}</h2>
+<ul class="lines">{{range .Declined}}<li>{{.Text}}</li>{{end}}</ul>
+{{end}}
+{{if .Unfinished}}
+<h2>{{$.T "Agreed, not done yet"}}</h2>
+<ul class="lines">{{range .Unfinished}}<li><div class="row"><span>{{.Text}}</span>{{if .Why}}<span class="tag warranty">{{$.T .Why}}</span>{{end}}</div></li>{{end}}</ul>
+{{end}}
+{{if .Unresolved}}
+<h2>{{$.T "Noticed and not dealt with"}}</h2>
+<ul class="lines">{{range .Unresolved}}<li>{{.Text}}</li>{{end}}</ul>
+{{end}}
+{{if .Recommendations}}
+<h2>{{$.T "Worth doing later"}}</h2>
+<ul class="lines">{{range .Recommendations}}<li><div class="row"><span>{{.Text}}</span>{{if .Why}}<span class="waiting">{{.Why}}</span>{{end}}</div></li>{{end}}</ul>
+<p class="waiting">{{$.T "These are suggestions. Nothing has been ordered or agreed."}}</p>
+{{end}}
+{{if .Empty}}<p class="empty">{{$.T "Nothing was recorded as done on this visit."}}</p>{{end}}
+{{end}}
+
+{{if .Instructions}}
+<h2>{{$.T "From the workshop"}}</h2>
+<p class="complaint">{{.Instructions}}</p>
+{{end}}
+{{if and $.StaffView .Note}}<p class="waiting">{{.Note}}</p>{{end}}
+
+<p class="waiting mt-l">{{$.T "This lists the work that was recorded. It is not a statement that the car is safe or roadworthy."}}</p>
+{{if $.StaffView}}<p class="waiting"><a href="/jobs/{{.JobID}}/summary">{{$.T "Back to the summary"}}</a></p>
+{{else}}<p class="waiting"><a href="/k/{{$.ShareToken}}">{{$.T "Back to your car"}}</a></p>{{end}}
+{{end}}
+{{end}}

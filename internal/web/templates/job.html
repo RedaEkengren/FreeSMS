@@ -30,7 +30,7 @@
      default and the desk is the exception. */}}
 <div class="split">
 <div class="side">
-<p class="waiting"><a href="/jobs/{{.Job.ID}}/timeline">{{.T "What has happened, and where it stands"}}</a></p>
+<p class="waiting"><a href="/jobs/{{.Job.ID}}/timeline">{{.T "What has happened, and where it stands"}}</a>{{if .Session.Scope.Role.SeesCustomerPersonalData}} &middot; <a href="/jobs/{{.Job.ID}}/summary">{{.T "Repair summary"}}</a>{{end}}</p>
 <div id="live-status" data-live="job:{{.Job.ID}}">
 <div id="clock">{{template "clock" .}}</div>
 {{if .Job.OthersRunning}}<p class="waiting">{{.T "%s still has a clock running on this job." .Job.OthersRunning}}</p>{{end}}
@@ -795,6 +795,13 @@
   <label><span>{{.T "How many"}}</span><input name="quantity" value="1" inputmode="decimal"></label>
   </div>
   <button type="submit" class="secondary">{{.T "Ask the parts desk"}}</button>
+</form>
+<form class="mt" method="post" action="/jobs/{{.Job.ID}}/recommendations" data-offline>
+  <div class="pair">
+    <label><span>{{.T "Worth doing later"}}</span><input name="body" maxlength="300" placeholder="{{.T "Rear pads at the next service"}}"></label>
+    <label><span>{{.T "When"}}</span><input name="when" maxlength="80"></label>
+  </div>
+  <button type="submit" class="secondary">{{.T "Suggest it"}}</button>
 </form>
 <form class="mt" method="post" action="/jobs/{{.Job.ID}}/findings" data-offline>
   <label>

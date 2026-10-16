@@ -74,6 +74,8 @@ type CustomerStatus struct {
 	ShopAddress  string
 	Registration string
 	Make, Model  string
+	// Whether a repair summary has been handed over, and so can be read.
+	HasSummary bool
 	// What the customer reads: in_work, waiting_for_part, ready, done.
 	Stage        string
 	CarAway      bool
@@ -125,6 +127,9 @@ func JobStatus(ctx context.Context, pool *pgxpool.Pool, shopID, token string) (C
 			return fmt.Errorf("read link: %w", err)
 		}
 		st.Stage = customerStage(state)
+		if err := tx.QueryRow(ctx, `SELECT exists(SELECT 1 FROM delivery_summaries WHERE work_order_id = $1)`, jobID).Scan(&st.HasSummary); err != nil {
+			return fmt.Errorf("read summaries: %w", err)
+		}
 
 		p, err := presenceTx(ctx, tx, jobID)
 		if err != nil {

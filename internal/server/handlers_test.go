@@ -44,6 +44,7 @@ const (
 	enquiryB    = "bbbbbbbb-0000-0000-0000-00000000000d"
 	taskB       = "bbbbbbbb-0000-0000-0000-00000000000e"
 	noteB       = "bbbbbbbb-0000-0000-0000-00000000000f"
+	recB        = "bbbbbbbb-0000-0000-0000-000000000014"
 	orderB      = "bbbbbbbb-0000-0000-0000-000000000010"
 	lineB       = "bbbbbbbb-0000-0000-0000-000000000011"
 	receiptB    = "bbbbbbbb-0000-0000-0000-000000000012"
@@ -191,6 +192,8 @@ func testServerOn(t *testing.T, pool *pgxpool.Pool) (*httptest.Server, *pgxpool.
 		 ('` + enquiryB + `','` + shopB + `', 'Brakes', '` + secretB + `', 'bbbbbbbb-0000-0000-0000-0000000000bb')`,
 		`INSERT INTO job_tasks (id, shop_id, work_order_id, position, title, created_by) VALUES
 		 ('` + taskB + `','` + shopB + `','` + jobB + `',1,'Secret step','bbbbbbbb-0000-0000-0000-0000000000bb')`,
+		`INSERT INTO job_recommendations (id, shop_id, work_order_id, body, by_user) VALUES
+		 ('` + recB + `','` + shopB + `','` + jobB + `','` + secretB + `','bbbbbbbb-0000-0000-0000-0000000000bb')`,
 		`INSERT INTO supplier_orders (id, shop_id, supplier, placed_on, placed_by) VALUES
 		 ('` + orderB + `','` + shopB + `','` + secretB + `', current_date, 'bbbbbbbb-0000-0000-0000-0000000000bb')`,
 		`INSERT INTO supplier_order_lines (id, shop_id, order_id, position, description, quantity) VALUES

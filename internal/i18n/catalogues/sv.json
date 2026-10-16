@@ -2696,6 +2696,135 @@
     "expected %s": {
       "other": "väntas %s"
     },
+    "%d in order": {
+      "other": "%d i ordning"
+    },
+    "%d need doing": {
+      "other": "%d behöver åtgärdas"
+    },
+    "%d to keep an eye on": {
+      "other": "%d att hålla ögonen på"
+    },
+    "A suggestion is not an approval and nobody is sent anything. An enquiry made from it is for you to follow up.": {
+      "other": "Ett förslag är inget godkännande och ingen får något skickat. En förfrågan som görs av det är för dig att följa upp."
+    },
+    "Add it": {
+      "other": "Lägg till"
+    },
+    "Agreed, not done yet": {
+      "other": "Överenskommet, inte gjort än"
+    },
+    "Back to the summary": {
+      "other": "Tillbaka till sammanfattningen"
+    },
+    "Back to your car": {
+      "other": "Tillbaka till din bil"
+    },
+    "Built from what was recorded as done. A quote is never listed as work done.": {
+      "other": "Byggd av det som registrerats som gjort. En offert listas aldrig som utfört arbete."
+    },
+    "Checks made": {
+      "other": "Kontroller som gjorts"
+    },
+    "From the workshop": {
+      "other": "Från verkstaden"
+    },
+    "From the workshop to the customer": {
+      "other": "Från verkstaden till kunden"
+    },
+    "Hand over a corrected version": {
+      "other": "Lämna över en rättad version"
+    },
+    "Handed over": {
+      "other": "Överlämnat"
+    },
+    "Handed to": {
+      "other": "Överlämnat till"
+    },
+    "Handing the summary over does not tell the customer their car is ready and does not record that it left. Those are their own records.": {
+      "other": "Att lämna över sammanfattningen säger inte till kunden att bilen är klar och registrerar inte att den åkt. Det är egna register."
+    },
+    "Not done, because you said no": {
+      "other": "Inte gjort, eftersom du sa nej"
+    },
+    "Note for ourselves": {
+      "other": "Anteckning till oss själva"
+    },
+    "Nothing was recorded as done on this visit.": {
+      "other": "Inget registrerades som gjort vid det här besöket."
+    },
+    "Noticed and not dealt with": {
+      "other": "Upptäckt och inte åtgärdat"
+    },
+    "Odometer now, if read": {
+      "other": "Mätarställning nu, om den lästs av"
+    },
+    "Open the enquiry": {
+      "other": "Öppna förfrågan"
+    },
+    "Parts fitted": {
+      "other": "Monterade delar"
+    },
+    "Read the repair summary": {
+      "other": "Läs reparationssammanfattningen"
+    },
+    "Rear pads at the next service": {
+      "other": "Bakre belägg vid nästa service"
+    },
+    "Repair summary": {
+      "other": "Reparationssammanfattning"
+    },
+    "Start an enquiry from it": {
+      "other": "Starta en förfrågan av det"
+    },
+    "Suggest": {
+      "other": "Föreslå"
+    },
+    "Suggest it": {
+      "other": "Föreslå det"
+    },
+    "Take it back": {
+      "other": "Dra tillbaka det"
+    },
+    "These are suggestions. Nothing has been ordered or agreed.": {
+      "other": "Det här är förslag. Inget har beställts eller överenskommits."
+    },
+    "This lists the work that was recorded. It is not a statement that the car is safe or roadworthy.": {
+      "other": "Det här listar det arbete som registrerats. Det är inget påstående om att bilen är säker eller trafikduglig."
+    },
+    "What it would say now": {
+      "other": "Vad den skulle säga nu"
+    },
+    "What was done": {
+      "other": "Vad som gjorts"
+    },
+    "What was done to your car": {
+      "other": "Vad som gjorts med din bil"
+    },
+    "Worth doing later": {
+      "other": "Värt att göra senare"
+    },
+    "a later version has replaced this one": {
+      "other": "en senare version har ersatt den här"
+    },
+    "handed over by %s": {
+      "other": "överlämnad av %s"
+    },
+    "in at %s km": {
+      "other": "in vid %s km"
+    },
+    "out at %s km": {
+      "other": "ut vid %s km"
+    },
+    "replaces version %d": {
+      "other": "ersätter version %d"
+    },
+    "to %s": {
+      "other": "till %s"
+    },
+    "held up": {
+      "other": "hindrad"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

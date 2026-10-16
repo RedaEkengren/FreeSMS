@@ -264,6 +264,7 @@
     <button type="button" role="tab" data-tab="13">Records</button>
     <button type="button" role="tab" data-tab="14">Handover</button>
     <button type="button" role="tab" data-tab="15">Deliveries</button>
+    <button type="button" role="tab" data-tab="16">Collection</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1156,6 +1157,43 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: the technician asks for a part, the parts desk notes the order and moves the day, the delivery comes in two parts, one is sent back and credited &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/26-supply.spec.ts">read the test</a>. Names and orders are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>When the car is collected</h2>
+  <p class="lede">The customer gets more than an invoice. The workshop hands over what was actually done, what the customer said no to, what is left and what the workshop wants them to know. It is built from what was recorded as done, never from a quote, and it does not claim the car is safe. It is handed to whoever collects, frozen, and a correction is the next version.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: a repair summary with work done, work agreed but not done, and something worth doing later. It is handed to the customer's brother. When the exhaust is later finished a corrected version is handed over that replaces the first, which stays.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">Repair summary</div>
+              <div class="cl-qrow"><span>What was done</span><span>Replace front brake discs</span></div>
+              <div class="cl-qrow"><span>Agreed, not done yet</span><span class="rd-tag rd-risk">Replace exhaust</span></div>
+              <div class="cl-qrow"><span>Worth doing later</span><span>Replace rear discs</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Version 1</div>
+              <div class="cl-qrow"><span>to Karl</span><span class="rd-tag">Handed over</span></div>
+              <div class="cl-qrow"><span>This lists the work that was recorded. It is not a statement that the car is safe or roadworthy.</span><span></span></div>
+            </div>            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">Version 2</div>
+              <div class="cl-qrow"><span>replaces version 1</span><span class="rd-tag rd-risk">a later version has replaced this one</span></div>
+              <div class="cl-qrow"><span>Replace exhaust</span><span class="rd-tag">Done</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">The summary is built from what was recorded as done. What is agreed but not finished stands apart, and suggestions for later are only suggestions.</div>
+      <div class="an-cap" data-t="8,15.8">It is handed to whoever collects the car, not necessarily the customer. It does not say the car is safe, and it is frozen.</div>
+      <div class="an-cap an-off" data-t="16,23.6">The exhaust is finished afterwards. A corrected version replaces the first, which stays exactly as it was handed over.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: the brakes are done, the technician suggests something for later, the counter hands over to the customer's brother and then a corrected version &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/27-summary.spec.ts">read the test</a>. Names and work are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

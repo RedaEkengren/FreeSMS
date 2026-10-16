@@ -52,6 +52,11 @@
   </form>
   {{end}}
 
+  {{if .HasSummary}}
+  <h2>{{$.T "What was done to your car"}}</h2>
+  <p><a class="button secondary" href="/k/{{.Token}}/summary">{{$.T "Read the repair summary"}}</a></p>
+  {{end}}
+
   {{if .Invoiced}}
   <h2>{{$.T "Invoice %s" .InvoiceReference}}</h2>
   <dl>
