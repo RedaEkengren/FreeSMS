@@ -265,6 +265,7 @@
     <button type="button" role="tab" data-tab="11">Rätta en rad</button>
     <button type="button" role="tab" data-tab="12">Arbetslistan</button>
     <button type="button" role="tab" data-tab="13">Kunduppgifter</button>
+    <button type="button" role="tab" data-tab="14">Överlämning</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1029,6 +1030,42 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: numret rättas, två som redigerar samtidigt får veta det, en felskriven skylt skrivs om medan en ny läggs till, bilen säljs, dubbletten frågas om och posterna slås ihop &ndash; <a href="{{test "e2e/tests/24-records.spec.ts" "a changed number, a mistaken plate, a sold car and two records that are one"}}">läs testet</a>. Namn och nummer är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>När skiftet byter</h2>
+  <p class="lede">Den som tar över ett jobb ska inte behöva fråga den som gick. Det som hänt står i en lista, hämtad från de register som redan finns: status, priset och godkännandet, stegen, delarna, besiktningen. Dit läggs anteckningar och samtal som inget annat register hade. En rättad anteckning behåller sin gamla formulering, och teknikern ser aldrig kundens eller prisernas sida.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: en överlämning med steg kvar, en anteckning från teknikern som rättas så att den gamla formuleringen syns genomstruken, och ett samtal med kunden som skrivits ner en timme efter att det hände och sorteras där det hände.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">{{t "Where it stands"}}</div>
+              <div class="cl-qrow"><span>{{t "Left to do"}}</span><span class="rd-tag rd-risk">{{t "waiting for a part"}}</span></div>
+              <div class="cl-qrow"><span>{{t "Next"}}</span><span>{{t "It is ready"}}</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "A note"}}</div>
+              <div class="cl-qrow"><span><s>Vänster skiva har fastrostad bult</s></span><span class="rd-tag">{{t "corrected"}}</span></div>
+              <div class="cl-qrow"><span>Höger skiva har fastrostad bult</span><span></span></div>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">{{t "A conversation with the customer"}}</div>
+              <div class="cl-qrow"><span>Kunden ringde och vill ha bilen på fredag</span><span class="rd-tag rd-risk">{{t "counter only"}}</span></div>
+              <div class="cl-qrow"><span>{{t "What was said is written down here. Their agreement to a price is recorded on the quote, not here."}}</span><span></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">Teknikern lämnar jobbet. Det som är kvar, vad som är hindrat och vem som äger nästa steg står överst.</div>
+      <div class="an-cap" data-t="8,15.8">En anteckning som var fel rättas. Den gamla formuleringen finns kvar, genomstruken, med vem och när.</div>
+      <div class="an-cap" data-t="16,23.6">Ett samtal skrivs ner en timme efter att det skedde. Det står där det skedde, markerat som nedskrivet senare, och är inget godkännande.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: teknikern lämnar och rättar en anteckning, disken skriver ner ett tidigare samtal, och teknikern ser aldrig samtalet &ndash; <a href="{{test "e2e/tests/25-timeline.spec.ts" "a shift handover from one list, with a corrected note and a call written down later"}}">läs testet</a>. Namn och anteckningar är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

@@ -1,0 +1,92 @@
+{{define "content"}}
+<div class="row">
+  <span class="plate">{{if .Job.Registration}}{{.Job.Registration}}{{else}}{{.T "no plate"}}{{end}}</span>
+  <span class="tag">#{{.Job.Number}}</span>
+</div>
+<h1>{{.T "What has happened"}}</h1>
+<p class="waiting"><a href="/jobs/{{.Job.ID}}">{{.T "Back to the job"}}</a></p>
+
+{{/* The handover: what a colleague taking the job over needs first. */}}
+<h2>{{.T "Where it stands"}}</h2>
+{{with .Handover}}
+<dl>
+  <dt>{{$.T "State"}}</dt><dd>{{$.T .State.Label}}</dd>
+  {{if .Step.Action}}<dt>{{$.T "Next"}}</dt><dd>{{$.T .Step.Action}} &middot; {{$.T .Step.Owner.Label}}</dd>{{end}}
+  <dt>{{$.T "Promised"}}</dt><dd>{{if .Promised}}{{$.Date ($.Local .Promised) "Mon 2 Jan 15:04"}}{{else}}{{$.T "no promise made"}}{{end}}</dd>
+  <dt>{{$.T "On it"}}</dt><dd>{{if .People}}{{range $i, $p := .People}}{{if $i}}, {{end}}{{$p}}{{end}}{{else}}{{$.T "Nobody is on it"}}{{end}}</dd>
+</dl>
+{{if .Unfinished}}
+<h3>{{$.T "Left to do"}}</h3>
+<ul class="lines">
+  {{range .Unfinished}}<li><div class="row"><span>{{.Title}}</span><span class="tag {{if eq (printf "%s" .Status) "blocked"}}late{{end}}">{{$.T .Why}}</span></div></li>{{end}}
+</ul>
+{{else}}<p class="waiting"><span class="tag pass">{{$.T "Nothing left on the list"}}</span></p>{{end}}
+{{if .OpenFindings}}<p class="waiting">{{$.N "%d thing noticed, not priced" .OpenFindings}}</p>{{end}}
+{{if .OpenParts}}<p class="waiting">{{$.N "%d part asked for, not here yet" .OpenParts}}</p>{{end}}
+{{with .LastNote}}<p class="waiting"><span class="tag">{{$.T "latest note"}}</span> {{.Detail}} &middot; {{.Actor}}</p>{{end}}
+{{end}}
+
+<h2>{{.T "Leave a note"}}</h2>
+<p class="waiting">{{.T "For whoever works on the job next. It is not shown to the customer, and it is not an approval."}}</p>
+<form method="post" action="/jobs/{{.Job.ID}}/notes" data-offline>
+  <input type="hidden" name="kind" value="note">
+  <label><span>{{.T "Note"}}</span><textarea name="body" rows="3" maxlength="1000" required></textarea></label>
+  {{if .Session.Scope.Role.SeesCustomerPersonalData}}
+  <label class="tick"><input type="checkbox" name="desk_only" value="1"> <span>{{.T "Only the counter may read it"}}</span></label>
+  {{end}}
+  <button type="submit">{{.T "Save the note"}}</button>
+</form>
+
+{{if .Session.Scope.Role.SeesCustomerPersonalData}}
+<h2>{{.T "Record a conversation with the customer"}}</h2>
+<p class="waiting">{{.T "What was said is written down here. Their agreement to a price is recorded on the quote, not here."}}</p>
+<form method="post" action="/jobs/{{.Job.ID}}/notes">
+  <input type="hidden" name="kind" value="conversation">
+  <div class="pair">
+    <label><span>{{.T "How"}}</span>
+      <select name="channel"><option value="phone">{{.T "By telephone"}}</option><option value="in_person">{{.T "At the counter"}}</option></select></label>
+    <label><span>{{.T "When, if not just now"}}</span><input type="datetime-local" name="occurred" max="{{.Today}}"></label>
+  </div>
+  <label><span>{{.T "What was said"}}</span><textarea name="body" rows="3" maxlength="1000" required></textarea></label>
+  <label class="tick"><input type="checkbox" name="everyone" value="1"> <span>{{.T "The shop floor may read it too"}}</span></label>
+  <button type="submit" class="secondary">{{.T "Save the conversation"}}</button>
+</form>
+{{end}}
+
+<h2>{{.T "In order"}}</h2>
+<ul class="lines">
+  {{range .Events}}
+  <li>
+    <div class="row">
+      <span>{{if .ArgKey}}{{$.T .Label ($.T .Arg)}}{{else}}{{$.T .Label .Arg}}{{end}}</span>
+      <span class="waiting">{{$.Date ($.Local .At) "2 Jan 15:04"}}</span>
+    </div>
+    <div class="waiting">
+      {{if .Actor}}{{.Actor}}{{end}}
+      {{if .AmountMinor}}&middot; {{$.MoneyOrBlank .AmountMinor}}{{end}}
+      {{if .CustomerSees}}<span class="tag">{{$.T "the customer saw this"}}</span>{{end}}
+      {{if .Internal}}<span class="tag">{{$.T "internal"}}</span>{{end}}
+      {{if .DeskOnly}}<span class="tag warranty">{{$.T "counter only"}}</span>{{end}}
+      {{if .RecordedLater}}<span class="tag warranty">{{$.T "written down %s" ($.Date ($.Local .RecordedAt) "2 Jan 15:04")}}</span>{{end}}
+      {{if .Link}}<a href="{{.Link}}">{{$.T "open"}}</a>{{end}}
+    </div>
+    {{if .Detail}}<div class="complaint">{{.Detail}}</div>{{end}}
+    {{if .Corrected}}
+    <details class="mt-s"><summary>{{$.T "corrected"}}</summary>
+      <ul class="lines">
+        {{range .Earlier}}<li><s>{{.Body}}</s><div class="waiting">{{.By}} &middot; {{$.Date ($.Local .At) "2 Jan 15:04"}}</div></li>{{end}}
+      </ul>
+    </details>
+    {{end}}
+    {{if and .NoteID .Mine}}
+    <details class="mt-s"><summary>{{$.T "Correct it"}}</summary>
+      <form method="post" action="/jobs/{{$.Job.ID}}/notes/{{.NoteID}}/correct">
+        <label><span>{{$.T "The right wording"}}</span><textarea name="body" rows="3" maxlength="1000" required>{{.Detail}}</textarea></label>
+        <button type="submit" class="secondary">{{$.T "Save the correction"}}</button>
+      </form>
+    </details>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{end}}

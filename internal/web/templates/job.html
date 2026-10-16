@@ -30,6 +30,7 @@
      default and the desk is the exception. */}}
 <div class="split">
 <div class="side">
+<p class="waiting"><a href="/jobs/{{.Job.ID}}/timeline">{{.T "What has happened, and where it stands"}}</a></p>
 <div id="live-status" data-live="job:{{.Job.ID}}">
 <div id="clock">{{template "clock" .}}</div>
 {{if .Job.OthersRunning}}<p class="waiting">{{.T "%s still has a clock running on this job." .Job.OthersRunning}}</p>{{end}}

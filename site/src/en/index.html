@@ -265,6 +265,7 @@
     <button type="button" role="tab" data-tab="11">Correct a line</button>
     <button type="button" role="tab" data-tab="12">Work list</button>
     <button type="button" role="tab" data-tab="13">Records</button>
+    <button type="button" role="tab" data-tab="14">Handover</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1029,6 +1030,42 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: the number is corrected, two people editing at once are told, a mistyped plate is rewritten while a new one is added, the car is sold, the duplicate is asked about and the records are merged &ndash; <a href="{{test "e2e/tests/24-records.spec.ts" "a changed number, a mistaken plate, a sold car and two records that are one"}}">read the test</a>. Names and numbers are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>When the shift changes</h2>
+  <p class="lede">Whoever takes over a job should not have to ask whoever left. What happened is in one list, read from the records that already exist: state, price and approval, steps, parts, inspection. Notes and conversations that no other record held are added to it. A corrected note keeps its old wording, and the technician never sees the customer or the prices.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: a handover with steps left, a technician note that is corrected so the old wording shows struck through, and a call with the customer written down an hour after it happened and sorted where it happened.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">{{t "Where it stands"}}</div>
+              <div class="cl-qrow"><span>{{t "Left to do"}}</span><span class="rd-tag rd-risk">{{t "waiting for a part"}}</span></div>
+              <div class="cl-qrow"><span>{{t "Next"}}</span><span>{{t "It is ready"}}</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "A note"}}</div>
+              <div class="cl-qrow"><span><s>Left disc has a seized bolt</s></span><span class="rd-tag">{{t "corrected"}}</span></div>
+              <div class="cl-qrow"><span>Right disc has a seized bolt</span><span></span></div>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">{{t "A conversation with the customer"}}</div>
+              <div class="cl-qrow"><span>The customer rang and wants the car on Friday</span><span class="rd-tag rd-risk">{{t "counter only"}}</span></div>
+              <div class="cl-qrow"><span>{{t "What was said is written down here. Their agreement to a price is recorded on the quote, not here."}}</span><span></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">The technician leaves the job. What is left, what is held up and who owns the next step is at the top.</div>
+      <div class="an-cap" data-t="8,15.8">A note that was wrong is corrected. The old wording stays, struck through, with who and when.</div>
+      <div class="an-cap" data-t="16,23.6">A call is written down an hour after it happened. It sits where it happened, marked as written down later, and is not an approval.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: the technician leaves and corrects a note, the counter writes down an earlier call, and the technician never sees the call &ndash; <a href="{{test "e2e/tests/25-timeline.spec.ts" "a shift handover from one list, with a corrected note and a call written down later"}}">read the test</a>. Names and notes are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

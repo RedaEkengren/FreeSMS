@@ -2267,6 +2267,199 @@
       "one": "%d skylt flyttas",
       "other": "%d skyltar flyttas"
     },
+    "%s was put on the job": {
+      "other": "%s sattes på jobbet"
+    },
+    "%s was taken off the job": {
+      "other": "%s togs bort från jobbet"
+    },
+    "A conversation with the customer": {
+      "other": "Ett samtal med kunden"
+    },
+    "A message was sent: %s": {
+      "other": "Ett meddelande skickades: %s"
+    },
+    "A note": {
+      "other": "En anteckning"
+    },
+    "A part arrived: %s": {
+      "other": "En del kom: %s"
+    },
+    "A part request was cancelled: %s": {
+      "other": "En delbegäran drogs tillbaka: %s"
+    },
+    "A payment on %s was reversed": {
+      "other": "En betalning på %s ångrades"
+    },
+    "Correct it": {
+      "other": "Rätta den"
+    },
+    "Credit note %s was issued": {
+      "other": "Kreditfaktura %s utfärdades"
+    },
+    "Customer decision about a step: %s": {
+      "other": "Kundens besked om ett steg: %s"
+    },
+    "For whoever works on the job next. It is not shown to the customer, and it is not an approval.": {
+      "other": "Till den som arbetar på jobbet härnäst. Den visas inte för kunden och är inget godkännande."
+    },
+    "In order": {
+      "other": "I ordning"
+    },
+    "Inspection finished: %s": {
+      "other": "Besiktning klar: %s"
+    },
+    "Inspection started: %s": {
+      "other": "Besiktning påbörjad: %s"
+    },
+    "Invoice %s was issued": {
+      "other": "Faktura %s utfärdades"
+    },
+    "Leave a note": {
+      "other": "Lämna en anteckning"
+    },
+    "Left to do": {
+      "other": "Kvar att göra"
+    },
+    "Line added: %s": {
+      "other": "Rad tillagd: %s"
+    },
+    "Line corrected: %s": {
+      "other": "Rad rättad: %s"
+    },
+    "Line withdrawn: %s": {
+      "other": "Rad tillbakadragen: %s"
+    },
+    "Moved to: %s": {
+      "other": "Flyttad till: %s"
+    },
+    "Next": {
+      "other": "Härnäst"
+    },
+    "Nothing left on the list": {
+      "other": "Inget kvar på listan"
+    },
+    "Only the counter may read it": {
+      "other": "Bara disken får läsa den"
+    },
+    "Payment recorded on %s": {
+      "other": "Betalning registrerad på %s"
+    },
+    "Put back on the shelf: %s": {
+      "other": "Lagd tillbaka på hyllan: %s"
+    },
+    "Quote version %s put to the customer": {
+      "other": "Offert version %s lades fram för kunden"
+    },
+    "Record a conversation with the customer": {
+      "other": "Anteckna ett samtal med kunden"
+    },
+    "Save the conversation": {
+      "other": "Spara samtalet"
+    },
+    "Save the note": {
+      "other": "Spara anteckningen"
+    },
+    "Something was noticed": {
+      "other": "Något upptäcktes"
+    },
+    "Step added: %s": {
+      "other": "Steg tillagt: %s"
+    },
+    "Step done: %s": {
+      "other": "Steg klart: %s"
+    },
+    "Step held up: %s": {
+      "other": "Steg hindrat: %s"
+    },
+    "Step left out: %s": {
+      "other": "Steg utelämnat: %s"
+    },
+    "Step started: %s": {
+      "other": "Steg påbörjat: %s"
+    },
+    "Taken out to the job: %s": {
+      "other": "Uttaget till jobbet: %s"
+    },
+    "The car came back": {
+      "other": "Bilen kom tillbaka"
+    },
+    "The car left": {
+      "other": "Bilen åkte"
+    },
+    "The car was collected": {
+      "other": "Bilen hämtades"
+    },
+    "The car's return was moved": {
+      "other": "Bilens återkomst flyttades"
+    },
+    "The customer said no (%s)": {
+      "other": "Kunden sa nej (%s)"
+    },
+    "The customer said yes (%s)": {
+      "other": "Kunden sa ja (%s)"
+    },
+    "The customer was contacted: %s": {
+      "other": "Kunden kontaktades: %s"
+    },
+    "The job was opened": {
+      "other": "Jobbet öppnades"
+    },
+    "The plan was set (version %s)": {
+      "other": "Planen lades (version %s)"
+    },
+    "The right wording": {
+      "other": "Rätt formulering"
+    },
+    "The shop floor may read it too": {
+      "other": "Verkstadsgolvet får läsa den också"
+    },
+    "What has happened": {
+      "other": "Vad som hänt"
+    },
+    "What was noticed was dealt with": {
+      "other": "Det som upptäcktes åtgärdades"
+    },
+    "What was said": {
+      "other": "Vad som sades"
+    },
+    "What was said is written down here. Their agreement to a price is recorded on the quote, not here.": {
+      "other": "Det som sades skrivs ner här. Kundens godkännande av ett pris registreras på offerten, inte här."
+    },
+    "When, if not just now": {
+      "other": "När, om inte nyss"
+    },
+    "Where it stands": {
+      "other": "Så här ligger det till"
+    },
+    "corrected": {
+      "other": "rättad"
+    },
+    "counter only": {
+      "other": "bara disken"
+    },
+    "internal": {
+      "other": "internt"
+    },
+    "latest note": {
+      "other": "senaste anteckning"
+    },
+    "no promise made": {
+      "other": "inget löfte givet"
+    },
+    "the customer saw this": {
+      "other": "kunden såg detta"
+    },
+    "written down %s": {
+      "other": "nedskriven %s"
+    },
+    "What has happened, and where it stands": {
+      "other": "Vad som hänt, och hur det ligger till"
+    },
+    "%d part asked for, not here yet": {
+      "one": "%d del beställd, inte här än",
+      "other": "%d delar beställda, inte här än"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

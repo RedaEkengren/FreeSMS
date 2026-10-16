@@ -62,6 +62,10 @@
       "one": "%d plate moves",
       "other": "%d plates move"
     },
+    "%d part asked for, not here yet": {
+      "one": "%d part asked for, not here yet",
+      "other": "%d parts asked for, not here yet"
+    },
     "%d visit": {
       "one": "%d visit",
       "other": "%d visits"

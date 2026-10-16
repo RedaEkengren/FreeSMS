@@ -340,6 +340,16 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 			return fmt.Errorf("clear the change log: %w", err)
 		}
 
+		// What was said about them on the telephone or at the counter, and any
+		// note kept to the counter. The note stays and says it was removed.
+		if _, err := tx.Exec(ctx, `
+			UPDATE job_notes SET body = $2
+			WHERE (kind = 'conversation' OR audience = 'desk')
+			  AND work_order_id IN (SELECT w.id FROM work_orders w JOIN customers c ON c.id = w.customer_id
+			                        WHERE c.person_id = $1)`, personID, ErasedName); err != nil {
+			return fmt.Errorf("clear the notes: %w", err)
+		}
+
 		// The numbers and addresses messages went to are theirs too, and no
 		// law asks for them to be kept.
 		if _, err := tx.Exec(ctx, `
