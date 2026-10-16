@@ -166,10 +166,15 @@ func (s *Server) handleBooking(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.log.Error("read planner rows", "error", err)
 	}
+	msgs, err := workshop.BookingMessagesFor(r.Context(), s.pool, session.Scope, b.ID)
+	if err != nil {
+		s.log.Error("read booking messages", "error", err)
+	}
 	s.render(w, r, http.StatusOK, "booking", pageData{
 		Title:   "Booking",
 		Session: session,
-		Booking: b, BookingEvents: events,
+		Booking: b, BookingEvents: events, BookingMessages: msgs,
+		CanText: s.sms != nil, CanEmail: s.email != nil,
 		Planner: plannerPage{Rows: rows},
 	})
 }

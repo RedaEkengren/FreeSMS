@@ -3352,6 +3352,105 @@
       "one": "%d återbetalning kvar att betala ut",
       "other": "%d återbetalningar kvar att betala ut"
     },
+    "%s: a reminder of your booking on %s (%s).": {
+      "other": "%s: en påminnelse om din bokning den %s (%s)."
+    },
+    "%s: your booking has moved to %s (%s).": {
+      "other": "%s: din bokning har flyttats till %s (%s)."
+    },
+    "%s: your booking is confirmed for %s (%s).": {
+      "other": "%s: din bokning är bekräftad till %s (%s)."
+    },
+    "%s: your booking on %s is cancelled.": {
+      "other": "%s: din bokning den %s är avbokad."
+    },
+    "A reminder about your booking": {
+      "other": "En påminnelse om din bokning"
+    },
+    "Confirmation": {
+      "other": "Bekräftelse"
+    },
+    "It has moved": {
+      "other": "Den har flyttats"
+    },
+    "It is cancelled": {
+      "other": "Den är avbokad"
+    },
+    "Messages still waiting to go are stopped.": {
+      "other": "Meddelanden som väntar på att gå iväg stoppas."
+    },
+    "Put the contact right": {
+      "other": "Rätta kontaktuppgiften"
+    },
+    "Queue it": {
+      "other": "Köa det"
+    },
+    "Rang them and they confirmed": {
+      "other": "Ringde dem och de bekräftade"
+    },
+    "Reminder, the day before": {
+      "other": "Påminnelse, dagen före"
+    },
+    "Reminder: your booking at %s": {
+      "other": "Påminnelse: din bokning hos %s"
+    },
+    "See what it says": {
+      "other": "Se vad det står"
+    },
+    "Send it again if it already went for this time": {
+      "other": "Skicka det igen om det redan gått för den här tiden"
+    },
+    "Tell the customer": {
+      "other": "Berätta för kunden"
+    },
+    "Texts and emails are not set up here. Ring them or give it on paper, and write it down.": {
+      "other": "Sms och e-post är inte inställda här. Ring dem eller ge det på papper och skriv ner det."
+    },
+    "The customer was not reached about a booking: %s": {
+      "other": "Kunden nåddes inte om en bokning: %s"
+    },
+    "This is what will be sent:": {
+      "other": "Det här är vad som skickas:"
+    },
+    "To %s, by %s.": {
+      "other": "Till %s, med %s."
+    },
+    "Told another way": {
+      "other": "Sagt på annat sätt"
+    },
+    "Where to come and what to bring, if it needs saying": {
+      "other": "Vart man ska komma och vad man ska ha med, om det behöver sägas"
+    },
+    "Your booking": {
+      "other": "Din bokning"
+    },
+    "Your booking at %s": {
+      "other": "Din bokning hos %s"
+    },
+    "Your booking at %s has moved": {
+      "other": "Din bokning hos %s har flyttats"
+    },
+    "Your booking at %s is cancelled": {
+      "other": "Din bokning hos %s är avbokad"
+    },
+    "Your booking has moved": {
+      "other": "Din bokning har flyttats"
+    },
+    "Your booking is cancelled": {
+      "other": "Din bokning är avbokad"
+    },
+    "confirmed_by_hand": {
+      "other": "bekräftad för hand"
+    },
+    "contact_corrected": {
+      "other": "kontaktuppgift rättad"
+    },
+    "queued": {
+      "other": "köad"
+    },
+    "retry": {
+      "other": "försöker igen"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

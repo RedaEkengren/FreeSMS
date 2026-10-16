@@ -43,6 +43,70 @@
 <p><a href="/jobs/{{.WorkOrderID}}">{{$.T "The job it became"}}</a></p>
 {{end}}
 
+{{/* Telling the customer. Nothing is inferred from a message being queued. */}}
+<h2>{{$.T "Tell the customer"}}</h2>
+{{if $.BookingPreview}}
+{{with $.BookingPreview}}
+<div class="card">
+  <p class="waiting">{{$.T "This is what will be sent:"}}</p>
+  <p><strong>{{.Subject}}</strong></p>
+  <p class="complaint">{{.Body}}</p>
+  <p class="waiting">{{$.T "To %s, by %s." .Address .Channel}}</p>
+</div>
+<form method="post" action="/bookings/{{$.Booking.ID}}/message">
+  <input type="hidden" name="send" value="1">
+  <input type="hidden" name="kind" value="{{.Kind}}">
+  <input type="hidden" name="channel" value="{{.Channel}}">
+  <input type="hidden" name="address" value="{{.Address}}">
+  <input type="hidden" name="recipient" value="{{.Recipient}}">
+  <input type="hidden" name="arrival" value="{{.Arrival}}">
+  <label class="tick"><input type="checkbox" name="confirm" value="yes" required> <span>{{$.T "This is who it is for, and this is where it should go"}}</span></label>
+  <label class="tick"><input type="checkbox" name="again" value="yes"> <span>{{$.T "Send it again if it already went for this time"}}</span></label>
+  <button type="submit">{{$.T "Queue it"}}</button>
+</form>
+{{end}}
+{{else}}
+{{if or $.CanText $.CanEmail}}
+<form method="post" action="/bookings/{{.ID}}/message">
+  <div class="pair">
+    <label><span>{{$.T "What"}}</span>
+      <select name="kind"><option value="confirm">{{$.T "Confirmation"}}</option><option value="reminder">{{$.T "Reminder, the day before"}}</option><option value="moved">{{$.T "It has moved"}}</option><option value="cancelled">{{$.T "It is cancelled"}}</option></select></label>
+    <label><span>{{$.T "How"}}</span>
+      <select name="channel">{{if $.CanText}}<option value="sms">{{$.T "text"}}</option>{{end}}{{if $.CanEmail}}<option value="email">{{$.T "email"}}</option>{{end}}</select></label>
+  </div>
+  <div class="pair">
+    <label><span>{{$.T "Who it is for"}}</span><input name="recipient" value="{{.CustomerName}}" required maxlength="100"></label>
+    <label><span>{{$.T "To"}}</span><input name="address" value="{{.CustomerPhone}}" required></label>
+  </div>
+  <label><span>{{$.T "Where to come and what to bring, if it needs saying"}}</span><input name="arrival" maxlength="300"></label>
+  <button type="submit" class="secondary">{{$.T "See what it says"}}</button>
+</form>
+{{else}}<p class="waiting">{{$.T "Texts and emails are not set up here. Ring them or give it on paper, and write it down."}}</p>{{end}}
+{{end}}
+
+<ul class="lines">
+  {{range $.BookingMessages}}
+  <li><div class="row"><span>{{$.T (index $.MessageAbouts .About)}} &middot; {{if eq .Channel "sms"}}{{$.T "text"}}{{else}}{{$.T "email"}}{{end}} &middot; {{.Recipient}}</span>
+    <span class="tag {{if eq .State "failed"}}late{{else if eq .State "cancelled"}}warranty{{end}}">{{$.T .State}}</span></div>
+    <div class="waiting">{{$.Date ($.Local .CreatedAt) "2 Jan 15:04"}} &middot; {{.CreatedBy}}{{if .Detail}} &middot; {{.Detail}}{{end}}</div></li>
+  {{end}}
+</ul>
+<h3>{{$.T "Told another way"}}</h3>
+<form method="post" action="/bookings/{{.ID}}/contact">
+  <input type="hidden" name="by_hand" value="1">
+  <label><span>{{$.T "How"}}</span><input name="how" placeholder="{{$.T "Rang them and they confirmed"}}" required maxlength="200"></label>
+  <button type="submit" class="secondary">{{$.T "Write it down"}}</button>
+</form>
+<h3>{{$.T "Put the contact right"}}</h3>
+<form method="post" action="/bookings/{{.ID}}/contact">
+  <div class="pair">
+    <label><span>{{$.T "Name"}}</span><input name="name" value="{{.CustomerName}}" maxlength="200"></label>
+    <label><span>{{$.T "Telephone"}}</span><input name="phone" value="{{.CustomerPhone}}" maxlength="40"></label>
+  </div>
+  <p class="waiting">{{$.T "Messages still waiting to go are stopped."}}</p>
+  <button type="submit" class="secondary">{{$.T "Save"}}</button>
+</form>
+
 <h2>{{$.T "What happened to it"}}</h2>
 <ul class="lines">
   {{range $.BookingEvents}}

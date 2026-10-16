@@ -77,6 +77,20 @@ func (s *Server) sendDue(ctx context.Context, now time.Time) {
 			}
 			m.Body = strings.ReplaceAll(m.Body, "{owed}", money.DisplayFor(locale, s.currency()).Amount(owed))
 		}
+		// A booking message is for the booking as it was when it was written.
+		if m.BookingID != "" {
+			wanted, why, err := workshop.BookingMessageStillWanted(ctx, s.pool, shop, m.BookingID, m.About, m.ValidForStarts)
+			if err != nil {
+				s.log.Error("recheck a booking message", "message", m.ID, "error", err)
+				continue
+			}
+			if !wanted {
+				if err := workshop.MessageCancelled(ctx, s.pool, shop, m.ID, why); err != nil {
+					s.log.Error("record a cancelled booking message", "message", m.ID, "error", err)
+				}
+				continue
+			}
+		}
 		sender := s.email
 		if m.Channel == "sms" {
 			sender = s.sms

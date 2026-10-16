@@ -222,6 +222,16 @@ func closeBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 }
 
 func bookingEventTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id, event string, starts, ends *time.Time, note string) error {
+	// A booking that moved, closed or came, or whose contact was put right,
+	// is not what the messages still waiting for it are about.
+	switch event {
+	case "moved", "cancelled", "arrived", "no_show", "contact_corrected":
+		why := "The booking was " + strings.ReplaceAll(event, "_", " ") + " before this went; nothing was sent."
+		// A move's or a cancellation's own message is for the new state.
+		if err := stopPendingBookingMessagesTx(ctx, tx, scope.ShopID, id, why, "booking_moved", "booking_cancelled"); err != nil {
+			return err
+		}
+	}
 	_, err := tx.Exec(ctx, `
 		INSERT INTO booking_events (shop_id, booking_id, event, starts_at, ends_at, note, by_user)
 		VALUES ($1, $2, $3, $4, $5, nullif($6, ''), $7)`,

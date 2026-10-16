@@ -363,6 +363,8 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /o/{token}/quote/{quoteID}", s.handleOfferAnswer)
 	mux.HandleFunc("GET /bookings/{id}", s.requireSession(s.handleBooking))
 	mux.HandleFunc("POST /bookings/{id}", s.requireSession(s.handleBookingAction))
+	mux.HandleFunc("POST /bookings/{id}/message", s.requireSession(s.handleBookingMessage))
+	mux.HandleFunc("POST /bookings/{id}/contact", s.requireSession(s.handleBookingContact))
 	mux.HandleFunc("POST /shop/final-check", s.requireSession(s.handleSaveFinalCheck))
 	mux.HandleFunc("GET /staff", s.requireSession(s.handleStaff))
 	mux.HandleFunc("POST /staff", s.requireSession(s.handleAddStaff))

@@ -23,11 +23,15 @@ import (
 // MessageAbouts are what a message can be about, as catalogue keys for the
 // page. One of each that matters, not one per change of state.
 var MessageAbouts = map[string]string{
-	"ready":        "Your car is ready to collect",
-	"answer":       "We need your answer",
-	"waiting_part": "Waiting for a part",
-	"invoice":      "Your invoice",
-	"reminder":     "A reminder about your invoice",
+	"ready":             "Your car is ready to collect",
+	"answer":            "We need your answer",
+	"waiting_part":      "Waiting for a part",
+	"invoice":           "Your invoice",
+	"reminder":          "A reminder about your invoice",
+	"booking_confirm":   "Your booking",
+	"booking_reminder":  "A reminder about your booking",
+	"booking_moved":     "Your booking has moved",
+	"booking_cancelled": "Your booking is cancelled",
 }
 
 // SendHours are when a message may go, as whole hours in the shop's zone:
@@ -80,6 +84,9 @@ type NewMessage struct {
 	NotBefore time.Time
 	// For a reminder: the invoice it is about.
 	ReminderFor string
+	// For a booking message: the booking, and the time it had when queued.
+	BookingID      string
+	ValidForStarts time.Time
 }
 
 // SentBefore reports whether this job's customer has been sent anything at
@@ -231,6 +238,10 @@ type DueMessage struct {
 	Tries                                               int
 	// For a reminder: the invoice it is about, asked after again as it goes.
 	ReminderFor string
+	// For a booking message: the booking, and the time it had when this was
+	// queued.
+	BookingID      string
+	ValidForStarts time.Time
 }
 
 // maxTries is how often a message that cannot be handed over is tried
@@ -244,9 +255,9 @@ func DueMessages(ctx context.Context, pool *pgxpool.Pool, shopID string, now tim
 	var out []DueMessage
 	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
-			SELECT m.id, m.work_order_id, m.about, m.channel, m.recipient, m.subject, m.body,
+			SELECT m.id, coalesce(m.work_order_id::text, ''), m.about, m.channel, m.recipient, m.subject, m.body,
 			       (SELECT count(*) FROM message_events r WHERE r.message_id = m.id AND r.event = 'retry')::int AS tries,
-			       coalesce(m.reminder_for::text, '')
+			       coalesce(m.reminder_for::text, ''), coalesce(m.booking_id::text, ''), coalesce(m.valid_for_starts, 'epoch'::timestamptz)
 			FROM outbound_messages m
 			JOIN LATERAL (SELECT event, at FROM message_events WHERE message_id = m.id ORDER BY at DESC LIMIT 1) e ON true
 			WHERE m.not_before <= $1 AND m.recipient <> ''
@@ -260,7 +271,7 @@ func DueMessages(ctx context.Context, pool *pgxpool.Pool, shopID string, now tim
 		defer rows.Close()
 		for rows.Next() {
 			var m DueMessage
-			if err := rows.Scan(&m.ID, &m.JobID, &m.About, &m.Channel, &m.Recipient, &m.Subject, &m.Body, &m.Tries, &m.ReminderFor); err != nil {
+			if err := rows.Scan(&m.ID, &m.JobID, &m.About, &m.Channel, &m.Recipient, &m.Subject, &m.Body, &m.Tries, &m.ReminderFor, &m.BookingID, &m.ValidForStarts); err != nil {
 				return err
 			}
 			out = append(out, m)
@@ -281,7 +292,7 @@ func MessageSent(ctx context.Context, pool *pgxpool.Pool, shopID, messageID, pro
 		}
 		_, err := tx.Exec(ctx, `
 			INSERT INTO customer_contacts (shop_id, work_order_id, about, how, recorded_by, message_id)
-			SELECT shop_id, work_order_id, about, channel, created_by, id FROM outbound_messages WHERE id = $1`, messageID)
+			SELECT shop_id, work_order_id, about, channel, created_by, id FROM outbound_messages WHERE id = $1 AND work_order_id IS NOT NULL`, messageID)
 		if err != nil {
 			return fmt.Errorf("record the contact: %w", err)
 		}

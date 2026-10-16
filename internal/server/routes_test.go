@@ -153,6 +153,8 @@ var swept = map[string]string{
 	"GET /exports/{id}":                              "sweep",
 	"GET /bookings/{id}":                             "sweep",
 	"POST /bookings/{id}":                            "sweep",
+	"POST /bookings/{id}/message":                    "sweep",
+	"POST /bookings/{id}/contact":                    "sweep",
 	"POST /invoices/{id}/payments":                   "sweep",
 	"POST /payments/{id}/reverse":                    "sweep",
 	"GET /inspections/{id}":                          "sweep",

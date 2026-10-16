@@ -269,6 +269,7 @@
     <button type="button" role="tab" data-tab="18">Rätta en faktura</button>
     <button type="button" role="tab" data-tab="19">Obetalt</button>
     <button type="button" role="tab" data-tab="20">Dagens slut</button>
+    <button type="button" role="tab" data-tab="21">Bokningen bekräftas</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1346,6 +1347,41 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog och beloppen ur dess pengakod när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: en dag med delbetalning och kredit jämförs med banken, godkänns, och ändras av en återbetalning &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/31-day.spec.ts">läs testet</a>. Namn och belopp är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>Innan bilen kommit</h2>
+  <p class="lede">En bokning finns innan det finns ett jobb, och kunden ska veta när de ska komma. Bekräftelsen skrivs ut först så att disken ser exakt vad som skickas, med tiden på verkstadens klocka och hur man når en människa. Den går genom samma kö som allt annat. En påminnelse som väntar stoppas om bokningen flyttas, avbokas eller bilen redan kommit, och det som inte gick fram hamnar i disken kö &ndash; eller sägs för hand.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: en bokningsbekräftelse förhandsvisas med datum och tid och köas. En påminnelse köas för dagen före. Bokningen flyttas och påminnelsen stoppas med anteckningen att bokningen flyttats innan den gick. Kunden sägs sedan för hand per telefon.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">Det här är vad som skickas:</div>
+              <div class="cl-qrow"><span>Verkstaden: din bokning är bekräftad till 2026-11-03 09:00 (Besiktningsservice).</span><span></span></div>
+              <span class="an-btn mo-btn an-fade" data-t="5">Köa det</span>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Berätta för kunden</div>
+              <div class="cl-qrow"><span>En påminnelse om din bokning</span><span class="rd-tag">köad</span></div>
+              <div class="cl-qrow an-fade" data-t="12"><span>Bokningen flyttades innan den gick; inget skickades.</span><span class="rd-tag rd-risk">avbeställd</span></div>
+            </div>            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">Sagt på annat sätt</div>
+              <div class="cl-qrow"><span>Ringde, hon bekräftade</span><span class="rd-tag pass">bekräftad för hand</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">Bekräftelsen visas först, med tiden på verkstadens klocka. Disken bekräftar vem den är till och vart den ska innan den köas.</div>
+      <div class="an-cap" data-t="8,15.8">Bokningen flyttas medan en påminnelse väntar. Påminnelsen stoppas och säger varför, i stället för att skickas med fel tid.</div>
+      <div class="an-cap an-off" data-t="16,23.6">Går inget att skicka, eller går det fel, skrivs det ner att kunden fick veta på annat sätt. Köad är inte levererad, och det visas inte som det.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare mot en riktig e-postserver: bekräftelsen förhandsvisas och landar i en brevlåda, en påminnelse stoppas av en flytt och kunden sägs för hand &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/32-booking-messages.spec.ts">läs testet</a>. Namn och tider är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

@@ -161,3 +161,95 @@ func TestTwoSendersAtOnceSendOnce(t *testing.T) {
 		t.Errorf("one message was handed over %d times", n)
 	}
 }
+
+// A booking message through the pages: previewed, confirmed, queued with the
+// time as the shop's clock shows it, a reminder the day before at the same
+// hour on the wall across the night the clocks change, and never sent for a
+// time the booking no longer has.
+func TestABookingIsConfirmedPreviewedAndNotRemindedAboutAMovedTime(t *testing.T) {
+	ts, pool := testServer(t)
+	v, _ := testServers.Load(ts.URL)
+	srv := v.(*Server)
+	elks := &fakeElks{}
+	srv.sms = notify.Elks{URL: elks.server(t).URL, Username: "u", Password: "p", From: "Verkstaden"}
+	ctx := context.Background()
+	desk, tech := signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	base := ts.URL
+
+	// A Sunday booking at 10:00 on the day the clocks go forward.
+	loc := srv.zone()
+	starts := time.Date(time.Now().Year()+1, 3, 31, 10, 0, 0, 0, loc)
+	for starts.Weekday() != time.Sunday || starts.Month() != 3 {
+		starts = starts.AddDate(0, 0, 1)
+	}
+	var id string
+	if err := database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `
+			INSERT INTO bookings (shop_id, starts_at, ends_at, what, customer_name, customer_phone, created_by)
+			SELECT $1, $2, $3, 'Service', 'Greta Gren', '070-123 45 67', u.id FROM users u WHERE u.role = 'service_advisor' LIMIT 1 RETURNING id::text`,
+			shopA, starts, starts.Add(time.Hour)).Scan(&id)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	form := url.Values{"kind": {"reminder"}, "channel": {"sms"}, "address": {"070-123 45 67"}, "recipient": {"Greta Gren"}, "arrival": {"Park in the yard."}}
+	if status := postStatus(t, tech, base+"/bookings/"+id+"/message", form); status != http.StatusForbidden {
+		t.Errorf("a technician messaged a booking's customer: %d", status)
+	}
+	status, preview := postBody(t, desk, base+"/bookings/"+id+"/message", form)
+	if status != http.StatusOK || !strings.Contains(preview, "This is what will be sent:") || !strings.Contains(preview, starts.Format("2006-01-02 15:04")) ||
+		!strings.Contains(preview, "Park in the yard.") || !strings.Contains(preview, "Queue it") {
+		t.Fatalf("the preview answered %d: %s", status, preview)
+	}
+	var n int
+	pool.QueryRow(ctx, `SELECT count(*) FROM outbound_messages WHERE booking_id = $1`, id).Scan(&n)
+	if n != 0 {
+		t.Fatal("a preview queued a message")
+	}
+	form.Set("send", "1")
+	if status := postStatus(t, desk, base+"/bookings/"+id+"/message", form); status != http.StatusBadRequest {
+		t.Errorf("queueing without confirming answered %d", status)
+	}
+	form.Set("confirm", "yes")
+	if status := postStatus(t, desk, base+"/bookings/"+id+"/message", form); status != http.StatusSeeOther {
+		t.Fatalf("queueing a reminder answered %d", status)
+	}
+	var notBefore time.Time
+	if err := pool.QueryRow(ctx, `SELECT not_before FROM outbound_messages WHERE booking_id = $1`, id).Scan(&notBefore); err != nil {
+		t.Fatal(err)
+	}
+	// The day before at the same hour on the wall, not twenty-four hours back.
+	want := time.Date(starts.Year(), starts.Month(), starts.Day()-1, 10, 0, 0, 0, loc)
+	if !notBefore.Equal(want) {
+		t.Errorf("the reminder is set for %v, want %v", notBefore.In(loc), want)
+	}
+
+	// Moved before it goes: it is not sent.
+	if status := postStatus(t, desk, base+"/bookings/"+id, url.Values{"action": {"move"}, "date": {starts.AddDate(0, 0, 7).Format("2006-01-02")},
+		"time": {"10:00"}, "minutes": {"60"}, "what": {"Service"}}); status != http.StatusSeeOther {
+		t.Fatalf("moving answered %d", status)
+	}
+	srv.sendDue(ctx, starts.Add(-time.Hour))
+	if elks.count() != 0 {
+		t.Errorf("a reminder for a moved booking reached the provider: %d texts", elks.count())
+	}
+	_, page2 := page(t, desk, base+"/bookings/"+id)
+	if !strings.Contains(page2, "cancelled") || !strings.Contains(page2, "moved before this went") && !strings.Contains(page2, "booking was moved") {
+		t.Errorf("the booking page does not say what became of the reminder")
+	}
+	// A confirmation for the new time goes.
+	form2 := url.Values{"kind": {"confirm"}, "channel": {"sms"}, "address": {"070-123 45 67"}, "recipient": {"Greta Gren"}, "send": {"1"}, "confirm": {"yes"}}
+	if status := postStatus(t, desk, base+"/bookings/"+id+"/message", form2); status != http.StatusSeeOther {
+		t.Fatalf("confirming the new time answered %d", status)
+	}
+	srv.sendDue(ctx, time.Now().Add(24*time.Hour))
+	if elks.count() != 1 || !strings.Contains(elks.sent[0].Get("message"), starts.AddDate(0, 0, 7).Format("2006-01-02")+" 10:00") {
+		t.Fatalf("what was sent: %v", elks.sent)
+	}
+	// And by hand when nothing could be sent.
+	if status := postStatus(t, desk, base+"/bookings/"+id+"/contact", url.Values{"by_hand": {"1"}, "how": {"Rang and she confirmed"}}); status != http.StatusSeeOther {
+		t.Errorf("writing it down answered %d", status)
+	}
+	if _, body := page(t, desk, base+"/bookings/"+id); !strings.Contains(body, "Rang and she confirmed") {
+		t.Error("the hand confirmation is not on the booking")
+	}
+}

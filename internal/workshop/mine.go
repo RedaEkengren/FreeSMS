@@ -32,6 +32,8 @@ type WaitingItem struct {
 	Registration string
 	// How many, where it is several of the same thing on one job.
 	Count int
+	// For an item about a booking.
+	BookingID string
 	// The shop's or the technician's own words -- a part's description, the
 	// line the customer said yes to. Never a customer's details.
 	Text string
@@ -57,6 +59,7 @@ var waitingSays = map[string]string{
 	"unstaffed":          "Nobody is on it",
 	"tech_away":          "%s is away; it needs somebody else",
 	"plan_overdue":       "The plan ran out and the job is still open",
+	"booking_not_told":   "The customer was not reached about a booking: %s",
 }
 
 // Says is the item's catalogue key.
@@ -74,6 +77,8 @@ func (w WaitingItem) Plural() bool {
 // Link is where dealing with it starts.
 func (w WaitingItem) Link() string {
 	switch w.Kind {
+	case "booking_not_told":
+		return "/bookings/" + w.BookingID
 	case "part_requested":
 		return "/parts"
 	case "schedule_changed":
@@ -308,6 +313,13 @@ func deskWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, la
 		}
 	}
 	var out []WaitingItem
+	untold, err := BookingsNeedingAttention(ctx, pool, scope)
+	if err != nil {
+		return nil, err
+	}
+	for _, b := range untold {
+		out = append(out, WaitingItem{Kind: "booking_not_told", BookingID: b.BookingID, Text: b.What})
+	}
 	backlog, err := Backlog(ctx, pool, scope)
 	if err != nil {
 		return nil, err

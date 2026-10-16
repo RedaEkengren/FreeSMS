@@ -43,35 +43,37 @@ type pageData struct {
 	Error   string
 	Email   string
 
-	Jobs          []workshop.Job
-	Job           workshop.Job
-	Progress      workshop.Progress
-	Surcharges    []workshop.SurchargeLine
-	Charges       workshop.Surcharges
-	Languages     []workshop.Language
-	Answers       []workshop.CustomerAnswer
-	Presence      workshop.Presence
-	JobPlan       workshop.JobPlan
-	Backlog       []workshop.BacklogItem
-	PlanForm      planForm
-	LineForm      lineForm
-	PlanTechs     []workshop.PlannerRow
-	JobParts      []workshop.JobPart
-	Contacts      []workshop.CustomerContact
-	Status        workshop.CustomerStatus
-	Quote         workshop.QuoteView
-	QuoteChanged  bool
-	Enquiries     []workshop.EnquiryRow
-	Enquiry       workshop.Enquiry
-	Offer         workshop.Offer
-	Version       *workshop.EnquiryQuote
-	ShopExports   []workshop.ShopExport
-	Planner       plannerPage
-	Booking       workshop.Booking
-	BookingEvents []workshop.BookingEvent
-	FinalCheck    workshop.FinalCheck
-	FinalSetting  workshop.FinalCheckSettings
-	MyLocale      string
+	Jobs            []workshop.Job
+	Job             workshop.Job
+	Progress        workshop.Progress
+	Surcharges      []workshop.SurchargeLine
+	Charges         workshop.Surcharges
+	Languages       []workshop.Language
+	Answers         []workshop.CustomerAnswer
+	Presence        workshop.Presence
+	JobPlan         workshop.JobPlan
+	Backlog         []workshop.BacklogItem
+	PlanForm        planForm
+	LineForm        lineForm
+	PlanTechs       []workshop.PlannerRow
+	JobParts        []workshop.JobPart
+	Contacts        []workshop.CustomerContact
+	Status          workshop.CustomerStatus
+	Quote           workshop.QuoteView
+	QuoteChanged    bool
+	Enquiries       []workshop.EnquiryRow
+	Enquiry         workshop.Enquiry
+	Offer           workshop.Offer
+	Version         *workshop.EnquiryQuote
+	ShopExports     []workshop.ShopExport
+	Planner         plannerPage
+	Booking         workshop.Booking
+	BookingEvents   []workshop.BookingEvent
+	BookingMessages []workshop.OutboundMessage
+	BookingPreview  *BookingPreview
+	FinalCheck      workshop.FinalCheck
+	FinalSetting    workshop.FinalCheckSettings
+	MyLocale        string
 	// What is waiting for the person signed in, and the header's count of it.
 	Waiting      []workshop.WaitingItem
 	WaitingCount int

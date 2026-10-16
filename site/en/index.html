@@ -269,6 +269,7 @@
     <button type="button" role="tab" data-tab="18">Correcting an invoice</button>
     <button type="button" role="tab" data-tab="19">Unpaid</button>
     <button type="button" role="tab" data-tab="20">Closing the day</button>
+    <button type="button" role="tab" data-tab="21">Booking confirmed</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1346,6 +1347,41 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue and the amounts from its money code when the page is generated. The flow is run against the real product in a browser: a day with a part payment and a credit is compared with the bank, signed off, and changed by a refund &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/31-day.spec.ts">read the test</a>. Names and amounts are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>Before the car comes</h2>
+  <p class="lede">A booking exists before a job does, and the customer should know when to come. The confirmation is shown first so the counter sees exactly what is sent, with the time on the workshop's clock and how to reach a person. It goes through the same queue as everything else. A reminder waiting is stopped if the booking moves, is cancelled or the car has already come, and what did not get through lands in the counter's queue &ndash; or is told by hand.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: a booking confirmation is previewed with date and time and queued. A reminder is queued for the day before. The booking is moved and the reminder is stopped with a note that the booking moved before it went. The customer is then told by hand on the telephone.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">This is what will be sent:</div>
+              <div class="cl-qrow"><span>The workshop: your booking is confirmed for 2026-11-03 09:00 (Inspection service).</span><span></span></div>
+              <span class="an-btn mo-btn an-fade" data-t="5">Queue it</span>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Tell the customer</div>
+              <div class="cl-qrow"><span>A reminder about your booking</span><span class="rd-tag">queued</span></div>
+              <div class="cl-qrow an-fade" data-t="12"><span>The booking was moved before this went; nothing was sent.</span><span class="rd-tag rd-risk">cancelled</span></div>
+            </div>            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">Told another way</div>
+              <div class="cl-qrow"><span>Rang, she confirmed</span><span class="rd-tag pass">confirmed_by_hand</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">The confirmation is shown first, with the time on the workshop's clock. The counter confirms who it is for and where it goes before it is queued.</div>
+      <div class="an-cap" data-t="8,15.8">The booking moves while a reminder waits. The reminder is stopped and says why, instead of going with the wrong time.</div>
+      <div class="an-cap an-off" data-t="16,23.6">If nothing can be sent, or it goes wrong, it is written down that the customer was told another way. Queued is not delivered, and is not shown as such.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser, against a real mail server: the confirmation is previewed and lands in a mailbox, a reminder is stopped by a move, and the customer is told by hand &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/32-booking-messages.spec.ts">read the test</a>. Names and times are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>
