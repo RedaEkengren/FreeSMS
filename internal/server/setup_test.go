@@ -140,8 +140,8 @@ func TestSetupCreatesTheShopAndSignsTheOwnerIn(t *testing.T) {
 	if resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("status = %d, want 303\n%s", resp.StatusCode, body)
 	}
-	if loc := resp.Header.Get("Location"); loc != "/" {
-		t.Errorf("Location = %q, want /", loc)
+	if loc := resp.Header.Get("Location"); loc != "/start" {
+		t.Errorf("Location = %q, want /start", loc)
 	}
 
 	// The owner's home is the counter board, and it is reachable without
@@ -347,5 +347,102 @@ func TestAShopKnownAtStartIsNotNews(t *testing.T) {
 	case <-srv.ShopSet():
 		t.Error("a shop known at start-up was announced as new")
 	default:
+	}
+}
+
+// A new owner, with nothing but this page: the list says what is missing, each
+// step is done through the forms the list links to, nothing else is blocked
+// along the way, and at the end it says the workshop is ready.
+func TestAFirstSetupCanBeDoneFromTheChecklistAlone(t *testing.T) {
+	ts, _ := emptyServer(t)
+	client := noRedirects()
+	resp := submitSetup(t, ts, client, "a long enough password")
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("setup answered %d", resp.StatusCode)
+	}
+	get := func(path string) (int, string) {
+		r, err := client.Get(ts.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer r.Body.Close()
+		b, _ := io.ReadAll(r.Body)
+		return r.StatusCode, string(b)
+	}
+	post := func(path string, v url.Values) int {
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+path, strings.NewReader(v.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", ts.URL)
+		r, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Body.Close()
+		return r.StatusCode
+	}
+
+	status, body := get("/start")
+	if status != http.StatusOK {
+		t.Fatalf("/start answered %d", status)
+	}
+	for _, want := range []string{"Getting started", "Your company details", "company number", "to do", "Who owns the backups", "Start clean", "No messaging provider is set up", "href=\"/shop\""} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the first view does not say %q", want)
+		}
+	}
+	if strings.Contains(body, "Ready for the first customer") {
+		t.Fatal("a workshop with nothing said is ready")
+	}
+	// Work is not in the way: the board and the new-job form answer.
+	for _, path := range []string{"/", "/jobs/new", "/board"} {
+		if status, _ := get(path); status != http.StatusOK && status != http.StatusSeeOther {
+			t.Errorf("%s answered %d with the setup unfinished", path, status)
+		}
+	}
+
+	// The company details through the form the list links to.
+	if st := post("/shop", url.Values{"name": {"Verkstaden"}, "address_line1": {"Gatan 1"}, "postal_code": {"411 38"}, "city": {"Göteborg"},
+		"org_number": {"556677-8899"}, "vat_number": {"SE556677889901"}, "payment_reference": {"Bankgiro 123-4567"}, "payment_terms_days": {"30"}}); st != http.StatusSeeOther {
+		t.Fatalf("saving the details answered %d", st)
+	}
+	step := func(name, state, note string) {
+		t.Helper()
+		if st := post("/start/step/"+name, url.Values{"state": {state}, "note": {note}}); st != http.StatusSeeOther {
+			t.Fatalf("step %s answered %d", name, st)
+		}
+	}
+	// A step about a person is refused without one.
+	if st := post("/start/step/backups", url.Values{"state": {"done"}}); st != http.StatusBadRequest {
+		t.Errorf("backups with nobody named answered %d", st)
+	}
+	step("operating_model", "done", "solo")
+	for _, s := range []string{"locale", "invoice"} {
+		step(s, "done", "")
+	}
+	step("data", "skipped", "")
+	step("final_check", "skipped", "")
+	step("accountant", "done", "Rut, 031-555 01 02")
+	step("backups", "done", "Olle, 070-111 22 33")
+	_, mid := get("/start")
+	if strings.Contains(mid, "Ready for the first customer") {
+		t.Error("ready with the support contact still missing")
+	}
+	step("support", "done", "Hosten, 08-123 45")
+	_, body = get("/start")
+	if !strings.Contains(body, "Ready for the first customer") {
+		t.Errorf("not ready after every step: %s", body)
+	}
+
+	// The invoice to look at is an example and takes nothing.
+	status, inv := get("/start/invoice")
+	if status != http.StatusOK || !strings.Contains(inv, "Gatan 1") || !strings.Contains(inv, "556677-8899") || !strings.Contains(inv, "No invoice has been made") {
+		t.Errorf("the invoice example answered %d: %s", status, inv)
+	}
+	// Help is there for the owner, in three parts.
+	for _, p := range []string{"/help", "/help/reception", "/help/workshop", "/help/owner"} {
+		if status, h := get(p); status != http.StatusOK || !strings.Contains(h, "Help") {
+			t.Errorf("%s answered %d", p, status)
+		}
 	}
 }

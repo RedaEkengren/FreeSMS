@@ -276,6 +276,7 @@
     <button type="button" role="tab" data-tab="22">The car comes back</button>
     <button type="button" role="tab" data-tab="23">Work at a supplier</button>
     <button type="button" role="tab" data-tab="24">Start from your file</button>
+    <button type="button" role="tab" data-tab="25">Getting started</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1437,6 +1438,42 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser with Swedish files: customers, parts and opening stock are previewed and applied, a possible duplicate needs an answer and the same file is the same upload &ndash; <a href="{{test "e2e/tests/35-import.spec.ts" "a customer list, parts and opening stock imported from Swedish files"}}">read the test</a>. Names and quantities are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>From the first sign-in to the first customer</h2>
+  <p class="lede">The owner who has just made the workshop gets a list, not an empty board. It is read from the workshop's own settings: the address is there or it is not, the technician exists or does not. What cannot be read &ndash; that the invoice has been looked at, who owns the backups, that &ldquo;no final check&rdquo; is a choice &ndash; is said by a person and kept with who and when. A one-person workshop is spared the staff questions, and a provider for texts or plate lookup is never a requirement.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: the list shows that the company details are missing and why. They are filled in, an example invoice is shown without using a number, and backups and support are given a name. Last it says the workshop is ready.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "owner"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">{{t "Your company details"}}</div>
+              <div class="cl-qrow"><span>{{t "address"}}, {{t "company number"}}</span><span class="rd-tag rd-risk">{{t "to do"}}</span></div>
+              <div class="cl-qrow"><span>{{t "Who owns the backups"}}</span><span class="rd-tag rd-risk">{{t "to do"}}</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "Look at the invoice"}}</div>
+              <div class="cl-qrow"><span>EXAMPLE-0 · Verkstadsgatan 1 · 556677-8899</span><span class="rd-tag warranty">{{t "Example"}}</span></div>
+              <div class="cl-qrow"><span>{{t "Your company details"}}</span><span class="rd-tag pass">{{t "done"}}</span></div>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">{{t "Who owns the backups"}}</div>
+              <div class="cl-qrow"><span>Olle Ägare, 070-111 22 33</span><span class="rd-tag pass">{{t "done"}}</span></div>
+              <div class="cl-qrow an-fade" data-t="20"><span>{{t "Ready for the first customer"}}</span><span class="rd-tag pass">&#10003;</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">The list says what is missing and why it matters, with a link to the form that puts it right. Nothing stops work in the meantime.</div>
+      <div class="an-cap" data-t="8,15.8">The invoice is shown as an example, drawn from your details. No invoice number is taken and nothing is stored.</div>
+      <div class="an-cap" data-t="16,23.6">Backups and support are given a name, not a box to tick. When everything required has been said, it says the workshop is ready.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: the owner fills in the details through the forms the list links to, looks at an example invoice and sees the list become ready &ndash; <a href="{{test "e2e/tests/36-getting-started.spec.ts" "the owner works through the list until the workshop is ready"}}">read the test</a>. Names and numbers are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

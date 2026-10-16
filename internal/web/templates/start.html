@@ -1,0 +1,82 @@
+{{define "content"}}
+{{with .Readiness}}
+<h1>{{$.T "Getting started"}}</h1>
+<p class="waiting">{{$.T "What is left before the first customer. Nothing here stops you working: it says what is missing, why it matters and where to put it right. You can put this down and come back to it."}}</p>
+
+<div class="row">
+  {{if .Ready}}<span class="tag pass">{{$.T "Ready for the first customer"}}</span>
+  {{else}}<span class="tag late">{{$.T "%s of %s needed things are done" ($.Num .Done) ($.Num .Total)}}</span>{{end}}
+</div>
+
+<h2>{{$.T "How the workshop works"}}</h2>
+<form method="post" action="/start/step/operating_model" class="inline">
+  <input type="hidden" name="state" value="done">
+  <label><input type="radio" name="note" value="team" {{if not .Solo}}checked{{end}}> {{$.T "There is a team: technicians, a counter, a parts desk"}}</label>
+  <label><input type="radio" name="note" value="solo" {{if .Solo}}checked{{end}}> {{$.T "One person does it all"}}</label>
+  <button type="submit" class="secondary">{{$.T "Save"}}</button>
+</form>
+<p class="waiting">{{$.T "A one-person workshop is not asked to add staff, and the owner does the technician's and the counter's work."}}</p>
+
+{{range $group := $.Groups}}
+<h2>{{$.T $group}}</h2>
+<ul class="lines">
+  {{range $.Readiness.Tasks}}{{if eq .Group $group}}
+  <li id="{{.Key}}">
+    <div class="row"><b>{{$.T .Title}}</b>
+      <span class="tag {{if eq .State "done"}}pass{{else if eq .State "decided"}}pass{{else if eq .State "manual"}}warranty{{else if .Required}}late{{else}}warranty{{end}}">{{if eq .State "done"}}{{$.T "done"}}{{else if eq .State "decided"}}{{$.T "decided"}}{{else if eq .State "manual"}}{{$.T "by hand"}}{{else if .Required}}{{$.T "to do"}}{{else}}{{$.T "optional"}}{{end}}</span></div>
+    <p class="waiting">{{$.T .Why}}</p>
+    {{range .Facts}}<p class="waiting">{{$.T .Key}}{{if .Arg}}: {{.Arg}}{{end}}</p>{{end}}
+    {{if .Note}}<p class="waiting">{{.Note}}{{if .By}} &middot; {{.By}}{{end}}{{if .At}} &middot; {{$.Date ($.Local .At) "2 Jan 2006"}}{{end}}</p>{{end}}
+    <p>{{if ne .Link "/start"}}<a href="{{.Link}}">{{$.T "Open"}}</a>{{end}}</p>
+
+    {{if and .CanSay (ne .State "done")}}
+    <form method="post" action="/start/step/{{.Key}}">
+      <input type="hidden" name="state" value="done">
+      {{if .NeedNote}}<label><span>{{$.T "Who, and how to reach them"}}</span><input name="note" maxlength="300" required></label>{{end}}
+      <button type="submit" class="secondary">{{$.T .SayText}}</button>
+    </form>
+    {{end}}
+    {{if and .CanSkip (eq .State "todo")}}
+    <form method="post" action="/start/step/{{.Key}}">
+      <input type="hidden" name="state" value="skipped">
+      <button type="submit" class="secondary">{{$.T .SkipText}}</button>
+    </form>
+    {{end}}
+    {{if or (eq .State "decided") (and (eq .State "done") .At)}}
+    <form method="post" action="/start/step/{{.Key}}">
+      <input type="hidden" name="state" value="reset">
+      <button type="submit" class="link">{{$.T "Take it back"}}</button>
+    </form>
+    {{end}}
+  </li>
+  {{end}}{{end}}
+</ul>
+{{end}}
+
+<h2>{{$.T "Try a message"}}</h2>
+{{if or $.CanEmail $.CanText}}
+{{if eq $.TestResult "sent"}}<p class="waiting"><span class="tag pass">{{$.T "sent"}}</span> {{$.T "Look for it where you sent it."}}</p>{{end}}
+{{if eq $.TestResult "failed"}}<p class="waiting"><span class="tag late">{{$.T "failed"}}</span> {{$.T "The provider did not take it. Check the settings and the address."}}</p>{{end}}
+<form method="post" action="/start/test-message">
+  <div class="pair">
+    <label><span>{{$.T "How"}}</span><select name="channel">{{if $.CanEmail}}<option value="email">{{$.T "email"}}</option>{{end}}{{if $.CanText}}<option value="sms">{{$.T "text message"}}</option>{{end}}</select></label>
+    <label><span>{{$.T "To"}}</span><input name="address" required></label>
+  </div>
+  <button type="submit" class="secondary">{{$.T "Send a test to yourself"}}</button>
+  <p class="waiting">{{$.T "It is not saved and carries nothing about any customer."}}</p>
+</form>
+{{else}}
+<p class="waiting">{{$.T "No messaging provider is set up. That is fine: send the link or the confirmation from your own phone or email, and write down on the job that you did."}}</p>
+{{end}}
+
+<h2>{{$.T "Practice first"}}</h2>
+<p class="waiting">{{$.T "A practice copy runs apart from the real workshop, with its own database, and can be thrown away. Import the example files into it and try a whole day. See DEMO.md, or ask whoever runs your server."}}</p>
+
+<h2>{{$.T "Help"}}</h2>
+<ul class="lines">
+  <li><a href="/help/reception">{{$.T "At the counter"}}</a></li>
+  <li><a href="/help/workshop">{{$.T "In the workshop"}}</a></li>
+  <li><a href="/help/owner">{{$.T "For the owner"}}</a></li>
+</ul>
+{{end}}
+{{end}}

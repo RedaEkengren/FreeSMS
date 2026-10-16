@@ -3949,6 +3949,426 @@
     "would be filled in": {
       "other": "skulle kompletteras"
     },
+    "%s of %s needed things are done": {
+      "other": "%s av %s nödvändiga saker är klara"
+    },
+    "A VAT number is printed on an invoice. A workshop that is not registered says so instead, and the invoice leaves it out.": {
+      "other": "Ett momsnummer skrivs ut på en faktura. En verkstad som inte är momsregistrerad säger det i stället, och fakturan utelämnar det."
+    },
+    "A name and a number, written down before the day you need them.": {
+      "other": "Ett namn och ett nummer, nedskrivna innan den dag du behöver dem."
+    },
+    "A one-person workshop is not asked to add staff, and the owner does the technician's and the counter's work.": {
+      "other": "En enmansverkstad behöver inte lägga till personal, och ägaren gör teknikerns och disken arbete."
+    },
+    "A practice copy runs apart from the real workshop, with its own database, and can be thrown away. Import the example files into it and try a whole day. See DEMO.md, or ask whoever runs your server.": {
+      "other": "En övningskopia körs vid sidan av den riktiga verkstaden, med en egen databas, och kan kastas. Importera exempelfilerna i den och prova en hel dag. Se DEMO.md, eller fråga den som sköter din server."
+    },
+    "A technician sees the cars and the work and never a customer's personal details. A one-person workshop does it all as the owner.": {
+      "other": "En tekniker ser bilarna och arbetet och aldrig en kunds personuppgifter. En enmansverkstad gör allt som ägare."
+    },
+    "A time guide gives a job its labour hours, and price bands turn a part's cost into a price. Without them every price is typed.": {
+      "other": "En tidbok ger ett jobb dess arbetstimmar, och prisband gör en dels inköpspris till ett pris. Utan dem skrivs varje pris för hand."
+    },
+    "A vehicle register agreement fills in make, model and year. It is the workshop's to hold, so nothing is included.": {
+      "other": "Ett avtal med ett fordonsregister fyller i märke, modell och årsmodell. Det är verkstadens att ha, så inget medföljer."
+    },
+    "A workshop cannot lose a day of invoices. Somebody has to own the backups and have tried getting them back. Write down who, and where the runbook is.": {
+      "other": "En verkstad kan inte förlora en dags fakturor. Någon måste äga säkerhetskopiorna och ha provat att få tillbaka dem. Skriv ner vem, och var driftbeskrivningen finns."
+    },
+    "Accounts for the accountant": {
+      "other": "Konton för redovisningen"
+    },
+    "Add the lines, then put the quote to the customer. A line added after their yes needs a new yes.": {
+      "other": "Lägg till raderna och lägg sedan offerten för kunden. En rad som läggs till efter deras ja behöver ett nytt ja."
+    },
+    "Add the people": {
+      "other": "Lägg till personerna"
+    },
+    "An invoice made now would lack:": {
+      "other": "En faktura som gjordes nu skulle sakna:"
+    },
+    "Ask for a part": {
+      "other": "Be om en del"
+    },
+    "Back to getting started": {
+      "other": "Tillbaka till att komma igång"
+    },
+    "Back up, and know how to get it back": {
+      "other": "Säkerhetskopiera, och vet hur du får tillbaka den"
+    },
+    "Before the first customer": {
+      "other": "Innan första kunden"
+    },
+    "Bring what you already have, or start clean. Either is fine, and it is a choice, not an oversight.": {
+      "other": "Ta med det du redan har, eller börja från noll. Båda går bra, och det är ett val, inte ett förbiseende."
+    },
+    "Bring what you have": {
+      "other": "Ta med det du har"
+    },
+    "Checklists and parts": {
+      "other": "Checklistor och delar"
+    },
+    "Choose Take in a vehicle and type the registration. A car that is known brings its owner and history. Write down what the customer says is wrong.": {
+      "other": "Välj Ta in en bil och skriv registreringsnumret. En bil som är känd tar med sig ägare och historik. Skriv ner vad kunden säger är fel."
+    },
+    "Close the day": {
+      "other": "Stäng dagen"
+    },
+    "Complete": {
+      "other": "Komplett"
+    },
+    "Customers and data": {
+      "other": "Kunder och data"
+    },
+    "Everything an invoice needs from you is there.": {
+      "other": "Allt en faktura behöver från dig finns."
+    },
+    "Example": {
+      "other": "Exempel"
+    },
+    "Figures shows what was sold and what is owed. The day shows what was paid in and out.": {
+      "other": "Siffror visar vad som sålts och vad som är skyldigt. Dagen visar vad som betalats in och ut."
+    },
+    "Final check before a car is ready": {
+      "other": "Slutkontroll innan en bil är klar"
+    },
+    "Find your jobs": {
+      "other": "Hitta dina jobb"
+    },
+    "Follow the list under Getting started. It says what is missing and where to put it right.": {
+      "other": "Följ listan under Komma igång. Den säger vad som saknas och var du rättar det."
+    },
+    "For me shows what is waiting for you. A car put on you, a part that has come and a customer who said yes all show up there.": {
+      "other": "Till mig visar vad som väntar på dig. En bil som lagts på dig, en del som kommit och en kund som sagt ja syns där."
+    },
+    "For the owner": {
+      "other": "För ägaren"
+    },
+    "FreeSMS writes a SIE 4B file. Hand your accountant a real one and have them tell you it imported before the first month ends; this cannot be checked from here.": {
+      "other": "FreeSMS skriver en SIE 4B-fil. Ge din redovisningskonsult en riktig och låt dem säga att den gick att läsa in innan första månaden är slut; det går inte att kontrollera härifrån."
+    },
+    "Getting started": {
+      "other": "Komma igång"
+    },
+    "Hand over to the accountant": {
+      "other": "Lämna över till redovisningskonsulten"
+    },
+    "Help": {
+      "other": "Hjälp"
+    },
+    "How the workshop works": {
+      "other": "Hur verkstaden arbetar"
+    },
+    "If a provider is set up, FreeSMS can send the link to a job, a booking confirmation and an invoice. Without one you send them yourself and write down that you did.": {
+      "other": "Om en leverantör är inställd kan FreeSMS skicka länken till ett jobb, en bokningsbekräftelse och en faktura. Utan en skickar du dem själv och skriver ner att du gjorde det."
+    },
+    "In the workshop": {
+      "other": "I verkstaden"
+    },
+    "Inspection checklists a technician works through, and the parts you stock. A workshop can begin without either.": {
+      "other": "Besiktningschecklistor en tekniker går igenom, och de delar du har på lager. En verkstad kan börja utan någondera."
+    },
+    "Invoice and record the payment": {
+      "other": "Fakturera och bokför betalningen"
+    },
+    "It is not saved and carries nothing about any customer.": {
+      "other": "Det sparas inte och innehåller inget om någon kund."
+    },
+    "Labour times and price bands": {
+      "other": "Tider och prisband"
+    },
+    "Language and time zone": {
+      "other": "Språk och tidszon"
+    },
+    "Look at the invoice": {
+      "other": "Titta på fakturan"
+    },
+    "Look at your numbers": {
+      "other": "Titta på dina siffror"
+    },
+    "Look for it where you sent it.": {
+      "other": "Titta efter det där du skickade det."
+    },
+    "Looking up a registration number": {
+      "other": "Slå upp ett registreringsnummer"
+    },
+    "Missing": {
+      "other": "Saknas"
+    },
+    "Money": {
+      "other": "Pengar"
+    },
+    "My accountant has read an export": {
+      "other": "Min redovisningskonsult har läst en export"
+    },
+    "No lookup: type the make and model when a car is taken in.": {
+      "other": "Ingen uppslagning: skriv märke och modell när en bil tas in."
+    },
+    "No messaging provider is set up. That is fine: send the link or the confirmation from your own phone or email, and write down on the job that you did.": {
+      "other": "Ingen leverantör för meddelanden är inställd. Det går bra: skicka länken eller bekräftelsen från din egen telefon eller e-post och skriv ner på jobbet att du gjorde det."
+    },
+    "No provider: send it from your own phone or email and write down that you did.": {
+      "other": "Ingen leverantör: skicka det från din egen telefon eller e-post och skriv ner att du gjorde det."
+    },
+    "On the job, choose Say who is paying. Find the customer, or add a new one. If it asks whether this is somebody you already have, believe it.": {
+      "other": "På jobbet väljer du Ange vem som betalar. Hitta kunden eller lägg till en ny. Om det frågar om det här är någon du redan har, lita på det."
+    },
+    "One person does it all": {
+      "other": "En person gör allt"
+    },
+    "Open": {
+      "other": "Öppna"
+    },
+    "Open Getting started": {
+      "other": "Öppna Komma igång"
+    },
+    "Open The day, compare the figures with the bank, and say why if they differ.": {
+      "other": "Öppna Dagen, jämför siffrorna med banken och säg varför om de skiljer sig."
+    },
+    "Open the job and choose Invoice it. When the money arrives, record the payment. FreeSMS does not move money.": {
+      "other": "Öppna jobbet och välj Fakturera den. När pengarna kommer bokför du betalningen. FreeSMS flyttar inga pengar."
+    },
+    "Opening hours and lifts": {
+      "other": "Arbetstider och lyftar"
+    },
+    "People and time": {
+      "other": "Personer och tid"
+    },
+    "Practice first": {
+      "other": "Öva först"
+    },
+    "Press It is ready when the work and the final check are done.": {
+      "other": "Tryck Den är klar när arbetet och slutkontrollen är gjorda."
+    },
+    "Price the work and ask for a yes": {
+      "other": "Prissätt arbetet och be om ett ja"
+    },
+    "Put it right": {
+      "other": "Rätta det"
+    },
+    "Ready for the first customer": {
+      "other": "Redo för första kunden"
+    },
+    "Report a finding with a photo. The counter prices it and asks the customer; you never see their details.": {
+      "other": "Rapportera ett fynd med ett foto. Disken prissätter det och frågar kunden; du ser aldrig deras uppgifter."
+    },
+    "Sales, VAT and receivables are booked to the standard Swedish accounts unless you change them. Your accountant can change them in the import.": {
+      "other": "Försäljning, moms och kundfordringar bokförs på standardkonton enligt BAS om du inte ändrar dem. Din redovisningskonsult kan ändra dem vid inläsningen."
+    },
+    "Say it is ready": {
+      "other": "Säg att den är klar"
+    },
+    "See what a customer will receive, drawn from your details with an example line. Nothing is stored and no invoice number is used.": {
+      "other": "Se vad en kund får, ritat från dina uppgifter med en exempelrad. Inget sparas och inget fakturanummer används."
+    },
+    "Send a test to yourself": {
+      "other": "Skicka ett test till dig själv"
+    },
+    "Set up the workshop": {
+      "other": "Ställ in verkstaden"
+    },
+    "Somebody owns the backups and has tried restoring one. The steps are in DEPLOY.md. Write the name and number of whoever you ring when it breaks under Getting started.": {
+      "other": "Någon äger säkerhetskopiorna och har provat att återställa en. Stegen finns i DEPLOY.md. Skriv namn och nummer på den du ringer när det går sönder under Komma igång."
+    },
+    "Start and stop the clock": {
+      "other": "Starta och stoppa klockan"
+    },
+    "Start clean": {
+      "other": "Börja från noll"
+    },
+    "Start work on a job. Starting on another car stops the first one.": {
+      "other": "Starta arbete på ett jobb. Att starta på en annan bil stoppar den första."
+    },
+    "Take a car in": {
+      "other": "Ta in en bil"
+    },
+    "Tell the customer the car is ready": {
+      "other": "Säg till kunden att bilen är klar"
+    },
+    "Texts and email to customers": {
+      "other": "Sms och e-post till kunder"
+    },
+    "The accountant can read the export": {
+      "other": "Redovisningskonsulten kan läsa exporten"
+    },
+    "The bankgiro, plusgiro or account an invoice tells the customer to pay to, and how many days they have.": {
+      "other": "Det bankgiro, plusgiro eller konto som en faktura ber kunden betala till, och hur många dagar de har."
+    },
+    "The business": {
+      "other": "Företaget"
+    },
+    "The invoice looks right": {
+      "other": "Fakturan ser rätt ut"
+    },
+    "The language every page and the words on an invoice come in until somebody picks their own, and the clock the day starts and ends on.": {
+      "other": "Det språk varje sida och orden på en faktura kommer på tills någon väljer sitt eget, och den klocka som dagen börjar och slutar på."
+    },
+    "The provider did not take it. Check the settings and the address.": {
+      "other": "Leverantören tog inte emot det. Kontrollera inställningarna och adressen."
+    },
+    "The work list shows each step. Mark a step done when it is, or blocked, and say what it is waiting for.": {
+      "other": "Arbetslistan visar varje steg. Markera ett steg klart när det är det, eller blockerat, och säg vad det väntar på."
+    },
+    "There is a team: technicians, a counter, a parts desk": {
+      "other": "Det finns ett team: tekniker, en disk, ett reservdelsbord"
+    },
+    "These are right": {
+      "other": "Det här stämmer"
+    },
+    "They are printed at the top of every invoice. An invoice without a company number and an address is not one a customer or the tax office can use.": {
+      "other": "De skrivs högst upp på varje faktura. En faktura utan organisationsnummer och adress går inte att använda för en kund eller Skatteverket."
+    },
+    "This is what an invoice from your workshop looks like, with an example customer and example lines. No invoice has been made and no number has been used.": {
+      "other": "Så här ser en faktura från din verkstad ut, med en exempelkund och exempelrader. Ingen faktura har gjorts och inget nummer har använts."
+    },
+    "This is who we ring": {
+      "other": "Det här är den vi ringer"
+    },
+    "This person owns the backups": {
+      "other": "Den här personen äger säkerhetskopiorna"
+    },
+    "Tick off the work": {
+      "other": "Bocka av arbetet"
+    },
+    "Try a message": {
+      "other": "Prova ett meddelande"
+    },
+    "Under Accounting, export a period. Have your accountant read a real file before you rely on it.": {
+      "other": "Under Bokföring exporterar du en period. Låt din redovisningskonsult läsa en riktig fil innan du litar på den."
+    },
+    "Under Import, upload customers, cars, parts and opening stock from your old system, or choose to start clean.": {
+      "other": "Under Import laddar du upp kunder, bilar, delar och ingående lager från ditt gamla system, eller väljer att börja från noll."
+    },
+    "Under Staff, add each person with the role that matches what they do. A technician never sees a customer's details.": {
+      "other": "Under Personal lägger du till varje person med den roll som motsvarar vad de gör. En tekniker ser aldrig en kunds uppgifter."
+    },
+    "Use Parts on the job. The parts desk sees it, and you are told when it has come.": {
+      "other": "Använd Delar på jobbet. Reservdelsbordet ser det, och du får veta när den har kommit."
+    },
+    "VAT registration": {
+      "other": "Momsregistrering"
+    },
+    "We are not registered for VAT": {
+      "other": "Vi är inte momsregistrerade"
+    },
+    "We do not use a final check": {
+      "other": "Vi använder ingen slutkontroll"
+    },
+    "What is left before the first customer. Nothing here stops you working: it says what is missing, why it matters and where to put it right. You can put this down and come back to it.": {
+      "other": "Vad som återstår innan första kunden. Inget här hindrar dig från att arbeta: det säger vad som saknas, varför det spelar roll och var du rättar det. Du kan lägga ifrån dig det här och komma tillbaka."
+    },
+    "When the technician says it is ready, it waits under For me until the customer has been told. Send the message or ring, and write down that you did.": {
+      "other": "När teknikern säger att den är klar väntar den under Till mig tills kunden har fått veta. Skicka meddelandet eller ring, och skriv ner att du gjorde det."
+    },
+    "Where customers pay": {
+      "other": "Dit kunder betalar"
+    },
+    "Whether a car can be called ready without somebody checking the work. Choose a checklist, or decide that you do not use one.": {
+      "other": "Om en bil kan kallas klar utan att någon kontrollerar arbetet. Välj en checklista, eller bestäm att ni inte använder någon."
+    },
+    "Who owns the backups": {
+      "other": "Vem äger säkerhetskopiorna"
+    },
+    "Who to ring when it breaks": {
+      "other": "Vem man ringer när det går sönder"
+    },
+    "Who, and how to reach them": {
+      "other": "Vem, och hur man når dem"
+    },
+    "Working hours per person and the number of lifts let the planning view show what fits. Without them everything still works; the calendar just cannot warn about a clash.": {
+      "other": "Arbetstider per person och antalet lyftar låter planeringen visa vad som får plats. Utan dem fungerar allt; kalendern kan bara inte varna för en krock."
+    },
+    "Write down what you find": {
+      "other": "Skriv ner det du hittar"
+    },
+    "Your company details": {
+      "other": "Dina företagsuppgifter"
+    },
+    "Your customers, cars and stock": {
+      "other": "Dina kunder, bilar och lager"
+    },
+    "a checklist signs the work off": {
+      "other": "en checklista godkänner arbetet"
+    },
+    "a lookup service is set up": {
+      "other": "en uppslagningstjänst är inställd"
+    },
+    "a one-person workshop": {
+      "other": "en enmansverkstad"
+    },
+    "accounts of your own": {
+      "other": "egna konton"
+    },
+    "by hand": {
+      "other": "för hand"
+    },
+    "checklists": {
+      "other": "checklistor"
+    },
+    "city": {
+      "other": "ort"
+    },
+    "counter and parts desk": {
+      "other": "disk och reservdelsbord"
+    },
+    "decided": {
+      "other": "bestämt"
+    },
+    "email is set up": {
+      "other": "e-post är inställd"
+    },
+    "files imported": {
+      "other": "filer importerade"
+    },
+    "labour times": {
+      "other": "tider"
+    },
+    "language": {
+      "other": "språk"
+    },
+    "lifts": {
+      "other": "lyftar"
+    },
+    "no technician yet": {
+      "other": "ingen tekniker än"
+    },
+    "optional": {
+      "other": "frivilligt"
+    },
+    "payment details": {
+      "other": "betaluppgifter"
+    },
+    "people with working hours": {
+      "other": "personer med arbetstider"
+    },
+    "postal code": {
+      "other": "postnummer"
+    },
+    "price bands": {
+      "other": "prisband"
+    },
+    "technicians": {
+      "other": "tekniker"
+    },
+    "text message": {
+      "other": "sms"
+    },
+    "text messages are set up": {
+      "other": "sms är inställt"
+    },
+    "time zone": {
+      "other": "tidszon"
+    },
+    "to do": {
+      "other": "att göra"
+    },
+    "This invoice went out without:": {
+      "other": "Den här fakturan gick ut utan:"
+    },
+    "Put the details right under The workshop, then credit this invoice and make it again.": {
+      "other": "Rätta uppgifterna under Verkstaden, kreditera sedan den här fakturan och gör den igen."
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

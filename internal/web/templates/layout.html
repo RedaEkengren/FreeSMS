@@ -28,7 +28,8 @@
     <a href="/outsourced" class="nav">{{.T "At suppliers"}}</a>{{end}}
     {{if .Session.Scope.Role.RunsTheShop}}<a href="/shop" class="nav">{{.T "The workshop"}}</a>
     <a href="/staff" class="nav">{{.T "Staff"}}</a>
-    <a href="/import" class="nav">{{.T "Import"}}</a>{{end}}
+    <a href="/import" class="nav">{{.T "Import"}}</a>
+    <a href="/start" class="nav">{{.T "Getting started"}}</a>{{end}}
     {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/customers" class="nav">{{.T "Customers"}}</a>
     <a href="/enquiries" class="nav">{{.T "Enquiries"}}</a>
     <a href="/calendar" class="nav">{{.T "Bookings"}}</a>
@@ -42,6 +43,7 @@
     <a href="/time" class="nav">{{.T "My hours"}}</a>
     <a href="/rota" class="nav">{{.T "Rota"}}</a>
     {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/labour" class="nav">{{.T "Labour times"}}</a>{{end}}
+    <a href="/help" class="nav">{{.T "Help"}}</a>
     <a href="/search" class="nav">{{.T "Search"}}</a>
   </nav>
   <form class="m-0" method="post" action="/logout">

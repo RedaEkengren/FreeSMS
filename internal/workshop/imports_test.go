@@ -3,6 +3,7 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -411,5 +412,41 @@ func TestOnlyWhoRunsTheShopMayImportAndAForgottenPreviewIsWiped(t *testing.T) {
 	// And the file can be uploaded again.
 	if again, err := workshop.PreviewImport(ctx, pool, owner(), "customers", "a.csv", file); err != nil || again.Existing {
 		t.Errorf("uploading a discarded file again = %+v, %v", again, err)
+	}
+}
+
+// The files shipped to practise with and the templates the page offers are
+// themselves valid: a template that its own importer refuses is a bad template.
+func TestTheShippedExamplesAndTemplatesAreValidFiles(t *testing.T) {
+	for _, kind := range workshop.ImportKinds {
+		tpl, ok := workshop.ImportTemplate(kind)
+		if !ok {
+			t.Fatalf("no template for %s", kind)
+		}
+		p, err := workshop.ParseImport(kind, []byte(tpl))
+		if err != nil {
+			t.Fatalf("template %s: %v", kind, err)
+		}
+		for _, r := range p.Rows {
+			if len(r.Errors) != 0 {
+				t.Errorf("template %s row %d: %v", kind, r.No, r.Errors)
+			}
+		}
+		if len(p.Unknown) != 0 {
+			t.Errorf("template %s has columns it does not know: %v", kind, p.Unknown)
+		}
+		raw, err := os.ReadFile("../../examples/import/" + kind + ".csv")
+		if err != nil {
+			t.Fatalf("example %s: %v", kind, err)
+		}
+		ex, err := workshop.ParseImport(kind, raw)
+		if err != nil {
+			t.Fatalf("example %s: %v", kind, err)
+		}
+		for _, r := range ex.Rows {
+			if len(r.Errors) != 0 {
+				t.Errorf("example %s row %d: %v", kind, r.No, r.Errors)
+			}
+		}
 	}
 }

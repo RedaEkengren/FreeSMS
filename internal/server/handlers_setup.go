@@ -91,7 +91,9 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.setSessionCookie(w, token, session)
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	// To the list of what is left before the first customer, not to an empty
+	// board: the owner has just made a workshop and has not yet said what it is.
+	http.Redirect(w, r, "/start", http.StatusSeeOther)
 }
 
 // requireSetup sends everything to the setup page until there is a shop.

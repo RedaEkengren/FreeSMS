@@ -137,6 +137,7 @@ var swept = map[string]string{
 	"POST /jobs/{id}/outsourced":                     "sweep",
 	"GET /outsourced":                                "",
 	"GET /import":                                    "", "POST /import": "", "GET /import/template/{kind}": "",
+	"GET /start": "", "POST /start/step/{step}": "", "GET /start/invoice": "", "POST /start/test-message": "", "GET /help": "", "GET /help/{role}": "",
 	"GET /import/{id}": "sweep", "POST /import/{id}": "sweep",
 	"POST /invoices/{id}/followup":                "sweep",
 	"POST /invoices/{id}/reminder":                "sweep",

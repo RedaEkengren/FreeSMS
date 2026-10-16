@@ -273,6 +273,7 @@
     <button type="button" role="tab" data-tab="22">Bilen kommer tillbaka</button>
     <button type="button" role="tab" data-tab="23">Arbete hos leverantör</button>
     <button type="button" role="tab" data-tab="24">Börja från din fil</button>
+    <button type="button" role="tab" data-tab="25">Komma igång</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1491,6 +1492,42 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare med svenska filer: kunder, delar och ingående lager förhandsvisas och genomförs, en möjlig dubblett kräver ett svar och samma fil blir samma uppladdning &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/35-import.spec.ts">läs testet</a>. Namn och antal är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>Från första inloggningen till första kunden</h2>
+  <p class="lede">Ägaren som just skapat verkstaden får en lista, inte en tom tavla. Den läses ur verkstadens egna inställningar: adressen finns eller inte, tekniken finns eller inte. Det som inte går att läsa &ndash; att fakturan setts över, vem som äger säkerhetskopiorna, att &rdquo;ingen slutkontroll&rdquo; är ett val &ndash; sägs av en människa och sparas med vem och när. En enmansverkstad slipper personalfrågor, och en leverantör för sms eller registreringsuppslag är aldrig ett krav.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: listan visar att företagsuppgifterna saknas och varför. De fylls i, en exempelfaktura visas utan att något nummer används, och säkerhetskopior och support får ett namn. Sist står det att verkstaden är redo.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Ägare</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">Dina företagsuppgifter</div>
+              <div class="cl-qrow"><span>adress, företagsnummer</span><span class="rd-tag rd-risk">att göra</span></div>
+              <div class="cl-qrow"><span>Vem äger säkerhetskopiorna</span><span class="rd-tag rd-risk">att göra</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Titta på fakturan</div>
+              <div class="cl-qrow"><span>EXAMPLE-0 · Verkstadsgatan 1 · 556677-8899</span><span class="rd-tag warranty">Exempel</span></div>
+              <div class="cl-qrow"><span>Dina företagsuppgifter</span><span class="rd-tag pass">klar</span></div>
+            </div>            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">Vem äger säkerhetskopiorna</div>
+              <div class="cl-qrow"><span>Olle Ägare, 070-111 22 33</span><span class="rd-tag pass">klar</span></div>
+              <div class="cl-qrow an-fade an-off" data-t="20"><span>Redo för första kunden</span><span class="rd-tag pass">&#10003;</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">Listan säger vad som saknas och varför det spelar roll, med en länk till formuläret som rättar det. Inget hindrar arbete under tiden.</div>
+      <div class="an-cap" data-t="8,15.8">Fakturan visas som ett exempel, ritad från dina uppgifter. Inget fakturanummer tas och ingenting sparas.</div>
+      <div class="an-cap an-off" data-t="16,23.6">Säkerhetskopior och stöd får ett namn, inte en ruta att bocka. När allt som krävs är sagt står det att verkstaden är redo.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: ägaren fyller i uppgifterna genom formulären listan länkar till, tittar på en exempelfaktura och ser listan bli klar &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/36-getting-started.spec.ts">läs testet</a>. Namn och nummer är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

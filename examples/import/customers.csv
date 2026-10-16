@@ -1,0 +1,4 @@
+ref;type;name;contact;org_number;vat_number;phone;email;address;address2;postal_code;city
+K-1001;private;Anna Svensson;;;;070-123 45 67;anna@example.se;Storgatan 1;;411 38;Göteborg
+K-1002;company;Åkeri Nilsson AB;Per Nilsson;556677-8899;SE556677889901;031-12 34 56;info@akeri.example;Hamnvägen 4;;418 34;Göteborg
+K-1003;private;Björn Öhman;;;;073-555 01 23;bjorn@example.se;Kyrkogatan 12;Lgh 1102;414 63;Göteborg

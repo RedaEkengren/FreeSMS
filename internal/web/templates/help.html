@@ -1,0 +1,40 @@
+{{define "content"}}
+<h1>{{.T "Help"}}</h1>
+<p class="waiting">
+  <a href="/help/reception">{{.T "At the counter"}}</a> &middot;
+  <a href="/help/workshop">{{.T "In the workshop"}}</a>{{if .Session.Scope.Role.RunsTheShop}} &middot;
+  <a href="/help/owner">{{.T "For the owner"}}</a>{{end}}
+</p>
+
+{{if eq .HelpRole "reception"}}
+<h2>{{.T "At the counter"}}</h2>
+<ol class="lines">
+  <li><b>{{.T "Take a car in"}}</b><br>{{.T "Choose Take in a vehicle and type the registration. A car that is known brings its owner and history. Write down what the customer says is wrong."}}</li>
+  <li><b>{{.T "Say who is paying"}}</b><br>{{.T "On the job, choose Say who is paying. Find the customer, or add a new one. If it asks whether this is somebody you already have, believe it."}}</li>
+  <li><b>{{.T "Price the work and ask for a yes"}}</b><br>{{.T "Add the lines, then put the quote to the customer. A line added after their yes needs a new yes."}}</li>
+  <li><b>{{.T "Tell the customer the car is ready"}}</b><br>{{.T "When the technician says it is ready, it waits under For me until the customer has been told. Send the message or ring, and write down that you did."}}</li>
+  <li><b>{{.T "Invoice and record the payment"}}</b><br>{{.T "Open the job and choose Invoice it. When the money arrives, record the payment. FreeSMS does not move money."}}</li>
+  <li><b>{{.T "Close the day"}}</b><br>{{.T "Open The day, compare the figures with the bank, and say why if they differ."}}</li>
+</ol>
+{{else if eq .HelpRole "workshop"}}
+<h2>{{.T "In the workshop"}}</h2>
+<ol class="lines">
+  <li><b>{{.T "Find your jobs"}}</b><br>{{.T "For me shows what is waiting for you. A car put on you, a part that has come and a customer who said yes all show up there."}}</li>
+  <li><b>{{.T "Start and stop the clock"}}</b><br>{{.T "Start work on a job. Starting on another car stops the first one."}}</li>
+  <li><b>{{.T "Tick off the work"}}</b><br>{{.T "The work list shows each step. Mark a step done when it is, or blocked, and say what it is waiting for."}}</li>
+  <li><b>{{.T "Ask for a part"}}</b><br>{{.T "Use Parts on the job. The parts desk sees it, and you are told when it has come."}}</li>
+  <li><b>{{.T "Write down what you find"}}</b><br>{{.T "Report a finding with a photo. The counter prices it and asks the customer; you never see their details."}}</li>
+  <li><b>{{.T "Say it is ready"}}</b><br>{{.T "Press It is ready when the work and the final check are done."}}</li>
+</ol>
+{{else}}
+<h2>{{.T "For the owner"}}</h2>
+<ol class="lines">
+  <li><b>{{.T "Set up the workshop"}}</b><br>{{.T "Follow the list under Getting started. It says what is missing and where to put it right."}} <a href="/start">{{.T "Open Getting started"}}</a></li>
+  <li><b>{{.T "Add the people"}}</b><br>{{.T "Under Staff, add each person with the role that matches what they do. A technician never sees a customer's details."}}</li>
+  <li><b>{{.T "Bring what you have"}}</b><br>{{.T "Under Import, upload customers, cars, parts and opening stock from your old system, or choose to start clean."}}</li>
+  <li><b>{{.T "Look at your numbers"}}</b><br>{{.T "Figures shows what was sold and what is owed. The day shows what was paid in and out."}}</li>
+  <li><b>{{.T "Hand over to the accountant"}}</b><br>{{.T "Under Accounting, export a period. Have your accountant read a real file before you rely on it."}}</li>
+  <li><b>{{.T "Back up, and know how to get it back"}}</b><br>{{.T "Somebody owns the backups and has tried restoring one. The steps are in DEPLOY.md. Write the name and number of whoever you ring when it breaks under Getting started."}}</li>
+</ol>
+{{end}}
+{{end}}

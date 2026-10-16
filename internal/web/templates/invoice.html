@@ -1,5 +1,8 @@
 {{define "content"}}
 {{with .Document}}
+{{with .SellerGaps}}
+<p class="waiting no-print"><span class="tag late">{{$.T "Missing"}}</span> {{$.T "This invoice went out without:"}} {{range $i, $g := .}}{{if $i}}, {{end}}{{$.T $g}}{{end}}. {{$.T "Put the details right under The workshop, then credit this invoice and make it again."}} <a href="/shop">{{$.T "The workshop"}}</a></p>
+{{end}}
 {{template "documentbody" $}}
 
 {{/* What is owed: the invoice, its credit notes and what has been paid.

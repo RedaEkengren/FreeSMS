@@ -1,0 +1,4 @@
+registration;vin;make;model;year;engine;owner_ref;odometer_km;odometer_date
+ABC 123;;Volvo;V70;2012;D5;K-1001;184500;2026-01-15
+DEF456;YV1BW59P0B1234567;Volvo;XC60;2015;;K-1002;;
+GHI 789;;Saab;9-3;2005;1.8t;K-1003;231000;2025-11-02

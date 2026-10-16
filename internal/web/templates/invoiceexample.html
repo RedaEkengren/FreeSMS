@@ -1,0 +1,14 @@
+{{define "content"}}
+<p class="waiting"><a href="/start#invoice">{{.T "Back to getting started"}}</a></p>
+<p class="waiting"><span class="tag warranty">{{.T "Example"}}</span> {{.T "This is what an invoice from your workshop looks like, with an example customer and example lines. No invoice has been made and no number has been used."}}</p>
+{{if .Lacks}}
+<p class="waiting"><span class="tag late">{{.T "Missing"}}</span> {{.T "An invoice made now would lack:"}} {{range $i, $l := .Lacks}}{{if $i}}, {{end}}{{$.T $l}}{{end}}. <a href="/shop">{{.T "Put it right"}}</a></p>
+{{else}}
+<p class="waiting"><span class="tag pass">{{.T "Complete"}}</span> {{.T "Everything an invoice needs from you is there."}}</p>
+{{end}}
+{{template "documentbody" .}}
+<form method="post" action="/start/step/invoice">
+  <input type="hidden" name="state" value="done">
+  <button type="submit" class="secondary">{{.T "The invoice looks right"}}</button>
+</form>
+{{end}}
