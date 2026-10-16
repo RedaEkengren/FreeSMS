@@ -1,0 +1,75 @@
+{{define "content"}}
+{{with .Document}}
+<div class="row"><h1>{{$.T "Credit part of %s" .Reference}}</h1></div>
+<p class="waiting">{{$.T "Billed to %s." .CustomerName}} <a href="/invoices/{{.ID}}">{{$.T "Back to the invoice"}}</a></p>
+{{end}}
+{{if .Error}}<p class="error">{{.T .Error}}</p>{{end}}
+
+{{if .CreditPreview}}
+{{with .CreditPreview}}
+<h2>{{$.T "Check the credit"}}</h2>
+<table class="lines-table">
+  <thead><tr><th>{{$.T "What"}}</th><th class="num">{{$.T "Quantity"}}</th><th class="num">{{$.T "Amount"}}</th></tr></thead>
+  <tbody>
+  {{range .Lines}}<tr><td>{{.Description}}</td><td class="num" data-label="{{$.T "Quantity"}}">{{$.Num .Quantity}}</td><td class="num" data-label="{{$.T "Amount"}}">{{$.Money .NetMinor}}</td></tr>{{end}}
+  </tbody>
+</table>
+<dl>
+  {{range .Bands}}<dt>{{$.T "VAT"}} {{divide .RateBasisPoints 100}}%</dt><dd>{{$.Money .VATMinor}}</dd>{{end}}
+  <dt class="grand">{{$.T "Credited, with VAT"}}</dt><dd class="grand">{{$.Money .GrossMinor}}</dd>
+  <dt>{{$.T "Could be credited before"}}</dt><dd>{{$.Money .LeftBefore}}</dd>
+  <dt>{{$.T "Could be credited after"}}</dt><dd>{{$.Money .LeftAfter}}{{if .Everything}} <span class="tag">{{$.T "nothing left"}}</span>{{end}}</dd>
+  <dt>{{$.T "Owed by the customer now"}}</dt><dd>{{$.Money .OwedBefore}}</dd>
+  <dt class="grand">{{if lt .OwedAfter 0}}{{$.T "Owed back to the customer after"}}{{else}}{{$.T "Owed by the customer after"}}{{end}}</dt><dd class="grand">{{$.Money .OwedAfter}}</dd>
+</dl>
+<p class="waiting">{{$.T "A credit is money. It does not put a part back on the shelf; if one comes back, that is recorded on its own."}}</p>
+{{end}}
+<form method="post" action="/invoices/{{.Document.ID}}/credit">
+  <input type="hidden" name="confirm" value="1">
+  <input type="hidden" name="key" value="{{.CreditKey}}">
+  <input type="hidden" name="reason" value="{{.CreditForm.Get "reason"}}">
+  {{if .CreditForm.Get "everything"}}<input type="hidden" name="everything" value="1">{{end}}
+  {{range .Eligible}}{{$q := index $.CreditForm (printf "qty_%d" .Position)}}{{if $q}}<input type="hidden" name="qty_{{.Position}}" value="{{index $q 0}}">{{end}}{{end}}
+  <input type="hidden" name="adj_desc_1" value="{{.CreditForm.Get "adj_desc_1"}}">
+  <input type="hidden" name="adj_net_1" value="{{.CreditForm.Get "adj_net_1"}}">
+  <input type="hidden" name="adj_vat_1" value="{{.CreditForm.Get "adj_vat_1"}}">
+  <input type="hidden" name="adj_desc_2" value="{{.CreditForm.Get "adj_desc_2"}}">
+  <input type="hidden" name="adj_net_2" value="{{.CreditForm.Get "adj_net_2"}}">
+  <input type="hidden" name="adj_vat_2" value="{{.CreditForm.Get "adj_vat_2"}}">
+  <button type="submit">{{.T "Issue the credit note"}}</button>
+</form>
+<p class="waiting"><a href="/invoices/{{.Document.ID}}/credit">{{.T "Start again"}}</a></p>
+{{else}}
+<h2>{{.T "What to take back"}}</h2>
+<form method="post" action="/invoices/{{.Document.ID}}/credit">
+  <input type="hidden" name="key" value="{{.CreditKey}}">
+  <table class="lines-table">
+    <thead><tr><th>{{.T "What"}}</th><th class="num">{{.T "Billed"}}</th><th class="num">{{.T "Left to credit"}}</th><th class="num">{{.T "Take back"}}</th></tr></thead>
+    <tbody>
+    {{range .Eligible}}
+      <tr><td>{{.Description}}</td><td class="num" data-label="{{$.T "Billed"}}">{{$.Num .Ordered}}</td><td class="num" data-label="{{$.T "Left to credit"}}">{{$.Num .Remaining}}</td>
+        <td class="num" data-label="{{$.T "Take back"}}">{{if gt .RemainingMilli 0}}<input name="qty_{{.Position}}" inputmode="decimal" aria-label="{{.Description}}">{{else}}&ndash;{{end}}</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  <label class="tick"><input type="checkbox" name="everything" value="1"> <span>{{.T "Everything that is left"}}</span></label>
+
+  <h3>{{.T "A sum that belongs to no line"}}</h3>
+  <p class="waiting">{{.T "Goodwill, a discount agreed afterwards. Excluding VAT."}}</p>
+  <div class="pair">
+    <label><span>{{.T "What for"}}</span><input name="adj_desc_1" maxlength="200"></label>
+    <label><span>{{.T "Amount"}}</span><input name="adj_net_1" inputmode="decimal"></label>
+  </div>
+  <label><span>{{.T "VAT rate, per cent"}}</span><input name="adj_vat_1" inputmode="decimal" value="25"></label>
+  <div class="pair">
+    <label><span>{{.T "What for"}}</span><input name="adj_desc_2" maxlength="200"></label>
+    <label><span>{{.T "Amount"}}</span><input name="adj_net_2" inputmode="decimal"></label>
+  </div>
+  <label><span>{{.T "VAT rate, per cent"}}</span><input name="adj_vat_2" inputmode="decimal" value="25"></label>
+
+  <label><span>{{.T "Why"}}</span><input name="reason" required maxlength="300"></label>
+  <button type="submit">{{.T "See what it comes to"}}</button>
+</form>
+<p class="waiting"><a href="/invoices/{{.Document.ID}}/rebill">{{.T "The wrong person was billed: credit it and bill the right one"}}</a></p>
+{{end}}
+{{end}}

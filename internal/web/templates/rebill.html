@@ -1,0 +1,23 @@
+{{define "content"}}
+{{with .Document}}
+<h1>{{$.T "The wrong person was billed"}}</h1>
+<p class="waiting">{{$.T "Invoice %s went to %s." .Reference .CustomerName}} <a href="/invoices/{{.ID}}">{{$.T "Back to the invoice"}}</a></p>
+{{end}}
+<p class="waiting">{{.T "The invoice is credited in full first. Then the same lines are billed to the right customer on a new order that says it corrects this one. Nothing leaves the shelf again and no work is counted twice."}}</p>
+
+<form method="get" action="/invoices/{{.Document.ID}}/rebill">
+  <label><span>{{.T "Find the right customer"}}</span><input name="q" value="{{.CustomerQuery}}" autocomplete="off" autofocus></label>
+  <button type="submit" class="secondary">{{.T "Look"}}</button>
+</form>
+{{if .CustomerQuery}}{{if not .Customers}}<p class="empty">{{.T "Nobody matched."}}</p>{{end}}{{end}}
+{{range .Customers}}
+<form class="card" method="post" action="/invoices/{{$.Document.ID}}/rebill">
+  <input type="hidden" name="customer_id" value="{{.ID}}">
+  <input type="hidden" name="key" value="{{$.CreditKey}}">
+  <div class="row"><span>{{.Name}}</span><span class="waiting">{{if .OrgNumber}}{{.OrgNumber}}{{end}}</span></div>
+  <label><span>{{$.T "Why"}}</span><input name="reason" required maxlength="300"></label>
+  <button type="submit">{{$.T "Bill them instead"}}</button>
+</form>
+{{end}}
+<p class="waiting"><a href="/invoices/{{.Document.ID}}/credit">{{.T "Credit the invoice first"}}</a></p>
+{{end}}

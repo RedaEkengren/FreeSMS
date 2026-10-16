@@ -202,141 +202,14 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 	return inv, nil
 }
 
-// CreditNote reverses an invoice exactly.
-//
-// Each line is negated rather than the totals recomputed from a negative
-// quantity, so the rounding that was applied to the original is reversed
-// rather than recalculated. Recalculating can round the other way and leave an
-// öre behind, which is precisely the kind of residue nobody can account for a
-// year later.
+// CreditNote credits what is left of an invoice: all of it, if nothing has been
+// credited, and the remainder if something has. A correction of one line or one
+// quantity is IssueCredit.
 func CreditNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoiceID string) (Invoice, error) {
 	if !scope.Role.SeesCustomerPersonalData() {
 		return Invoice{}, access.ErrForbidden
 	}
-
-	var note Invoice
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		// Lock the invoice being credited before asking whether it has been
-		// credited already. The index refuses a second note either way; this
-		// turns a constraint violation into a wait and then a clean refusal.
-		var locked string
-		switch err := tx.QueryRow(ctx,
-			`SELECT id FROM invoices WHERE id = $1 FOR UPDATE`, invoiceID).Scan(&locked); {
-		case errors.Is(err, pgx.ErrNoRows):
-			return ErrNotFound
-		case err != nil:
-			return fmt.Errorf("lock the invoice: %w", err)
-		}
-
-		var original Invoice
-		var address, orgNumber, vatNumber *string
-		const read = `
-			SELECT id, series, number, work_order_id, customer_name,
-			       customer_address, customer_org_number, customer_vat_number,
-			       net_minor, vat_minor, gross_minor
-			FROM invoices WHERE id = $1`
-		err := tx.QueryRow(ctx, read, invoiceID).Scan(
-			&original.ID, &original.Series, &original.Number, &original.WorkOrderID,
-			&original.CustomerName, &address, &orgNumber, &vatNumber,
-			&original.NetMinor, &original.VATMinor, &original.GrossMinor)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNotFound
-		}
-		if err != nil {
-			return fmt.Errorf("read invoice: %w", err)
-		}
-
-		var credited bool
-		if err := tx.QueryRow(ctx,
-			`SELECT exists(SELECT 1 FROM invoices WHERE credit_of_id = $1)`, invoiceID).Scan(&credited); err != nil {
-			return fmt.Errorf("check for an existing credit note: %w", err)
-		}
-		if credited {
-			return ErrAlreadyCredited
-		}
-
-		rows, err := tx.Query(ctx, `
-			SELECT position, kind, description, (quantity * 1000)::bigint,
-			       unit_price_minor, vat_rate_bp, net_minor, vat_minor
-			FROM invoice_lines WHERE invoice_id = $1 ORDER BY position`, invoiceID)
-		if err != nil {
-			return fmt.Errorf("read invoice lines: %w", err)
-		}
-		var lines []invoiceLine
-		for rows.Next() {
-			var l invoiceLine
-			if err := rows.Scan(&l.Position, &l.Kind, &l.Description, &l.QuantityMilli,
-				&l.UnitPriceMinor, &l.VATRateBasis, &l.NetMinor, &l.VATMinor); err != nil {
-				rows.Close()
-				return fmt.Errorf("scan invoice line: %w", err)
-			}
-			// Negate what was stored. Not recomputed.
-			l.QuantityMilli = -l.QuantityMilli
-			l.NetMinor = -l.NetMinor
-			l.VATMinor = -l.VATMinor
-			lines = append(lines, l)
-		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return err
-		}
-
-		number, err := nextNumber(ctx, tx, scope.ShopID, original.Series)
-		if err != nil {
-			return err
-		}
-
-		// The seller as it is at the moment the note is issued, which can
-		// differ from the invoice being credited. That is correct: the note is
-		// its own document, issued today by whoever the shop is today.
-		sold, err := readSeller(ctx, tx, scope.ShopID)
-		if err != nil {
-			return err
-		}
-
-		const insert = `
-			INSERT INTO invoices
-			  (shop_id, series, number, work_order_id, credit_of_id, issued_by,
-			   customer_name, customer_address, customer_org_number, customer_vat_number,
-			   seller_name, seller_address, seller_org_number, seller_vat_number,
-			   seller_phone, seller_email, seller_payment_reference,
-			   seller_payment_terms_days, seller_f_tax,
-			   net_minor, vat_minor, gross_minor)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
-			RETURNING id, issued_at`
-		if err := tx.QueryRow(ctx, insert,
-			scope.ShopID, original.Series, number, original.WorkOrderID, original.ID, scope.UserID,
-			original.CustomerName, address, orgNumber, vatNumber,
-			sold.Name, sold.Address, sold.OrgNumber, sold.VATNumber,
-			sold.Phone, sold.Email, sold.PaymentReference,
-			sold.PaymentTermsDays, sold.FTax,
-			-original.NetMinor, -original.VATMinor, -original.GrossMinor,
-		).Scan(&note.ID, &note.IssuedAt); err != nil {
-			if dup := alreadyThere(err, ErrAlreadyCredited); errors.Is(dup, ErrAlreadyCredited) {
-				return dup
-			}
-			return fmt.Errorf("write credit note: %w", err)
-		}
-
-		for i := range lines {
-			lines[i].Position = i + 1
-		}
-		if err := writeInvoiceLines(ctx, tx, scope.ShopID, note.ID, lines); err != nil {
-			return err
-		}
-
-		note.Series, note.Number = original.Series, number
-		note.WorkOrderID = original.WorkOrderID
-		note.CreditOfID = &original.ID
-		note.CustomerName = original.CustomerName
-		note.NetMinor, note.VATMinor, note.GrossMinor =
-			-original.NetMinor, -original.VATMinor, -original.GrossMinor
-		return nil
-	})
-	if err != nil {
-		return Invoice{}, err
-	}
-	return note, nil
+	return IssueCredit(ctx, pool, scope, invoiceID, CreditRequest{Reason: "Credit note"})
 }
 
 // InvoicesFor returns every document issued against a work order, oldest
@@ -467,6 +340,8 @@ type invoiceLine struct {
 	VATRateBasis   int
 	NetMinor       int64
 	VATMinor       int64
+	// The line of the original invoice this one takes back, if it is a credit.
+	CreditsLineID string
 }
 
 func chargeableLines(ctx context.Context, tx pgx.Tx, workOrderID string) ([]invoiceLine, error) {
@@ -520,11 +395,11 @@ func writeInvoiceLines(ctx context.Context, tx pgx.Tx, shopID, invoiceID string,
 	const insert = `
 		INSERT INTO invoice_lines
 		  (shop_id, invoice_id, position, kind, description, quantity,
-		   unit_price_minor, vat_rate_bp, net_minor, vat_minor)
-		VALUES ($1,$2,$3,$4,$5,($6::bigint)::numeric / 1000,$7,$8,$9,$10)`
+		   unit_price_minor, vat_rate_bp, net_minor, vat_minor, credits_line_id)
+		VALUES ($1,$2,$3,$4,$5,($6::bigint)::numeric / 1000,$7,$8,$9,$10,nullif($11, '')::uuid)`
 	for _, l := range lines {
 		if _, err := tx.Exec(ctx, insert, shopID, invoiceID, l.Position, l.Kind, l.Description,
-			l.QuantityMilli, l.UnitPriceMinor, l.VATRateBasis, l.NetMinor, l.VATMinor); err != nil {
+			l.QuantityMilli, l.UnitPriceMinor, l.VATRateBasis, l.NetMinor, l.VATMinor, l.CreditsLineID); err != nil {
 			return fmt.Errorf("write invoice line %d: %w", l.Position, err)
 		}
 	}

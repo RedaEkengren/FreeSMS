@@ -55,6 +55,29 @@
 </section>
 {{end}}
 
+{{if and (not $.Document.IsCreditNote) (not $.Document.CreditOf)}}
+<section class="no-print mt-l">
+<h2>{{$.T "Correct it"}}</h2>
+<p class="waiting">{{$.T "An issued invoice is not changed. A correction is another document."}}</p>
+<a class="button secondary" href="/invoices/{{$.Document.ID}}/credit">{{$.T "Credit part of it"}}</a>
+<a class="button secondary" href="/invoices/{{$.Document.ID}}/rebill">{{$.T "The wrong person was billed"}}</a>
+</section>
+{{end}}
+{{if $.Corrections}}
+<section class="no-print mt-l">
+<h2>{{$.T "What has been done to correct it"}}</h2>
+<ul class="lines">
+  {{range $.Corrections}}
+  <li><div class="row">
+    <a href="/invoices/{{.InvoiceID}}">{{if eq .Kind "credit"}}{{$.T "Credit note %s" .Reference}}{{else if eq .Kind "rebill"}}{{$.T "Replaced by %s" .Reference}}{{else if eq .Kind "replaces"}}{{$.T "Replaces %s" .Reference}}{{else}}{{$.T "Credits %s" .Reference}}{{end}}</a>
+    <span class="waiting">{{$.Date ($.Local .At) "2 Jan 2006 15:04"}} &middot; {{.By}}</span>
+  </div>
+  <div class="waiting">{{.Reason}}</div></li>
+  {{end}}
+</ul>
+</section>
+{{end}}
+
 {{/* Getting it to the customer, and knowing whether it got there. */}}
 <section class="no-print mt-l">
 <h2>{{$.T "Delivery"}}</h2>

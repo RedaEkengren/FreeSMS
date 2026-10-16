@@ -122,3 +122,74 @@ func TestAnInvoiceReachesTheCustomerOnALinkThatOpensOnlyThatDocument(t *testing.
 		t.Error("the handover is not on the invoice")
 	}
 }
+
+// Crediting part of an invoice through the pages: the form, the preview that
+// writes nothing, the credit that follows, and a retry that is the same credit.
+func TestCreditingPartOfAnInvoiceThroughThePages(t *testing.T) {
+	ts, pool := testServer(t)
+	ctx := context.Background()
+	var invoice string
+	if err := database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx, `
+			INSERT INTO invoices (shop_id, series, number, work_order_id, customer_name, net_minor, vat_minor, gross_minor, seller_name)
+			VALUES ($1, 'A', 88, $2, 'Test Kund', 200000, 50000, 250000, 'Shop A') RETURNING id::text`, shopA, jobA).Scan(&invoice); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `
+			INSERT INTO invoice_lines (shop_id, invoice_id, position, kind, description, quantity, unit_price_minor, vat_rate_bp, net_minor, vat_minor)
+			VALUES ($1, $2, 1, 'labour', 'Brakes', 2, 80000, 2500, 160000, 40000),
+			       ($1, $2, 2, 'labour', 'Test drive', 1, 40000, 2500, 40000, 10000)`, shopA, invoice)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	desk, tech := signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	base := ts.URL + "/invoices/" + invoice
+
+	if status, _ := page(t, tech, base+"/credit"); status != http.StatusForbidden {
+		t.Errorf("a technician opened the credit form: %d", status)
+	}
+	status, form := page(t, desk, base+"/credit")
+	key := regexp.MustCompile(`name="key" value="([0-9a-f]+)"`).FindStringSubmatch(form)
+	if status != http.StatusOK || key == nil || !strings.Contains(form, "qty_1") || !strings.Contains(form, "qty_2") {
+		t.Fatalf("the credit form answered %d: %s", status, form)
+	}
+	post := url.Values{"key": {key[1]}, "qty_1": {"1"}, "reason": {"Only one fitted"}}
+	if status, _ := postBody(t, desk, base+"/credit", url.Values{"key": {key[1]}, "reason": {"nothing picked"}}); status != http.StatusBadRequest {
+		t.Errorf("a credit that names nothing answered %d, want 400", status)
+	}
+	status, preview := postBody(t, desk, base+"/credit", post)
+	if status != http.StatusOK || !strings.Contains(preview, "Check the credit") || !strings.Contains(preview, "Issue the credit note") {
+		t.Fatalf("the preview answered %d: %s", status, preview)
+	}
+	if n := func() int {
+		var n int
+		pool.QueryRow(ctx, `SELECT count(*) FROM invoices WHERE credit_of_id = $1`, invoice).Scan(&n)
+		return n
+	}(); n != 0 {
+		t.Fatalf("a preview wrote %d credit notes", n)
+	}
+	post.Set("confirm", "1")
+	if status := postStatus(t, desk, base+"/credit", post); status != http.StatusSeeOther {
+		t.Fatalf("issuing answered %d", status)
+	}
+	if status := postStatus(t, desk, base+"/credit", post); status != http.StatusSeeOther {
+		t.Fatalf("the same form again answered %d", status)
+	}
+	var n int
+	pool.QueryRow(ctx, `SELECT count(*) FROM invoices WHERE credit_of_id = $1`, invoice).Scan(&n)
+	if n != 1 {
+		t.Errorf("%d credit notes after sending the form twice, want 1", n)
+	}
+	// More than is left is told why.
+	again := url.Values{"qty_1": {"5"}, "reason": {"x"}}
+	if status, body := postBody(t, desk, base+"/credit", again); status != http.StatusBadRequest || !strings.Contains(body, "is left to credit") {
+		t.Errorf("crediting too much answered %d", status)
+	}
+	if _, body := page(t, desk, base); !strings.Contains(body, "Only one fitted") || !strings.Contains(body, "Credit note A-") {
+		t.Errorf("the correction is not on the invoice")
+	}
+	if status, _ := page(t, desk, base+"/rebill?q=Greta"); status != http.StatusOK {
+		t.Errorf("the rebill form answered %d", status)
+	}
+}

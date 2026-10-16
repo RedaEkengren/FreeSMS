@@ -2925,6 +2925,111 @@
       "one": "öppnad %d gång",
       "other": "öppnad %d gånger"
     },
+    "A credit is money. It does not put a part back on the shelf; if one comes back, that is recorded on its own.": {
+      "other": "En kredit är pengar. Den lägger inte tillbaka en del på hyllan; kommer en tillbaka registreras det för sig."
+    },
+    "A sum that belongs to no line": {
+      "other": "En summa som inte hör till någon rad"
+    },
+    "An issued invoice is not changed. A correction is another document.": {
+      "other": "En utfärdad faktura ändras inte. En rättelse är ett annat dokument."
+    },
+    "Back to the invoice": {
+      "other": "Tillbaka till fakturan"
+    },
+    "Bill them instead": {
+      "other": "Fakturera dem i stället"
+    },
+    "Billed": {
+      "other": "Fakturerat"
+    },
+    "Check the credit": {
+      "other": "Kontrollera krediten"
+    },
+    "Could be credited after": {
+      "other": "Kan krediteras efteråt"
+    },
+    "Could be credited before": {
+      "other": "Kunde krediteras förut"
+    },
+    "Credit note %s": {
+      "other": "Kreditfaktura %s"
+    },
+    "Credit part of %s": {
+      "other": "Kreditera en del av %s"
+    },
+    "Credit part of it": {
+      "other": "Kreditera en del av den"
+    },
+    "Credit the invoice first": {
+      "other": "Kreditera fakturan först"
+    },
+    "Credited, with VAT": {
+      "other": "Krediterat, med moms"
+    },
+    "Everything that is left": {
+      "other": "Allt som är kvar"
+    },
+    "Find the right customer": {
+      "other": "Hitta rätt kund"
+    },
+    "Goodwill, a discount agreed afterwards. Excluding VAT.": {
+      "other": "Kulans, en rabatt som kommit överens om efteråt. Exklusive moms."
+    },
+    "Invoice %s went to %s.": {
+      "other": "Faktura %s gick till %s."
+    },
+    "Issue the credit note": {
+      "other": "Utfärda kreditfakturan"
+    },
+    "Left to credit": {
+      "other": "Kvar att kreditera"
+    },
+    "Owed back to the customer after": {
+      "other": "Skyldigt tillbaka till kunden efteråt"
+    },
+    "Owed by the customer after": {
+      "other": "Kunden är skyldig efteråt"
+    },
+    "Owed by the customer now": {
+      "other": "Kunden är skyldig nu"
+    },
+    "Replaced by %s": {
+      "other": "Ersatt av %s"
+    },
+    "Replaces %s": {
+      "other": "Ersätter %s"
+    },
+    "Start again": {
+      "other": "Börja om"
+    },
+    "Take back": {
+      "other": "Ta tillbaka"
+    },
+    "The invoice is credited in full first. Then the same lines are billed to the right customer on a new order that says it corrects this one. Nothing leaves the shelf again and no work is counted twice.": {
+      "other": "Fakturan krediteras först helt. Sedan faktureras samma rader till rätt kund på en ny order som säger att den rättar den här. Inget lämnar hyllan igen och inget arbete räknas två gånger."
+    },
+    "The wrong person was billed": {
+      "other": "Fel person fakturerades"
+    },
+    "The wrong person was billed: credit it and bill the right one": {
+      "other": "Fel person fakturerades: kreditera den och fakturera rätt"
+    },
+    "VAT rate, per cent": {
+      "other": "Momssats, procent"
+    },
+    "What for": {
+      "other": "Vad för"
+    },
+    "What has been done to correct it": {
+      "other": "Vad som gjorts för att rätta den"
+    },
+    "What to take back": {
+      "other": "Vad som ska tas tillbaka"
+    },
+    "nothing left": {
+      "other": "inget kvar"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

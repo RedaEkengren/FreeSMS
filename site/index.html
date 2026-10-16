@@ -266,6 +266,7 @@
     <button type="button" role="tab" data-tab="15">Leveranser</button>
     <button type="button" role="tab" data-tab="16">Överlämning till kund</button>
     <button type="button" role="tab" data-tab="17">Fakturan hem</button>
+    <button type="button" role="tab" data-tab="18">Rätta en faktura</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1230,6 +1231,43 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare mot en riktig e-postserver: fakturan skickas, kunden öppnar länken, disken ser att den öppnats, skickar igen och den första länken slutar fungera &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/28-invoice-delivery.spec.ts">läs testet</a>. Namn och adresser är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>När fakturan är fel</h2>
+  <p class="lede">En utfärdad faktura ändras inte. En del som debiterats fel krediteras för sig, efter att disken sett vad det blir och vad som är kvar att kreditera, och det går aldrig att kreditera mer än som fakturerats. Var det fel person fakturerades krediteras hela och rätt kund faktureras på en rättelseorder. Varje steg säger varför och vem, och inget lägger tillbaka en del på hyllan av sig själv.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: disken kreditterar en av två bromsskivor och ser först vad krediten blir och vad som är kvar. Resten krediteras senare. Sedan faktureras rätt kund på en rättelseorder som pekar tillbaka på den första fakturan.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">Vad som ska tas tillbaka</div>
+              <div class="cl-qrow"><span>Byte av bromsskivor</span><span>Kvar att kreditera: 2 &rarr; <span data-type="2,1">1</span></span></div>
+              <div class="cl-qrow"><span>Varför</span><span>Bara en skiva byttes</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Kontrollera krediten</div>
+              <div class="cl-qrow"><span>Kunde krediteras förut</span><span>2 500,00 kr</span></div>
+              <div class="cl-qrow"><span>Kan krediteras efteråt</span><span>1 500,00 kr</span></div>
+              <span class="an-btn mo-btn an-fade" data-t="12.4">Utfärda kreditfakturan</span>
+            </div>            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">Vad som gjorts för att rätta den</div>
+              <div class="cl-qrow"><span>Kreditfaktura A-12</span><span class="rd-tag">Bara en skiva byttes</span></div>
+              <div class="cl-qrow"><span>Ersatt av A-14</span><span class="rd-tag rd-risk">Fel mottagare</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">Bara en av två skivor byttes. Disken tar tillbaka en, med ett skäl.</div>
+      <div class="an-cap" data-t="8,15.8">Först syns vad krediten blir och vad som kan krediteras efteråt. Inget är skrivet förrän disken bekräftar.</div>
+      <div class="an-cap an-off" data-t="16,23.6">Var det fel person som fakturerades krediteras resten, och rätt kund faktureras på en rättelseorder. Den gamla fakturan står kvar som den var, med länkar åt båda hållen.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog och beloppen ur dess pengakod när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: en del krediteras efter en förhandsvisning, för mycket nekas, resten krediteras och rätt kund faktureras &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/29-credit.spec.ts">läs testet</a>. Namn och belopp är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

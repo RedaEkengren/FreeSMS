@@ -266,6 +266,7 @@
     <button type="button" role="tab" data-tab="15">Deliveries</button>
     <button type="button" role="tab" data-tab="16">Collection</button>
     <button type="button" role="tab" data-tab="17">The invoice, delivered</button>
+    <button type="button" role="tab" data-tab="18">Correcting an invoice</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1230,6 +1231,43 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser, against a real mail server: the invoice is sent, the customer opens the link, the counter sees it was opened, sends again, and the first link stops working &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/28-invoice-delivery.spec.ts">read the test</a>. Names and addresses are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>When the invoice is wrong</h2>
+  <p class="lede">An issued invoice is not changed. A part billed wrongly is credited on its own, after the counter has seen what that comes to and what is left to credit, and more than was billed can never be credited. If the wrong person was billed, all of it is credited and the right customer is billed on a correction order. Every step says why and by whom, and nothing puts a part back on the shelf by itself.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: the counter credits one of two brake discs and first sees what the credit comes to and what is left. The rest is credited later. Then the right customer is billed on a correction order that points back at the first invoice.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">What to take back</div>
+              <div class="cl-qrow"><span>Replace brake discs</span><span>Left to credit: 2 &rarr; <span data-type="2,1">1</span></span></div>
+              <div class="cl-qrow"><span>Why</span><span>Only one was fitted</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Check the credit</div>
+              <div class="cl-qrow"><span>Could be credited before</span><span>SEK 2,500.00</span></div>
+              <div class="cl-qrow"><span>Could be credited after</span><span>SEK 1,500.00</span></div>
+              <span class="an-btn mo-btn an-fade" data-t="12.4">Issue the credit note</span>
+            </div>            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">What has been done to correct it</div>
+              <div class="cl-qrow"><span>Credit note A-12</span><span class="rd-tag">Only one was fitted</span></div>
+              <div class="cl-qrow"><span>Replaced by A-14</span><span class="rd-tag rd-risk">Wrong recipient</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">Only one of the two discs was fitted. The counter takes one back, with a reason.</div>
+      <div class="an-cap" data-t="8,15.8">First it shows what the credit comes to and what can still be credited. Nothing is written until the counter confirms.</div>
+      <div class="an-cap an-off" data-t="16,23.6">If the wrong person was billed the rest is credited and the right customer is billed on a correction order. The old invoice stays as it was, with links both ways.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue and the amounts from its money code when the page is generated. The flow is run against the real product in a browser: a part is credited after a preview, too much is refused, the rest is credited and the right customer is billed &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/29-credit.spec.ts">read the test</a>. Names and amounts are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>
