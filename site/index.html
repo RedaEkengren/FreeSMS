@@ -267,6 +267,7 @@
     <button type="button" role="tab" data-tab="16">Överlämning till kund</button>
     <button type="button" role="tab" data-tab="17">Fakturan hem</button>
     <button type="button" role="tab" data-tab="18">Rätta en faktura</button>
+    <button type="button" role="tab" data-tab="19">Obetalt</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1268,6 +1269,43 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog och beloppen ur dess pengakod när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: en del krediteras efter en förhandsvisning, för mycket nekas, resten krediteras och rätt kund faktureras &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/29-credit.spec.ts">läs testet</a>. Namn och belopp är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>När fakturan inte betalas</h2>
+  <p class="lede">Obetalda fakturor listas inte bara, de följs upp: någon har dem, ett samtal och ett löfte skrivs ner, och en tvist spärrar påminnelsen utan att röra saldot. Påminnelsen innehåller vad som är skyldigt när den går iväg, och en som blivit betald i mellantiden skickas aldrig. Pengar som är skyldiga tillbaka blir en uppgift, och en återbetalning är inte detsamma som att ångra en felregistrerad betalning.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: en obetald faktura tas av någon, ett löfte att betala skrivs ner, och en tvist spärrar påminnelsen. När spärren hävts köas en påminnelse som går iväg med det belopp som är skyldigt. Efter en kreditering är pengar skyldiga tillbaka och betalas ut.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">Obetalt</div>
+              <div class="cl-qrow"><span>A-12 &middot; Folke Fordran</span><span>2 250,00 kr</span></div>
+              <div class="cl-qrow"><span>Har den: Disa</span><span class="rd-tag rd-risk">titta på den idag</span></div>
+              <div class="cl-qrow"><span>Betalar 500 kr senast 1 mars</span><span class="rd-tag">lovad</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Bestridd</div>
+              <div class="cl-qrow"><span>En spärr ändrar inget i vad som är skyldigt. Ingen påminnelse går medan den står.</span><span class="rd-tag rd-risk">bestridd</span></div>
+              <div class="cl-qrow an-fade" data-t="12"><span>Påminn dem</span><span>Köa påminnelsen</span></div>
+            </div>            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">Betala tillbaka</div>
+              <div class="cl-qrow"><span>skyldigt tillbaka till kunden</span><span>375,00 kr</span></div>
+              <span class="an-btn mo-btn an-fade an-off" data-t="20">Den har betalats ut</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">Någon har fakturan och har skrivit ner samtalet och löftet. Saldot är oförändrat; om löftet hölls läses av det som betalas.</div>
+      <div class="an-cap" data-t="8,15.8">Kunden bestrider avgiften. Spärren ändrar inget i vad som är skyldigt, men ingen påminnelse går medan den står.</div>
+      <div class="an-cap an-off" data-t="16,23.6">Efter en kreditering är pengar skyldiga tillbaka. Att betala ut dem skrivs ner som det är: ingen flyttning av pengar, och inte en ångrad betalning.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog och beloppen ur dess pengakod när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare mot en riktig e-postserver: fakturan tas, ett samtal och ett löfte skrivs ner, en tvist spärrar och hävs, påminnelsen går med rätt belopp, och en del krediteras och betalas tillbaka &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/30-followup.spec.ts">läs testet</a>. Namn och belopp är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

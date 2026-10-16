@@ -1,0 +1,120 @@
+{{define "content"}}
+{{with .FollowUp}}
+<div class="row"><h1>{{.Reference}} &middot; {{.Customer}}</h1>
+  {{if .Disputed}}<span class="tag late">{{$.T "disputed"}}</span>{{end}}</div>
+<p class="waiting"><a href="/invoices/{{.InvoiceID}}">{{$.T "Back to the invoice"}}</a></p>
+<dl>
+  <dt>{{if lt .Outstanding 0}}{{$.T "Owed back to the customer"}}{{else}}{{$.T "Outstanding"}}{{end}}</dt><dd class="grand">{{$.Money .Outstanding}}</dd>
+  <dt>{{$.T "Has it"}}</dt><dd>{{if .Owner}}{{.Owner}}{{else}}{{$.T "Nobody"}}{{end}}</dd>
+  <dt>{{$.T "Next"}}</dt><dd>{{if .Next}}{{$.Date ($.Local .Next) "Mon 2 Jan 2006"}}{{else}}&ndash;{{end}}</dd>
+</dl>
+{{if .Disputed}}<p class="waiting">{{$.T "On hold since %s:" ($.Date ($.Local .Disputed) "2 Jan")}} {{.DisputeNote}}</p>{{end}}
+{{range .Promises}}
+<p class="waiting"><span class="tag {{if .Kept}}pass{{else if .Broken}}late{{else}}warranty{{end}}">{{if .Kept}}{{$.T "kept"}}{{else if .Broken}}{{$.T "not kept"}}{{else}}{{$.T "promised"}}{{end}}</span>
+  {{$.T "%s by %s" ($.Money .AmountMinor) ($.Date ($.Local .By) "2 Jan")}}</p>
+{{end}}
+{{end}}
+
+{{if lt .FollowUp.Outstanding 0}}
+<h2>{{.T "Pay it back"}}</h2>
+<p class="waiting">{{.T "Recording a refund says money was paid out, by the means you name. FreeSMS does not move it. A payment entered by mistake is reversed on the invoice instead."}}</p>
+<form method="post" action="/invoices/{{.FollowUp.InvoiceID}}/followup">
+  <input type="hidden" name="action" value="refund">
+  <div class="pair">
+    <label><span>{{.T "Amount"}}</span><input name="amount" inputmode="decimal" placeholder="{{.T "all of it"}}"></label>
+    <label><span>{{.T "Paid out on"}}</span><input type="date" name="paid_on" value="{{.Today}}" max="{{.Today}}" required></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "How"}}</span><select name="method">{{range .Methods}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+    <label><span>{{.T "Reference"}}</span><input name="reference" maxlength="100"></label>
+  </div>
+  <button type="submit">{{.T "It has been paid out"}}</button>
+</form>
+{{else}}
+
+<h2>{{.T "Who has it"}}</h2>
+<form method="post" action="/invoices/{{.FollowUp.InvoiceID}}/followup">
+  <input type="hidden" name="action" value="take">
+  <div class="pair">
+    <label><span>{{.T "Has it"}}</span>
+      <select name="owner"><option value="">{{.T "Leave as it is"}}</option><option value="me">{{.T "Me"}}</option>{{range .DeskPeople}}<option value="{{.ID}}">{{.Name}}</option>{{end}}<option value="none">{{.T "Nobody"}}</option></select></label>
+    <label><span>{{.T "Look at it again on"}}</span><input type="date" name="next"></label>
+  </div>
+  <label><span>{{.T "Note"}}</span><input name="note" maxlength="500"></label>
+  <button type="submit" class="secondary">{{.T "Save"}}</button>
+</form>
+
+<h2>{{.T "Write down a conversation"}}</h2>
+<form method="post" action="/invoices/{{.FollowUp.InvoiceID}}/followup">
+  <input type="hidden" name="action" value="contact">
+  <div class="pair">
+    <label><span>{{.T "How"}}</span><input name="how" value="{{.T "phoned"}}" required maxlength="40"></label>
+    <label><span>{{.T "Look at it again on"}}</span><input type="date" name="next"></label>
+  </div>
+  <label><span>{{.T "What was said"}}</span><input name="note" required maxlength="500"></label>
+  <button type="submit" class="secondary">{{.T "Write it down"}}</button>
+</form>
+
+<h2>{{.T "A promise to pay"}}</h2>
+<form method="post" action="/invoices/{{.FollowUp.InvoiceID}}/followup">
+  <input type="hidden" name="action" value="promise">
+  <div class="pair">
+    <label><span>{{.T "How much"}}</span><input name="amount" inputmode="decimal" required></label>
+    <label><span>{{.T "By"}}</span><input type="date" name="by" required></label>
+  </div>
+  <label><span>{{.T "Note"}}</span><input name="note" maxlength="500"></label>
+  <button type="submit" class="secondary">{{.T "Write it down"}}</button>
+  <p class="waiting">{{.T "The balance stays what it is. Whether the promise was kept is read from what is paid."}}</p>
+</form>
+
+<h2>{{.T "Disputed"}}</h2>
+{{if .FollowUp.Disputed}}
+<form method="post" action="/invoices/{{.FollowUp.InvoiceID}}/followup">
+  <input type="hidden" name="action" value="resolve">
+  <label><span>{{.T "How it was settled"}}</span><input name="note" required maxlength="500"></label>
+  <button type="submit" class="secondary">{{.T "Lift the hold"}}</button>
+</form>
+{{else}}
+<form method="post" action="/invoices/{{.FollowUp.InvoiceID}}/followup">
+  <input type="hidden" name="action" value="dispute">
+  <label><span>{{.T "What the customer disputes"}}</span><input name="note" required maxlength="300"></label>
+  <button type="submit" class="secondary">{{.T "Put it on hold"}}</button>
+  <p class="waiting">{{.T "A hold changes nothing in what is owed. No reminder goes while it stands."}}</p>
+</form>
+{{end}}
+
+<h2>{{.T "Remind them"}}</h2>
+{{with .Reminder}}
+<p class="waiting">{{$.T "Still to pay: %s." ($.Money .Outstanding)}}{{if .DaysLate}} {{$.N "%d day late" .DaysLate}}.{{end}}
+  {{if .NeverDelivered}}<span class="tag warranty">{{$.T "The customer is not known to have the invoice"}}</span>{{end}}
+  {{if .Reminders}}<span class="tag">{{$.N "%d reminder sent" .Reminders}}</span>{{end}}</p>
+{{end}}
+{{if or .CanText .CanEmail}}
+{{if .FollowUp.Disputed}}<p class="waiting">{{.T "On hold: lift the hold to send a reminder."}}</p>{{else}}
+<form method="post" action="/invoices/{{.FollowUp.InvoiceID}}/reminder">
+  <p class="waiting">{{.T "The message carries a link to the invoice and what is owed at the moment it goes. If it is paid before then, it is not sent."}}</p>
+  <label><span>{{.T "Who it is for"}}</span><input name="recipient" value="{{.FollowUp.Customer}}" required maxlength="100"></label>
+  <div class="pair">
+    <label><span>{{.T "How"}}</span><select name="channel">{{if .CanText}}<option value="sms">{{.T "text"}}</option>{{end}}{{if .CanEmail}}<option value="email">{{.T "email"}}</option>{{end}}</select></label>
+    <label><span>{{.T "To"}}</span><input name="address" value="{{if .Contact.Phone}}{{.Contact.Phone}}{{else}}{{.Contact.Email}}{{end}}" required></label>
+  </div>
+  <label class="tick"><input type="checkbox" name="confirm" value="yes" required> <span>{{.T "This is who it is for, and this is where it should go"}}</span></label>
+  <button type="submit">{{.T "Queue the reminder"}}</button>
+</form>
+{{end}}
+{{else}}<p class="waiting">{{.T "Texts and emails are not set up here. Ring or write yourself, and write it down above."}}</p>{{end}}
+{{end}}
+
+<h2>{{.T "What has been done"}}</h2>
+{{if not .FollowUp.Events}}<p class="empty">{{.T "Nothing yet."}}</p>{{end}}
+<ul class="lines">
+  {{range .FollowUp.Events}}
+  <li>
+    <div class="row"><span>{{if eq .Kind "taken"}}{{$.T "Taken"}}{{else if eq .Kind "contact"}}{{.How}}{{else if eq .Kind "promise"}}{{$.T "Promised"}}: {{$.Money .PromisedMinor}}{{if .PromisedBy}} {{$.T "by %s" ($.Date ($.Local .PromisedBy) "2 Jan")}}{{end}}
+      {{else if eq .Kind "dispute"}}{{$.T "Put on hold"}}{{else if eq .Kind "dispute_resolved"}}{{$.T "Hold lifted"}}{{else if eq .Kind "reminder"}}{{$.T "Reminder queued"}}{{else}}{{$.T "Refund paid out"}}{{end}}</span>
+      <span class="waiting">{{$.Date ($.Local .At) "2 Jan 15:04"}} &middot; {{.By}}</span></div>
+    {{if .Note}}<div class="waiting">{{.Note}}</div>{{end}}
+  </li>
+  {{end}}
+</ul>
+{{end}}

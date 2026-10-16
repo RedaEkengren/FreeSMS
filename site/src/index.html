@@ -270,6 +270,7 @@
     <button type="button" role="tab" data-tab="16">Överlämning till kund</button>
     <button type="button" role="tab" data-tab="17">Fakturan hem</button>
     <button type="button" role="tab" data-tab="18">Rätta en faktura</button>
+    <button type="button" role="tab" data-tab="19">Obetalt</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1214,6 +1215,43 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog och beloppen ur dess pengakod när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: en del krediteras efter en förhandsvisning, för mycket nekas, resten krediteras och rätt kund faktureras &ndash; <a href="{{test "e2e/tests/29-credit.spec.ts" "part of an invoice credited, the rest later, and the right buyer billed"}}">läs testet</a>. Namn och belopp är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>När fakturan inte betalas</h2>
+  <p class="lede">Obetalda fakturor listas inte bara, de följs upp: någon har dem, ett samtal och ett löfte skrivs ner, och en tvist spärrar påminnelsen utan att röra saldot. Påminnelsen innehåller vad som är skyldigt när den går iväg, och en som blivit betald i mellantiden skickas aldrig. Pengar som är skyldiga tillbaka blir en uppgift, och en återbetalning är inte detsamma som att ångra en felregistrerad betalning.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: en obetald faktura tas av någon, ett löfte att betala skrivs ner, och en tvist spärrar påminnelsen. När spärren hävts köas en påminnelse som går iväg med det belopp som är skyldigt. Efter en kreditering är pengar skyldiga tillbaka och betalas ut.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">{{t "Owed"}}</div>
+              <div class="cl-qrow"><span>A-12 &middot; Folke Fordran</span><span>{{money 225000}}</span></div>
+              <div class="cl-qrow"><span>{{t "Has it: %s" "Disa"}}</span><span class="rd-tag rd-risk">{{t "look at it today"}}</span></div>
+              <div class="cl-qrow"><span>Betalar 500 kr senast 1 mars</span><span class="rd-tag">{{t "promised"}}</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "Disputed"}}</div>
+              <div class="cl-qrow"><span>{{t "A hold changes nothing in what is owed. No reminder goes while it stands."}}</span><span class="rd-tag rd-risk">{{t "disputed"}}</span></div>
+              <div class="cl-qrow an-fade" data-t="12"><span>{{t "Remind them"}}</span><span>{{t "Queue the reminder"}}</span></div>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">{{t "Pay it back"}}</div>
+              <div class="cl-qrow"><span>{{t "owed back to the customer"}}</span><span>{{money 37500}}</span></div>
+              <span class="an-btn mo-btn an-fade" data-t="20">{{t "It has been paid out"}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">Någon har fakturan och har skrivit ner samtalet och löftet. Saldot är oförändrat; om löftet hölls läses av det som betalas.</div>
+      <div class="an-cap" data-t="8,15.8">Kunden bestrider avgiften. Spärren ändrar inget i vad som är skyldigt, men ingen påminnelse går medan den står.</div>
+      <div class="an-cap" data-t="16,23.6">Efter en kreditering är pengar skyldiga tillbaka. Att betala ut dem skrivs ner som det är: ingen flyttning av pengar, och inte en ångrad betalning.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog och beloppen ur dess pengakod när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare mot en riktig e-postserver: fakturan tas, ett samtal och ett löfte skrivs ner, en tvist spärrar och hävs, påminnelsen går med rätt belopp, och en del krediteras och betalas tillbaka &ndash; <a href="{{test "e2e/tests/30-followup.spec.ts" "an unpaid invoice followed up, reminded, then credited and paid back"}}">läs testet</a>. Namn och belopp är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RedaEkengren/FreeSMS/internal/money"
 	"github.com/RedaEkengren/FreeSMS/internal/notify"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
@@ -52,6 +53,30 @@ func (s *Server) sendDue(ctx context.Context, now time.Time) {
 		return
 	}
 	for _, m := range due {
+		// A reminder is for something owed. It is asked again as it is about
+		// to go: paid, or disputed, while it waited, it does not.
+		if m.ReminderFor != "" {
+			owed, hold, err := workshop.StillOwed(ctx, s.pool, shop, m.ReminderFor)
+			if err != nil {
+				s.log.Error("recheck a reminder", "message", m.ID, "error", err)
+				continue
+			}
+			if owed <= 0 || hold {
+				why := "It was paid before this went; nothing was sent."
+				if hold {
+					why = "The charge was disputed before this went; nothing was sent."
+				}
+				if err := workshop.MessageCancelled(ctx, s.pool, shop, m.ID, why); err != nil {
+					s.log.Error("record a cancelled reminder", "message", m.ID, "error", err)
+				}
+				continue
+			}
+			locale, _ := workshop.ShopLocale(ctx, s.pool, shop)
+			if locale == "" {
+				locale = s.locale
+			}
+			m.Body = strings.ReplaceAll(m.Body, "{owed}", money.DisplayFor(locale, s.currency()).Amount(owed))
+		}
 		sender := s.email
 		if m.Channel == "sms" {
 			sender = s.sms

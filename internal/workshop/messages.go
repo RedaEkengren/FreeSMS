@@ -27,6 +27,7 @@ var MessageAbouts = map[string]string{
 	"answer":       "We need your answer",
 	"waiting_part": "Waiting for a part",
 	"invoice":      "Your invoice",
+	"reminder":     "A reminder about your invoice",
 }
 
 // SendHours are when a message may go, as whole hours in the shop's zone:
@@ -77,6 +78,8 @@ type NewMessage struct {
 	Subject   string
 	Body      string
 	NotBefore time.Time
+	// For a reminder: the invoice it is about.
+	ReminderFor string
 }
 
 // SentBefore reports whether this job's customer has been sent anything at
@@ -150,10 +153,10 @@ func QueueMessage(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, m
 func queueMessageTx(ctx context.Context, tx pgx.Tx, scope access.Scope, m NewMessage) (string, error) {
 	var id string
 	err := tx.QueryRow(ctx, `
-		INSERT INTO outbound_messages (shop_id, work_order_id, about, channel, recipient, subject, body, not_before, created_by)
-		SELECT $1, w.id, $3, $4, $5, $6, $7, $8, $9 FROM work_orders w WHERE w.id = $2
+		INSERT INTO outbound_messages (shop_id, work_order_id, about, channel, recipient, subject, body, not_before, created_by, reminder_for)
+		SELECT $1, w.id, $3, $4, $5, $6, $7, $8, $9, nullif($10, '')::uuid FROM work_orders w WHERE w.id = $2
 		RETURNING id`,
-		scope.ShopID, m.JobID, m.About, m.Channel, m.Recipient, m.Subject, m.Body, m.NotBefore, scope.UserID).Scan(&id)
+		scope.ShopID, m.JobID, m.About, m.Channel, m.Recipient, m.Subject, m.Body, m.NotBefore, scope.UserID, m.ReminderFor).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", ErrNotFound
 	}
@@ -226,6 +229,8 @@ func MessagesThisMonth(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 type DueMessage struct {
 	ID, JobID, About, Channel, Recipient, Subject, Body string
 	Tries                                               int
+	// For a reminder: the invoice it is about, asked after again as it goes.
+	ReminderFor string
 }
 
 // maxTries is how often a message that cannot be handed over is tried
@@ -240,7 +245,8 @@ func DueMessages(ctx context.Context, pool *pgxpool.Pool, shopID string, now tim
 	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT m.id, m.work_order_id, m.about, m.channel, m.recipient, m.subject, m.body,
-			       (SELECT count(*) FROM message_events r WHERE r.message_id = m.id AND r.event = 'retry')::int AS tries
+			       (SELECT count(*) FROM message_events r WHERE r.message_id = m.id AND r.event = 'retry')::int AS tries,
+			       coalesce(m.reminder_for::text, '')
 			FROM outbound_messages m
 			JOIN LATERAL (SELECT event, at FROM message_events WHERE message_id = m.id ORDER BY at DESC LIMIT 1) e ON true
 			WHERE m.not_before <= $1 AND m.recipient <> ''
@@ -254,7 +260,7 @@ func DueMessages(ctx context.Context, pool *pgxpool.Pool, shopID string, now tim
 		defer rows.Close()
 		for rows.Next() {
 			var m DueMessage
-			if err := rows.Scan(&m.ID, &m.JobID, &m.About, &m.Channel, &m.Recipient, &m.Subject, &m.Body, &m.Tries); err != nil {
+			if err := rows.Scan(&m.ID, &m.JobID, &m.About, &m.Channel, &m.Recipient, &m.Subject, &m.Body, &m.Tries, &m.ReminderFor); err != nil {
 				return err
 			}
 			out = append(out, m)

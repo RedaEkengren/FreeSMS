@@ -58,15 +58,24 @@ func (s *Server) handleReversePayment(w http.ResponseWriter, r *http.Request) {
 // handleReceivables lists what is owed, overdue first.
 func (s *Server) handleReceivables(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
-	list, err := workshop.Receivables(r.Context(), s.pool, session.Scope)
+	work, err := workshop.Worklist(r.Context(), s.pool, session.Scope, s.today(r))
 	if s.paymentError(w, r, err) {
 		return
+	}
+	if r.URL.Query().Get("who") == "me" {
+		mine := work[:0]
+		for _, w := range work {
+			if w.OwnerID == session.Scope.UserID {
+				mine = append(mine, w)
+			}
+		}
+		work = mine
 	}
 	undelivered, err := workshop.UndeliveredDocuments(r.Context(), s.pool, session.Scope, time.Now().AddDate(0, 0, -60))
 	if err != nil {
 		s.log.Error("read undelivered documents", "error", err)
 	}
-	s.render(w, r, http.StatusOK, "receivables", pageData{Title: "Owed", Session: session, Receivables: list, Undelivered: undelivered})
+	s.render(w, r, http.StatusOK, "receivables", pageData{Title: "Owed", Session: session, Worklist: work, Undelivered: undelivered, Today: s.today(r).Format("2006-01-02")})
 }
 
 func (s *Server) paymentError(w http.ResponseWriter, r *http.Request, err error) bool {

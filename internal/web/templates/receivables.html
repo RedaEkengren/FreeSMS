@@ -1,4 +1,8 @@
 {{define "content"}}
+<h1>{{.T "Owed"}}</h1>
+<p class="waiting">{{.T "Every invoice with something owed either way. Money owed back to a customer is listed first. Following one up changes nothing in what is owed."}}</p>
+<p class="waiting"><a href="/receivables">{{.T "Everybody's"}}</a> &middot; <a href="/receivables?who=me">{{.T "Mine"}}</a></p>
+
 {{if .Undelivered}}
 <h2>{{.T "Documents the customer is not known to have"}}</h2>
 <ul class="lines">
@@ -10,19 +14,29 @@
   {{end}}
 </ul>
 {{end}}
-<h1>{{.T "Owed"}}</h1>
-<p class="waiting">{{.T "Every invoice with something owed either way, overdue first. Money owed back to a customer is listed too."}}</p>
-{{if not .Receivables}}
+
+{{if not .Worklist}}
   <p class="empty">{{.T "Nothing is owed."}}</p>
 {{else}}
 <ul class="lines">
-  {{range .Receivables}}
+  {{range .Worklist}}
   <li>
     <div class="row">
-      <a href="/invoices/{{.InvoiceID}}">{{.Reference}} &middot; {{.CustomerName}}</a>
-      <span>{{$.Money .OutstandingMinor}}{{if .Overdue}} <span class="tag late">{{$.T "overdue"}}</span>{{end}}</span>
+      <a href="/invoices/{{.InvoiceID}}">{{.Reference}} &middot; {{.Customer}}</a>
+      <span>{{$.Money .Outstanding}}{{if .Overdue}} <span class="tag late">{{$.T "overdue"}}</span>{{end}}</span>
     </div>
-    <div class="waiting">{{if lt .OutstandingMinor 0}}{{$.T "Owed back to the customer"}}{{else}}{{$.T "Due %s" ($.Date ($.Local .Due) "2 Jan 2006")}}{{end}}</div>
+    <div class="waiting">
+      {{if .Refund}}<span class="tag warranty">{{$.T "owed back to the customer"}}</span>{{else}}{{$.T "Due %s" ($.Date ($.Local .Due) "2 Jan 2006")}}{{if .Overdue}} &middot; {{$.N "%d day late" .DaysLate}}{{end}}{{end}}
+      {{if .Disputed}}<span class="tag late">{{$.T "disputed"}}</span>{{end}}
+      {{if eq .Delivered "none"}}<span class="tag warranty">{{$.T "never delivered"}}</span>{{else if eq .Delivered "tried"}}<span class="tag warranty">{{$.T "delivery not confirmed"}}</span>{{end}}
+      {{if .OtherOpen}}<span class="tag">{{$.N "%d other open invoice" .OtherOpen}}</span>{{end}}
+    </div>
+    <div class="waiting">
+      {{if .Owner}}{{$.T "Has it: %s" .Owner}}{{else}}{{$.T "Nobody has it"}}{{end}}
+      {{if .Next}} &middot; {{if .FollowToday}}<span class="tag late">{{$.T "look at it today"}}</span>{{else}}{{$.T "next: %s" ($.Date ($.Local .Next) "2 Jan")}}{{end}}{{end}}
+      {{if .LastNote}} &middot; {{.LastNote}}{{end}}
+      &middot; <a href="/invoices/{{.InvoiceID}}/followup">{{if .Refund}}{{$.T "Pay it back"}}{{else}}{{$.T "Follow up"}}{{end}}</a>
+    </div>
   </li>
   {{end}}
 </ul>

@@ -193,3 +193,66 @@ func TestCreditingPartOfAnInvoiceThroughThePages(t *testing.T) {
 		t.Errorf("the rebill form answered %d", status)
 	}
 }
+
+// A reminder is asked after again as it goes: paid while it waited, it is
+// cancelled and never reaches the provider; unpaid, it goes with what is owed
+// at that moment.
+func TestAReminderForSomethingPaidInTheMeantimeIsNotSent(t *testing.T) {
+	ts, pool := testServer(t)
+	v, _ := testServers.Load(ts.URL)
+	srv := v.(*Server)
+	elks := &fakeElks{}
+	srv.sms = notify.Elks{URL: elks.server(t).URL, Username: "u", Password: "p", From: "Verkstaden"}
+	ctx := context.Background()
+	var invoice string
+	if err := database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `
+			INSERT INTO invoices (shop_id, series, number, work_order_id, customer_name, net_minor, vat_minor, gross_minor, seller_name, seller_payment_terms_days)
+			VALUES ($1, 'A', 99, $2, 'Test Kund', 100000, 25000, 125000, 'Shop A', 0) RETURNING id::text`, shopA, jobA).Scan(&invoice)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	desk, tech := signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	base := ts.URL + "/invoices/" + invoice
+	if status, _ := page(t, tech, base+"/followup"); status != http.StatusForbidden {
+		t.Errorf("a technician opened the follow-up: %d", status)
+	}
+	if status, body := page(t, desk, base+"/followup"); status != http.StatusOK || !strings.Contains(body, "Remind them") {
+		t.Fatalf("the follow-up page answered %d", status)
+	}
+	if _, body := page(t, desk, ts.URL+"/receivables"); !strings.Contains(body, "A-99") || !strings.Contains(body, "Follow up") {
+		t.Error("the invoice is not on the list with a way to follow it up")
+	}
+	rem := url.Values{"channel": {"sms"}, "address": {"070-123 45 67"}, "recipient": {"Test Kund"}}
+	if status := postStatus(t, desk, base+"/reminder", rem); status != http.StatusBadRequest {
+		t.Errorf("an unconfirmed reminder answered %d, want 400", status)
+	}
+	rem.Set("confirm", "yes")
+	if status := postStatus(t, desk, base+"/reminder", rem); status != http.StatusSeeOther {
+		t.Fatalf("queueing answered %d", status)
+	}
+	// Part-paid while it waits: it goes, with what is owed then.
+	if status := postStatus(t, desk, base+"/payments", url.Values{"amount": {"500"}, "paid_on": {time.Now().Format("2006-01-02")}, "method": {"bank"}}); status != http.StatusSeeOther {
+		t.Fatalf("recording a part payment answered %d", status)
+	}
+	srv.sendDue(ctx, time.Now().Add(24*time.Hour))
+	if elks.count() != 1 || !strings.Contains(elks.sent[0].Get("message"), "750") || strings.Contains(elks.sent[0].Get("message"), "{owed}") {
+		t.Fatalf("the reminder that went: %v", elks.sent)
+	}
+	// A second one, then paid in full before it goes: cancelled.
+	if status := postStatus(t, desk, base+"/reminder", rem); status != http.StatusSeeOther {
+		t.Fatalf("queueing again answered %d", status)
+	}
+	if status := postStatus(t, desk, base+"/payments", url.Values{"paid_on": {time.Now().Format("2006-01-02")}, "method": {"bank"}}); status != http.StatusSeeOther {
+		t.Fatalf("settling answered %d", status)
+	}
+	srv.sendDue(ctx, time.Now().Add(48*time.Hour))
+	if elks.count() != 1 {
+		t.Errorf("a reminder for a settled invoice reached the provider: %d texts", elks.count())
+	}
+	var event string
+	if err := pool.QueryRow(ctx, `SELECT e.event FROM message_events e JOIN outbound_messages m ON m.id = e.message_id
+		WHERE m.about = 'reminder' ORDER BY m.created_at DESC, e.at DESC LIMIT 1`).Scan(&event); err != nil || event != "cancelled" {
+		t.Errorf("the second reminder's last event is %q, %v; want cancelled", event, err)
+	}
+}

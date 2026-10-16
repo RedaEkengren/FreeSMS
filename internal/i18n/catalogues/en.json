@@ -78,6 +78,18 @@
       "one": "opened %d time",
       "other": "opened %d times"
     },
+    "%d day late": {
+      "one": "%d day late",
+      "other": "%d days late"
+    },
+    "%d other open invoice": {
+      "one": "%d other open invoice",
+      "other": "%d other open invoices"
+    },
+    "%d reminder sent": {
+      "one": "%d reminder sent",
+      "other": "%d reminders sent"
+    },
     "%d visit": {
       "one": "%d visit",
       "other": "%d visits"

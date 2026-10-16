@@ -3030,6 +3030,186 @@
     "nothing left": {
       "other": "inget kvar"
     },
+    "%s by %s": {
+      "other": "%s senast %s"
+    },
+    "%s: a reminder about invoice %s. Still to pay: {owed}. {link}": {
+      "other": "%s: en påminnelse om faktura %s. Kvar att betala: {owed}. {link}"
+    },
+    "A hold changes nothing in what is owed. No reminder goes while it stands.": {
+      "other": "En spärr ändrar inget i vad som är skyldigt. Ingen påminnelse går medan den står."
+    },
+    "A promise to pay": {
+      "other": "Ett löfte att betala"
+    },
+    "A reminder about your invoice": {
+      "other": "En påminnelse om din faktura"
+    },
+    "By": {
+      "other": "Senast"
+    },
+    "Disputed": {
+      "other": "Bestridd"
+    },
+    "Every invoice with something owed either way. Money owed back to a customer is listed first. Following one up changes nothing in what is owed.": {
+      "other": "Varje faktura med något skyldigt åt endera hållet. Pengar som är skyldiga tillbaka till en kund står först. Att följa upp en ändrar inget i vad som är skyldigt."
+    },
+    "Everybody's": {
+      "other": "Allas"
+    },
+    "Follow up": {
+      "other": "Följ upp"
+    },
+    "Has it": {
+      "other": "Har den"
+    },
+    "Has it: %s": {
+      "other": "Har den: %s"
+    },
+    "Hold lifted": {
+      "other": "Spärren hävd"
+    },
+    "How it was settled": {
+      "other": "Hur det löstes"
+    },
+    "How much": {
+      "other": "Hur mycket"
+    },
+    "It has been paid out": {
+      "other": "Den har betalats ut"
+    },
+    "Leave as it is": {
+      "other": "Lämna som den är"
+    },
+    "Lift the hold": {
+      "other": "Häv spärren"
+    },
+    "Look at it again on": {
+      "other": "Titta på den igen den"
+    },
+    "Me": {
+      "other": "Jag"
+    },
+    "Mine": {
+      "other": "Mina"
+    },
+    "Nobody": {
+      "other": "Ingen"
+    },
+    "Nobody has it": {
+      "other": "Ingen har den"
+    },
+    "On hold since %s:": {
+      "other": "Spärrad sedan %s:"
+    },
+    "On hold: lift the hold to send a reminder.": {
+      "other": "Spärrad: häv spärren för att skicka en påminnelse."
+    },
+    "Paid out on": {
+      "other": "Utbetald den"
+    },
+    "Pay it back": {
+      "other": "Betala tillbaka"
+    },
+    "Put it on hold": {
+      "other": "Spärra den"
+    },
+    "Put on hold": {
+      "other": "Spärrad"
+    },
+    "Queue the reminder": {
+      "other": "Köa påminnelsen"
+    },
+    "Recording a refund says money was paid out, by the means you name. FreeSMS does not move it. A payment entered by mistake is reversed on the invoice instead.": {
+      "other": "Att registrera en återbetalning säger att pengar betalats ut, på det sätt du anger. FreeSMS flyttar dem inte. En betalning som registrerats av misstag ångras i stället på fakturan."
+    },
+    "Refund paid out": {
+      "other": "Återbetalning utbetald"
+    },
+    "Remind them": {
+      "other": "Påminn dem"
+    },
+    "Reminder queued": {
+      "other": "Påminnelse köad"
+    },
+    "Reminder: invoice %s from %s": {
+      "other": "Påminnelse: faktura %s från %s"
+    },
+    "Still to pay: %s.": {
+      "other": "Kvar att betala: %s."
+    },
+    "Taken": {
+      "other": "Tagen"
+    },
+    "Texts and emails are not set up here. Ring or write yourself, and write it down above.": {
+      "other": "Sms och e-post är inte inställda här. Ring eller skriv själv och skriv ner det ovan."
+    },
+    "The balance stays what it is. Whether the promise was kept is read from what is paid.": {
+      "other": "Saldot förblir som det är. Om löftet hölls läses av det som betalas."
+    },
+    "The customer is not known to have the invoice": {
+      "other": "Kunden vet inte att ha fått fakturan"
+    },
+    "The message carries a link to the invoice and what is owed at the moment it goes. If it is paid before then, it is not sent.": {
+      "other": "Meddelandet har en länk till fakturan och vad som är skyldigt när det går iväg. Är den betald dessförinnan skickas det inte."
+    },
+    "This is who it is for, and this is where it should go": {
+      "other": "Det här är vem det gäller, och hit ska det gå"
+    },
+    "What has been done": {
+      "other": "Vad som gjorts"
+    },
+    "What the customer disputes": {
+      "other": "Vad kunden bestrider"
+    },
+    "Who has it": {
+      "other": "Vem som har den"
+    },
+    "Write down a conversation": {
+      "other": "Skriv ner ett samtal"
+    },
+    "Write it down": {
+      "other": "Skriv ner det"
+    },
+    "by %s": {
+      "other": "senast %s"
+    },
+    "delivery not confirmed": {
+      "other": "leverans inte bekräftad"
+    },
+    "disputed": {
+      "other": "bestridd"
+    },
+    "look at it today": {
+      "other": "titta på den idag"
+    },
+    "never delivered": {
+      "other": "aldrig levererad"
+    },
+    "next: %s": {
+      "other": "nästa: %s"
+    },
+    "not kept": {
+      "other": "hölls inte"
+    },
+    "owed back to the customer": {
+      "other": "skyldigt tillbaka till kunden"
+    },
+    "promised": {
+      "other": "lovad"
+    },
+    "%d day late": {
+      "one": "%d dag sen",
+      "other": "%d dagar sen"
+    },
+    "%d other open invoice": {
+      "one": "%d annan öppen faktura",
+      "other": "%d andra öppna fakturor"
+    },
+    "%d reminder sent": {
+      "one": "%d påminnelse skickad",
+      "other": "%d påminnelser skickade"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

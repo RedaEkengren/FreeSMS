@@ -270,6 +270,7 @@
     <button type="button" role="tab" data-tab="16">Collection</button>
     <button type="button" role="tab" data-tab="17">The invoice, delivered</button>
     <button type="button" role="tab" data-tab="18">Correcting an invoice</button>
+    <button type="button" role="tab" data-tab="19">Unpaid</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1214,6 +1215,43 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue and the amounts from its money code when the page is generated. The flow is run against the real product in a browser: a part is credited after a preview, too much is refused, the rest is credited and the right customer is billed &ndash; <a href="{{test "e2e/tests/29-credit.spec.ts" "part of an invoice credited, the rest later, and the right buyer billed"}}">read the test</a>. Names and amounts are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>When the invoice is not paid</h2>
+  <p class="lede">Unpaid invoices are not just listed, they are followed up: someone has them, a conversation and a promise are written down, and a dispute holds the reminder without touching the balance. The reminder carries what is owed when it goes, and one paid in the meantime is never sent. Money owed back becomes a task, and a refund is not the same as reversing a mistaken payment.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: an unpaid invoice is taken by someone, a promise to pay is written down, and a dispute holds the reminder. When the hold is lifted a reminder is queued and goes with the amount owed. After a credit money is owed back and is paid out.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">{{t "Owed"}}</div>
+              <div class="cl-qrow"><span>A-12 &middot; Folke Fordran</span><span>{{money 225000}}</span></div>
+              <div class="cl-qrow"><span>{{t "Has it: %s" "Disa"}}</span><span class="rd-tag rd-risk">{{t "look at it today"}}</span></div>
+              <div class="cl-qrow"><span>Pays 500 by 1 March</span><span class="rd-tag">{{t "promised"}}</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "Disputed"}}</div>
+              <div class="cl-qrow"><span>{{t "A hold changes nothing in what is owed. No reminder goes while it stands."}}</span><span class="rd-tag rd-risk">{{t "disputed"}}</span></div>
+              <div class="cl-qrow an-fade" data-t="12"><span>{{t "Remind them"}}</span><span>{{t "Queue the reminder"}}</span></div>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">{{t "Pay it back"}}</div>
+              <div class="cl-qrow"><span>{{t "owed back to the customer"}}</span><span>{{money 37500}}</span></div>
+              <span class="an-btn mo-btn an-fade" data-t="20">{{t "It has been paid out"}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">Someone has the invoice and has written down the conversation and the promise. The balance is unchanged; whether the promise was kept is read from what is paid.</div>
+      <div class="an-cap" data-t="8,15.8">The customer disputes the charge. The hold changes nothing in what is owed, but no reminder goes while it stands.</div>
+      <div class="an-cap" data-t="16,23.6">After a credit money is owed back. Paying it out is written down as what it is: no movement of money, and not a reversed payment.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue and the amounts from its money code when the page is generated. The flow is run against the real product in a browser, against a real mail server: the invoice is taken, a conversation and a promise are written down, a dispute holds and is lifted, the reminder goes with the right amount, and a part is credited and paid back &ndash; <a href="{{test "e2e/tests/30-followup.spec.ts" "an unpaid invoice followed up, reminded, then credited and paid back"}}">read the test</a>. Names and amounts are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>
