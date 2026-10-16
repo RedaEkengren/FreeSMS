@@ -432,6 +432,10 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /customers/{id}/people/{row}/remove", s.requireSession(s.handleRemoveCustomerPerson))
 	mux.HandleFunc("POST /vehicles/{id}/edit", s.requireSession(s.handleEditVehicle))
 	mux.HandleFunc("POST /vehicles/{id}/registration", s.requireSession(s.handleVehicleRegistration))
+	mux.HandleFunc("GET /customers/{id}/merge", s.requireSession(s.handleCustomerMergeForm))
+	mux.HandleFunc("POST /customers/{id}/merge", s.requireSession(s.handleCustomerMerge))
+	mux.HandleFunc("GET /vehicles/{id}/merge", s.requireSession(s.handleVehicleMergeForm))
+	mux.HandleFunc("POST /vehicles/{id}/merge", s.requireSession(s.handleVehicleMerge))
 	mux.HandleFunc("GET /vehicles/{id}/sell", s.requireSession(s.handleSellForm))
 	mux.HandleFunc("POST /vehicles/{id}/sell", s.requireSession(s.handleSellVehicle))
 

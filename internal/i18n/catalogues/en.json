@@ -30,6 +30,38 @@
       "one": "%d job",
       "other": "%d jobs"
     },
+    "%d issued invoice stays exactly as issued": {
+      "one": "%d issued invoice stays exactly as issued",
+      "other": "%d issued invoices stay exactly as issued"
+    },
+    "%d job moves to the kept customer": {
+      "one": "%d job moves to the kept customer",
+      "other": "%d jobs move to the kept customer"
+    },
+    "%d job moves to the kept vehicle": {
+      "one": "%d job moves to the kept vehicle",
+      "other": "%d jobs move to the kept vehicle"
+    },
+    "%d odometer reading moves": {
+      "one": "%d odometer reading moves",
+      "other": "%d odometer readings move"
+    },
+    "%d period of ownership moves": {
+      "one": "%d period of ownership moves",
+      "other": "%d periods of ownership move"
+    },
+    "%d period of owning a car moves": {
+      "one": "%d period of owning a car moves",
+      "other": "%d periods of owning a car move"
+    },
+    "%d person at the company moves": {
+      "one": "%d person at the company moves",
+      "other": "%d people at the company move"
+    },
+    "%d plate moves": {
+      "one": "%d plate moves",
+      "other": "%d plates move"
+    },
     "%d visit": {
       "one": "%d visit",
       "other": "%d visits"

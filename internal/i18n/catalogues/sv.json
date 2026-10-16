@@ -2133,6 +2133,140 @@
       "one": "%d jobb",
       "other": "%d jobb"
     },
+    "A shared telephone number is often a family. If they are different people, go on.": {
+      "other": "Ett delat telefonnummer är ofta en familj. Är de olika personer, gå vidare."
+    },
+    "Is this somebody we already have?": {
+      "other": "Är det här någon vi redan har?"
+    },
+    "No, a different one": {
+      "other": "Nej, en annan"
+    },
+    "Nothing has been saved. These share something with %s.": {
+      "other": "Inget har sparats. Dessa delar något med %s."
+    },
+    "They are different: make a new customer": {
+      "other": "De är olika: skapa en ny kund"
+    },
+    "Yes, use this one": {
+      "other": "Ja, använd den här"
+    },
+    "Are these the same?": {
+      "other": "Är de samma?"
+    },
+    "Filled in from the other:": {
+      "other": "Fylls i från den andra:"
+    },
+    "Keep the other one instead": {
+      "other": "Behåll den andra i stället"
+    },
+    "Look for the other one": {
+      "other": "Sök efter den andra"
+    },
+    "Names are not enough to say two people are one. Check it is the same person or company before you go on.": {
+      "other": "Namn räcker inte för att säga att två personer är en. Kontrollera att det är samma person eller företag innan du går vidare."
+    },
+    "Share something with it": {
+      "other": "Delar något med den"
+    },
+    "This record:": {
+      "other": "Den här posten:"
+    },
+    "Yes, it is the same car: merge": {
+      "other": "Ja, det är samma bil: slå ihop"
+    },
+    "Yes, they are the same: merge": {
+      "other": "Ja, de är samma: slå ihop"
+    },
+    "cannot be merged": {
+      "other": "kan inte slås ihop"
+    },
+    "kept": {
+      "other": "behålls"
+    },
+    "merged into the other": {
+      "other": "slås ihop med den andra"
+    },
+    "Is this the same as another record?": {
+      "other": "Är det här samma som en annan post?"
+    },
+    "Is this the same car as another record?": {
+      "other": "Är det här samma bil som en annan post?"
+    },
+    "the same company number": {
+      "other": "samma företagsnummer"
+    },
+    "the same email address": {
+      "other": "samma e-postadress"
+    },
+    "the same telephone number": {
+      "other": "samma telefonnummer"
+    },
+    "telephone": {
+      "other": "telefon"
+    },
+    "company number": {
+      "other": "företagsnummer"
+    },
+    "address": {
+      "other": "adress"
+    },
+    "chassis number": {
+      "other": "chassinummer"
+    },
+    "make": {
+      "other": "märke"
+    },
+    "model": {
+      "other": "modell"
+    },
+    "engine": {
+      "other": "motor"
+    },
+    "model year": {
+      "other": "årsmodell"
+    },
+    "They carry different chassis numbers, so they are two cars.": {
+      "other": "De har olika chassinummer, så det är två bilar."
+    },
+    "Both have an owner at the same time. Sell one of them first, so the dates agree.": {
+      "other": "Båda har en ägare samtidigt. Sälj den ena först, så att datumen stämmer."
+    },
+    "They carry the same plate at the same time.": {
+      "other": "De har samma skylt samtidigt."
+    },
+    "%d issued invoice stays exactly as issued": {
+      "one": "%d utfärdad faktura står kvar precis som den utfärdades",
+      "other": "%d utfärdade fakturor står kvar precis som de utfärdades"
+    },
+    "%d job moves to the kept customer": {
+      "one": "%d jobb flyttas till kunden som behålls",
+      "other": "%d jobb flyttas till kunden som behålls"
+    },
+    "%d job moves to the kept vehicle": {
+      "one": "%d jobb flyttas till fordonet som behålls",
+      "other": "%d jobb flyttas till fordonet som behålls"
+    },
+    "%d odometer reading moves": {
+      "one": "%d mätarställning flyttas",
+      "other": "%d mätarställningar flyttas"
+    },
+    "%d period of ownership moves": {
+      "one": "%d ägarperiod flyttas",
+      "other": "%d ägarperioder flyttas"
+    },
+    "%d period of owning a car moves": {
+      "one": "%d period av bilägande flyttas",
+      "other": "%d perioder av bilägande flyttas"
+    },
+    "%d person at the company moves": {
+      "one": "%d person på företaget flyttas",
+      "other": "%d personer på företaget flyttas"
+    },
+    "%d plate moves": {
+      "one": "%d skylt flyttas",
+      "other": "%d skyltar flyttas"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

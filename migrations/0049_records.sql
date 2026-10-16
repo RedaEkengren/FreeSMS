@@ -80,4 +80,4 @@ CREATE POLICY shop_isolation ON customer_people
     WITH CHECK (shop_id = nullif(current_setting('app.current_shop', true), '')::uuid);
 REVOKE ALL ON customer_people FROM freesms_app;
 GRANT SELECT, INSERT ON customer_people TO freesms_app;
-GRANT UPDATE (title, removed_at) ON customer_people TO freesms_app;
+GRANT UPDATE (title, removed_at, customer_id) ON customer_people TO freesms_app;

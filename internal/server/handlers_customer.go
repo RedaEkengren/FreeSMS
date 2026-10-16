@@ -66,7 +66,7 @@ func (s *Server) handleSaveCustomer(w http.ResponseWriter, r *http.Request) {
 
 	customerID := r.FormValue("customer_id")
 	if customerID == "" {
-		created, err := workshop.CreateCustomer(r.Context(), s.pool, session.Scope, workshop.NewCustomer{
+		n := workshop.NewCustomer{
 			Kind:         r.FormValue("kind"),
 			Name:         r.FormValue("name"),
 			ContactName:  r.FormValue("contact_name"),
@@ -78,7 +78,23 @@ func (s *Server) handleSaveCustomer(w http.ResponseWriter, r *http.Request) {
 			AddressLine2: r.FormValue("address_line2"),
 			PostalCode:   r.FormValue("postal_code"),
 			City:         r.FormValue("city"),
-		})
+		}
+		// A second copy of somebody we have is how a register becomes
+		// useless, so a match on an identifier is put in front of the person
+		// before anything is made.
+		created, dups, err := workshop.CreateCustomerChecked(r.Context(), s.pool, session.Scope, n, r.FormValue("not_duplicate") == "1")
+		if err == nil && len(dups) > 0 {
+			job, _, jerr := workshop.JobByID(r.Context(), s.pool, session.Scope, id)
+			if jerr != nil {
+				err = jerr
+			} else {
+				s.render(w, r, http.StatusOK, "duplicates", pageData{
+					Title: "Is this somebody we have?", Session: session, Job: job,
+					Candidates: dups, NewCustomerForm: n, AlsoOwner: r.FormValue("also_owner") == "yes",
+				})
+				return
+			}
+		}
 		if s.customerError(w, r, err) {
 			return
 		}

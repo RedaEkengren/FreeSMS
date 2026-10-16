@@ -261,6 +261,7 @@
     <button type="button" role="tab" data-tab="10">Off sick</button>
     <button type="button" role="tab" data-tab="11">Correct a line</button>
     <button type="button" role="tab" data-tab="12">Work list</button>
+    <button type="button" role="tab" data-tab="13">Records</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1043,6 +1044,45 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: the list is made from the agreed work, the technician ticks off and says a part is in the way, the counter leaves a job out with a reason and a customer decision, and the car cannot be marked ready until everything is done &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/23-work-list.spec.ts">read the test</a>. Registration numbers and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>The same customer, once</h2>
+  <p class="lede">The number changes, the car gets a new plate and the customer suddenly exists twice. The desk corrects the card and sees what changed, who did it and when. A duplicate is asked about before it is made, and two records that are one are joined after a page that says what moves &ndash; issued invoices stay as they were issued.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="9">
+    <div class="an-canvas" role="img" aria-label="Animation: on the customer card a telephone number is corrected and the change shows in the log with the old and the new value. A new customer with the same telephone number is asked whether it is somebody we already have. The merge shows that one job moves and the invoice stays, and then the customer exists once.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">Greta Gren</div>
+              <div class="cl-qrow"><span>Telephone</span><span><s>070-123 45 67</s> &rarr; <span data-type="2,1.2">070-765 43 21</span></span></div>
+              <div class="cl-qrow an-fade" data-t="5"><span>What has been changed</span><span>New number</span></div>
+            </div>
+            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Is this somebody we already have?</div>
+              <div class="cl-qrow"><span>Greta Gren</span><span class="rd-tag rd-risk">the same telephone number</span></div>
+              <span class="an-btn mo-btn an-fade an-off" data-t="12.4">Yes, use this one</span>
+            </div>
+            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">Are these the same?</div>
+              <div class="cl-qrow"><span>1 job moves to the kept customer</span><span></span></div>
+              <div class="cl-qrow"><span>1 issued invoice stays exactly as issued</span><span></span></div>
+              <span class="an-btn mo-btn an-fade an-off" data-t="20">Yes, they are the same: merge</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">The number is wrong. The desk corrects it on the card, and the old number stays in the log with who and when.</div>
+      <div class="an-cap" data-t="8,15.8">A new customer is typed in with the same telephone number. Nothing is saved until the desk has seen who it might be.</div>
+      <div class="an-cap an-off" data-t="16,23.6">It is the same person. The merge says first what moves, and the invoice stays as it was issued.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: the number is corrected, two people editing at once are told, a mistyped plate is rewritten while a new one is added, the car is sold, the duplicate is asked about and the records are merged &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/24-records.spec.ts">read the test</a>. Names and numbers are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

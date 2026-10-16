@@ -45,7 +45,8 @@
   </div>
   <button type="submit" class="secondary">{{.T "It changed plate"}}</button>
 </form>
-<p class="waiting"><a href="/vehicles/{{.Vehicle.ID}}/sell">{{.T "The vehicle was sold"}}</a></p>
+<p class="waiting"><a href="/vehicles/{{.Vehicle.ID}}/sell">{{.T "The vehicle was sold"}}</a>
+  &middot; <a href="/vehicles/{{.Vehicle.ID}}/merge">{{.T "Is this the same car as another record?"}}</a></p>
 {{end}}
 
 {{if gt (len .Vehicle.Registrations) 1}}

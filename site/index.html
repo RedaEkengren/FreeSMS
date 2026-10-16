@@ -261,6 +261,7 @@
     <button type="button" role="tab" data-tab="10">Sjuk tekniker</button>
     <button type="button" role="tab" data-tab="11">Rätta en rad</button>
     <button type="button" role="tab" data-tab="12">Arbetslistan</button>
+    <button type="button" role="tab" data-tab="13">Kunduppgifter</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1043,6 +1044,45 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: listan görs av det godkända arbetet, teknikern bockar av och anger en hindrande del, disken utelämnar ett moment med skäl och ett kundbeslut, och bilen går inte att sätta som klar förrän allt är gjort &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/23-work-list.spec.ts">läs testet</a>. Registreringsnummer och namn är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>Samma kund, en gång</h2>
+  <p class="lede">Numret ändras, bilen byter skylt och kunden finns plötsligt två gånger. Disken rättar på kortet och ser vad som ändrats, vem som gjorde det och när. En dubblett frågas om innan den skapas, och två poster som är en slås ihop efter en sida som säger vad som flyttas &ndash; utfärdade fakturor står kvar som de utfärdades.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="9">
+    <div class="an-canvas" role="img" aria-label="Animering: på kundkortet rättas ett telefonnummer och ändringen syns i loggen med gammalt och nytt värde. Ett nytt kundnamn med samma telefonnummer får frågan om det är någon vi redan har. Sammanslagningen visar att ett jobb flyttas och att fakturan står kvar, och sedan finns kunden en gång.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Kundmottagning</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">Greta Gren</div>
+              <div class="cl-qrow"><span>Telefon</span><span><s>070-123 45 67</s> &rarr; <span data-type="2,1.2">070-765 43 21</span></span></div>
+              <div class="cl-qrow an-fade" data-t="5"><span>Vad som ändrats</span><span>Nytt nummer</span></div>
+            </div>
+            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Är det här någon vi redan har?</div>
+              <div class="cl-qrow"><span>Greta Gren</span><span class="rd-tag rd-risk">samma telefonnummer</span></div>
+              <span class="an-btn mo-btn an-fade an-off" data-t="12.4">Ja, använd den här</span>
+            </div>
+            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">Är de samma?</div>
+              <div class="cl-qrow"><span>1 jobb flyttas till kunden som behålls</span><span></span></div>
+              <div class="cl-qrow"><span>1 utfärdad faktura står kvar precis som den utfärdades</span><span></span></div>
+              <span class="an-btn mo-btn an-fade an-off" data-t="20">Ja, de är samma: slå ihop</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">Numret är fel. Disken rättar det på kortet, och det gamla numret finns kvar i loggen med vem och när.</div>
+      <div class="an-cap" data-t="8,15.8">En ny kund skrivs in med samma telefonnummer. Inget sparas förrän disken har sett vem det kan vara.</div>
+      <div class="an-cap an-off" data-t="16,23.6">Det är samma person. Sammanslagningen säger först vad som flyttas, och fakturan står kvar som den utfärdades.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: numret rättas, två som redigerar samtidigt får veta det, en felskriven skylt skrivs om medan en ny läggs till, bilen säljs, dubbletten frågas om och posterna slås ihop &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/24-records.spec.ts">läs testet</a>. Namn och nummer är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

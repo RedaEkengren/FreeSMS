@@ -1,0 +1,100 @@
+{{define "content"}}
+<h1>{{.T "Are these the same?"}}</h1>
+
+{{if eq .MergeKind "customer"}}
+{{with .CustomerCard}}<p class="waiting">{{$.T "This record:"}} <a href="/customers/{{.ID}}">{{.Name}}</a></p>{{end}}
+{{if not .MergeWith}}
+  {{if .Candidates}}
+  <h2>{{.T "Share something with it"}}</h2>
+  {{range .Candidates}}
+  <a class="card" href="/customers/{{$.CustomerCard.ID}}/merge?with={{.ID}}">
+    <div class="row"><span>{{.Name}}</span><span class="tag">{{$.N "%d job" .Orders}}</span></div>
+    <div class="waiting">{{range $i, $w := .Why}}{{if $i}}, {{end}}{{$.T $w}}{{end}}</div>
+  </a>
+  {{end}}
+  {{end}}
+  <form method="get" action="/customers/{{.CustomerCard.ID}}/merge">
+    <label><span>{{.T "Look for the other one"}}</span><input name="q" value="{{.CustomerQuery}}" autocomplete="off"></label>
+    <button type="submit" class="secondary">{{.T "Look"}}</button>
+  </form>
+  {{range .Customers}}{{if ne .ID $.CustomerCard.ID}}
+  <a class="card" href="/customers/{{$.CustomerCard.ID}}/merge?with={{.ID}}">
+    <div class="row"><span>{{.Name}}</span><span class="tag">{{$.N "%d job" .Orders}}</span></div>
+    <div class="waiting">{{if .Phone}}{{.Phone}}{{end}}{{if .Email}} &middot; {{.Email}}{{end}}{{if .OrgNumber}} &middot; {{.OrgNumber}}{{end}}</div>
+  </a>
+  {{end}}{{end}}
+{{else}}
+  {{with .CustomerMerge}}
+  <p class="waiting">{{$.T "Names are not enough to say two people are one. Check it is the same person or company before you go on."}}</p>
+  <div class="card">
+    <div class="row"><span>{{.Keep.Name}}</span><span class="tag pass">{{$.T "kept"}}</span></div>
+    <div class="waiting">{{if .Keep.Phone}}{{.Keep.Phone}}{{end}}{{if .Keep.Email}} &middot; {{.Keep.Email}}{{end}}{{if .Keep.OrgNumber}} &middot; {{.Keep.OrgNumber}}{{end}}</div>
+  </div>
+  <div class="card">
+    <div class="row"><span>{{.Drop.Name}}</span><span class="tag warranty">{{$.T "merged into the other"}}</span></div>
+    <div class="waiting">{{if .Drop.Phone}}{{.Drop.Phone}}{{end}}{{if .Drop.Email}} &middot; {{.Drop.Email}}{{end}}{{if .Drop.OrgNumber}} &middot; {{.Drop.OrgNumber}}{{end}}</div>
+  </div>
+  <ul class="lines">
+    <li>{{$.N "%d job moves to the kept customer" .Jobs}}</li>
+    <li>{{$.N "%d period of owning a car moves" .Ownerships}}</li>
+    <li>{{$.N "%d person at the company moves" .People}}</li>
+    {{if .FillsIn}}<li>{{$.T "Filled in from the other:"}} {{range $i, $f := .FillsIn}}{{if $i}}, {{end}}{{$.T $f}}{{end}}</li>{{end}}
+    <li>{{$.N "%d issued invoice stays exactly as issued" .Invoices}}</li>
+  </ul>
+  <form method="post" action="/customers/{{$.CustomerCard.ID}}/merge">
+    <input type="hidden" name="drop" value="{{.Drop.ID}}">
+    <input type="hidden" name="keep_revision" value="{{.KeepRevision}}">
+    <input type="hidden" name="drop_revision" value="{{.DropRevision}}">
+    <label><span>{{$.T "Why, if it is worth saying"}}</span><input name="reason" maxlength="300"></label>
+    <button type="submit">{{$.T "Yes, they are the same: merge"}}</button>
+  </form>
+  <p class="waiting"><a href="/customers/{{.Drop.ID}}/merge?with={{.Keep.ID}}">{{$.T "Keep the other one instead"}}</a></p>
+  {{end}}
+{{end}}
+
+{{else}}
+{{with .Vehicle}}<p class="waiting">{{$.T "This record:"}} <a href="/vehicles/{{.ID}}"><span class="plate plate-small">{{.Describe}}</span></a></p>{{end}}
+{{if not .MergeWith}}
+  <form method="get" action="/vehicles/{{.Vehicle.ID}}/merge">
+    <label><span>{{.T "Look for the other one"}}</span><input name="q" value="{{.Query}}" autocomplete="off" autocapitalize="characters"></label>
+    <button type="submit" class="secondary">{{.T "Look"}}</button>
+  </form>
+  {{range .Results}}{{if ne .VehicleID $.Vehicle.ID}}
+  <a class="card" href="/vehicles/{{$.Vehicle.ID}}/merge?with={{.VehicleID}}">
+    <div class="row"><span class="plate">{{.Describe}}</span><span class="tag">{{.MatchedOn}}</span></div>
+    <div class="vehicle">{{.Make}} {{.Model}}{{if .ModelYear}} {{.ModelYear}}{{end}}</div>
+  </a>
+  {{end}}{{end}}
+{{else}}
+  {{with .VehicleMerge}}
+  <div class="card">
+    <div class="row"><span class="plate">{{.Keep.Describe}}</span><span class="tag pass">{{$.T "kept"}}</span></div>
+    <div class="vehicle">{{.Keep.Make}} {{.Keep.Model}}{{if .Keep.VIN}} &middot; {{.Keep.VIN}}{{end}}</div>
+  </div>
+  <div class="card">
+    <div class="row"><span class="plate">{{.Drop.Describe}}</span><span class="tag warranty">{{$.T "merged into the other"}}</span></div>
+    <div class="vehicle">{{.Drop.Make}} {{.Drop.Model}}{{if .Drop.VIN}} &middot; {{.Drop.VIN}}{{end}}</div>
+  </div>
+  {{if .Blocked}}
+  <p class="waiting"><span class="tag late">{{$.T "cannot be merged"}}</span> {{$.T .Blocked}}</p>
+  {{else}}
+  <ul class="lines">
+    <li>{{$.N "%d job moves to the kept vehicle" .Jobs}}</li>
+    <li>{{$.N "%d plate moves" .Plates}}</li>
+    <li>{{$.N "%d period of ownership moves" .Ownerships}}</li>
+    <li>{{$.N "%d odometer reading moves" .Readings}}</li>
+    {{if .FillsIn}}<li>{{$.T "Filled in from the other:"}} {{range $i, $f := .FillsIn}}{{if $i}}, {{end}}{{$.T $f}}{{end}}</li>{{end}}
+  </ul>
+  <form method="post" action="/vehicles/{{$.Vehicle.ID}}/merge">
+    <input type="hidden" name="drop" value="{{.Drop.ID}}">
+    <input type="hidden" name="keep_revision" value="{{.KeepRevision}}">
+    <input type="hidden" name="drop_revision" value="{{.DropRevision}}">
+    <label><span>{{$.T "Why, if it is worth saying"}}</span><input name="reason" maxlength="300"></label>
+    <button type="submit">{{$.T "Yes, it is the same car: merge"}}</button>
+  </form>
+  {{end}}
+  <p class="waiting"><a href="/vehicles/{{.Drop.ID}}/merge?with={{.Keep.ID}}">{{$.T "Keep the other one instead"}}</a></p>
+  {{end}}
+{{end}}
+{{end}}
+{{end}}

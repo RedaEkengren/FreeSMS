@@ -80,3 +80,76 @@ func TestTheCustomerAndVehicleRegistersThroughThePages(t *testing.T) {
 		t.Error("the vehicle still has an owner after the sale")
 	}
 }
+
+// A second copy of somebody is put in front of the desk before it is made, and
+// two records that are one are joined after a page that says what moves.
+func TestDuplicatesAreAskedAboutAndMergedThroughThePages(t *testing.T) {
+	ts, _ := testServer(t)
+	desk, tech := signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	base := ts.URL
+	first := base + intake(t, base, desk, url.Values{"registration": {"DUP 001"}, "complaint": {"Squeal"}})
+	second := base + intake(t, base, desk, url.Values{"registration": {"DUP 002"}, "complaint": {"Squeal"}})
+
+	if status := postStatus(t, desk, first+"/customer", url.Values{"kind": {"private"}, "name": {"Greta Gren"}, "phone": {"070-123 45 67"}}); status != http.StatusSeeOther {
+		t.Fatalf("the first customer answered %d", status)
+	}
+	// The same number again: asked, not made.
+	form := url.Values{"kind": {"private"}, "name": {"G. Gren"}, "phone": {"0701234567"}}
+	status, ask := postBody(t, desk, second+"/customer", form)
+	if status != http.StatusOK || !strings.Contains(ask, "Is this somebody we already have?") || !strings.Contains(ask, "Greta Gren") || !strings.Contains(ask, "the same telephone number") {
+		t.Fatalf("the duplicate warning answered %d: %s", status, ask)
+	}
+	if _, body := page(t, desk, base+"/customers?q=0701234567"); strings.Contains(body, "G. Gren") {
+		t.Error("asking about a duplicate made the customer")
+	}
+	// Same name and nothing else is not a duplicate.
+	if status := postStatus(t, desk, second+"/customer", url.Values{"kind": {"private"}, "name": {"Greta Gren"}, "phone": {"070-999 00 11"}}); status != http.StatusSeeOther {
+		t.Fatalf("a different Greta answered %d", status)
+	}
+
+	// Going on after looking makes the second record.
+	third := base + intake(t, base, desk, url.Values{"registration": {"DUP 003"}, "complaint": {"Squeal"}})
+	form.Set("not_duplicate", "1")
+	if status := postStatus(t, desk, third+"/customer", form); status != http.StatusSeeOther {
+		t.Fatalf("a confirmed create answered %d", status)
+	}
+	_, list := page(t, desk, base+"/customers?q=Gren")
+	id := regexp.MustCompile(`/customers/([0-9a-f-]{36})`).FindStringSubmatch(list)
+	if id == nil {
+		t.Fatal("the confirmed customer is not in the register")
+	}
+	_, card := page(t, desk, base+"/customers/"+id[1])
+	other := regexp.MustCompile(`/customers/([0-9a-f-]{36})/merge`).FindStringSubmatch(card)
+	if other == nil {
+		t.Fatal("the card offers no merge")
+	}
+	m := base + "/customers/" + id[1] + "/merge"
+	_, picker := page(t, desk, m)
+	with := regexp.MustCompile(`merge\?with=([0-9a-f-]{36})`).FindStringSubmatch(picker)
+	if with == nil || !strings.Contains(picker, "the same telephone number") {
+		t.Fatalf("the merge page lists no likely duplicate: %s", picker)
+	}
+	_, review := page(t, desk, m+"?with="+with[1])
+	if !strings.Contains(review, "moves to the kept customer") || !strings.Contains(review, "Yes, they are the same: merge") {
+		t.Fatalf("the review does not say what moves: %s", review)
+	}
+	if status, _ := page(t, tech, m+"?with="+with[1]); status != http.StatusForbidden {
+		t.Errorf("a technician reached the merge review: %d", status)
+	}
+	rev := regexp.MustCompile(`name="keep_revision" value="(\d+)"`).FindStringSubmatch(review)
+	drev := regexp.MustCompile(`name="drop_revision" value="(\d+)"`).FindStringSubmatch(review)
+	post := url.Values{"drop": {with[1]}, "keep_revision": {rev[1]}, "drop_revision": {"99"}}
+	if status := postStatus(t, desk, m, post); status != http.StatusConflict {
+		t.Errorf("a stale merge answered %d, want 409", status)
+	}
+	post.Set("drop_revision", drev[1])
+	if status := postStatus(t, desk, m, post); status != http.StatusSeeOther {
+		t.Fatalf("merging answered %d", status)
+	}
+	if _, body := page(t, desk, base+"/customers/"+with[1]); !strings.Contains(body, "merged") {
+		t.Error("the merged-away record does not say so")
+	}
+	if status := postStatus(t, tech, m, post); status != http.StatusForbidden {
+		t.Errorf("a technician merged: %d", status)
+	}
+}

@@ -67,6 +67,10 @@
 {{end}}
 {{end}}
 
+{{if not .MergedInto}}
+<p class="waiting"><a href="/customers/{{.ID}}/merge">{{$.T "Is this the same as another record?"}}</a></p>
+{{end}}
+
 <h2>{{$.T "Vehicles"}}</h2>
 {{if not .Vehicles}}<p class="empty">{{$.T "No vehicle is recorded as theirs."}}</p>{{else}}
 <ul class="lines">

@@ -1,0 +1,43 @@
+{{define "content"}}
+<div class="row">
+  <span class="plate">{{if .Job.Registration}}{{.Job.Registration}}{{else}}{{.T "no plate"}}{{end}}</span>
+  <span class="tag">#{{.Job.Number}}</span>
+</div>
+<h1>{{.T "Is this somebody we already have?"}}</h1>
+<p class="waiting">{{.T "Nothing has been saved. These share something with %s." .NewCustomerForm.Name}}</p>
+
+{{range .Candidates}}
+<div class="card">
+  <div class="row">
+    <span>{{.Name}}</span>
+    <span class="tag">{{if .Private}}{{$.T "person"}}{{else}}{{$.T "company"}}{{end}}</span>
+  </div>
+  <div class="waiting">{{if .Phone}}{{.Phone}}{{end}}{{if .Email}} &middot; {{.Email}}{{end}}{{if .OrgNumber}} &middot; {{.OrgNumber}}{{end}} &middot; {{$.N "%d job" .Orders}}</div>
+  <p class="waiting">{{range $i, $w := .Why}}{{if $i}}, {{end}}{{$.T $w}}{{end}}</p>
+  <form method="post" action="/jobs/{{$.Job.ID}}/customer">
+    <input type="hidden" name="customer_id" value="{{.ID}}">
+    {{if $.AlsoOwner}}<input type="hidden" name="also_owner" value="yes">{{end}}
+    <button type="submit">{{$.T "Yes, use this one"}}</button>
+  </form>
+</div>
+{{end}}
+
+<h2>{{.T "No, a different one"}}</h2>
+<p class="waiting">{{.T "A shared telephone number is often a family. If they are different people, go on."}}</p>
+<form method="post" action="/jobs/{{.Job.ID}}/customer">
+  <input type="hidden" name="not_duplicate" value="1">
+  <input type="hidden" name="kind" value="{{.NewCustomerForm.Kind}}">
+  <input type="hidden" name="name" value="{{.NewCustomerForm.Name}}">
+  <input type="hidden" name="contact_name" value="{{.NewCustomerForm.ContactName}}">
+  <input type="hidden" name="org_number" value="{{.NewCustomerForm.OrgNumber}}">
+  <input type="hidden" name="vat_number" value="{{.NewCustomerForm.VATNumber}}">
+  <input type="hidden" name="phone" value="{{.NewCustomerForm.Phone}}">
+  <input type="hidden" name="email" value="{{.NewCustomerForm.Email}}">
+  <input type="hidden" name="address_line1" value="{{.NewCustomerForm.AddressLine1}}">
+  <input type="hidden" name="address_line2" value="{{.NewCustomerForm.AddressLine2}}">
+  <input type="hidden" name="postal_code" value="{{.NewCustomerForm.PostalCode}}">
+  <input type="hidden" name="city" value="{{.NewCustomerForm.City}}">
+  {{if .AlsoOwner}}<input type="hidden" name="also_owner" value="yes">{{end}}
+  <button type="submit" class="secondary">{{.T "They are different: make a new customer"}}</button>
+</form>
+{{end}}
