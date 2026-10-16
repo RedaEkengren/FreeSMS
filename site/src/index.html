@@ -273,6 +273,7 @@
     <button type="button" role="tab" data-tab="19">Obetalt</button>
     <button type="button" role="tab" data-tab="20">Dagens slut</button>
     <button type="button" role="tab" data-tab="21">Bokningen bekräftas</button>
+    <button type="button" role="tab" data-tab="22">Bilen kommer tillbaka</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1328,6 +1329,40 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare mot en riktig e-postserver: bekräftelsen förhandsvisas och landar i en brevlåda, en påminnelse stoppas av en flytt och kunden sägs för hand &ndash; <a href="{{test "e2e/tests/32-booking-messages.spec.ts" "a booking confirmed by email, a reminder stopped by a move, and told by hand"}}">läs testet</a>. Namn och tider är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>När bilen kommer tillbaka</h2>
+  <p class="lede">Att kunden kommer tillbaka är inte samma sak som att reparationen var fel. Ett återbesök öppnar ett eget jobb på samma bil och skriver ner vad kunden säger, men avgör ingenting om vems fel det var. Verkstadens ställningstagande &ndash; garanti, kulans, orelaterat &ndash; är en rad med anledning, och kan ändras utan att det tidigare försvinner. Ett krav på leverantören kräver att ärendet kallats garanti, och kan avslås och drivas vidare.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: ett återbesök öppnas med vad kunden anmäler. Verkstaden kallar det garanti och skriver varför. Ett krav på leverantören ställs, avslås och godkänns sedan efter en diskussion.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">{{t "What was reported"}}</div>
+              <div class="cl-qrow"><span>Gnisslar igen vid låg fart</span><span class="rd-tag">{{t "reported"}}</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "Where the shop stands"}}</div>
+              <div class="cl-qrow"><span>Klossen släppte från underlaget</span><span class="rd-tag pass">{{t "warranty"}}</span></div>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">{{t "Claims on suppliers"}}</div>
+              <div class="cl-qrow"><span>Bromsgrossen &middot; 900</span><span class="rd-tag rd-risk">{{t "claim rejected"}}</span></div>
+              <div class="cl-qrow an-fade" data-t="20"><span>Bromsgrossen &middot; 600</span><span class="rd-tag pass">{{t "claim accepted"}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">Återbesöket skriver ner vad kunden säger och när bilen kom, men inte vems fel det var. Att utreda avgör ingenting.</div>
+      <div class="an-cap" data-t="8,15.8">Garanti, kulans och orelaterat kräver var sin anledning. Ändras ställningstagandet ligger det första kvar i historiken.</div>
+      <div class="an-cap" data-t="16,23.6">Leverantören avslår, verkstaden driver vidare och får ett lägre belopp godkänt. Varje svar är en rad, och originalfakturan rörs aldrig.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: ett återbesök öppnas från ett fakturerat jobb, ett ställningstagande kräver sin anledning, ett leverantörskrav avslås och drivs, och en tekniker ser vad som anmälts men inga pengar &ndash; <a href="{{test "e2e/tests/33-comeback.spec.ts" "a car comes back, the shop takes a position, and a supplier claim is argued"}}">läs testet</a>. Namn och belopp är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

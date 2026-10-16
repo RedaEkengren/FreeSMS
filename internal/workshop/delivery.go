@@ -69,6 +69,20 @@ type SummaryContent struct {
 	Unfinished      []SummaryItem       `json:"unfinished,omitempty"`
 	Unresolved      []SummaryItem       `json:"unresolved,omitempty"`
 	Recommendations []SummaryItem       `json:"recommendations,omitempty"`
+	// Set when the visit was a return for an earlier repair.
+	Return *SummaryReturn `json:"return,omitempty"`
+}
+
+// SummaryReturn is what the customer is told about a return visit: what they
+// reported and, only where the workshop has decided to cover it, that it did.
+// Nothing here says whose fault it was; the reasons stay inside the workshop.
+type SummaryReturn struct {
+	OriginalNumber int64      `json:"original_number"`
+	Reported       string     `json:"reported"`
+	ReturnedOn     *time.Time `json:"returned_on,omitempty"`
+	// "warranty" or "goodwill" when the repair is without charge for that
+	// reason; empty otherwise.
+	Covered string `json:"covered,omitempty"`
 }
 
 // Empty reports that nothing was recorded as done, left or noticed.
@@ -313,6 +327,25 @@ func draftTx(ctx context.Context, tx pgx.Tx, jobID string) (SummaryContent, erro
 		return nil
 	}); err != nil {
 		return c, err
+	}
+
+	var ret SummaryReturn
+	var kind string
+	err = tx.QueryRow(ctx, `
+		SELECT o.number, cb.symptoms, cb.returned_on::timestamptz,
+		       coalesce((SELECT e.kind FROM comeback_events e
+		         WHERE e.comeback_id = cb.id AND e.kind IN ('reported', 'investigating', 'warranty', 'goodwill', 'unrelated')
+		         ORDER BY e.at DESC, e.id DESC LIMIT 1), '')
+		FROM comebacks cb JOIN work_orders o ON o.id = cb.original_work_order_id
+		WHERE cb.follow_up_work_order_id = $1`, jobID).Scan(&ret.OriginalNumber, &ret.Reported, &ret.ReturnedOn, &kind)
+	switch {
+	case err == nil:
+		if kind == "warranty" || kind == "goodwill" {
+			ret.Covered = kind
+		}
+		c.Return = &ret
+	case !errors.Is(err, pgx.ErrNoRows):
+		return c, fmt.Errorf("draft return visit: %w", err)
 	}
 	return c, nil
 }

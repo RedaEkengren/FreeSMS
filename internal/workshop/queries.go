@@ -65,6 +65,13 @@ type Job struct {
 	OpenRequests int
 	OpenFindings int
 
+	// Set when this job is a return visit for the repair on job ReturnOf, with
+	// what was reported; Returns is how many times this job was come back to.
+	// Only JobByID fills them.
+	ReturnOf       int64
+	ReturnSymptoms string
+	Returns        int
+
 	// Somebody other than the caller with a clock running on this job. Handing
 	// the car back stops the caller's clock and not theirs, so the page has to
 	// say so rather than leaving it to be discovered on Friday.
@@ -95,6 +102,8 @@ func (j Job) AcceptsWork() bool { return State(j.State).AcceptsWork() }
 
 // Line is one line of a work order.
 type Line struct {
+	// Only JobByID fills it.
+	ID            string
 	Position      int
 	Kind          string
 	Description   string
@@ -299,8 +308,17 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 		}
 		job = j
 
+		if err := tx.QueryRow(ctx, `
+			SELECT coalesce((SELECT o.number FROM comebacks cb JOIN work_orders o ON o.id = cb.original_work_order_id
+			                  WHERE cb.follow_up_work_order_id = $1), 0),
+			       coalesce((SELECT cb.symptoms FROM comebacks cb WHERE cb.follow_up_work_order_id = $1), ''),
+			       (SELECT count(*) FROM comebacks cb WHERE cb.original_work_order_id = $1)`,
+			id).Scan(&job.ReturnOf, &job.ReturnSymptoms, &job.Returns); err != nil {
+			return fmt.Errorf("read return visits: %w", err)
+		}
+
 		rows, err := tx.Query(ctx, `
-			SELECT position, kind, description,
+			SELECT id::text, position, kind, description,
 			       -- Thousandths, taken as an integer. quantity is
 			       -- numeric(12,3), so this is exact; reading it as a float
 			       -- would put a floating point value in the middle of a
@@ -316,7 +334,7 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 		defer rows.Close()
 		for rows.Next() {
 			var l Line
-			if err := rows.Scan(&l.Position, &l.Kind, &l.Description, &l.QuantityMilli,
+			if err := rows.Scan(&l.ID, &l.Position, &l.Kind, &l.Description, &l.QuantityMilli,
 				&l.CostBearer, &l.ApprovedAt, &l.DeclinedAt, &l.PerformedAt, &l.FromAnswer, &l.UnitPriceMinor, &l.EstimatedMinor,
 				&l.VATRateBasis, &l.Revision, &l.WithdrawnAt, &l.WithdrawnReason, &l.PartID); err != nil {
 				return fmt.Errorf("scan line: %w", err)

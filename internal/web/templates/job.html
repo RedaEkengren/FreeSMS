@@ -16,6 +16,7 @@
   {{with .Step.Action}}<p><strong>{{$.T "Next:"}}</strong> {{$.T .}}{{with $.Step.Owner.Label}} <span class="tag">{{$.T .}}</span>{{end}}</p>{{end}}
   {{with .Step.Missing}}<p class="waiting">{{$.T "Not known yet:"}} {{range $i, $m := .}}{{if $i}}, {{end}}{{$.T $m}}{{end}}</p>{{end}}
   {{if and .Job.BookingID .Session.Scope.Role.SeesCustomerPersonalData}}<p class="waiting"><a href="/bookings/{{.Job.BookingID}}">{{.T "The booking this car came for"}}</a></p>{{end}}
+  {{if .Job.ReturnOf}}<p class="waiting"><span class="tag warranty">{{.T "Return visit"}}</span> {{.T "for the repair on job %s:" (printf "%d" .Job.ReturnOf)}} {{.Job.ReturnSymptoms}}</p>{{end}}
   {{if and .Job.EnquiryID .Session.Scope.Role.SeesCustomerPersonalData}}<p class="waiting"><a href="/enquiries/{{.Job.EnquiryID}}">{{.T "The enquiry and the price they accepted"}}</a></p>{{end}}
 </div>
 </div>
@@ -30,7 +31,7 @@
      default and the desk is the exception. */}}
 <div class="split">
 <div class="side">
-<p class="waiting"><a href="/jobs/{{.Job.ID}}/timeline">{{.T "What has happened, and where it stands"}}</a>{{if .Session.Scope.Role.SeesCustomerPersonalData}} &middot; <a href="/jobs/{{.Job.ID}}/summary">{{.T "Repair summary"}}</a>{{end}}</p>
+<p class="waiting"><a href="/jobs/{{.Job.ID}}/timeline">{{.T "What has happened, and where it stands"}}</a>{{if .Session.Scope.Role.SeesCustomerPersonalData}} &middot; <a href="/jobs/{{.Job.ID}}/summary">{{.T "Repair summary"}}</a> &middot; <a href="/jobs/{{.Job.ID}}/comeback">{{.T "Return visit"}}</a>{{if .Job.Returns}} <span class="tag late">{{.T "come back to: %s" ($.Num .Job.Returns)}}</span>{{end}}{{end}}</p>
 <div id="live-status" data-live="job:{{.Job.ID}}">
 <div id="clock">{{template "clock" .}}</div>
 {{if .Job.OthersRunning}}<p class="waiting">{{.T "%s still has a clock running on this job." .Job.OthersRunning}}</p>{{end}}

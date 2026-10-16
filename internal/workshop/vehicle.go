@@ -174,6 +174,14 @@ type HistoryEntry struct {
 	CustomerName  string
 	GrossMinor    int64
 	HasInvoice    bool
+
+	// This job was a return visit for the repair on job ComebackOf, and
+	// ComebackKind is where the shop's position stands. Neither says whose
+	// fault anything was unless a person said so.
+	ComebackOf   int64
+	ComebackKind string
+	// This job was come back to this many times.
+	ComebackCount int
 }
 
 // StateLabel is the condition the job was left in, as a catalogue key.
@@ -287,8 +295,15 @@ func VehicleByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 			       coalesce(i.gross_minor, 0), i.id IS NOT NULL,
 			       (SELECT o.km FROM odometer_readings o
 			         WHERE o.vehicle_id = w.vehicle_id AND o.read_at <= w.opened_at
-			         ORDER BY o.read_at DESC LIMIT 1)
+			         ORDER BY o.read_at DESC LIMIT 1),
+			       coalesce(orig.number, 0),
+			       coalesce((SELECT e.kind FROM comeback_events e
+			         WHERE e.comeback_id = cb.id AND e.kind IN ('reported', 'investigating', 'warranty', 'goodwill', 'unrelated')
+			         ORDER BY e.at DESC, e.id DESC LIMIT 1), ''),
+			       (SELECT count(*) FROM comebacks c2 WHERE c2.original_work_order_id = w.id)
 			FROM work_orders w
+			LEFT JOIN comebacks cb ON cb.follow_up_work_order_id = w.id
+			LEFT JOIN work_orders orig ON orig.id = cb.original_work_order_id
 			LEFT JOIN customers c ON c.id = w.customer_id
 			LEFT JOIN people cp   ON cp.id = c.person_id
 			LEFT JOIN invoices i  ON i.work_order_id = w.id AND i.credit_of_id IS NULL
@@ -302,7 +317,8 @@ func VehicleByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 			var h HistoryEntry
 			var customer string
 			if err := rows.Scan(&h.WorkOrderID, &h.Number, &h.State, &h.OpenedAt, &h.Complaint,
-				&h.PreviousOwner, &customer, &h.GrossMinor, &h.HasInvoice, &h.OdometerKm); err != nil {
+				&h.PreviousOwner, &customer, &h.GrossMinor, &h.HasInvoice, &h.OdometerKm,
+				&h.ComebackOf, &h.ComebackKind, &h.ComebackCount); err != nil {
 				rows.Close()
 				return fmt.Errorf("scan history: %w", err)
 			}

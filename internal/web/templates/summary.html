@@ -56,6 +56,7 @@
 
 {{define "draft"}}
 {{with .Draft}}
+{{with .Return}}<h3>{{$.T "A return visit"}}</h3><p>{{.Reported}}{{if .Covered}} <span class="tag pass">{{$.T .Covered}}</span>{{end}}</p>{{end}}
 {{if .Completed}}<h3>{{$.T "What was done"}}</h3><ul class="lines">{{range .Completed}}<li>{{.Text}}</li>{{end}}</ul>{{end}}
 {{if .Parts}}<h3>{{$.T "Parts fitted"}}</h3><ul class="lines">{{range .Parts}}<li>{{.Name}} &times; {{.Count}}</li>{{end}}</ul>{{end}}
 {{if .Inspections}}<h3>{{$.T "Checks made"}}</h3><ul class="lines">{{range .Inspections}}<li>{{.Name}}: {{$.T "%d in order" .Passed}}{{if .Attention}}, {{$.T "%d to keep an eye on" .Attention}}{{end}}{{if .Failed}}, {{$.T "%d need doing" .Failed}}{{end}}</li>{{end}}</ul>{{end}}

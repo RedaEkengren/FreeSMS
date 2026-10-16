@@ -18,6 +18,11 @@
 {{if $.Summary.Replaces}}<p class="waiting"><span class="tag warranty">{{$.T "replaces version %d" $.Summary.Replaces}}</span></p>{{end}}
 {{if $.Summary.Superseded}}<p class="waiting"><span class="tag late">{{$.T "a later version has replaced this one"}}</span></p>{{end}}
 
+{{with .Return}}
+<h2>{{$.T "A return visit"}}</h2>
+<p>{{$.T "You came back about the repair on job %s:" (printf "%d" .OriginalNumber)}} {{.Reported}}</p>
+{{if eq .Covered "warranty"}}<p><span class="tag pass">{{$.T "Without charge: warranty"}}</span></p>{{else if eq .Covered "goodwill"}}<p><span class="tag pass">{{$.T "Without charge: goodwill"}}</span></p>{{end}}
+{{end}}
 {{if .Completed}}
 <h2>{{$.T "What was done"}}</h2>
 <ul class="lines">{{range .Completed}}<li><div class="row"><span>{{.Text}}</span>{{if .At}}<span class="waiting">{{$.Date ($.Local .At) "2 Jan"}}</span>{{end}}</div></li>{{end}}</ul>

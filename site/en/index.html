@@ -270,6 +270,7 @@
     <button type="button" role="tab" data-tab="19">Unpaid</button>
     <button type="button" role="tab" data-tab="20">Closing the day</button>
     <button type="button" role="tab" data-tab="21">Booking confirmed</button>
+    <button type="button" role="tab" data-tab="22">The car comes back</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1382,6 +1383,40 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser, against a real mail server: the confirmation is previewed and lands in a mailbox, a reminder is stopped by a move, and the customer is told by hand &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/32-booking-messages.spec.ts">read the test</a>. Names and times are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>When the car comes back</h2>
+  <p class="lede">A customer coming back is not the same as the repair being wrong. A return visit opens a job of its own on the same car and writes down what the customer says, but decides nothing about whose fault it was. The shop's position &ndash; warranty, goodwill, unrelated &ndash; is a row with a reason, and can change without the earlier ones disappearing. A claim on the supplier needs the case called warranty, and can be rejected and argued.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: a return visit is opened with what the customer reports. The shop calls it warranty and writes why. A claim on the supplier is filed, rejected and then accepted after an argument.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">What was reported</div>
+              <div class="cl-qrow"><span>Squeals again at low speed</span><span class="rd-tag">reported</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Where the shop stands</div>
+              <div class="cl-qrow"><span>The pad let go of its backing</span><span class="rd-tag pass">warranty</span></div>
+            </div>            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">Claims on suppliers</div>
+              <div class="cl-qrow"><span>Bromsgrossen &middot; 900</span><span class="rd-tag rd-risk">claim rejected</span></div>
+              <div class="cl-qrow an-fade an-off" data-t="20"><span>Bromsgrossen &middot; 600</span><span class="rd-tag pass">claim accepted</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">The return visit writes down what the customer says and when the car came, but not whose fault it was. Looking into it decides nothing.</div>
+      <div class="an-cap" data-t="8,15.8">Warranty, goodwill and unrelated each need a reason. If the position changes, the first stays in the history.</div>
+      <div class="an-cap an-off" data-t="16,23.6">The supplier rejects, the shop argues and gets a lower amount accepted. Every answer is a row, and the original invoice is never touched.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: a return visit is opened from an invoiced job, a position needs its reason, a supplier claim is rejected and argued, and a technician sees what was reported but no money &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/33-comeback.spec.ts">read the test</a>. Names and amounts are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

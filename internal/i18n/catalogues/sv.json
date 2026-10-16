@@ -3451,6 +3451,177 @@
     "retry": {
       "other": "försöker igen"
     },
+    "%s km": {
+      "other": "%s km"
+    },
+    "%s km at the first repair": {
+      "other": "%s km vid första reparationen"
+    },
+    "%s min clocked": {
+      "other": "%s min stämplade"
+    },
+    "%s without a cost price": {
+      "other": "%s utan inköpspris"
+    },
+    "A claim can be filed once the case is called warranty.": {
+      "other": "Ett krav kan ställas när ärendet har kallats garanti."
+    },
+    "A note on the return visit": {
+      "other": "En anteckning om återbesöket"
+    },
+    "A return visit": {
+      "other": "Ett återbesök"
+    },
+    "Amount asked for": {
+      "other": "Begärt belopp"
+    },
+    "Came back": {
+      "other": "Kom tillbaka"
+    },
+    "Came back on": {
+      "other": "Kom tillbaka den"
+    },
+    "Claims on suppliers": {
+      "other": "Krav på leverantörer"
+    },
+    "File a claim": {
+      "other": "Ställ ett krav"
+    },
+    "History": {
+      "other": "Historik"
+    },
+    "Looking into it decides nothing. Warranty, goodwill and unrelated each need a reason, and can be changed; the earlier ones stay in the history.": {
+      "other": "Att utreda avgör ingenting. Garanti, kulans och orelaterat kräver var sin anledning och kan ändras; de tidigare stannar kvar i historiken."
+    },
+    "Nothing has been added or clocked on the follow-up job yet.": {
+      "other": "Inget har lagts till eller stämplats på uppföljningsjobbet än."
+    },
+    "Open a return visit": {
+      "other": "Öppna ett återbesök"
+    },
+    "Parts are counted at the shop's cost price and time as clocked. No wage is assumed.": {
+      "other": "Delar räknas till verkstadens inköpspris och tid som den stämplats. Ingen lön antas."
+    },
+    "Position": {
+      "other": "Ställningstagande"
+    },
+    "Record their answer": {
+      "other": "Skriv ner deras svar"
+    },
+    "Return visit": {
+      "other": "Återbesök"
+    },
+    "Return visit: %s": {
+      "other": "Återbesök: %s"
+    },
+    "Supplier": {
+      "other": "Leverantör"
+    },
+    "The car came back after job %s": {
+      "other": "Bilen kom tillbaka efter jobb %s"
+    },
+    "The car came back; follow-up is job %s": {
+      "other": "Bilen kom tillbaka; uppföljningen är jobb %s"
+    },
+    "The car has a new owner": {
+      "other": "Bilen har en ny ägare"
+    },
+    "The follow-up job": {
+      "other": "Uppföljningsjobbet"
+    },
+    "The operation, if it is one": {
+      "other": "Momentet, om det är ett"
+    },
+    "The person who brought it back is not the one who paid for the first repair.": {
+      "other": "Den som lämnade in bilen igen är inte den som betalade för första reparationen."
+    },
+    "The repair as a whole": {
+      "other": "Reparationen som helhet"
+    },
+    "They said": {
+      "other": "De svarade"
+    },
+    "This opens a new job on the same car. It decides nothing about whose fault it was.": {
+      "other": "Detta öppnar ett nytt jobb på samma bil. Det avgör ingenting om vems fel det var."
+    },
+    "Times this job was come back to": {
+      "other": "Gånger detta jobb har fått återbesök"
+    },
+    "What the customer says is wrong": {
+      "other": "Vad kunden säger är fel"
+    },
+    "What the repair used": {
+      "other": "Vad reparationen gick åt"
+    },
+    "What was reported": {
+      "other": "Vad som anmäldes"
+    },
+    "Where the shop stands": {
+      "other": "Verkstadens ställning"
+    },
+    "Without charge: goodwill": {
+      "other": "Utan kostnad: kulans"
+    },
+    "Without charge: warranty": {
+      "other": "Utan kostnad: garanti"
+    },
+    "You came back about the repair on job %s:": {
+      "other": "Du kom tillbaka angående reparationen på jobb %s:"
+    },
+    "as filed": {
+      "other": "som ställt"
+    },
+    "being looked into": {
+      "other": "utreds"
+    },
+    "claim accepted": {
+      "other": "krav godkänt"
+    },
+    "claim filed": {
+      "other": "krav ställt"
+    },
+    "claim paid": {
+      "other": "krav betalt"
+    },
+    "claim rejected": {
+      "other": "krav avslaget"
+    },
+    "claim waiting": {
+      "other": "krav väntar på svar"
+    },
+    "come back to: %s": {
+      "other": "återbesök: %s"
+    },
+    "for the repair on job %s:": {
+      "other": "för reparationen på jobb %s:"
+    },
+    "goodwill": {
+      "other": "kulans"
+    },
+    "job %s": {
+      "other": "jobb %s"
+    },
+    "nobody has said": {
+      "other": "ingen har sagt"
+    },
+    "parts at cost %s": {
+      "other": "delar till inköpspris %s"
+    },
+    "reported": {
+      "other": "anmält"
+    },
+    "the supplier": {
+      "other": "leverantören"
+    },
+    "the workshop": {
+      "other": "verkstaden"
+    },
+    "unrelated to the first repair": {
+      "other": "orelaterat till första reparationen"
+    },
+    "warranty": {
+      "other": "garanti"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

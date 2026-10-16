@@ -290,6 +290,50 @@ func timelineTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID string
 		return nil, err
 	}
 
+	// A return visit: what was reported and the positions taken, on the job
+	// that followed it up; and on the job it was about, that the car came back.
+	// Claims are money matters and belong to the counter.
+	if err := add(collect(ctx, tx, `
+		SELECT e.id::text, e.at, e.kind, coalesce(e.note, ''), coalesce(p.display_name, ''), o.number, cb.symptoms
+		FROM comeback_events e JOIN comebacks cb ON cb.id = e.comeback_id
+		JOIN work_orders o ON o.id = cb.original_work_order_id
+		LEFT JOIN users u ON u.id = e.by_user LEFT JOIN people p ON p.id = u.person_id
+		WHERE cb.follow_up_work_order_id = $1 AND (e.kind NOT LIKE 'claim\_%' OR $2)`, append(job, desk), func(r pgx.Rows) (Event, error) {
+		var e Event
+		var kind, note, symptoms string
+		var original int64
+		if err := r.Scan(&e.id, &e.At, &kind, &note, &e.Actor, &original, &symptoms); err != nil {
+			return e, err
+		}
+		e.Kind, e.rank = "comeback", 1
+		switch kind {
+		case "reported":
+			e.Label, e.Arg, e.Detail = "The car came back after job %s", fmt.Sprint(original), symptoms
+		case "note":
+			e.Label, e.Detail = "A note on the return visit", note
+		default:
+			e.Label, e.Arg, e.ArgKey, e.Detail = "Return visit: %s", ComebackKindLabel(kind), true, note
+		}
+		return e, nil
+	})); err != nil {
+		return nil, err
+	}
+	if err := add(collect(ctx, tx, `
+		SELECT cb.id::text, cb.opened_at, f.number, coalesce(p.display_name, '')
+		FROM comebacks cb JOIN work_orders f ON f.id = cb.follow_up_work_order_id
+		LEFT JOIN users u ON u.id = cb.opened_by LEFT JOIN people p ON p.id = u.person_id
+		WHERE cb.original_work_order_id = $1`, job, func(r pgx.Rows) (Event, error) {
+		var e Event
+		var number int64
+		if err := r.Scan(&e.id, &e.At, &number, &e.Actor); err != nil {
+			return e, err
+		}
+		e.Kind, e.Label, e.Arg, e.rank = "comeback", "The car came back; follow-up is job %s", fmt.Sprint(number), 1
+		return e, nil
+	})); err != nil {
+		return nil, err
+	}
+
 	// State.
 	if err := add(collect(ctx, tx, `
 		SELECT c.id::text, c.at, c.to_state, coalesce(p.display_name, '')

@@ -483,6 +483,8 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /day", s.requireSession(s.handleDay))
 	mux.HandleFunc("POST /day/settlement", s.requireSession(s.handleDaySettlement))
 	mux.HandleFunc("POST /day/review", s.requireSession(s.handleDayReview))
+	mux.HandleFunc("GET /jobs/{id}/comeback", s.requireSession(s.handleComebackPage))
+	mux.HandleFunc("POST /jobs/{id}/comeback", s.requireSession(s.handleComeback))
 	mux.HandleFunc("GET /invoices/{id}/followup", s.requireSession(s.handleFollowUpPage))
 	mux.HandleFunc("POST /invoices/{id}/followup", s.requireSession(s.handleFollowUp))
 	mux.HandleFunc("POST /invoices/{id}/reminder", s.requireSession(s.handleReminder))

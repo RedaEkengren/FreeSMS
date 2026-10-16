@@ -1,0 +1,110 @@
+{{define "content"}}
+<div class="row">
+  <span class="plate">{{if .Job.Registration}}{{.Job.Registration}}{{else}}{{.T "no plate"}}{{end}}</span>
+  <span class="tag">#{{.Job.Number}}</span>
+</div>
+<h1>{{.T "Return visit"}}</h1>
+<p class="waiting"><a href="/jobs/{{.Job.ID}}">{{.T "Back to the job"}}</a></p>
+
+{{with .Comeback}}
+{{/* This job is a return visit. Opening one decides nothing about whose fault it was. */}}
+<dl>
+  <dt>{{$.T "About"}}</dt><dd><a href="/jobs/{{.OriginalJobID}}/comeback">{{$.T "job %s" (printf "%d" .OriginalNumber)}}</a>{{if .OriginalLine}} &middot; {{.OriginalLine}}{{end}}</dd>
+  <dt>{{$.T "Came back"}}</dt><dd>{{$.Date .ReturnedOn "Mon 2 Jan 2006"}}{{if .OdometerKm}} &middot; {{$.T "%s km" ($.Num .Odometer)}}{{end}}{{if .OriginalOdometer}} ({{$.T "%s km at the first repair" ($.Num .FirstOdometer)}}){{end}}</dd>
+  <dt>{{$.T "Where it stands"}}</dt><dd><span class="tag {{if .Settled}}pass{{else}}warranty{{end}}">{{$.T .Label}}</span>{{if .KindNote}} {{.KindNote}}{{end}}</dd>
+</dl>
+<h2>{{$.T "What was reported"}}</h2>
+<p>{{.Symptoms}}</p>
+{{if .OwnerChanged}}<p class="waiting"><span class="tag late">{{$.T "The car has a new owner"}}</span> {{$.T "The person who brought it back is not the one who paid for the first repair."}}</p>{{end}}
+
+<h2>{{$.T "Where the shop stands"}}</h2>
+<p class="waiting">{{$.T "Looking into it decides nothing. Warranty, goodwill and unrelated each need a reason, and can be changed; the earlier ones stay in the history."}}</p>
+<form method="post" action="/jobs/{{$.Job.ID}}/comeback">
+  <input type="hidden" name="action" value="classify">
+  <input type="hidden" name="case" value="{{.ID}}">
+  <div class="pair">
+    <label><span>{{$.T "Position"}}</span>
+      <select name="kind">{{range $.Positions}}<option value="{{.Value}}"{{if eq .Value $.Comeback.Kind}} selected{{end}}>{{$.T .Label}}</option>{{end}}</select></label>
+    <label><span>{{$.T "Why"}}</span><input name="note" maxlength="500"></label>
+  </div>
+  <button type="submit" class="secondary">{{$.T "Save"}}</button>
+</form>
+<form method="post" action="/jobs/{{$.Job.ID}}/comeback">
+  <input type="hidden" name="action" value="note">
+  <input type="hidden" name="case" value="{{.ID}}">
+  <label><span>{{$.T "Note"}}</span><input name="note" maxlength="500" required></label>
+  <button type="submit" class="secondary">{{$.T "Write it down"}}</button>
+</form>
+
+<h2>{{$.T "What the repair used"}}</h2>
+{{if .Costs}}
+<ul class="lines">
+{{range .Costs}}<li><div class="row"><span>{{$.T .BearerLabel}}</span>
+  <span class="waiting">{{if .PartsCost}}{{$.T "parts at cost %s" ($.Money .PartsCost)}}{{end}}{{if .PartsUnpriced}} {{$.T "%s without a cost price" ($.Num .PartsUnpriced)}}{{end}} {{if .LabourSeconds}}{{$.T "%s min clocked" ($.Num .Minutes)}}{{end}}</span></div></li>{{end}}
+</ul>
+<p class="waiting">{{$.T "Parts are counted at the shop's cost price and time as clocked. No wage is assumed."}}</p>
+{{else}}<p class="empty">{{$.T "Nothing has been added or clocked on the follow-up job yet."}}</p>{{end}}
+<p><a href="/jobs/{{.FollowUpJobID}}">{{$.T "The follow-up job"}}</a></p>
+
+<h2>{{$.T "Claims on suppliers"}}</h2>
+{{range .Claims}}
+<div class="row"><span>{{.Supplier}}{{if .Reference}} &middot; {{.Reference}}{{end}}{{if .AmountMinor}} &middot; {{$.Money .Amount}}{{end}}</span>
+  <span class="tag {{if eq .Status "paid"}}pass{{else if eq .Status "rejected"}}late{{else}}warranty{{end}}">{{$.T .StatusLabel}}</span></div>
+{{if ne .Status "paid"}}
+<form method="post" action="/jobs/{{$.Job.ID}}/comeback">
+  <input type="hidden" name="action" value="answer">
+  <input type="hidden" name="claim" value="{{.ID}}">
+  <div class="pair">
+    <label><span>{{$.T "They said"}}</span><select name="status">{{range $.ClaimStates}}<option value="{{.Value}}">{{$.T .Label}}</option>{{end}}</select></label>
+    <label><span>{{$.T "Amount"}}</span><input name="amount" inputmode="decimal" placeholder="{{$.T "as filed"}}"></label>
+  </div>
+  <label><span>{{$.T "Note"}}</span><input name="note" maxlength="500"></label>
+  <button type="submit" class="secondary">{{$.T "Record their answer"}}</button>
+</form>
+{{end}}
+{{end}}
+{{if eq .Kind "warranty"}}
+<form method="post" action="/jobs/{{$.Job.ID}}/comeback">
+  <input type="hidden" name="action" value="claim">
+  <input type="hidden" name="case" value="{{.ID}}">
+  <div class="pair">
+    <label><span>{{$.T "Supplier"}}</span><input name="supplier" required maxlength="100"></label>
+    <label><span>{{$.T "Their reference"}}</span><input name="reference" maxlength="100"></label>
+  </div>
+  <label><span>{{$.T "Amount asked for"}}</span><input name="amount" inputmode="decimal"></label>
+  <button type="submit" class="secondary">{{$.T "File a claim"}}</button>
+</form>
+{{else}}<p class="waiting">{{$.T "A claim can be filed once the case is called warranty."}}</p>{{end}}
+
+<h2>{{$.T "History"}}</h2>
+<ul class="lines">
+{{range .Events}}<li><div class="row"><span>{{$.T .Label}}{{if .Note}}: {{.Note}}{{end}}</span><span class="waiting">{{.By}} &middot; {{$.Date ($.Local .At) "2 Jan 15:04"}}</span></div></li>{{end}}
+</ul>
+{{end}}
+
+{{if .Comebacks}}
+<h2>{{.T "Times this job was come back to"}}</h2>
+<ul class="lines">
+{{range .Comebacks}}<li><div class="row"><a href="/jobs/{{.FollowUpJobID}}/comeback">{{$.T "job %s" (printf "%d" .FollowUpNumber)}} &middot; {{$.Date .ReturnedOn "2 Jan 2006"}}</a>
+  <span class="tag {{if .Settled}}pass{{else}}warranty{{end}}">{{$.T .Label}}</span>{{if .NeedsClaimAnswer}} <span class="tag late">{{$.T "claim waiting"}}</span>{{end}}</div>
+  <p class="waiting">{{.Symptoms}}</p></li>
+{{end}}
+</ul>
+{{end}}
+
+{{if .CanReturn}}
+<h2>{{.T "The car came back"}}</h2>
+<p class="waiting">{{.T "This opens a new job on the same car. It decides nothing about whose fault it was."}}</p>
+<form method="post" action="/jobs/{{.Job.ID}}/comeback">
+  <input type="hidden" name="action" value="open">
+  <label><span>{{.T "What the customer says is wrong"}}</span><input name="symptoms" required maxlength="1000"></label>
+  <div class="pair">
+    <label><span>{{.T "Came back on"}}</span><input type="date" name="returned_on" value="{{.Today}}" max="{{.Today}}" required></label>
+    <label><span>{{.T "Odometer, km"}}</span><input name="odometer" inputmode="numeric"></label>
+  </div>
+  <label><span>{{.T "The operation, if it is one"}}</span>
+    <select name="line"><option value="">{{.T "The repair as a whole"}}</option>{{range .Lines}}{{if not .WithdrawnAt}}<option value="{{.ID}}">{{.Description}}</option>{{end}}{{end}}</select></label>
+  <button type="submit">{{.T "Open a return visit"}}</button>
+</form>
+{{end}}
+{{end}}
