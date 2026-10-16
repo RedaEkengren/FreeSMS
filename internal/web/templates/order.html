@@ -1,0 +1,84 @@
+{{define "content"}}
+{{with .Order}}
+<div class="row"><h1>{{.Supplier}}{{if .Reference}} &middot; {{.Reference}}{{end}}</h1>
+  {{if .CancelledAt}}<span class="tag warranty">{{$.T "cancelled"}}</span>{{end}}</div>
+<p class="waiting">{{$.T "Noted %s by %s" ($.Date ($.Local .PlacedOn) "2 Jan 2006") .By}}{{if .Note}} &middot; {{.Note}}{{end}}</p>
+<p class="waiting"><a href="/supply">{{$.T "Back to orders and deliveries"}}</a></p>
+
+{{if .CancelledAt}}
+<p class="waiting">{{$.T "Cancelled here:"}} {{.CancelNote}}.
+  {{if .SupplierConfirmed}}<span class="tag pass">{{$.T "the supplier has confirmed"}}</span>
+  {{else}}<span class="tag warranty">{{$.T "the supplier has not confirmed"}}</span>{{end}}</p>
+{{if not .SupplierConfirmed}}
+<form method="post" action="/supply/orders/{{.ID}}/cancel"><input type="hidden" name="confirmed" value="1">
+  <button type="submit" class="secondary">{{$.T "The supplier has confirmed they stopped it"}}</button></form>
+{{end}}
+{{else}}
+<form method="post" action="/supply/orders/{{.ID}}/cancel">
+  <label><span>{{$.T "Cancelling it here does not stop the supplier. Why:"}}</span><input name="note" required maxlength="300"></label>
+  <button type="submit" class="secondary">{{$.T "Cancel what has not come"}}</button>
+</form>
+{{end}}
+
+{{range .Lines}}
+<div class="card">
+  <div class="row"><span>{{.Description}} &times; {{$.Num .Ordered}}</span>
+    {{if .Cancelled}}<span class="tag warranty">{{$.T "cancelled"}}</span>{{else if gt .Rest 0.0}}<span class="tag">{{$.T "%s still owed" ($.Num .Rest)}}</span>{{else}}<span class="tag pass">{{$.T "all here"}}</span>{{end}}</div>
+  <div class="waiting">{{if .Registration}}{{$.T "for %s" .Registration}} &middot; {{end}}{{if .ExpectedUnit}}{{$.T "expected %s each" .ExpectedCost}}{{end}}</div>
+
+  {{if .ETAs}}<p class="waiting">{{$.T "Expected:"}}
+    {{range $i, $e := .ETAs}}{{if $i}} &rarr; {{end}}{{$.Date ($.Local $e.ETA) "2 Jan"}}{{end}}</p>{{end}}
+  <form class="mt-s" method="post" action="/supply/lines/{{.LineID}}/eta">
+    <input type="hidden" name="back" value="/supply/orders/{{$.Order.ID}}">
+    <div class="pair">
+      <label><span>{{$.T "Now expected on"}}</span><input type="date" name="eta" required></label>
+      <label><span>{{$.T "Note"}}</span><input name="note" maxlength="300"></label>
+    </div>
+    <button type="submit" class="secondary">{{$.T "Change the day"}}</button>
+  </form>
+
+  {{range .Receipts}}
+  <div class="waiting mt-s">
+    {{$.Num .Quantity}} &middot; {{$.Date ($.Local .At) "2 Jan 15:04"}} &middot; {{.By}}
+    {{if .DeliveryRef}} &middot; {{.DeliveryRef}}{{end}}
+    <span class="tag">{{if eq .Route "stock"}}{{$.T "onto the shelf"}}{{else if eq .Route "direct"}}{{$.T "straight to the car"}}{{else}}{{$.T "the customer's own"}}{{end}}</span>
+    {{if .Substitute}}<span class="tag warranty">{{.Substitute}}: {{if eq .SubstituteStatus "pending"}}{{$.T "needs a decision"}}{{else if eq .SubstituteStatus "accepted"}}{{$.T "accepted"}}{{else}}{{$.T "turned down"}}{{end}}</span>{{end}}
+  </div>
+  {{range .Returns}}
+  <div class="waiting">&rarr; {{$.T "%s going back" ($.Num .Quantity)}}: {{$.T .Status}}</div>
+  {{end}}
+  {{if and (gt .Returnable 0.0) (ne .SubstituteStatus "pending")}}
+  <details><summary>{{$.T "Send some of it back"}}</summary>
+  <form method="post" action="/supply/receipts/{{.ID}}/return">
+    <input type="hidden" name="back" value="/supply/orders/{{$.Order.ID}}">
+    <div class="pair">
+      <label><span>{{$.T "How many"}}</span><input name="quantity" value="{{$.Num .Returnable}}" inputmode="decimal"></label>
+      <label><span>{{$.T "Why"}}</span>
+        <select name="reason"><option value="wrong_part">{{$.T "the wrong part"}}</option><option value="damaged">{{$.T "damaged"}}</option><option value="not_needed">{{$.T "no longer needed"}}</option><option value="other">{{$.T "another reason"}}</option></select></label>
+    </div>
+    <label><span>{{$.T "Credit expected"}}</span><input name="expected_credit" inputmode="decimal"></label>
+    <label class="tick"><input type="checkbox" name="replacement" value="1"> <span>{{$.T "The job still needs it: ask for it again"}}</span></label>
+    <button type="submit" class="secondary">{{$.T "Plan the return"}}</button>
+  </form></details>
+  {{end}}
+  {{end}}
+
+  <h3>{{$.T "It has arrived"}}</h3>
+  <form method="post" action="/supply/lines/{{.LineID}}/receive">
+    <input type="hidden" name="back" value="/supply/orders/{{$.Order.ID}}">
+    <div class="pair">
+      <label><span>{{$.T "How many came"}}</span><input name="quantity" value="{{$.Num .Rest}}" inputmode="decimal" required></label>
+      <label><span>{{$.T "Cost each, if the note says"}}</span><input name="unit_cost" inputmode="decimal"></label>
+    </div>
+    <div class="pair">
+      <label><span>{{$.T "Delivery note"}}</span><input name="delivery_ref" maxlength="100"></label>
+      <label><span>{{$.T "Where it went"}}</span>
+        <select name="route"><option value="stock">{{$.T "onto the shelf"}}</option><option value="direct">{{$.T "straight to the car"}}</option><option value="customer">{{$.T "the customer's own"}}</option></select></label>
+    </div>
+    <label><span>{{$.T "If something else was sent, what"}}</span><input name="substitute" maxlength="200"></label>
+    <button type="submit">{{$.T "Book the delivery"}}</button>
+  </form>
+</div>
+{{end}}
+{{end}}
+{{end}}

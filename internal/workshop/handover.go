@@ -24,11 +24,30 @@ type PartRequest struct {
 	CancelledAt *time.Time
 	// How many were asked for, and how many have come so far, in deliveries
 	// or off the shelf.
-	Quantity     float64
-	Received     float64
+	Quantity float64
+	Received float64
+	// Whether anybody has ordered it, and when the latest word is that it is
+	// expected. No supplier and no cost: the shop floor needs to know when.
+	Ordered      bool
+	ETA          *time.Time
 	Registration string
 	Make         string
 	Model        string
+}
+
+// Stage is where the request stands, as a catalogue key.
+func (p PartRequest) Stage() string {
+	switch {
+	case p.CancelledAt != nil:
+		return "cancelled"
+	case p.ArrivedAt != nil:
+		return "arrived"
+	case p.Received > 0:
+		return "partly here"
+	case p.Ordered:
+		return "ordered"
+	}
+	return "not ordered yet"
 }
 
 // Open reports whether this request is still waiting on somebody.
@@ -73,28 +92,36 @@ func RequestParts(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, j
 		return fmt.Errorf("%w: ask for at least one", ErrInvalid)
 	}
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `
-			INSERT INTO part_requests (shop_id, work_order_id, description, requested_by, quantity)
-			SELECT $1, w.id, $2, $3, $5 FROM work_orders w WHERE w.id = $4`,
-			scope.ShopID, strings.TrimSpace(description), scope.UserID, jobID, quantity)
-		if err != nil {
-			return fmt.Errorf("record the request: %w", err)
-		}
-		if tag.RowsAffected() == 0 {
-			return ErrNotFound
-		}
-
-		var state State
-		if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1`, jobID).Scan(&state); err != nil {
-			return fmt.Errorf("read state: %w", err)
-		}
-		if CanTransition(state, StateAwaitingParts) {
-			return setStateTx(ctx, tx, jobID, StateAwaitingParts)
-		}
-		// Already waiting, or somewhere the move does not apply. The request
-		// still stands.
-		return nil
+		_, err := requestPartsTx(ctx, tx, scope, jobID, description, quantity)
+		return err
 	})
+}
+
+// requestPartsTx makes the request and puts the job to waiting, inside the
+// caller's transaction, and says which request it made.
+func requestPartsTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID, description string, quantity float64) (string, error) {
+	var id string
+	err := tx.QueryRow(ctx, `
+		INSERT INTO part_requests (shop_id, work_order_id, description, requested_by, quantity)
+		SELECT $1, w.id, $2, $3, $5 FROM work_orders w WHERE w.id = $4
+		RETURNING id`,
+		scope.ShopID, strings.TrimSpace(description), scope.UserID, jobID, quantity).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("record the request: %w", err)
+	}
+	var state State
+	if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1`, jobID).Scan(&state); err != nil {
+		return "", fmt.Errorf("read state: %w", err)
+	}
+	if CanTransition(state, StateAwaitingParts) {
+		return id, setStateTx(ctx, tx, jobID, StateAwaitingParts)
+	}
+	// Already waiting, or somewhere the move does not apply. The request
+	// still stands.
+	return id, nil
 }
 
 // OpenPartRequests is the parts desk's list: what is being waited for.
@@ -108,7 +135,10 @@ func OpenPartRequests(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			SELECT pr.id, pr.work_order_id, pr.description,
 			       coalesce(p.display_name, ''), pr.requested_at,
 			       coalesce(r.registration, ''), coalesce(v.make, ''), coalesce(v.model, ''),
-			       pr.quantity::float8, coalesce((SELECT sum(rc.quantity) FROM part_request_receipts rc WHERE rc.request_id = pr.id), 0)::float8
+			       pr.quantity::float8, coalesce((SELECT sum(rc.quantity) FROM part_request_receipts rc WHERE rc.request_id = pr.id), 0)::float8,
+			       EXISTS (SELECT 1 FROM supplier_order_lines sl WHERE sl.request_id = pr.id AND sl.cancelled_at IS NULL),
+			       (SELECT e.eta::timestamptz FROM supplier_order_lines sl JOIN supplier_line_etas e ON e.line_id = sl.id
+			         WHERE sl.request_id = pr.id AND sl.cancelled_at IS NULL ORDER BY e.at DESC, e.id DESC LIMIT 1)
 			FROM part_requests pr
 			JOIN work_orders w ON w.id = pr.work_order_id
 			JOIN vehicles v    ON v.id = w.vehicle_id
@@ -126,7 +156,7 @@ func OpenPartRequests(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 		for rows.Next() {
 			var p PartRequest
 			if err := rows.Scan(&p.ID, &p.WorkOrderID, &p.Description, &p.RequestedBy,
-				&p.RequestedAt, &p.Registration, &p.Make, &p.Model, &p.Quantity, &p.Received); err != nil {
+				&p.RequestedAt, &p.Registration, &p.Make, &p.Model, &p.Quantity, &p.Received, &p.Ordered, &p.ETA); err != nil {
 				return fmt.Errorf("scan part request: %w", err)
 			}
 			out = append(out, p)
@@ -159,46 +189,55 @@ func ReceivePart(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, re
 	if !looksLikeUUID(requestID) {
 		return ErrNotFound
 	}
-	if source != "delivery" && source != "shelf" {
+	if source != "delivery" && source != "shelf" && source != "customer" {
 		return fmt.Errorf("%w: %q is not where a part comes from", ErrInvalid, source)
 	}
 	if quantity < 0 {
 		return fmt.Errorf("%w: a negative arrival is a return to the supplier", ErrInvalid)
 	}
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		var jobID string
-		var asked, received float64
-		err := tx.QueryRow(ctx, `
-			SELECT pr.work_order_id, pr.quantity::float8,
-			       coalesce((SELECT sum(rc.quantity) FROM part_request_receipts rc WHERE rc.request_id = pr.id), 0)::float8
-			FROM part_requests pr
-			WHERE pr.id = $1 AND pr.arrived_at IS NULL AND pr.cancelled_at IS NULL
-			FOR UPDATE`, requestID).Scan(&jobID, &asked, &received)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNotFound
-		}
-		if err != nil {
-			return fmt.Errorf("read request: %w", err)
-		}
-		if quantity == 0 {
-			quantity = asked - received
-		}
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO part_request_receipts (shop_id, request_id, quantity, source, received_by)
-			VALUES ($1, $2, $3, $4, $5)`, scope.ShopID, requestID, quantity, source, scope.UserID); err != nil {
-			return fmt.Errorf("record the arrival: %w", err)
-		}
-		if received+quantity+1e-9 < asked {
-			// Part of it. The job keeps waiting for the rest.
-			return nil
-		}
-		if _, err := tx.Exec(ctx, `
-			UPDATE part_requests SET arrived_at = now(), arrived_by = $1 WHERE id = $2`,
-			scope.UserID, requestID); err != nil {
-			return fmt.Errorf("mark arrived: %w", err)
-		}
-		return resumeIfNothingOwedTx(ctx, tx, jobID)
+		_, _, err := receiveRequestTx(ctx, tx, scope, requestID, quantity, source)
+		return err
 	})
+}
+
+// receiveRequestTx books an arrival against a request: the receipt, the
+// request finished if everything has come, the job back to work if nothing else
+// is owed. It says which receipt it wrote and whether the request is now done.
+func receiveRequestTx(ctx context.Context, tx pgx.Tx, scope access.Scope, requestID string, quantity float64, source string) (string, bool, error) {
+	var jobID string
+	var asked, received float64
+	err := tx.QueryRow(ctx, `
+		SELECT pr.work_order_id, pr.quantity::float8,
+		       coalesce((SELECT sum(rc.quantity) FROM part_request_receipts rc WHERE rc.request_id = pr.id), 0)::float8
+		FROM part_requests pr
+		WHERE pr.id = $1 AND pr.arrived_at IS NULL AND pr.cancelled_at IS NULL
+		FOR UPDATE`, requestID).Scan(&jobID, &asked, &received)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, ErrNotFound
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("read request: %w", err)
+	}
+	if quantity == 0 {
+		quantity = asked - received
+	}
+	var receiptID string
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO part_request_receipts (shop_id, request_id, quantity, source, received_by)
+		VALUES ($1, $2, $3, $4, $5) RETURNING id`, scope.ShopID, requestID, quantity, source, scope.UserID).Scan(&receiptID); err != nil {
+		return "", false, fmt.Errorf("record the arrival: %w", err)
+	}
+	if received+quantity+1e-9 < asked {
+		// Part of it. The job keeps waiting for the rest.
+		return receiptID, false, nil
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE part_requests SET arrived_at = now(), arrived_by = $1 WHERE id = $2`,
+		scope.UserID, requestID); err != nil {
+		return "", false, fmt.Errorf("mark arrived: %w", err)
+	}
+	return receiptID, true, resumeIfNothingOwedTx(ctx, tx, jobID)
 }
 
 // CancelPartRequest drops a request the supplier will not fill, or that is
@@ -265,7 +304,10 @@ func PartRequestsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 		rows, err := tx.Query(ctx, `
 			SELECT pr.id, pr.work_order_id, pr.description,
 			       coalesce(p.display_name, ''), pr.requested_at, pr.arrived_at, pr.cancelled_at,
-			       pr.quantity::float8, coalesce((SELECT sum(rc.quantity) FROM part_request_receipts rc WHERE rc.request_id = pr.id), 0)::float8
+			       pr.quantity::float8, coalesce((SELECT sum(rc.quantity) FROM part_request_receipts rc WHERE rc.request_id = pr.id), 0)::float8,
+			       EXISTS (SELECT 1 FROM supplier_order_lines sl WHERE sl.request_id = pr.id AND sl.cancelled_at IS NULL),
+			       (SELECT e.eta::timestamptz FROM supplier_order_lines sl JOIN supplier_line_etas e ON e.line_id = sl.id
+			         WHERE sl.request_id = pr.id AND sl.cancelled_at IS NULL ORDER BY e.at DESC, e.id DESC LIMIT 1)
 			FROM part_requests pr
 			LEFT JOIN users u  ON u.id = pr.requested_by
 			LEFT JOIN people p ON p.id = u.person_id
@@ -278,7 +320,7 @@ func PartRequestsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 		for rows.Next() {
 			var p PartRequest
 			if err := rows.Scan(&p.ID, &p.WorkOrderID, &p.Description, &p.RequestedBy,
-				&p.RequestedAt, &p.ArrivedAt, &p.CancelledAt, &p.Quantity, &p.Received); err != nil {
+				&p.RequestedAt, &p.ArrivedAt, &p.CancelledAt, &p.Quantity, &p.Received, &p.Ordered, &p.ETA); err != nil {
 				return fmt.Errorf("scan request: %w", err)
 			}
 			out = append(out, p)

@@ -1,0 +1,124 @@
+{{define "content"}}
+<h1>{{.T "Orders and deliveries"}}</h1>
+<p class="waiting">{{.T "What was ordered outside FreeSMS, from whom, and what is still owed. Nothing here orders anything."}}
+  <a href="/parts">{{.T "Waiting for parts"}}</a></p>
+
+{{if .Supply.Empty}}<p class="empty">{{.T "Nothing to act on."}}</p>{{end}}
+
+{{if .Supply.Overdue}}
+<h2>{{.T "Late"}}</h2>
+<ul class="lines">
+  {{range .Supply.Overdue}}
+  <li><div class="row">
+    <a href="/supply/orders/{{.OrderID}}">{{.Description}} &middot; {{.Supplier}}</a>
+    <span class="tag late">{{$.T "was due %s" ($.Date ($.Local .ETA) "2 Jan")}}</span>
+  </div>
+  <div class="waiting">{{$.T "%s of %s here" ($.Num .Received) ($.Num .Ordered)}}{{if .Registration}} &middot; {{.Registration}}{{end}}{{if .Slips}} &middot; {{$.N "moved %d time" .Slips}}{{end}}</div></li>
+  {{end}}
+</ul>
+{{end}}
+
+{{if .Supply.Substitutes}}
+<h2>{{.T "Sent instead of what was ordered"}}</h2>
+{{range .Supply.Substitutes}}
+<div class="card">
+  <div class="row"><span>{{.Substitute}}</span><span class="tag warranty">{{$.T "needs a decision"}}</span></div>
+  <div class="waiting">{{$.T "Ordered:"}} {{.Ordered}} &middot; {{.Supplier}}{{if .Registration}} &middot; {{.Registration}}{{end}}</div>
+  <div class="actions mt-s">
+    <form method="post" action="/supply/receipts/{{.ReceiptID}}/accept"><input type="hidden" name="back" value="/supply"><button type="submit">{{$.T "It will do"}}</button></form>
+    <form method="post" action="/supply/receipts/{{.ReceiptID}}/reject"><input type="hidden" name="back" value="/supply"><button type="submit" class="secondary">{{$.T "Send it back"}}</button></form>
+  </div>
+</div>
+{{end}}
+{{end}}
+
+{{if .Supply.Returns}}
+<h2>{{.T "Going back"}}</h2>
+{{range .Supply.Returns}}
+<div class="card">
+  <div class="row"><span>{{.Description}} &times; {{$.Num .Quantity}}</span><span class="tag warranty">{{$.T .Status}}</span></div>
+  <div class="waiting">{{.Supplier}} &middot; {{$.T .ReasonLabel}}{{if .ExpectedMinor}} &middot; {{$.T "credit expected %s" ($.MoneyOrBlank .ExpectedMinor)}}{{end}}</div>
+  {{if not .ReturnedAt}}
+  <form class="mt-s" method="post" action="/supply/returns/{{.ID}}/returned"><input type="hidden" name="back" value="/supply"><button type="submit" class="secondary">{{$.T "It has been sent back"}}</button></form>
+  {{end}}
+  {{if not .CreditedAt}}
+  <form class="mt-s" method="post" action="/supply/returns/{{.ID}}/credit">
+    <input type="hidden" name="back" value="/supply">
+    <div class="pair">
+      <label><span>{{$.T "Credited"}}</span><input name="credited" inputmode="decimal" required></label>
+      <label><span>{{$.T "Credit note number"}}</span><input name="credit_ref" maxlength="100"></label>
+    </div>
+    <button type="submit" class="secondary">{{$.T "The supplier will credit it"}}</button>
+  </form>
+  {{end}}
+</div>
+{{end}}
+{{end}}
+
+{{if .Supply.Cancellations}}
+<h2>{{.T "Cancelled here, not confirmed by the supplier"}}</h2>
+<ul class="lines">
+  {{range .Supply.Cancellations}}
+  <li><div class="row"><a href="/supply/orders/{{.OrderID}}">{{.Supplier}}{{if .Reference}} &middot; {{.Reference}}{{end}}</a>
+    <span class="tag warranty">{{$.N "%d line still owed" .Open}}</span></div>
+  <div class="waiting">{{.Note}}</div></li>
+  {{end}}
+</ul>
+{{end}}
+
+{{if .Supply.CostDiffs}}
+<h2>{{.T "Cost more or less than expected"}}</h2>
+<ul class="lines">
+  {{range .Supply.CostDiffs}}
+  <li><div class="row"><a href="/supply/orders/{{.OrderID}}">{{.Description}} &middot; {{.Supplier}}</a>
+    <span class="tag {{if gt .PerUnit 0}}late{{else}}pass{{end}}">{{$.Money .PerUnit}} {{$.T "each"}}</span></div>
+  <div class="waiting">{{$.T "expected %s, came to %s" ($.Money .Expected) ($.Money .Actual)}} &middot; {{$.Num .Quantity}} {{$.T "delivered"}}</div></li>
+  {{end}}
+</ul>
+{{end}}
+
+<h2>{{.T "Asked for, not ordered"}}</h2>
+{{if not .Supply.Unordered}}<p class="empty">{{.T "Everything asked for has been ordered."}}</p>{{end}}
+
+<form method="post" action="/supply/orders">
+  <div class="pair">
+    <label><span>{{.T "Ordered from"}}</span><input name="supplier" required maxlength="100"></label>
+    <label><span>{{.T "Their reference"}}</span><input name="reference" maxlength="100"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "Placed on"}}</span><input type="date" name="placed_on" value="{{.Today}}" max="{{.Today}}"></label>
+    <label><span>{{.T "Expected on"}}</span><input type="date" name="eta"></label>
+  </div>
+  {{range .Supply.Unordered}}
+  <div class="card">
+    <label class="tick"><input type="checkbox" name="use_{{.ID}}" value="1"> <span>{{.Description}} &middot; {{if .Registration}}{{.Registration}}{{else}}{{$.T "no plate"}}{{end}}</span></label>
+    <div class="pair">
+      <label><span>{{$.T "How many"}}</span><input name="qty_{{.ID}}" value="{{$.Num .Rest}}" inputmode="decimal"></label>
+      <label><span>{{$.T "Expected cost each"}}</span><input name="cost_{{.ID}}" inputmode="decimal"></label>
+    </div>
+    <label><span>{{$.T "Catalogue number, if it is one"}}</span><input name="part_{{.ID}}" autocapitalize="characters" spellcheck="false"></label>
+  </div>
+  {{end}}
+  <h3>{{.T "Something for the shelf"}}</h3>
+  <div class="pair">
+    <label><span>{{.T "What"}}</span><input name="extra_desc" maxlength="200"></label>
+    <label><span>{{.T "Catalogue number, if it is one"}}</span><input name="extra_part" autocapitalize="characters" spellcheck="false"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "How many"}}</span><input name="extra_qty" value="1" inputmode="decimal"></label>
+    <label><span>{{.T "Expected cost each"}}</span><input name="extra_cost" inputmode="decimal"></label>
+  </div>
+  <label><span>{{.T "Note"}}</span><input name="note" maxlength="300"></label>
+  <button type="submit">{{.T "Note the order"}}</button>
+</form>
+
+<h2>{{.T "Ordered, not here yet"}}</h2>
+{{if not .Supply.Open}}<p class="empty">{{.T "Nothing is on its way."}}</p>{{end}}
+<ul class="lines">
+  {{range .Supply.Open}}
+  <li><div class="row"><a href="/supply/orders/{{.OrderID}}">{{.Description}} &middot; {{.Supplier}}</a>
+    <span class="tag">{{if .ETA}}{{$.Date ($.Local .ETA) "Mon 2 Jan"}}{{else}}{{$.T "no day given"}}{{end}}</span></div>
+  <div class="waiting">{{$.T "%s of %s here" ($.Num .Received) ($.Num .Ordered)}}{{if .Registration}} &middot; {{.Registration}}{{end}}</div></li>
+  {{end}}
+</ul>
+{{end}}

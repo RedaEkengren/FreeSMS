@@ -262,6 +262,12 @@ func Move(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, m Movemen
 }
 
 func moveTx(ctx context.Context, tx pgx.Tx, scope access.Scope, m Movement, partID, workOrderID, lineID string) error {
+	_, err := moveTxID(ctx, tx, scope, m, partID, workOrderID, lineID)
+	return err
+}
+
+// moveTxID is moveTx for a caller that needs to point at the movement it made.
+func moveTxID(ctx context.Context, tx pgx.Tx, scope access.Scope, m Movement, partID, workOrderID, lineID string) (string, error) {
 	// The cost at the moment it moved, taken from the part when the caller did
 	// not say. A valuation that reprices history is one nobody can reconcile.
 	//
@@ -272,27 +278,29 @@ func moveTx(ctx context.Context, tx pgx.Tx, scope access.Scope, m Movement, part
 	var current *int64
 	if err := tx.QueryRow(ctx, `SELECT cost_minor FROM parts WHERE id = $1 FOR UPDATE`, partID).Scan(&current); err != nil {
 		if err == pgx.ErrNoRows {
-			return ErrNotFound
+			return "", ErrNotFound
 		}
-		return fmt.Errorf("read cost: %w", err)
+		return "", fmt.Errorf("read cost: %w", err)
 	}
 	cost := m.CostMinor
 	if cost == nil {
 		cost = current
 	}
 
-	_, err := tx.Exec(ctx, `
+	var id string
+	err := tx.QueryRow(ctx, `
 		INSERT INTO stock_movements
 		  (shop_id, part_id, kind, quantity, reason, unit_cost_minor,
 		   work_order_id, line_id, moved_by, note)
 		VALUES ($1, $2, $3, $4, nullif($5,''), $6,
-		        nullif($7,'')::uuid, nullif($8,'')::uuid, $9, nullif($10,''))`,
+		        nullif($7,'')::uuid, nullif($8,'')::uuid, $9, nullif($10,''))
+		RETURNING id`,
 		scope.ShopID, partID, m.Kind, m.Quantity, m.Reason, cost,
-		workOrderID, lineID, scope.UserID, strings.TrimSpace(m.Note))
+		workOrderID, lineID, scope.UserID, strings.TrimSpace(m.Note)).Scan(&id)
 	if err != nil {
-		return fmt.Errorf("record movement: %w", err)
+		return "", fmt.Errorf("record movement: %w", err)
 	}
-	return nil
+	return id, nil
 }
 
 // MovementsFor lists a part's ledger, newest first.

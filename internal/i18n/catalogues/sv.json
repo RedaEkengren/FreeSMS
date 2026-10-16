@@ -2460,6 +2460,242 @@
       "one": "%d del beställd, inte här än",
       "other": "%d delar beställda, inte här än"
     },
+    "%s going back": {
+      "other": "%s går tillbaka"
+    },
+    "%s of %s here": {
+      "other": "%s av %s är här"
+    },
+    "%s still owed": {
+      "other": "%s återstår"
+    },
+    "Asked for, not ordered": {
+      "other": "Efterfrågat, inte beställt"
+    },
+    "Back to orders and deliveries": {
+      "other": "Tillbaka till beställningar och leveranser"
+    },
+    "Book the delivery": {
+      "other": "Boka leveransen"
+    },
+    "Cancel what has not come": {
+      "other": "Avbeställ det som inte kommit"
+    },
+    "Cancelled here, not confirmed by the supplier": {
+      "other": "Avbeställt här, inte bekräftat av leverantören"
+    },
+    "Cancelled here:": {
+      "other": "Avbeställt här:"
+    },
+    "Cancelling it here does not stop the supplier. Why:": {
+      "other": "Att avbeställa här stoppar inte leverantören. Varför:"
+    },
+    "Catalogue number, if it is one": {
+      "other": "Katalognummer, om det är en katalogdel"
+    },
+    "Cost each, if the note says": {
+      "other": "Pris per styck, om följesedeln anger det"
+    },
+    "Cost more or less than expected": {
+      "other": "Kostade mer eller mindre än väntat"
+    },
+    "Credit expected": {
+      "other": "Väntad kredit"
+    },
+    "Credit note number": {
+      "other": "Kreditnotans nummer"
+    },
+    "Delivery note": {
+      "other": "Följesedel"
+    },
+    "Everything asked for has been ordered.": {
+      "other": "Allt som efterfrågats är beställt."
+    },
+    "Expected cost each": {
+      "other": "Väntat pris per styck"
+    },
+    "Expected on": {
+      "other": "Väntas den"
+    },
+    "Expected:": {
+      "other": "Väntas:"
+    },
+    "Going back": {
+      "other": "På väg tillbaka"
+    },
+    "If something else was sent, what": {
+      "other": "Om något annat skickades, vad"
+    },
+    "It has been sent back": {
+      "other": "Den har skickats tillbaka"
+    },
+    "It will do": {
+      "other": "Den duger"
+    },
+    "Late": {
+      "other": "Sena"
+    },
+    "Note the order": {
+      "other": "Notera beställningen"
+    },
+    "Noted %s by %s": {
+      "other": "Noterad %s av %s"
+    },
+    "Nothing is on its way.": {
+      "other": "Inget är på väg."
+    },
+    "Nothing to act on.": {
+      "other": "Inget att göra något åt."
+    },
+    "Now expected on": {
+      "other": "Väntas nu den"
+    },
+    "Ordered from": {
+      "other": "Beställt hos"
+    },
+    "Ordered, not here yet": {
+      "other": "Beställt, inte här än"
+    },
+    "Ordered:": {
+      "other": "Beställt:"
+    },
+    "Orders and deliveries": {
+      "other": "Beställningar och leveranser"
+    },
+    "Placed on": {
+      "other": "Lagd den"
+    },
+    "Plan the return": {
+      "other": "Planera returen"
+    },
+    "Send it back": {
+      "other": "Skicka tillbaka den"
+    },
+    "Send some of it back": {
+      "other": "Skicka tillbaka en del"
+    },
+    "Sent instead of what was ordered": {
+      "other": "Skickat i stället för det beställda"
+    },
+    "Something for the shelf": {
+      "other": "Något till hyllan"
+    },
+    "The job still needs it: ask for it again": {
+      "other": "Jobbet behöver den fortfarande: be om den igen"
+    },
+    "The supplier has confirmed they stopped it": {
+      "other": "Leverantören har bekräftat att de stoppade den"
+    },
+    "The supplier will credit it": {
+      "other": "Leverantören krediterar den"
+    },
+    "Their reference": {
+      "other": "Deras referens"
+    },
+    "What was ordered outside FreeSMS, from whom, and what is still owed. Nothing here orders anything.": {
+      "other": "Vad som beställts utanför FreeSMS, hos vem och vad som återstår. Ingenting här beställer något."
+    },
+    "Where it went": {
+      "other": "Vart den tog vägen"
+    },
+    "a substitute that would not do": {
+      "other": "en ersättning som inte dög"
+    },
+    "accepted": {
+      "other": "godtagen"
+    },
+    "all here": {
+      "other": "allt är här"
+    },
+    "another reason": {
+      "other": "en annan orsak"
+    },
+    "credit expected %s": {
+      "other": "väntad kredit %s"
+    },
+    "credited": {
+      "other": "krediterad"
+    },
+    "credited, the part is still here": {
+      "other": "krediterad, delen finns kvar"
+    },
+    "damaged": {
+      "other": "skadad"
+    },
+    "expected %s each": {
+      "other": "väntat %s per styck"
+    },
+    "expected %s, came to %s": {
+      "other": "väntat %s, blev %s"
+    },
+    "for %s": {
+      "other": "för %s"
+    },
+    "needs a decision": {
+      "other": "behöver ett beslut"
+    },
+    "no day given": {
+      "other": "ingen dag angiven"
+    },
+    "no longer needed": {
+      "other": "behövs inte längre"
+    },
+    "onto the shelf": {
+      "other": "till hyllan"
+    },
+    "sent back, waiting for the credit": {
+      "other": "återskickad, väntar på krediten"
+    },
+    "straight to the car": {
+      "other": "direkt till bilen"
+    },
+    "the customer's own": {
+      "other": "kundens egen"
+    },
+    "the supplier has confirmed": {
+      "other": "leverantören har bekräftat"
+    },
+    "the supplier has not confirmed": {
+      "other": "leverantören har inte bekräftat"
+    },
+    "the wrong part": {
+      "other": "fel del"
+    },
+    "to send back": {
+      "other": "ska skickas tillbaka"
+    },
+    "turned down": {
+      "other": "avvisad"
+    },
+    "was due %s": {
+      "other": "skulle komma %s"
+    },
+    "Orders": {
+      "other": "Beställningar"
+    },
+    "Supply": {
+      "other": "Leverans"
+    },
+    "not ordered yet": {
+      "other": "inte beställd än"
+    },
+    "ordered": {
+      "other": "beställd"
+    },
+    "partly here": {
+      "other": "delvis här"
+    },
+    "%d line still owed": {
+      "one": "%d rad återstår",
+      "other": "%d rader återstår"
+    },
+    "moved %d time": {
+      "one": "flyttad %d gång",
+      "other": "flyttad %d gånger"
+    },
+    "expected %s": {
+      "other": "väntas %s"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

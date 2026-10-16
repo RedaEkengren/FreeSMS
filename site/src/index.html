@@ -266,6 +266,7 @@
     <button type="button" role="tab" data-tab="12">Arbetslistan</button>
     <button type="button" role="tab" data-tab="13">Kunduppgifter</button>
     <button type="button" role="tab" data-tab="14">Överlämning</button>
+    <button type="button" role="tab" data-tab="15">Leveranser</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1066,6 +1067,41 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: teknikern lämnar och rättar en anteckning, disken skriver ner ett tidigare samtal, och teknikern ser aldrig samtalet &ndash; <a href="{{test "e2e/tests/25-timeline.spec.ts" "a shift handover from one list, with a corrected note and a call written down later"}}">läs testet</a>. Namn och anteckningar är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>Beställt någon annanstans</h2>
+  <p class="lede">Reservdelar beställs hos grossisten, inte i systemet. Lagret noterar vad som beställts, hos vem och när det väntas, och sätter beställningen mot jobbets begäran. Dagen kan flyttas, leveransen kan komma i två omgångar och samma följesedel räknas en gång. En fel del går tillbaka, jobbet ber om rätt, och krediten är ett eget steg som kan komma före eller efter.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: en beställning noteras hos en grossist med en väntad dag. Dagen flyttas, en av två delar kommer och samma följesedel skrivs in en gång till utan att räknas dubbelt. Den andra delen är fel och planeras tillbaka, jobbet ber om rätt del, och krediten bekräftas som ett eget steg.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "parts"}}</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">{{t "Orders and deliveries"}}</div>
+              <div class="cl-qrow"><span>Hjullager bak höger</span><span class="rd-tag">4 mars</span></div>
+              <div class="cl-qrow"><span>{{t "%s of %s here" "1" "2"}}</span><span class="rd-tag rd-risk">{{t "%s still owed" "1"}}</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "Going back"}}</div>
+              <div class="cl-qrow"><span>Hjullager bak höger</span><span class="rd-tag rd-risk">{{t "the wrong part"}}</span></div>
+              <div class="cl-qrow"><span>{{t "to send back"}}</span><span></span></div>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">Ersättning: Hjullager bak höger</div>
+              <div class="cl-qrow"><span>{{t "not ordered yet"}}</span><span class="rd-tag">{{t "credited"}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">Beställningen är noterad hos grossisten med en väntad dag. En av två delar har kommit, och följesedeln räknas en gång även om den skrivs in två gånger.</div>
+      <div class="an-cap" data-t="8,15.8">Den andra delen är fel. Den planeras tillbaka, lagret ändras först när den faktiskt lämnar, och krediten är ett eget steg.</div>
+      <div class="an-cap" data-t="16,23.6">Jobbet ber om rätt del igen, och teknikern ser att den inte är beställd än &ndash; men aldrig vem leverantören är eller vad den kostar.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: teknikern ber om en del, lagret noterar beställningen och flyttar dagen, leveransen kommer i två omgångar, en del går tillbaka och krediteras &ndash; <a href="{{test "e2e/tests/26-supply.spec.ts" "an order noted, delivered in two parts, one wrong part sent back"}}">läs testet</a>. Namn och beställningar är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

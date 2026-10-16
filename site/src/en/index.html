@@ -266,6 +266,7 @@
     <button type="button" role="tab" data-tab="12">Work list</button>
     <button type="button" role="tab" data-tab="13">Records</button>
     <button type="button" role="tab" data-tab="14">Handover</button>
+    <button type="button" role="tab" data-tab="15">Deliveries</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1066,6 +1067,41 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: the technician leaves and corrects a note, the counter writes down an earlier call, and the technician never sees the call &ndash; <a href="{{test "e2e/tests/25-timeline.spec.ts" "a shift handover from one list, with a corrected note and a call written down later"}}">read the test</a>. Names and notes are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>Ordered somewhere else</h2>
+  <p class="lede">Parts are ordered from the wholesaler, not in the system. The parts desk notes what was ordered, from whom and when it is expected, and ties the order to the job's request. The day can move, the delivery can come in two parts and the same delivery note counts once. A wrong part goes back, the job asks again for the right one, and the credit is a step of its own that can come before or after.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: an order is noted with a wholesaler and an expected day. The day moves, one of two parts comes and the same delivery note is entered again without being counted twice. The second part is wrong and is planned back, the job asks again for the right part, and the credit is confirmed as a step of its own.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "parts"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">{{t "Orders and deliveries"}}</div>
+              <div class="cl-qrow"><span>Rear right wheel bearing</span><span class="rd-tag">4 Mar</span></div>
+              <div class="cl-qrow"><span>{{t "%s of %s here" "1" "2"}}</span><span class="rd-tag rd-risk">{{t "%s still owed" "1"}}</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "Going back"}}</div>
+              <div class="cl-qrow"><span>Rear right wheel bearing</span><span class="rd-tag rd-risk">{{t "the wrong part"}}</span></div>
+              <div class="cl-qrow"><span>{{t "to send back"}}</span><span></span></div>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">Replacement: Rear right wheel bearing</div>
+              <div class="cl-qrow"><span>{{t "not ordered yet"}}</span><span class="rd-tag">{{t "credited"}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">The order is noted with the wholesaler and an expected day. One of two parts has come, and the delivery note counts once even if it is entered twice.</div>
+      <div class="an-cap" data-t="8,15.8">The second part is wrong. It is planned back, stock changes only when it actually leaves, and the credit is a step of its own.</div>
+      <div class="an-cap" data-t="16,23.6">The job asks for the right part again, and the technician sees it is not ordered yet &ndash; but never who the supplier is or what it costs.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: the technician asks for a part, the parts desk notes the order and moves the day, the delivery comes in two parts, one is sent back and credited &ndash; <a href="{{test "e2e/tests/26-supply.spec.ts" "an order noted, delivered in two parts, one wrong part sent back"}}">read the test</a>. Names and orders are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

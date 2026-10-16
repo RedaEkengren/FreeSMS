@@ -11,7 +11,7 @@
     </div>
     <div class="vehicle">{{.Make}} {{.Model}}</div>
     <div class="complaint">{{.Description}}</div>
-    <div class="waiting">{{$.T "Asked for by %s" .RequestedBy}}</div>
+    <div class="waiting">{{$.T "Asked for by %s" .RequestedBy}} &middot; {{$.T .Stage}}{{with .ETA}} &middot; {{$.T "expected %s" ($.Date ($.Local .) "Mon 2 Jan")}}{{end}}</div>
     {{/* Part of it having come is the normal case, said as such. */}}
     <div class="waiting">{{if .Partly}}<span class="tag warranty">{{$.T "%s of %s here, %s to come" ($.Num .Received) ($.Num .Quantity) ($.Num .Rest)}}</span>{{else}}{{$.T "%s asked for" ($.Num .Quantity)}}{{end}}</div>
     <form class="mt-m" method="post" action="/parts/arrived" data-offline>

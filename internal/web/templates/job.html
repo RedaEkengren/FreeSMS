@@ -269,7 +269,7 @@
       {{else if .ArrivedAt}}<span class="tag">{{$.T "arrived"}}</span>
       {{else}}<span class="tag">{{$.T "cancelled"}}</span>{{end}}
     </div>
-    <div class="waiting">{{$.T "Asked for by %s" .RequestedBy}}</div>
+    <div class="waiting">{{$.T "Asked for by %s" .RequestedBy}}{{if .Open}} &middot; {{$.T .Stage}}{{with .ETA}} &middot; {{$.T "expected %s" ($.Date ($.Local .) "Mon 2 Jan")}}{{end}}{{end}}</div>
   </li>
   {{end}}
 </ul>

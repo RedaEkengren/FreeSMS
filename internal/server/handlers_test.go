@@ -44,6 +44,10 @@ const (
 	enquiryB    = "bbbbbbbb-0000-0000-0000-00000000000d"
 	taskB       = "bbbbbbbb-0000-0000-0000-00000000000e"
 	noteB       = "bbbbbbbb-0000-0000-0000-00000000000f"
+	orderB      = "bbbbbbbb-0000-0000-0000-000000000010"
+	lineB       = "bbbbbbbb-0000-0000-0000-000000000011"
+	receiptB    = "bbbbbbbb-0000-0000-0000-000000000012"
+	returnB     = "bbbbbbbb-0000-0000-0000-000000000013"
 
 	// A string that appears nowhere in shop A. If it reaches a response body,
 	// something leaked, whatever the status code said.
@@ -187,6 +191,14 @@ func testServerOn(t *testing.T, pool *pgxpool.Pool) (*httptest.Server, *pgxpool.
 		 ('` + enquiryB + `','` + shopB + `', 'Brakes', '` + secretB + `', 'bbbbbbbb-0000-0000-0000-0000000000bb')`,
 		`INSERT INTO job_tasks (id, shop_id, work_order_id, position, title, created_by) VALUES
 		 ('` + taskB + `','` + shopB + `','` + jobB + `',1,'Secret step','bbbbbbbb-0000-0000-0000-0000000000bb')`,
+		`INSERT INTO supplier_orders (id, shop_id, supplier, placed_on, placed_by) VALUES
+		 ('` + orderB + `','` + shopB + `','` + secretB + `', current_date, 'bbbbbbbb-0000-0000-0000-0000000000bb')`,
+		`INSERT INTO supplier_order_lines (id, shop_id, order_id, position, description, quantity) VALUES
+		 ('` + lineB + `','` + shopB + `','` + orderB + `',1,'Secret part',2)`,
+		`INSERT INTO supplier_receipts (id, shop_id, line_id, quantity, route, received_by) VALUES
+		 ('` + receiptB + `','` + shopB + `','` + lineB + `',1,'direct','bbbbbbbb-0000-0000-0000-0000000000bb')`,
+		`INSERT INTO supplier_returns (id, shop_id, receipt_id, quantity, reason, planned_by) VALUES
+		 ('` + returnB + `','` + shopB + `','` + receiptB + `',1,'damaged','bbbbbbbb-0000-0000-0000-0000000000bb')`,
 		`INSERT INTO job_notes (id, shop_id, work_order_id, kind, body, occurred_at, author) VALUES
 		 ('` + noteB + `','` + shopB + `','` + jobB + `','note','` + secretB + `', now(), 'bbbbbbbb-0000-0000-0000-0000000000bb')`,
 	})

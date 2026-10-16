@@ -66,6 +66,14 @@
       "one": "%d part asked for, not here yet",
       "other": "%d parts asked for, not here yet"
     },
+    "%d line still owed": {
+      "one": "%d line still owed",
+      "other": "%d lines still owed"
+    },
+    "moved %d time": {
+      "one": "moved %d time",
+      "other": "moved %d times"
+    },
     "%d visit": {
       "one": "%d visit",
       "other": "%d visits"

@@ -22,6 +22,7 @@
     <a href="/mine" class="nav" data-live-topics="board parts staff">{{.T "For me"}} <span id="mine-count" class="count"
       hx-get="/mine/count" hx-trigger="load" hx-swap="outerHTML" hx-headers='{"X-FreeSMS-Live": "1"}'></span></a>
     {{if .Session.Scope.Role.SeesParts}}<a href="/parts" class="nav">{{.T "Parts"}}</a>
+    <a href="/supply" class="nav">{{.T "Orders"}}</a>
     <a href="/stock" class="nav">{{.T "Stock"}}</a>
     <a href="/scan" class="nav">{{.T "Scan"}}</a>{{end}}
     {{if .Session.Scope.Role.RunsTheShop}}<a href="/shop" class="nav">{{.T "The workshop"}}</a>
