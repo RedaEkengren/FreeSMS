@@ -99,21 +99,31 @@ func (s *Server) handleEditVehicle(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/vehicles/"+id, http.StatusSeeOther)
 }
 
-// dateField reads a date input as the start of that day in the shop's zone;
-// empty means now.
+// dateField reads a date input as a moment in the shop's zone; empty means now.
 func (s *Server) dateField(r *http.Request, name string) (time.Time, bool) {
 	v := strings.TrimSpace(r.FormValue(name))
 	if v == "" {
 		return time.Time{}, true
 	}
-	loc := s.shopLocation(r)
+	return resolveDay(v, time.Now(), s.shopLocation(r))
+}
+
+// resolveDay is the moment a date typed into a form stands for.
+//
+// Today is now: anything recorded earlier today is before it, whatever the
+// hour. Noon was used before and put a date typed after lunch before the
+// entries made since, which refused a sale of a car bought that afternoon. Any
+// other day is noon, so it is neither in the future nor before the morning's
+// own entries; a day to come is now, since nothing can be dated ahead.
+func resolveDay(v string, now time.Time, loc *time.Location) (time.Time, bool) {
 	t, err := time.ParseInLocation("2006-01-02", v, loc)
 	if err != nil {
 		return time.Time{}, false
 	}
-	// Noon, so a date typed for today is not in the future and not before the
-	// morning's own entries.
-	now := time.Now()
+	ny, nm, nd := now.In(loc).Date()
+	if y, m, d := t.Date(); y == ny && m == nm && d == nd {
+		return now, true
+	}
 	t = t.Add(12 * time.Hour)
 	if t.After(now) {
 		t = now

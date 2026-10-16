@@ -87,7 +87,7 @@ test('an unpaid invoice followed up, reminded, then credited and paid back', asy
       if (!m) return '';
       text = (await (await d.request.get(`http://mailpit:8025/api/v1/message/${m.ID}`)).json()).Text;
       return text;
-    }, { timeout: 20_000 }).toContain('/d/');
+    }, { timeout: 45_000 }).toContain('/d/'); // the sender looks every 20 s, so a poll of 20 s misses it half the time
     expect(text).toMatch(/2[\s ,.]?250/);
     expect(text).not.toContain('{owed}');
 
