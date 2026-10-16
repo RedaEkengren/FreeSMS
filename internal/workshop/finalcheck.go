@@ -123,6 +123,10 @@ func finalCheckTx(ctx context.Context, tx pgx.Tx, shopID, jobID string) (FinalCh
 		              WHERE m.work_order_id = w.id AND m.kind = 'consumed' AND m.moved_at > i.started_at)
 		    OR exists(SELECT 1 FROM work_order_lines l
 		              WHERE l.work_order_id = w.id AND l.kind IN ('labour', 'part', 'sublet') AND l.created_at > i.started_at)
+		    OR exists(SELECT 1 FROM job_tasks t
+		              WHERE t.work_order_id = w.id AND t.line_id IS NULL AND t.status <> 'omitted' AND t.created_at > i.started_at)
+		    OR exists(SELECT 1 FROM job_task_events e
+		              WHERE e.work_order_id = w.id AND e.to_status = 'done' AND e.at > i.started_at)
 		FROM inspections i
 		JOIN work_orders w ON w.id = i.work_order_id
 		LEFT JOIN users u ON u.id = i.performed_by

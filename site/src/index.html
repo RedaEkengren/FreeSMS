@@ -263,6 +263,7 @@
     <button type="button" role="tab" data-tab="9">Förfrågan</button>
     <button type="button" role="tab" data-tab="10">Sjuk tekniker</button>
     <button type="button" role="tab" data-tab="11">Rätta en rad</button>
+    <button type="button" role="tab" data-tab="12">Arbetslistan</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -957,6 +958,37 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog och beloppen ur dess pengakod när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: priset rättas, godkännandet faller, den andra raden behåller sitt, två personer rättar samma rad och en rad dras tillbaka &ndash; <a href="{{test "e2e/tests/22-line-corrections.spec.ts" "a line corrected after approval, with what it comes to shown first"}}">läs testet</a>. Registreringsnummer, namn och belopp är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>När en bil har flera moment</h2>
+  <p class="lede">Bromsarna är klara, avgasen väntar på en del och provkörningen utgår. Teknikern bockar av och säger vad som hindrar, utan ett pris på skärmen. Disken ser vad som står i vägen, och en bil med arbete kvar kan inte sättas som klar.</p>
+
+  <div class="an-wrap" data-loop="22" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: en arbetslista med tre moment. Teknikern bockar av byte av bromsskivor och anger att avgasröret väntar på en del. Disken ser att två av tre återstår, lämnar provkörningen utanför med ett skäl och en notering om att kunden måste få veta, och bilen kan inte sättas som klar förrän avgasröret är klart.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="wf-card"><div class="wf-plate">ABC 123</div></div>
+            <div class="wf-h">{{t "Work list"}}</div>
+            <div class="cl-qrow"><span>Byte av bromsskivor</span><span class="rd-tag an-fade" data-t="3">{{t "Done"}}</span></div>
+            <div class="cl-qrow"><span>Byte av avgasrör</span><span class="rd-tag rd-risk an-fade" data-t="6">{{t "waiting for a part"}}</span></div>
+            <div class="cl-qrow"><span>Provkörning</span><span class="rd-tag an-fade" data-t="11">{{t "Left out"}}</span></div>
+            <div class="cl-qrow an-fade" data-t="11"><span>Bilen står kvar tills delen kommit</span><span class="rd-tag rd-risk">{{t "Put it to the customer"}}</span></div>
+            <div class="cl-qrow an-fade" data-t="7,19"><span>{{t "%d of %d left" 2 3}}</span><span></span></div>
+                        <div class="cl-qrow an-fade" data-t="19"><span>{{t "All done"}}</span><span>{{t "It is ready"}}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,6.8">Teknikern bockar av bromsarna. Avgasröret väntar på en del, och det står vem som sa det och när.</div>
+      <div class="an-cap" data-t="7,14.8">Disken ser att två av tre återstår och att bilen inte kan sättas som klar. Provkörningen utelämnas med ett skäl, och kunden måste få veta.</div>
+      <div class="an-cap" data-t="15,21.6">När delen är på plats och avgasröret klart finns inget kvar, och bilen kan lämnas tillbaka.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: listan görs av det godkända arbetet, teknikern bockar av och anger en hindrande del, disken utelämnar ett moment med skäl och ett kundbeslut, och bilen går inte att sätta som klar förrän allt är gjort &ndash; <a href="{{test "e2e/tests/23-work-list.spec.ts" "three operations: one done, one waiting for a part, one left out"}}">läs testet</a>. Registreringsnummer och namn är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

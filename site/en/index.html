@@ -260,6 +260,7 @@
     <button type="button" role="tab" data-tab="9">Enquiry</button>
     <button type="button" role="tab" data-tab="10">Off sick</button>
     <button type="button" role="tab" data-tab="11">Correct a line</button>
+    <button type="button" role="tab" data-tab="12">Work list</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1011,6 +1012,37 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue and the amounts from its money code when the page is generated. The flow runs against the real product in a browser: the price is corrected, the agreement falls, the other line keeps its own, two people correct the same line and one line is withdrawn &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/22-line-corrections.spec.ts">read the test</a>. Registration numbers, names and amounts are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>When a car has several jobs</h2>
+  <p class="lede">The brakes are done, the exhaust is waiting for a part and the road test is dropped. The technician ticks off and says what is in the way, with no price on the screen. The counter sees what holds the car up, and a car with work left cannot be marked ready.</p>
+
+  <div class="an-wrap" data-loop="22" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: a work list with three jobs. The technician ticks off the brake discs and says the exhaust is waiting for a part. The counter sees two of three left, leaves the road test out with a reason and a note that the customer has to be told, and the car cannot be marked ready until the exhaust is done.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Front desk</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="wf-card"><div class="wf-plate">ABC 123</div></div>
+            <div class="wf-h">Work list</div>
+            <div class="cl-qrow"><span>Replace brake discs</span><span class="rd-tag an-fade" data-t="3">Done</span></div>
+            <div class="cl-qrow"><span>Replace exhaust</span><span class="rd-tag rd-risk an-fade" data-t="6">waiting for a part</span></div>
+            <div class="cl-qrow"><span>Road test</span><span class="rd-tag an-fade" data-t="11">Left out</span></div>
+            <div class="cl-qrow an-fade" data-t="11"><span>The car stays until the part arrives</span><span class="rd-tag rd-risk">Put it to the customer</span></div>
+            <div class="cl-qrow an-fade" data-t="7,19"><span>2 of 3 left</span><span></span></div>
+                        <div class="cl-qrow an-fade an-off" data-t="19"><span>All done</span><span>It is ready</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,6.8">The technician ticks off the brakes. The exhaust is waiting for a part, and it says who said so and when.</div>
+      <div class="an-cap" data-t="7,14.8">The counter sees two of three left and that the car cannot be marked ready. The road test is left out with a reason, and the customer has to be told.</div>
+      <div class="an-cap an-off" data-t="15,21.6">When the part is in and the exhaust is done there is nothing left, and the car can be handed back.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: the list is made from the agreed work, the technician ticks off and says a part is in the way, the counter leaves a job out with a reason and a customer decision, and the car cannot be marked ready until everything is done &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/23-work-list.spec.ts">read the test</a>. Registration numbers and names are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

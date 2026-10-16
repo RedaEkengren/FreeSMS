@@ -639,6 +639,119 @@
 </div>
 {{end}}
 
+{{/* The job's work list: what the car needs done, apart from what is charged.
+     Nothing here is priced and nothing customer-shaped is fetched, so the
+     technician's phone gets the same list the counter does. */}}
+<div id="work-list" data-live="job:{{.Job.ID}}">
+{{$open := and (ne .Job.State "invoiced") (ne .Job.State "closed") (ne .Job.State "cancelled")}}
+{{if or .Tasks $open}}
+<h2>{{.T "Work list"}}</h2>
+{{if .Tasks}}
+<p class="waiting">
+  {{if .TaskCounts.Outstanding}}<span class="tag warranty">{{.T "%d of %d left" .TaskCounts.Outstanding .TaskCounts.Total}}</span>{{if .TaskCounts.Blocked}} <span class="tag late">{{.T "%d blocked" .TaskCounts.Blocked}}</span>{{end}} {{.T "It cannot be handed back until these are done or left out."}}
+  {{else}}<span class="tag pass">{{.T "All done"}}</span>{{end}}
+  {{if .TaskCounts.AwaitingCustomer}} <span class="tag late">{{.T "%d to put to the customer" .TaskCounts.AwaitingCustomer}}</span>{{end}}
+</p>
+<ul class="lines">
+  {{range .Tasks}}
+  <li>
+    <div class="row">
+      <span>{{.Title}}{{if .LineGone}} <span class="tag">{{$.T "not owed"}}</span>{{end}}</span>
+      {{if eq (printf "%s" .Status) "done"}}<span class="tag pass">{{$.T "Done"}}</span>
+      {{else if eq (printf "%s" .Status) "underway"}}<span class="tag running">{{$.T "Underway"}}</span>
+      {{else if eq (printf "%s" .Status) "blocked"}}<span class="tag late">{{$.T .Why}}</span>
+      {{else if eq (printf "%s" .Status) "omitted"}}<span class="tag">{{$.T "Left out"}}</span>
+      {{else}}<span class="tag">{{$.T "To do"}}</span>{{end}}
+    </div>
+    {{if .By}}<div class="waiting">{{.By}} &middot; {{$.Date .At "Mon 2 Jan 15:04"}}{{with .Note}} &middot; {{.}}{{end}}</div>{{end}}
+    {{if .NeedsCustomer}}<div class="waiting"><span class="tag late">{{$.T "Put it to the customer"}}</span></div>{{end}}
+    {{if $open}}
+    {{if eq (printf "%s" .Status) "omitted"}}
+      {{if $.Session.Scope.Role.SeesCustomerPersonalData}}
+      {{if .NeedsCustomer}}
+      <form class="mt-s" method="post" action="/jobs/{{$.Job.ID}}/tasks/{{.ID}}/decision">
+        <label><span>{{$.T "What the customer decided"}}</span><input name="note" maxlength="300" required></label>
+        <button type="submit" class="secondary">{{$.T "Record it"}}</button>
+      </form>
+      {{end}}
+      <form class="mt-s" method="post" action="/jobs/{{$.Job.ID}}/tasks/{{.ID}}/move">
+        <input type="hidden" name="to" value="pending">
+        <button type="submit" class="secondary">{{$.T "Put it back on the list"}}</button>
+      </form>
+      {{end}}
+    {{else}}
+    <div class="actions mt-s">
+      {{if ne (printf "%s" .Status) "underway"}}{{if ne (printf "%s" .Status) "done"}}
+      <form method="post" action="/jobs/{{$.Job.ID}}/tasks/{{.ID}}/move" data-offline>
+        <input type="hidden" name="to" value="underway">
+        <button type="submit" class="secondary">{{$.T "Start"}}</button>
+      </form>{{end}}{{end}}
+      {{if ne (printf "%s" .Status) "done"}}
+      <form method="post" action="/jobs/{{$.Job.ID}}/tasks/{{.ID}}/move" data-offline>
+        <input type="hidden" name="to" value="done">
+        <button type="submit">{{$.T "Done"}}</button>
+      </form>
+      {{else}}
+      <form method="post" action="/jobs/{{$.Job.ID}}/tasks/{{.ID}}/move" data-offline>
+        <input type="hidden" name="to" value="pending">
+        <button type="submit" class="secondary">{{$.T "Not done after all"}}</button>
+      </form>
+      {{end}}
+    </div>
+    {{if ne (printf "%s" .Status) "done"}}
+    <form class="mt-s" method="post" action="/jobs/{{$.Job.ID}}/tasks/{{.ID}}/move" data-offline>
+      <input type="hidden" name="to" value="blocked">
+      <div class="pair">
+        <label><span>{{$.T "Held up by"}}</span>
+          <select name="blocker">
+            <option value="part">{{$.T "A part"}}</option>
+            <option value="customer">{{$.T "The customer"}}</option>
+            <option value="other">{{$.T "Something else"}}</option>
+          </select></label>
+        <label><span>{{$.T "Note"}}</span><input name="note" maxlength="300"></label>
+      </div>
+      <button type="submit" class="secondary">{{$.T "It is held up"}}</button>
+    </form>
+    {{if $.Session.Scope.Role.SeesCustomerPersonalData}}
+    <form class="mt-s" method="post" action="/jobs/{{$.Job.ID}}/tasks/{{.ID}}/move">
+      <input type="hidden" name="to" value="omitted">
+      <div class="pair">
+        <label><span>{{$.T "Why it is being left out"}}</span><input name="note" maxlength="300" required></label>
+        <label><input type="checkbox" name="needs_decision" value="1"> <span>{{$.T "The customer has to be told"}}</span></label>
+      </div>
+      <button type="submit" class="secondary">{{$.T "Leave it out"}}</button>
+    </form>
+    {{end}}
+    {{end}}
+    {{end}}
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{if $open}}
+<form class="mt" method="post" action="/jobs/{{.Job.ID}}/tasks" data-offline>
+  <div class="pair">
+    <label><span>{{.T "Something that has to be done"}}</span><input name="title" maxlength="120" required></label>
+    {{if .Session.Scope.Role.SeesCustomerPersonalData}}{{if .Lines}}
+    <label><span>{{.T "For which line"}}</span>
+      <select name="line">
+        <option value="">{{.T "None"}}</option>
+        {{range .Lines}}{{if not .WithdrawnAt}}<option value="{{.Position}}" label="{{.Position}}. {{.Description}}"></option>{{end}}{{end}}
+      </select></label>
+    {{end}}{{end}}
+  </div>
+  <button type="submit" class="secondary">{{.T "Add to the list"}}</button>
+</form>
+{{if and .Lines .Session.Scope.Role.SeesCustomerPersonalData}}
+<form class="mt-s" method="post" action="/jobs/{{.Job.ID}}/tasks/from-lines">
+  <button type="submit" class="secondary">{{.T "Make a list from the agreed work"}}</button>
+</form>
+{{end}}
+{{end}}
+{{end}}
+</div>
+
 <div id="live-docs" data-live="job:{{.Job.ID}}">
 {{if .Invoices}}
 <h2>{{.T "Documents"}}</h2>

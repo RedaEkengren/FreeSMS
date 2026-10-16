@@ -46,6 +46,12 @@ func MarkPerformed(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 				return fmt.Errorf("mark performed: %w", err)
 			}
 			tag = ct.RowsAffected()
+			if tag > 0 {
+				// The step on the work list for this line is done too.
+				if err := finishTasksOfLineTx(ctx, tx, scope, jobID, []int{position}, "Marked performed on the line."); err != nil {
+					return err
+				}
+			}
 		} else {
 			ct, err := tx.Exec(ctx, `
 				UPDATE work_order_lines
@@ -98,6 +104,9 @@ func Decline(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 			if int(ct.RowsAffected()) != len(uniqueInts(performed)) {
 				return fmt.Errorf("%w: some of those lines are not on this order", ErrInvalid)
 			}
+		}
+		if err := closeTasksOfDeclinedJobTx(ctx, tx, scope, jobID, performed); err != nil {
+			return err
 		}
 		return setStateInScopeTx(ctx, tx, scope, jobID, StateDeclined)
 	})

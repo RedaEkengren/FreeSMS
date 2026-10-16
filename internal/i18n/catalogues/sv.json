@@ -38,6 +38,14 @@
       "one": "%d sak upptäckt, inte prissatt",
       "other": "%d saker upptäckta, inte prissatta"
     },
+    "%d step left on the list": {
+      "one": "%d steg kvar på listan",
+      "other": "%d steg kvar på listan"
+    },
+    "%d step is held up": {
+      "one": "%d hindrat",
+      "other": "%d hindrade"
+    },
     "%d visit": {
       "one": "%d besök",
       "other": "%d besök"
@@ -1885,6 +1893,99 @@
     },
     "agreement cleared": {
       "other": "godkännandet borttaget"
+    },
+    "Work list": {
+      "other": "Arbetslista"
+    },
+    "%d of %d left": {
+      "other": "%d av %d kvarstår"
+    },
+    "%d blocked": {
+      "other": "%d hindrade"
+    },
+    "It cannot be handed back until these are done or left out.": {
+      "other": "Bilen kan inte lämnas tillbaka förrän de är klara eller utelämnade."
+    },
+    "All done": {
+      "other": "Allt klart"
+    },
+    "%d to put to the customer": {
+      "other": "%d att ta upp med kunden"
+    },
+    "not owed": {
+      "other": "inte aktuell"
+    },
+    "Done": {
+      "other": "Klar"
+    },
+    "Underway": {
+      "other": "Pågår"
+    },
+    "Left out": {
+      "other": "Utelämnad"
+    },
+    "To do": {
+      "other": "Att göra"
+    },
+    "Blocked": {
+      "other": "Hindrad"
+    },
+    "waiting for a part": {
+      "other": "väntar på del"
+    },
+    "waiting for the customer": {
+      "other": "väntar på kunden"
+    },
+    "blocked": {
+      "other": "hindrad"
+    },
+    "What the customer decided": {
+      "other": "Vad kunden bestämde"
+    },
+    "Put it back on the list": {
+      "other": "Lägg tillbaka på listan"
+    },
+    "Start": {
+      "other": "Påbörja"
+    },
+    "Not done after all": {
+      "other": "Inte klar ändå"
+    },
+    "Held up by": {
+      "other": "Hindras av"
+    },
+    "A part": {
+      "other": "En del"
+    },
+    "Something else": {
+      "other": "Något annat"
+    },
+    "It is held up": {
+      "other": "Den är hindrad"
+    },
+    "Why it is being left out": {
+      "other": "Varför den utelämnas"
+    },
+    "The customer has to be told": {
+      "other": "Kunden måste få veta"
+    },
+    "Leave it out": {
+      "other": "Utelämna"
+    },
+    "Something that has to be done": {
+      "other": "Något som måste göras"
+    },
+    "For which line": {
+      "other": "För vilken rad"
+    },
+    "None": {
+      "other": "Ingen"
+    },
+    "Add to the list": {
+      "other": "Lägg till på listan"
+    },
+    "Make a list from the agreed work": {
+      "other": "Gör en lista av det godkända arbetet"
     },
     "Final check": {
       "other": "Slutkontroll"

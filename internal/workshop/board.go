@@ -62,6 +62,10 @@ type BoardEntry struct {
 	// Who signed the work off, where the shop requires a final check.
 	FinalCheckedBy string
 
+	// Work left on the job's list, and how much of it is held up. The cue
+	// for why a car with a promise is not ready.
+	TasksLeft, TasksBlocked int
+
 	// Promised, sold and clocked, put together.
 	Progress Progress
 
@@ -180,7 +184,13 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 			                  JOIN users fu ON fu.id = fi.performed_by
 			                  JOIN people fp ON fp.id = fu.person_id
 			                  WHERE fi.work_order_id = w.id AND fi.completed_at IS NOT NULL
-			                  ORDER BY fi.completed_at DESC LIMIT 1), ''),` + progressColumns + `
+			                  ORDER BY fi.completed_at DESC LIMIT 1), ''),
+			       (SELECT count(*) FROM job_tasks t LEFT JOIN work_order_lines tl ON tl.id = t.line_id
+			         WHERE t.work_order_id = w.id AND t.status IN ('pending', 'underway', 'blocked')
+			           AND NOT coalesce(tl.withdrawn_at IS NOT NULL OR (tl.declined_at IS NOT NULL AND tl.performed_at IS NULL), false)),
+			       (SELECT count(*) FROM job_tasks t LEFT JOIN work_order_lines tl ON tl.id = t.line_id
+			         WHERE t.work_order_id = w.id AND t.status = 'blocked'
+			           AND NOT coalesce(tl.withdrawn_at IS NOT NULL OR (tl.declined_at IS NOT NULL AND tl.performed_at IS NULL), false)),` + progressColumns + `
 			FROM work_orders w
 			JOIN vehicles v  ON v.id = w.vehicle_id
 			-- Left, not inner. A work order is allowed to have no customer --
@@ -213,7 +223,7 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 			targets := append([]any{&b.ID, &b.Number, &b.State,
 				&b.Registration, &b.Make, &b.Model, &b.Complaint,
 				&b.CustomerName, &b.HasCustomer, &b.OpenedAt, &b.PromisedAt, &b.ReadyAt,
-				&b.WorkingNow, &b.OpenFindings, &b.ApprovedUnpriced, &b.CarAway, &b.ExpectedBack, &b.ToldAt, &b.FinalCheckedBy},
+				&b.WorkingNow, &b.OpenFindings, &b.ApprovedUnpriced, &b.CarAway, &b.ExpectedBack, &b.ToldAt, &b.FinalCheckedBy, &b.TasksLeft, &b.TasksBlocked},
 				b.Progress.scanTargets()...)
 			if err := rows.Scan(targets...); err != nil {
 				return fmt.Errorf("scan board entry: %w", err)

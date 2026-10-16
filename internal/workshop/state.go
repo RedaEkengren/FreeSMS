@@ -345,6 +345,15 @@ func setStateInScopeTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID
 		}
 	}
 	if to == StateReady {
+		// Work still on the list is work not done, whatever the final check
+		// says: the check certifies what was done, not what was left.
+		open, err := outstandingTasksTx(ctx, tx, jobID)
+		if err != nil {
+			return err
+		}
+		if len(open) > 0 {
+			return unfinishedTasksError(open)
+		}
 		fc, err := finalCheckTx(ctx, tx, scope.ShopID, jobID)
 		if err != nil {
 			return err

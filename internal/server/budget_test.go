@@ -26,8 +26,10 @@ import (
 // made in the commit that does it, with the reason in the message.
 var queryBudgets = map[string]int{
 	// The technician's screens, on the worst connection: these matter most.
-	"tech GET /":                         11,
-	"tech GET /jobs/{id}":                23,
+	"tech GET /": 11,
+	// 23 to 24: the work list is one more read (two once a job has steps,
+	// which the budget's jobs do not).
+	"tech GET /jobs/{id}":                24,
 	"tech GET /time":                     11,
 	"tech GET /inspections/{inspection}": 12,
 	"tech GET /mine":                     12,
@@ -41,7 +43,8 @@ var queryBudgets = map[string]int{
 	"desk GET /board": 21,
 	// 35: the quote the customer was shown and what they answered to it
 	// (two statements), which the counter reads on every live refresh.
-	"desk GET /jobs/{id}":   38,
+	// 39: the work list, as for the technician.
+	"desk GET /jobs/{id}":   39,
 	"desk GET /receivables": 11,
 	"desk GET /parts":       11,
 	"desk GET /stock":       26,

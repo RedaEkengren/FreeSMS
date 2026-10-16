@@ -102,6 +102,8 @@ type pageData struct {
 	CustomerQuery string
 	Requests      []workshop.PartRequest
 	Findings      []workshop.Finding
+	Tasks         []workshop.Task
+	TaskCounts    workshop.TaskCounts
 
 	Inspection  workshop.Inspection
 	Inspections []workshop.Inspection

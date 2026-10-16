@@ -42,6 +42,7 @@ const (
 	exportB     = "bbbbbbbb-0000-0000-0000-00000000000a"
 	bookingB    = "bbbbbbbb-0000-0000-0000-00000000000c"
 	enquiryB    = "bbbbbbbb-0000-0000-0000-00000000000d"
+	taskB       = "bbbbbbbb-0000-0000-0000-00000000000e"
 
 	// A string that appears nowhere in shop A. If it reaches a response body,
 	// something leaked, whatever the status code said.
@@ -183,6 +184,8 @@ func testServerOn(t *testing.T, pool *pgxpool.Pool) (*httptest.Server, *pgxpool.
 		  'bbbbbbbb-0000-0000-0000-0000000000bb')`,
 		`INSERT INTO enquiries (id, shop_id, subject, customer_name, created_by) VALUES
 		 ('` + enquiryB + `','` + shopB + `', 'Brakes', '` + secretB + `', 'bbbbbbbb-0000-0000-0000-0000000000bb')`,
+		`INSERT INTO job_tasks (id, shop_id, work_order_id, position, title, created_by) VALUES
+		 ('` + taskB + `','` + shopB + `','` + jobB + `',1,'Secret step','bbbbbbbb-0000-0000-0000-0000000000bb')`,
 	})
 
 	cfg := &config.Config{

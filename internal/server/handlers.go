@@ -217,10 +217,15 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 	if err != nil {
 		s.log.Error("read final check", "error", err)
 	}
+	tasks, err := workshop.TasksFor(r.Context(), s.pool, session.Scope, id)
+	if err != nil {
+		s.log.Error("read tasks", "error", err)
+	}
+	taskCounts := workshop.CountTasks(tasks)
 	next := stateChoices(session.Scope.Role, workshop.State(job.State), job.HasWork)
 	// Not offered until the final check is done, where the shop requires
 	// one. SetState refuses it too; this keeps the page honest about it.
-	if finalCheck.Required && !finalCheck.Done {
+	if (finalCheck.Required && !finalCheck.Done) || taskCounts.Outstanding > 0 {
 		kept := next[:0]
 		for _, st := range next {
 			if st != workshop.StateReady {
@@ -392,6 +397,8 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 		Contact:     contact,
 		Requests:    requests,
 		Findings:    findings,
+		Tasks:       tasks,
+		TaskCounts:  taskCounts,
 		Answers:     answers,
 		Quote:       quote,
 		Presence:    presence,

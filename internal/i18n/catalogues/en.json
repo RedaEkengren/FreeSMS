@@ -14,6 +14,14 @@
       "one": "%d thing noticed, not priced",
       "other": "%d things noticed, not priced"
     },
+    "%d step left on the list": {
+      "one": "%d step left on the list",
+      "other": "%d steps left on the list"
+    },
+    "%d step is held up": {
+      "one": "%d step is held up",
+      "other": "%d steps are held up"
+    },
     "%d visit": {
       "one": "%d visit",
       "other": "%d visits"
