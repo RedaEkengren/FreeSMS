@@ -24,9 +24,11 @@
     {{if .Session.Scope.Role.SeesParts}}<a href="/parts" class="nav">{{.T "Parts"}}</a>
     <a href="/supply" class="nav">{{.T "Orders"}}</a>
     <a href="/stock" class="nav">{{.T "Stock"}}</a>
-    <a href="/scan" class="nav">{{.T "Scan"}}</a>{{end}}
+    <a href="/scan" class="nav">{{.T "Scan"}}</a>
+    <a href="/outsourced" class="nav">{{.T "At suppliers"}}</a>{{end}}
     {{if .Session.Scope.Role.RunsTheShop}}<a href="/shop" class="nav">{{.T "The workshop"}}</a>
-    <a href="/staff" class="nav">{{.T "Staff"}}</a>{{end}}
+    <a href="/staff" class="nav">{{.T "Staff"}}</a>
+    <a href="/import" class="nav">{{.T "Import"}}</a>{{end}}
     {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/customers" class="nav">{{.T "Customers"}}</a>
     <a href="/enquiries" class="nav">{{.T "Enquiries"}}</a>
     <a href="/calendar" class="nav">{{.T "Bookings"}}</a>

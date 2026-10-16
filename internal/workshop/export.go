@@ -38,7 +38,7 @@ var ExportTables = []string{
 	"stock_movements", "price_bands", "labour_times", "erasures", "shop_exports",
 	"bookings", "booking_events", "staff_absences", "shop_closures", "rotas", "rota_hours", "shift_changes", "outbound_messages", "message_events",
 	"work_order_state_changes", "quotes", "quote_lines", "quote_decisions", "enquiries", "enquiry_lines", "job_assignments", "job_plans", "work_order_line_revisions", "job_tasks", "job_task_events", "record_changes", "customer_people", "job_notes",
-	"supplier_orders", "supplier_order_lines", "supplier_line_etas", "supplier_receipts", "supplier_returns", "job_recommendations", "delivery_summaries", "invoice_deliveries", "invoice_corrections", "receivable_cases", "receivable_events", "day_settlements", "day_reviews", "comebacks", "comeback_claims", "comeback_events", "outsourced_work", "outsourced_events",
+	"supplier_orders", "supplier_order_lines", "supplier_line_etas", "supplier_receipts", "supplier_returns", "job_recommendations", "delivery_summaries", "invoice_deliveries", "invoice_corrections", "receivable_cases", "receivable_events", "day_settlements", "day_reviews", "comebacks", "comeback_claims", "comeback_events", "outsourced_work", "outsourced_events", "import_batches", "import_refs",
 }
 
 // exportQueries are tables exported with chosen columns, because one of
@@ -57,6 +57,7 @@ var exportExcluded = map[string]string{
 	"idempotency_keys":  "request keys for safe retries; plumbing",
 	"drafts":            "half-typed forms; not records",
 	"schema_migrations": "this software's own bookkeeping",
+	"import_rows":       "the rows of an upload, kept only until it is applied or discarded and wiped then; what a batch did lives in import_batches and import_refs",
 }
 
 // ExportExcluded says whether a table is left out, and why.

@@ -275,6 +275,7 @@
     <button type="button" role="tab" data-tab="21">Booking confirmed</button>
     <button type="button" role="tab" data-tab="22">The car comes back</button>
     <button type="button" role="tab" data-tab="23">Work at a supplier</button>
+    <button type="button" role="tab" data-tab="24">Start from your file</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1399,6 +1400,43 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: a turbocharger is sent, runs late, comes back, is accepted by the shop and not before, and the invoice is handed on &ndash; <a href="{{test "e2e/tests/34-outsourced.spec.ts" "a turbocharger sent out, late, back, accepted, and the invoice handed on"}}">read the test</a>. Names and amounts are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>Start from what you already have</h2>
+  <p class="lede">The workshop already has a customer list, a vehicle register and a shelf of parts. An import writes nothing until you have seen it: the file is read (semicolons, decimal commas, åäö, older Windows files too), every row is shown with what it would do, and a row that may be somebody already here needs your answer. The same file twice is the same upload, and opening stock is a dated ledger entry that is never added twice.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: a customer file is read and previewed. A row that shares a telephone number with another needs an answer, a row without a name is refused. The file is applied all or nothing, and parts and opening stock follow.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "owner"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">{{t "row %s" "2"}} &middot; Åsa Öberg</div>
+              <div class="cl-qrow"><span>Åsa Öberg</span><span class="rd-tag pass">{{t "would be created"}}</span></div>
+              <div class="cl-qrow"><span>Åsa Öberg again · the same telephone number</span><span class="rd-tag rd-risk">{{t "Needs your answer"}}</span></div>
+              <div class="cl-qrow"><span>&ndash;</span><span class="rd-tag rd-risk">{{t "cannot be imported"}}</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "This may be somebody who is already here"}}</div>
+              <div class="cl-qrow"><span>{{t "Leave it out"}}</span><span class="rd-tag pass">&#10003;</span></div>
+              <span class="an-btn mo-btn an-fade" data-t="12">{{t "Apply"}}</span>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">{{t "opening stock"}}</div>
+              <div class="cl-qrow"><span>IMP-OIL × 48.5 · 2026-01-31</span><span class="rd-tag pass">{{t "created"}}</span></div>
+              <div class="cl-qrow an-fade" data-t="20"><span>IMP-OIL × 48.5 · 2026-01-31</span><span class="rd-tag">{{t "nothing to add"}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">Every row is shown with what it would do. What cannot be imported is pointed out with why, row by row &ndash; nothing is guessed.</div>
+      <div class="an-cap" data-t="8,15.8">A row that may be somebody who is already here needs an answer before anything is written. Then everything goes in, or nothing does.</div>
+      <div class="an-cap" data-t="16,23.6">Opening stock becomes a dated entry in the stock ledger with the file as its source. The same part and day is never added twice.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser with Swedish files: customers, parts and opening stock are previewed and applied, a possible duplicate needs an answer and the same file is the same upload &ndash; <a href="{{test "e2e/tests/35-import.spec.ts" "a customer list, parts and opening stock imported from Swedish files"}}">read the test</a>. Names and quantities are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

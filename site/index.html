@@ -272,6 +272,7 @@
     <button type="button" role="tab" data-tab="21">Bokningen bekräftas</button>
     <button type="button" role="tab" data-tab="22">Bilen kommer tillbaka</button>
     <button type="button" role="tab" data-tab="23">Arbete hos leverantör</button>
+    <button type="button" role="tab" data-tab="24">Börja från din fil</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1453,6 +1454,43 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: en turbo skickas, blir sen, kommer tillbaka, godkänns av verkstaden och inte förr, och fakturan lämnas vidare &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/34-outsourced.spec.ts">läs testet</a>. Namn och belopp är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>Börja från det du redan har</h2>
+  <p class="lede">Verkstaden har redan en kundlista, ett fordonsregister och en hylla med delar. En import skriver ingenting förrän du sett den: filen läses (semikolon, decimalkomma, åäö, även äldre Windows-filer), varje rad visas med vad den skulle göra, och en rad som kan vara någon som redan finns måste du svara på. Samma fil två gånger blir samma uppladdning, och ingående lager är ett daterat bokningsrad som aldrig läggs på två gånger.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: en kundfil läses och förhandsvisas. En rad som delar telefonnummer med en annan kräver ett svar, en rad utan namn avvisas. Filen genomförs allt eller inget, och delar och ingående lager följer efter.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>Ägare</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade an-off" data-t="0,8">
+              <div class="wf-h">rad 2 &middot; Åsa Öberg</div>
+              <div class="cl-qrow"><span>Åsa Öberg</span><span class="rd-tag pass">skulle skapas</span></div>
+              <div class="cl-qrow"><span>Åsa Öberg igen · samma telefonnummer</span><span class="rd-tag rd-risk">Behöver ditt svar</span></div>
+              <div class="cl-qrow"><span>&ndash;</span><span class="rd-tag rd-risk">kan inte importeras</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">Det här kan vara någon som redan finns</div>
+              <div class="cl-qrow"><span>Utelämna</span><span class="rd-tag pass">&#10003;</span></div>
+              <span class="an-btn mo-btn an-fade" data-t="12">Genomför</span>
+            </div>            <div class="an-fade an-off" data-t="16">
+              <div class="wf-h">ingående lager</div>
+              <div class="cl-qrow"><span>IMP-OIL × 48,5 · 2026-01-31</span><span class="rd-tag pass">skapad</span></div>
+              <div class="cl-qrow an-fade an-off" data-t="20"><span>IMP-OIL × 48,5 · 2026-01-31</span><span class="rd-tag">inget att lägga till</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap an-off" data-t="0.3,7.8">Varje rad visas med vad den skulle göra. Det som inte går att importera pekas ut med varför, rad för rad &ndash; inget gissas.</div>
+      <div class="an-cap" data-t="8,15.8">En rad som kan vara någon som redan finns kräver ett svar innan något skrivs. Sedan går allt in, eller inget.</div>
+      <div class="an-cap an-off" data-t="16,23.6">Ingående lager blir en daterad rad i lagerboken med filen som ursprung. Samma del och dag läggs inte på två gånger.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare med svenska filer: kunder, delar och ingående lager förhandsvisas och genomförs, en möjlig dubblett kräver ett svar och samma fil blir samma uppladdning &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/35-import.spec.ts">läs testet</a>. Namn och antal är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

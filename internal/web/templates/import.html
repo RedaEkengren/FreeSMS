@@ -1,0 +1,34 @@
+{{define "content"}}
+<h1>{{.T "Import"}}</h1>
+<p class="waiting">{{.T "Start from what the shop already has. A file is read and shown to you before anything is written, and applying it is all or nothing."}}</p>
+
+<h2>{{.T "Upload a file"}}</h2>
+<form method="post" action="/import" enctype="multipart/form-data">
+  <div class="pair">
+    <label><span>{{.T "What the file holds"}}</span>
+      <select name="kind">{{range .Positions}}<option value="{{.Value}}">{{$.T .Label}}</option>{{end}}</select></label>
+    <label><span>{{.T "The file (CSV, up to 5 MB)"}}</span><input type="file" name="file" accept=".csv,text/csv,text/plain" required></label>
+  </div>
+  <button type="submit">{{.T "Read the file"}}</button>
+  <p class="waiting">{{.T "Do the files in this order: customers, vehicles, parts, then opening stock. A vehicle finds its owner by the customer's reference, and a stock row finds its part by number."}}</p>
+</form>
+
+<h2>{{.T "Templates"}}</h2>
+<ul class="lines">
+  {{range .Positions}}<li><a href="/import/template/{{.Value}}">{{$.T .Label}}</a></li>{{end}}
+</ul>
+<p class="waiting">{{.T "Semicolons or commas, UTF-8 or Windows-1252, a decimal comma or a point, and a space as the thousands separator all work. Dates are written 2026-01-31. A cell that begins with = + or @ is refused."}}</p>
+<p class="waiting">{{.T "Customers need a reference of their own (the source system's customer number) so a corrected file finds them again. Vehicles are found by registration, parts by number, and a stock row by part and day. Records that already exist are only filled in where they are empty."}}</p>
+<p class="waiting">{{.T "Repair history is not imported."}}</p>
+
+<h2>{{.T "Earlier uploads"}}</h2>
+{{if .Batches}}
+<ul class="lines">
+  {{range .Batches}}
+  <li><div class="row"><a href="/import/{{.ID}}">{{.FileName}}</a>
+    <span class="tag {{if eq .Status "applied"}}pass{{else if eq .Status "discarded"}}late{{else}}warranty{{end}}">{{$.T .Status}}</span></div>
+    <p class="waiting">{{$.T .Kind}} &middot; {{$.Date ($.Local .CreatedAt) "2 Jan 2006 15:04"}}{{if eq .Status "applied"}} &middot; {{$.T "%s created, %s filled in, %s left, %s refused" ($.Num .Created) ($.Num .Updated) ($.Num .Skipped) ($.Num .Failed)}}{{end}}</p></li>
+  {{end}}
+</ul>
+{{else}}<p class="empty">{{.T "Nothing has been imported."}}</p>{{end}}
+{{end}}

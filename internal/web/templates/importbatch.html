@@ -1,0 +1,63 @@
+{{define "content"}}
+{{with .Batch}}
+<div class="row"><h1>{{.FileName}}</h1>
+  <span class="tag {{if eq .Status "applied"}}pass{{else if eq .Status "discarded"}}late{{else}}warranty{{end}}">{{$.T .Status}}</span></div>
+<p class="waiting"><a href="/import">{{$.T "Back to imports"}}</a> &middot; {{$.T .Kind}} &middot; {{$.T "read as %s" .Encoding}}</p>
+
+{{if .Pending}}
+<dl>
+  <dt>{{$.T "Would be created"}}</dt><dd>{{$.Num .WouldCreate}}</dd>
+  <dt>{{$.T "Would be filled in"}}</dt><dd>{{$.Num .WouldUpdate}}</dd>
+  <dt>{{$.T "Nothing to add"}}</dt><dd>{{$.Num .WouldSkip}}</dd>
+  <dt>{{$.T "Cannot be imported"}}</dt><dd>{{$.Num .WouldRefuse}}</dd>
+</dl>
+{{if .Undecided}}<p class="waiting"><span class="tag late">{{$.T "Needs your answer"}}</span> {{$.T "Some rows may be somebody who is already here. Say what to do about each before applying."}}</p>{{end}}
+
+<form method="post" action="/import/{{.ID}}">
+  <input type="hidden" name="action" value="apply">
+  <ul class="lines">
+  {{range .Rows}}
+  <li>
+    <div class="row"><span><b>{{$.T "row %s" ($.Num .No)}}</b> &middot; {{.Title}}</span>
+      <span class="tag {{if eq .Action "error"}}late{{else if eq .Action "create"}}pass{{else}}warranty{{end}}">{{$.T .Label}}</span></div>
+    {{range .Errors}}<p class="waiting"><span class="tag late">{{$.T "problem"}}</span> {{.}}</p>{{end}}
+    {{range .Warnings}}<p class="waiting">{{.}}</p>{{end}}
+    {{if .Fills}}<p class="waiting">{{$.T "Would fill in:"}} {{range $i, $f := .Fills}}{{if $i}}, {{end}}{{$f}}{{end}}</p>{{end}}
+    {{if .Candidates}}
+    <fieldset>
+      <legend>{{$.T "This may be somebody who is already here"}}</legend>
+      {{$row := .No}}
+      <label><input type="radio" name="d_{{$row}}" value="create" required> {{$.T "It is a new one: create it"}}</label>
+      {{range .Candidates}}<label><input type="radio" name="d_{{$row}}" value="link:{{.ID}}"> {{$.T "It is the same as %s" .Name}} ({{range $i, $w := .Why}}{{if $i}}, {{end}}{{$.T $w}}{{end}})</label>{{end}}
+      <label><input type="radio" name="d_{{$row}}" value="skip"> {{$.T "Leave it out"}}</label>
+    </fieldset>
+    {{end}}
+  </li>
+  {{end}}
+  </ul>
+  {{if .WouldRefuse}}<label><span><input type="checkbox" name="skip_failed" value="1"> {{$.T "Import the others; leave out the rows that cannot be imported"}}</span></label>{{end}}
+  <button type="submit">{{$.T "Apply"}}</button>
+  <p class="waiting">{{$.T "Everything goes in or nothing does. If something fails, the file is still here to apply again."}}</p>
+</form>
+<form method="post" action="/import/{{.ID}}">
+  <input type="hidden" name="action" value="discard">
+  <button type="submit" class="secondary">{{$.T "Throw this away"}}</button>
+</form>
+
+{{else if eq .Status "applied"}}
+<dl>
+  <dt>{{$.T "Created"}}</dt><dd>{{$.Num .Created}}</dd>
+  <dt>{{$.T "Filled in"}}</dt><dd>{{$.Num .Updated}}</dd>
+  <dt>{{$.T "Left as they were"}}</dt><dd>{{$.Num .Skipped}}</dd>
+  <dt>{{$.T "Refused"}}</dt><dd>{{$.Num .Failed}}</dd>
+</dl>
+<p class="waiting">{{$.T "Applied %s by %s." ($.Date ($.Local .AppliedAt) "2 Jan 2006 15:04") .By}} {{$.T "What the file said has been removed; this report stays."}}</p>
+<ul class="lines">
+  {{range .Rows}}<li><div class="row"><span><b>{{$.T "row %s" ($.Num .No)}}</b>{{if .Ref}} &middot; {{.Ref}}{{end}}</span><span class="tag {{if eq .Outcome "failed"}}late{{else if eq .Outcome "created"}}pass{{else}}warranty{{end}}">{{$.T .Label}}</span></div>
+    {{if .Message}}<p class="waiting">{{.Message}}</p>{{end}}</li>{{end}}
+</ul>
+{{else}}
+<p class="empty">{{$.T "This upload was thrown away, and what the file said with it."}}</p>
+{{end}}
+{{end}}
+{{end}}

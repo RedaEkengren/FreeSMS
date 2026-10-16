@@ -3775,6 +3775,180 @@
     "Away at suppliers": {
       "other": "Hos leverantörer"
     },
+    "Import": {
+      "other": "Import"
+    },
+    "At suppliers": {
+      "other": "Hos leverantörer"
+    },
+    "%s created, %s filled in, %s left, %s refused": {
+      "other": "%s skapade, %s kompletterade, %s lämnade, %s avvisade"
+    },
+    "Applied %s by %s.": {
+      "other": "Genomfört %s av %s."
+    },
+    "Apply": {
+      "other": "Genomför"
+    },
+    "Back to imports": {
+      "other": "Tillbaka till importerna"
+    },
+    "Cannot be imported": {
+      "other": "Kan inte importeras"
+    },
+    "Created": {
+      "other": "Skapade"
+    },
+    "Customers need a reference of their own (the source system's customer number) so a corrected file finds them again. Vehicles are found by registration, parts by number, and a stock row by part and day. Records that already exist are only filled in where they are empty.": {
+      "other": "Kunder behöver en egen referens (källsystemets kundnummer) så att en rättad fil hittar dem igen. Fordon hittas på registreringsnummer, delar på artikelnummer och en lagerrad på del och dag. Poster som redan finns kompletteras bara där de är tomma."
+    },
+    "Do the files in this order: customers, vehicles, parts, then opening stock. A vehicle finds its owner by the customer's reference, and a stock row finds its part by number.": {
+      "other": "Gör filerna i den här ordningen: kunder, fordon, delar och sist ingående lager. Ett fordon hittar sin ägare på kundens referens och en lagerrad sin del på artikelnummer."
+    },
+    "Earlier uploads": {
+      "other": "Tidigare uppladdningar"
+    },
+    "Everything goes in or nothing does. If something fails, the file is still here to apply again.": {
+      "other": "Allt kommer in eller inget gör det. Om något går fel finns filen kvar att genomföra igen."
+    },
+    "Filled in": {
+      "other": "Kompletterade"
+    },
+    "Import the others; leave out the rows that cannot be imported": {
+      "other": "Importera de andra; lämna de rader som inte kan importeras"
+    },
+    "It is a new one: create it": {
+      "other": "Det är en ny: skapa den"
+    },
+    "It is the same as %s": {
+      "other": "Det är samma som %s"
+    },
+    "Left as they were": {
+      "other": "Lämnade som de var"
+    },
+    "Needs your answer": {
+      "other": "Behöver ditt svar"
+    },
+    "Nothing has been imported.": {
+      "other": "Inget har importerats."
+    },
+    "Nothing to add": {
+      "other": "Inget att lägga till"
+    },
+    "Read the file": {
+      "other": "Läs filen"
+    },
+    "Refused": {
+      "other": "Avvisade"
+    },
+    "Repair history is not imported.": {
+      "other": "Reparationshistorik importeras inte."
+    },
+    "Semicolons or commas, UTF-8 or Windows-1252, a decimal comma or a point, and a space as the thousands separator all work. Dates are written 2026-01-31. A cell that begins with = + or @ is refused.": {
+      "other": "Semikolon eller komma, UTF-8 eller Windows-1252, decimalkomma eller punkt och mellanslag som tusentalsavgränsare fungerar. Datum skrivs 2026-01-31. En cell som börjar med = + eller @ avvisas."
+    },
+    "Some rows may be somebody who is already here. Say what to do about each before applying.": {
+      "other": "Några rader kan vara någon som redan finns. Säg vad som ska göras med var och en innan du genomför."
+    },
+    "Start from what the shop already has. A file is read and shown to you before anything is written, and applying it is all or nothing.": {
+      "other": "Börja från det verkstaden redan har. En fil läses och visas för dig innan något skrivs, och att genomföra den är allt eller inget."
+    },
+    "Templates": {
+      "other": "Mallar"
+    },
+    "The file (CSV, up to 5 MB)": {
+      "other": "Filen (CSV, upp till 5 MB)"
+    },
+    "This may be somebody who is already here": {
+      "other": "Det här kan vara någon som redan finns"
+    },
+    "This upload was thrown away, and what the file said with it.": {
+      "other": "Den här uppladdningen kastades, och det filen innehöll med den."
+    },
+    "Throw this away": {
+      "other": "Kasta bort den här"
+    },
+    "Upload a file": {
+      "other": "Ladda upp en fil"
+    },
+    "What the file holds": {
+      "other": "Vad filen innehåller"
+    },
+    "What the file said has been removed; this report stays.": {
+      "other": "Det filen innehöll är borttaget; den här rapporten finns kvar."
+    },
+    "Would be created": {
+      "other": "Skulle skapas"
+    },
+    "Would be filled in": {
+      "other": "Skulle kompletteras"
+    },
+    "Would fill in:": {
+      "other": "Skulle komplettera:"
+    },
+    "applied": {
+      "other": "genomförd"
+    },
+    "cannot be imported": {
+      "other": "kan inte importeras"
+    },
+    "created": {
+      "other": "skapad"
+    },
+    "customers": {
+      "other": "kunder"
+    },
+    "discarded": {
+      "other": "kastad"
+    },
+    "filled in": {
+      "other": "kompletterad"
+    },
+    "left as it was": {
+      "other": "lämnad som den var"
+    },
+    "linked to an existing record": {
+      "other": "kopplad till en befintlig post"
+    },
+    "nothing to add": {
+      "other": "inget att lägga till"
+    },
+    "opening stock": {
+      "other": "ingående lager"
+    },
+    "parts": {
+      "other": "delar"
+    },
+    "previewed": {
+      "other": "granskas"
+    },
+    "problem": {
+      "other": "problem"
+    },
+    "read as %s": {
+      "other": "lästes som %s"
+    },
+    "refused": {
+      "other": "avvisad"
+    },
+    "row %s": {
+      "other": "rad %s"
+    },
+    "skipped": {
+      "other": "överhoppad"
+    },
+    "stock": {
+      "other": "lager"
+    },
+    "vehicles": {
+      "other": "fordon"
+    },
+    "would be created": {
+      "other": "skulle skapas"
+    },
+    "would be filled in": {
+      "other": "skulle kompletteras"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

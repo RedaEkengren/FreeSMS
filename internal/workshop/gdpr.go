@@ -484,13 +484,16 @@ const (
 
 // SweepResult says what a retention sweep removed.
 type SweepResult struct {
-	LoginAttempts int64
-	Shares        int64
-	JobLinks      int64
+	LoginAttempts  int64
+	Shares         int64
+	JobLinks       int64
+	ImportPreviews int64
 }
 
 // Empty reports whether there was nothing to do.
-func (s SweepResult) Empty() bool { return s.LoginAttempts == 0 && s.Shares == 0 && s.JobLinks == 0 }
+func (s SweepResult) Empty() bool {
+	return s.LoginAttempts == 0 && s.Shares == 0 && s.JobLinks == 0 && s.ImportPreviews == 0
+}
 
 // Sweep applies the retention policy.
 //
@@ -525,6 +528,13 @@ func Sweep(ctx context.Context, pool *pgxpool.Pool, shopID string) (SweepResult,
 
 		// Idempotency keys and drafts exist to survive a bad minute, not to be
 		// a record. Keeping them is keeping a log of what somebody was typing.
+		// A file somebody uploaded and never applied holds what the file
+		// said, personal data among it. A week is time to come back to it.
+		step("import previews", func(ctx context.Context, tx pgx.Tx) error {
+			n, err := expireImportsTx(ctx, tx, importPreviewRetention)
+			r.ImportPreviews = n
+			return err
+		}),
 		step("idempotency keys", func(ctx context.Context, tx pgx.Tx) error {
 			_, err := tx.Exec(ctx,
 				`DELETE FROM idempotency_keys WHERE created_at < now() - $1::interval`,

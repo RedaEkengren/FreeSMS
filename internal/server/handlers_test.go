@@ -49,6 +49,7 @@ const (
 	lineB       = "bbbbbbbb-0000-0000-0000-000000000011"
 	receiptB    = "bbbbbbbb-0000-0000-0000-000000000012"
 	returnB     = "bbbbbbbb-0000-0000-0000-000000000013"
+	batchB      = "bbbbbbbb-0000-0000-0000-000000000015"
 
 	// A string that appears nowhere in shop A. If it reaches a response body,
 	// something leaked, whatever the status code said.
@@ -202,6 +203,8 @@ func testServerOn(t *testing.T, pool *pgxpool.Pool) (*httptest.Server, *pgxpool.
 		 ('` + receiptB + `','` + shopB + `','` + lineB + `',1,'direct','bbbbbbbb-0000-0000-0000-0000000000bb')`,
 		`INSERT INTO supplier_returns (id, shop_id, receipt_id, quantity, reason, planned_by) VALUES
 		 ('` + returnB + `','` + shopB + `','` + receiptB + `',1,'damaged','bbbbbbbb-0000-0000-0000-0000000000bb')`,
+		`INSERT INTO import_batches (id, shop_id, kind, file_name, file_sha256, encoding, row_count, created_by) VALUES
+		 ('` + batchB + `','` + shopB + `','customers','` + secretB + `.csv','\x00','UTF-8',1,'bbbbbbbb-0000-0000-0000-0000000000bb')`,
 		`INSERT INTO job_notes (id, shop_id, work_order_id, kind, body, occurred_at, author) VALUES
 		 ('` + noteB + `','` + shopB + `','` + jobB + `','note','` + secretB + `', now(), 'bbbbbbbb-0000-0000-0000-0000000000bb')`,
 	})
