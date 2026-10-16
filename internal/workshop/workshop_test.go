@@ -33,10 +33,9 @@ func owner() access.Scope {
 func setup(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	ctx := context.Background()
-	pool := testsupport.FreshPool(t)
-	if err := database.Migrate(ctx, pool, migrations.FS); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	pool := testsupport.ClonedPool(t, func(ctx context.Context, p *pgxpool.Pool) error {
+		return database.Migrate(ctx, p, migrations.FS)
+	})
 	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
 		for _, s := range []string{
 			`INSERT INTO shops (id, name) VALUES ('` + shopID + `', 'Verkstaden')`,

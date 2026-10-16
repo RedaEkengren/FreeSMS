@@ -6,8 +6,12 @@ package testsupport
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"syscall"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -104,4 +108,125 @@ func FreshPoolWith(t *testing.T, tracer pgx.QueryTracer) *pgxpool.Pool {
 		t.Fatalf("reset schema: %v", err)
 	}
 	return pool
+}
+
+var (
+	templateOnce sync.Once
+	templateName string
+	templateErr  error
+	cloneSeq     atomic.Int64
+)
+
+// ClonedPool returns a pool on a database of its own, copied from a template
+// that has been migrated once for the whole test process.
+//
+// FreshPool resets the schema and leaves the caller to migrate, which for a
+// package with hundreds of tests means applying every migration hundreds of
+// times: the workshop package spent nearly all of its ten minutes doing it.
+// Postgres can copy a finished database in a fraction of that.
+//
+// A database per test also needs no lock against other packages, which is
+// what FreshPool's advisory lock was for. The database is dropped when the
+// test ends.
+func ClonedPool(t *testing.T, migrate func(context.Context, *pgxpool.Pool) error) *pgxpool.Pool {
+	t.Helper()
+	url := os.Getenv(EnvDatabaseURL)
+	if url == "" {
+		if os.Getenv("CI") != "" {
+			t.Fatalf("%s is not set, but this is CI: the integration tests would "+
+				"skip silently and the run would still be green", EnvDatabaseURL)
+		}
+		t.Skipf("%s not set", EnvDatabaseURL)
+	}
+	if strings.HasSuffix(url, "/freesms?sslmode=disable") || strings.HasSuffix(url, "/freesms") {
+		t.Fatalf("%s points at the development database; use freesms_test", EnvDatabaseURL)
+	}
+	ctx := context.Background()
+	base, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		t.Fatalf("parse %s: %v", EnvDatabaseURL, err)
+	}
+
+	templateOnce.Do(func() {
+		templateName = fmt.Sprintf("freesms_tpl_%d", os.Getpid())
+		templateErr = buildTemplate(ctx, base, templateName, migrate)
+	})
+	if templateErr != nil {
+		t.Fatalf("build the template database: %v", templateErr)
+	}
+
+	name := fmt.Sprintf("freesms_t_%d_%d", os.Getpid(), cloneSeq.Add(1))
+	admin, err := pgx.ConnectConfig(ctx, base.ConnConfig)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	_, err = admin.Exec(ctx, fmt.Sprintf(`CREATE DATABASE %s TEMPLATE %s`, name, templateName))
+	admin.Close(ctx)
+	if err != nil {
+		t.Fatalf("clone the template: %v", err)
+	}
+
+	cfg := base.Copy()
+	cfg.ConnConfig.Database = name
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatalf("connect to the clone: %v", err)
+	}
+	t.Cleanup(func() {
+		pool.Close()
+		if c, err := pgx.ConnectConfig(context.Background(), base.ConnConfig); err == nil {
+			_, _ = c.Exec(context.Background(), fmt.Sprintf(`DROP DATABASE IF EXISTS %s WITH (FORCE)`, name))
+			c.Close(context.Background())
+		}
+	})
+	return pool
+}
+
+func buildTemplate(ctx context.Context, base *pgxpool.Config, name string, migrate func(context.Context, *pgxpool.Pool) error) error {
+	admin, err := pgx.ConnectConfig(ctx, base.ConnConfig)
+	if err != nil {
+		return err
+	}
+	defer admin.Close(ctx)
+	dropAbandoned(ctx, admin)
+	if _, err := admin.Exec(ctx, fmt.Sprintf(`CREATE DATABASE %s`, name)); err != nil {
+		return err
+	}
+	cfg := base.Copy()
+	cfg.ConnConfig.Database = name
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	// Closed before anything is cloned from it: Postgres refuses to copy a
+	// database somebody is connected to.
+	defer pool.Close()
+	return migrate(ctx, pool)
+}
+
+// dropAbandoned removes the templates and clones of test processes that are
+// no longer running: a run that was killed never reached its cleanup.
+func dropAbandoned(ctx context.Context, admin *pgx.Conn) {
+	rows, err := admin.Query(ctx, `SELECT datname FROM pg_database WHERE datname ~ '^freesms_(tpl|t)_[0-9]+'`)
+	if err != nil {
+		return
+	}
+	var names []string
+	for rows.Next() {
+		var n string
+		if rows.Scan(&n) == nil {
+			names = append(names, n)
+		}
+	}
+	rows.Close()
+	for _, n := range names {
+		var pid int
+		if _, err := fmt.Sscanf(strings.TrimPrefix(strings.TrimPrefix(n, "freesms_tpl_"), "freesms_t_"), "%d", &pid); err != nil {
+			continue
+		}
+		if p, err := os.FindProcess(pid); err == nil && p.Signal(syscall.Signal(0)) == nil {
+			continue
+		}
+		_, _ = admin.Exec(ctx, fmt.Sprintf(`DROP DATABASE IF EXISTS %s WITH (FORCE)`, n))
+	}
 }
