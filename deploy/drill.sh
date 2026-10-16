@@ -91,6 +91,9 @@ LOST="no"; grep -q "job 9002" "$WORK/verify.txt" && LOST="NO -- the post-backup 
 RESULT="PASS"; [ "$VERIFY_EXIT" -eq 0 ] || RESULT="FAIL"
 [ "$RTO" -le $(( 4 * 3600 )) ] || RESULT="FAIL (recovery time over the 4 hour target)"
 
+# Read before the evidence file is written: writing it is itself a change to a
+# tracked file, and the revision must say what was run, not what was run plus this.
+REV="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)$(git diff --quiet -- . ':!drills' 2>/dev/null || echo ' (with uncommitted changes)')"
 mkdir -p "$EVIDENCE"
 OUT="$EVIDENCE/$(date -u +%Y-%m-%d)-restore-drill.md"
 {
@@ -100,7 +103,7 @@ OUT="$EVIDENCE/$(date -u +%Y-%m-%d)-restore-drill.md"
   echo
   echo "| | |"
   echo "|---|---|"
-  echo "| Revision | \`$(git rev-parse --short HEAD 2>/dev/null || echo unknown)\`$(git diff --quiet 2>/dev/null || echo ' (with uncommitted changes)') |"
+  echo "| Revision | \`$REV\` |"
   echo "| Where | $(uname -srm); $(docker --version | sed 's/,.*//') — a developer machine, **not** the production server |"
   echo "| Started | $(date -u -d @"$START" +%FT%TZ) |"
   echo "| Backup | dump $DUMP_BYTES bytes, photographs $FILES_BYTES bytes |"

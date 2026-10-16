@@ -106,6 +106,9 @@ echo "job 9001 (in the base backup): $HAVE_9001; job 9002 (after the base backup
 RESULT=PASS
 [ "$HAVE_9001" = 1 ] && [ "$HAVE_9002" = 1 ] && [ "$HAVE_9003" = 0 ] || RESULT=FAIL
 
+# Read before the evidence file is written: writing it is itself a change to a
+# tracked file, and the revision must say what was run, not what was run plus this.
+REV="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)$(git diff --quiet -- . ':!drills' 2>/dev/null || echo ' (with uncommitted changes)')"
 mkdir -p "$EVIDENCE"
 OUT="$EVIDENCE/$(date -u +%Y-%m-%d)-wal-drill.md"
 {
@@ -115,7 +118,7 @@ OUT="$EVIDENCE/$(date -u +%Y-%m-%d)-wal-drill.md"
   echo
   echo "| | |"
   echo "|---|---|"
-  echo "| Revision | \`$(git rev-parse --short HEAD 2>/dev/null || echo unknown)\`$(git diff --quiet 2>/dev/null || echo ' (with uncommitted changes)') |"
+  echo "| Revision | \`$REV\` |"
   echo "| Where | $(uname -srm); $(docker --version | sed 's/,.*//') — a developer machine, **not** the production server |"
   echo "| Archive | \`archive_command\` copying each segment to /wal, \`archive_timeout\` ${WAL_ARCHIVE_TIMEOUT} s (\`deploy/wal.compose.yml\`) |"
   echo "| Recovered to | \`$TARGET\` |"
