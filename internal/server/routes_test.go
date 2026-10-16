@@ -43,7 +43,7 @@ var swept = map[string]string{
 	"GET /board": "", "GET /jobs/new": "", "POST /jobs/new": "",
 	"GET /jobs/new/lookup": "", "GET /jobs/new/customers": "", "GET /figures": "", "GET /accounting": "",
 	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/charges": "", "POST /shop/final-check": "",
-	"GET /privacy": "", "POST /privacy/export": "", "GET /events": "", "GET /mine": "", "GET /rota": "", "POST /hooks/46elks/{secret}": "", "POST /rota": "", "GET /schedule": "", "GET /mine/count": "", "POST /account/alert": "", "POST /account/theme": "", "GET /calendar": "", "POST /calendar": "", "GET /enquiries": "", "POST /enquiries": "", "POST /calendar/capacity": "", "GET /labour": "", "POST /labour": "",
+	"GET /privacy": "", "GET /day": "", "POST /day/settlement": "", "POST /day/review": "", "POST /privacy/export": "", "GET /events": "", "GET /mine": "", "GET /rota": "", "POST /hooks/46elks/{secret}": "", "POST /rota": "", "GET /schedule": "", "GET /mine/count": "", "POST /account/alert": "", "POST /account/theme": "", "GET /calendar": "", "POST /calendar": "", "GET /enquiries": "", "POST /enquiries": "", "POST /calendar/capacity": "", "GET /labour": "", "POST /labour": "",
 	"POST /labour/rate": "", "GET /time": "", "POST /time/correct": "",
 	"POST /drafts": "", "GET /drafts": "", "DELETE /drafts": "",
 	"GET /search": "", "GET /scan": "", "GET /labels": "", "GET /stock": "",

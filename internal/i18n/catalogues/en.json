@@ -90,6 +90,10 @@
       "one": "%d reminder sent",
       "other": "%d reminders sent"
     },
+    "%d refund still to pay out": {
+      "one": "%d refund still to pay out",
+      "other": "%d refunds still to pay out"
+    },
     "%d visit": {
       "one": "%d visit",
       "other": "%d visits"

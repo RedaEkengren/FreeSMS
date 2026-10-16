@@ -271,6 +271,7 @@
     <button type="button" role="tab" data-tab="17">The invoice, delivered</button>
     <button type="button" role="tab" data-tab="18">Correcting an invoice</button>
     <button type="button" role="tab" data-tab="19">Unpaid</button>
+    <button type="button" role="tab" data-tab="20">Closing the day</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1252,6 +1253,45 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue and the amounts from its money code when the page is generated. The flow is run against the real product in a browser, against a real mail server: the invoice is taken, a conversation and a promise are written down, a dispute holds and is lifted, the reminder goes with the right amount, and a part is credited and paid back &ndash; <a href="{{test "e2e/tests/30-followup.spec.ts" "an unpaid invoice followed up, reminded, then credited and paid back"}}">read the test</a>. Names and amounts are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>The day adds up</h2>
+  <p class="lede">At closing time the day shows what was invoiced and credited, apart from what was recorded as arrived and paid out, and every total is a link to the document or entry it is made of. The owner compares with the bank statement, and if the figures differ a reason is needed. If the day is signed off and something changes after, a payment entered late for instance, the day says it has changed. Everything that should be put right first is a list.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: the day's sales and cash movement are shown apart. The bank says 980 where FreeSMS has 1,000 and a reason is needed. The owner signs the day off. Then an amount is paid back for the same day and the day says it has changed since it was reviewed.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "owner"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">{{t "Sales"}}</div>
+              <div class="cl-qrow"><span>{{t "Invoiced"}}</span><span>{{money 250000}}</span></div>
+              <div class="cl-qrow"><span>{{t "Credited"}}</span><span>{{money -50000}}</span></div>
+              <div class="wf-h">{{t "Money recorded"}}</div>
+              <div class="cl-qrow"><span>{{t "bank"}}</span><span>{{money 100000}}</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "Compare with the bank, the terminal and the till"}}</div>
+              <div class="cl-qrow"><span>{{t "theirs"}} {{money 98000}} &middot; {{t "ours"}} {{money 100000}}</span><span class="rd-tag rd-risk">{{t "difference"}}</span></div>
+              <div class="cl-qrow"><span>A bank fee was taken before the statement</span><span></span></div>
+              <span class="an-btn mo-btn an-fade" data-t="12.4">{{t "I have looked at this day"}}</span>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">{{t "The day"}}</div>
+              <div class="cl-qrow"><span>{{t "reviewed"}}</span><span class="rd-tag">{{t "Version %d by %s" 1 "Olle"}}</span></div>
+              <div class="cl-qrow"><span>{{t "the day has changed since it was reviewed"}}</span><span class="rd-tag rd-risk">{{t "refund"}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">Sales and money are shown apart. The bank is not assumed: what is recorded is what was entered.</div>
+      <div class="an-cap" data-t="8,15.8">The bank says something other than FreeSMS. The difference needs a reason, and then the owner signs the day off.</div>
+      <div class="an-cap" data-t="16,23.6">If the day changes afterwards, a payment or refund entered late, the sign-off says it no longer matches. History is never rewritten.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue and the amounts from its money code when the page is generated. The flow is run against the real product in a browser: a day with a part payment and a credit is compared with the bank, signed off, and changed by a refund &ndash; <a href="{{test "e2e/tests/31-day.spec.ts" "a day compared with the bank, signed off, and changed afterwards"}}">read the test</a>. Names and amounts are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

@@ -3210,6 +3210,148 @@
       "one": "%d påminnelse skickad",
       "other": "%d påminnelser skickade"
     },
+    "A clock is still running:": {
+      "other": "En klocka går fortfarande:"
+    },
+    "A sign-off does not stop later corrections. If the day changes after it, the day says so.": {
+      "other": "En godkännande hindrar inte senare rättelser. Ändras dagen efteråt säger dagen det."
+    },
+    "Compare with the bank, the terminal and the till": {
+      "other": "Jämför med banken, terminalen och kassan"
+    },
+    "Documents issued this day. What was invoiced and credited, not what was paid.": {
+      "other": "Dokument utfärdade den här dagen. Vad som fakturerats och krediterats, inte vad som betalats."
+    },
+    "Done and not invoiced:": {
+      "other": "Klart och inte fakturerat:"
+    },
+    "Handed to the accountant": {
+      "other": "Överlämnat till redovisningen"
+    },
+    "Handover %d": {
+      "other": "Överlämning %d"
+    },
+    "I have looked at this day": {
+      "other": "Jag har tittat på den här dagen"
+    },
+    "If it differs, why": {
+      "other": "Om det skiljer, varför"
+    },
+    "Money recorded": {
+      "other": "Registrerade pengar"
+    },
+    "Net sales, excluding VAT": {
+      "other": "Nettoförsäljning, exklusive moms"
+    },
+    "No payments or payouts were recorded for this day.": {
+      "other": "Inga betalningar eller utbetalningar registrerades för den här dagen."
+    },
+    "Not known to have reached the customer:": {
+      "other": "Vet inte att ha nått kunden:"
+    },
+    "Owed back to customers": {
+      "other": "Skyldigt tillbaka till kunder"
+    },
+    "Owed by customers": {
+      "other": "Skyldigt av kunder"
+    },
+    "Received": {
+      "other": "Mottaget"
+    },
+    "Record the comparison": {
+      "other": "Registrera jämförelsen"
+    },
+    "Review it again": {
+      "other": "Granska den igen"
+    },
+    "Sales": {
+      "other": "Försäljning"
+    },
+    "Show": {
+      "other": "Visa"
+    },
+    "Sign it off": {
+      "other": "Godkänn den"
+    },
+    "Still owed": {
+      "other": "Fortfarande skyldigt"
+    },
+    "Taken out and not priced:": {
+      "other": "Uttaget och inte prissatt:"
+    },
+    "The day": {
+      "other": "Dagen"
+    },
+    "Their total": {
+      "other": "Deras summa"
+    },
+    "This day's documents: %d handed over, %d not yet. Payments and payouts: %d, %d.": {
+      "other": "Den här dagens dokument: %d överlämnade, %d inte än. Betalningar och utbetalningar: %d, %d."
+    },
+    "To put right before signing off": {
+      "other": "Att rätta före godkännande"
+    },
+    "Type what their statement or count says for the day. If it differs from what was recorded, say why.": {
+      "other": "Skriv vad deras utdrag eller räkning säger för dagen. Skiljer det sig från det som registrerats, säg varför."
+    },
+    "Version %d by %s": {
+      "other": "Version %d av %s"
+    },
+    "What was recorded as arrived and paid out this day. It is what was entered, not what the bank says.": {
+      "other": "Vad som registrerats som inkommet och utbetalt den här dagen. Det är det som skrevs in, inte vad banken säger."
+    },
+    "agrees": {
+      "other": "stämmer"
+    },
+    "difference": {
+      "other": "skillnad"
+    },
+    "excluding VAT %s": {
+      "other": "exklusive moms %s"
+    },
+    "handed to the accountant": {
+      "other": "överlämnat till redovisningen"
+    },
+    "not handed over yet": {
+      "other": "inte överlämnat än"
+    },
+    "nothing open": {
+      "other": "inget öppet"
+    },
+    "ours": {
+      "other": "våra"
+    },
+    "paid out": {
+      "other": "utbetalt"
+    },
+    "repeat": {
+      "other": "upprepad"
+    },
+    "reversed": {
+      "other": "ångrat"
+    },
+    "reviewed": {
+      "other": "granskad"
+    },
+    "the day has changed since it was reviewed": {
+      "other": "dagen har ändrats sedan den granskades"
+    },
+    "theirs": {
+      "other": "deras"
+    },
+    "payment": {
+      "other": "betalning"
+    },
+    "refund": {
+      "other": "återbetalning"
+    },
+    "reversal": {
+      "other": "ångring"
+    },
+    "%d refund still to pay out": {
+      "one": "%d återbetalning kvar att betala ut",
+      "other": "%d återbetalningar kvar att betala ut"
+    },
     "Final check": {
       "other": "Slutkontroll"
     },

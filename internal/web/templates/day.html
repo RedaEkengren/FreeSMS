@@ -1,0 +1,105 @@
+{{define "content"}}
+{{with .DayFigures}}
+<h1>{{$.T "The day"}}</h1>
+<form method="get" action="/day" class="row">
+  <a href="/day?d={{$.DayPrev}}" class="button secondary">&larr;</a>
+  <label><span class="visually-hidden">{{$.T "Day"}}</span><input type="date" name="d" value="{{$.DayValue}}" max="{{$.Today}}"></label>
+  <button type="submit" class="secondary">{{$.T "Show"}}</button>
+  <a href="/day?d={{$.DayNext}}" class="button secondary">&rarr;</a>
+</form>
+
+{{if .Review}}
+<p class="waiting"><span class="tag {{if .Stale}}late{{else}}pass{{end}}">{{if .Stale}}{{$.T "the day has changed since it was reviewed"}}{{else}}{{$.T "reviewed"}}{{end}}</span>
+  {{$.T "Version %d by %s" .Review.Version .Review.By}} &middot; {{$.Date ($.Local .Review.At) "2 Jan 15:04"}}
+  {{if .Review.Note}} &middot; {{.Review.Note}}{{end}}</p>
+{{end}}
+
+<h2>{{$.T "Sales"}}</h2>
+<p class="waiting">{{$.T "Documents issued this day. What was invoiced and credited, not what was paid."}}</p>
+<dl>
+  <dt>{{$.T "Invoiced"}}</dt><dd>{{$.Money .InvoicedGross}} <span class="waiting">({{$.T "excluding VAT %s" ($.Money .InvoicedNet)}})</span></dd>
+  <dt>{{$.T "Credited"}}</dt><dd>{{$.Money .CreditedGross}} <span class="waiting">({{$.T "excluding VAT %s" ($.Money .CreditedNet)}})</span></dd>
+  <dt class="grand">{{$.T "Net sales, excluding VAT"}}</dt><dd class="grand">{{$.Money .NetSales}}</dd>
+</dl>
+{{if .Documents}}
+<ul class="lines">
+  {{range .Documents}}
+  <li><div class="row"><a href="/invoices/{{.ID}}">{{if .Credit}}{{$.T "Credit note"}}{{else}}{{$.T "Invoice"}}{{end}} {{.Reference}}</a> <span>{{$.Money .Gross}}</span></div>
+    <div class="waiting">{{.Customer}}{{if .Exported}} &middot; {{$.T "handed to the accountant"}}{{else}} &middot; {{$.T "not handed over yet"}}{{end}}</div></li>
+  {{end}}
+</ul>
+{{end}}
+
+<h2>{{$.T "Money recorded"}}</h2>
+<p class="waiting">{{$.T "What was recorded as arrived and paid out this day. It is what was entered, not what the bank says."}}</p>
+{{if not .Methods}}<p class="empty">{{$.T "No payments or payouts were recorded for this day."}}</p>{{end}}
+{{range .Methods}}
+<div class="card">
+  <div class="row"><strong>{{$.T .Method}}</strong><span>{{$.Money .Movement}}</span></div>
+  <div class="waiting">{{$.T "Received"}} {{$.Money .Received}}{{if .PaidOut}} &middot; {{$.T "paid out"}} {{$.Money .PaidOut}}{{end}}{{if .Reversed}} &middot; {{$.T "reversed"}} {{$.Money .Reversed}}{{end}}{{if .Rounding}} &middot; {{$.T "rounding"}} {{$.Money .Rounding}}{{end}}</div>
+  <ul class="lines mt-s">
+    {{range .Entries}}
+    <li><div class="row"><span><a href="/invoices/{{.InvoiceID}}">{{.Reference}} &middot; {{.Invoice}}</a> <span class="tag">{{$.T .Kind}}</span></span><span>{{$.Money .Amount}}</span></div></li>
+    {{end}}
+  </ul>
+</div>
+{{end}}
+
+<h2>{{$.T "Compare with the bank, the terminal and the till"}}</h2>
+<p class="waiting">{{$.T "Type what their statement or count says for the day. If it differs from what was recorded, say why."}}</p>
+<form method="post" action="/day/settlement">
+  <input type="hidden" name="d" value="{{$.DayValue}}">
+  <div class="pair">
+    <label><span>{{$.T "How"}}</span><select name="method">{{range $.Methods}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+    <label><span>{{$.T "Their total"}}</span><input name="external" inputmode="decimal" required></label>
+  </div>
+  <label><span>{{$.T "If it differs, why"}}</span><input name="explanation" maxlength="500"></label>
+  <button type="submit" class="secondary">{{$.T "Record the comparison"}}</button>
+</form>
+{{range .Methods}}{{if .Compared}}
+<p class="waiting"><strong>{{$.T .Method}}</strong>: {{$.T "theirs"}} {{$.Money .External}}, {{$.T "ours"}} {{$.Money .Movement}}
+  {{if .Difference}}<span class="tag late">{{$.T "difference"}} {{$.Money .Difference}}</span>{{if .Explanation}} {{.Explanation}}{{end}}{{else}}<span class="tag pass">{{$.T "agrees"}}</span>{{end}}
+  &middot; {{.ComparedBy}}, {{$.Date ($.Local .ComparedAt) "2 Jan 15:04"}}</p>
+{{end}}{{end}}
+
+<h2>{{$.T "Still owed"}}</h2>
+<dl>
+  <dt>{{$.T "Owed by customers"}}</dt><dd>{{$.Money .OwedToUs}}</dd>
+  <dt>{{$.T "Owed back to customers"}}</dt><dd>{{$.Money .OwedBack}}</dd>
+</dl>
+<p class="waiting"><a href="/receivables">{{$.T "Owed"}}</a></p>
+
+<h2>{{$.T "To put right before signing off"}}</h2>
+{{if eq .Exceptions.Count 0}}<p class="waiting"><span class="tag pass">{{$.T "nothing open"}}</span></p>{{else}}
+<ul class="lines">
+  {{range .Exceptions.RunningClocks}}<li>{{$.T "A clock is still running:"}} {{.}}</li>{{end}}
+  {{range .Exceptions.ReadyNotInvoiced}}<li>{{$.T "Done and not invoiced:"}} {{.}}</li>{{end}}
+  {{range .Exceptions.UnpricedTakeOuts}}<li>{{$.T "Taken out and not priced:"}} {{.}}</li>{{end}}
+  {{range .Exceptions.Undelivered}}<li><a href="/invoices/{{.InvoiceID}}">{{$.T "Not known to have reached the customer:"}} {{.Reference}}</a></li>{{end}}
+  {{if .Exceptions.RefundTasks}}<li><a href="/receivables">{{$.N "%d refund still to pay out" .Exceptions.RefundTasks}}</a></li>{{end}}
+</ul>
+{{end}}
+
+<h2>{{$.T "Handed to the accountant"}}</h2>
+<p class="waiting">{{$.T "This day's documents: %d handed over, %d not yet. Payments and payouts: %d, %d." .Exports.DocsExported .Exports.DocsNot .Exports.EntriesExported .Exports.EntriesNot}}</p>
+{{if $.Exports}}
+<ul class="lines">
+  {{range $.Exports}}
+  <li><div class="row"><span>{{$.T "Handover %d" .Number}} &middot; {{$.Date .From "2 Jan"}} – {{$.Date .To "2 Jan"}}</span>
+    <span class="tag">{{$.N "%d document" .InvoiceCount}}{{if .Repeat}} <span class="tag warranty">{{$.T "repeat"}}</span>{{end}}</span></div></li>
+  {{end}}
+</ul>
+{{end}}
+<p class="waiting"><a href="/accounting">{{$.T "Accounting"}}</a></p>
+
+{{if $.Session.Scope.Role.RunsTheShop}}
+<h2>{{$.T "Sign it off"}}</h2>
+<form method="post" action="/day/review">
+  <input type="hidden" name="d" value="{{$.DayValue}}">
+  <label><span>{{$.T "Note"}}</span><input name="note" maxlength="500"></label>
+  <button type="submit">{{if .Review}}{{if .Stale}}{{$.T "Review it again"}}{{else}}{{$.T "Review it again"}}{{end}}{{else}}{{$.T "I have looked at this day"}}{{end}}</button>
+  <p class="waiting">{{$.T "A sign-off does not stop later corrections. If the day changes after it, the day says so."}}</p>
+</form>
+{{end}}
+{{end}}
+{{end}}

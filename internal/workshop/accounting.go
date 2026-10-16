@@ -390,6 +390,11 @@ func ledgerAccounts(ctx context.Context, tx pgx.Tx, shopID string) (map[string]i
 
 // AccountingExport is a record of a file handed over.
 type AccountingExport struct {
+	// Its place in the order they were handed over, from one.
+	Number int
+	// Part of its period was already handed over: an accountant who imports
+	// both has most of it twice.
+	Repeat       bool
 	From, To     time.Time
 	ExportedAt   time.Time
 	ExportedBy   string
@@ -405,7 +410,10 @@ func AccountingExports(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT e.period_from, e.period_to, e.exported_at,
-			       coalesce(p.display_name, ''), e.invoice_count
+			       coalesce(p.display_name, ''), e.invoice_count,
+			       (row_number() OVER (ORDER BY e.exported_at))::int,
+			       EXISTS (SELECT 1 FROM accounting_exports o
+			                WHERE o.exported_at < e.exported_at AND o.period_from < e.period_to AND o.period_to > e.period_from)
 			FROM accounting_exports e
 			LEFT JOIN users u  ON u.id = e.exported_by
 			LEFT JOIN people p ON p.id = u.person_id
@@ -416,7 +424,7 @@ func AccountingExports(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		defer rows.Close()
 		for rows.Next() {
 			var e AccountingExport
-			if err := rows.Scan(&e.From, &e.To, &e.ExportedAt, &e.ExportedBy, &e.InvoiceCount); err != nil {
+			if err := rows.Scan(&e.From, &e.To, &e.ExportedAt, &e.ExportedBy, &e.InvoiceCount, &e.Number, &e.Repeat); err != nil {
 				return fmt.Errorf("scan export: %w", err)
 			}
 			out = append(out, e)

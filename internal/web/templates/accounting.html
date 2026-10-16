@@ -23,8 +23,8 @@
   {{range .Exports}}
   <li>
     <div class="row">
-      <span>{{$.Date .From "2 Jan 2006"}} – {{$.Date .To "2 Jan 2006"}}</span>
-      <span class="tag">{{$.N "%d document" .InvoiceCount}}</span>
+      <span>{{$.T "Handover %d" .Number}} &middot; {{$.Date .From "2 Jan 2006"}} – {{$.Date .To "2 Jan 2006"}}</span>
+      <span class="tag">{{$.N "%d document" .InvoiceCount}}{{if .Repeat}} <span class="tag warranty">{{$.T "repeat"}}</span>{{end}}</span>
     </div>
     <div class="waiting">{{$.Date ($.Local .ExportedAt) "2 Jan 15:04"}}{{if .ExportedBy}} &middot; {{.ExportedBy}}{{end}}</div>
   </li>

@@ -308,43 +308,50 @@ func UndeliveredDocuments(ctx context.Context, pool *pgxpool.Pool, scope access.
 	}
 	var out []Undelivered
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `
-			WITH status AS (
-			  SELECT i.id, i.series || '-' || i.number AS ref, i.issued_at, i.gross_minor, i.customer_name, i.credit_of_id IS NOT NULL AS credit,
-			         count(d.id) AS tries,
-			         bool_or(d.kind = 'handed' OR l.first_opened_at IS NOT NULL
-			                 OR (SELECT e.event FROM message_events e WHERE e.message_id = d.message_id ORDER BY e.at DESC, e.id DESC LIMIT 1) = 'delivered') AS reached,
-			         bool_or((SELECT e.event FROM message_events e WHERE e.message_id = d.message_id ORDER BY e.at DESC, e.id DESC LIMIT 1) = 'failed') AS failed
-			  FROM invoices i
-			  LEFT JOIN invoice_deliveries d ON d.invoice_id = i.id
-			  LEFT JOIN invoice_links l ON l.id = d.link_id
-			  WHERE i.issued_at >= $1
-			  GROUP BY i.id)
-			SELECT s.id::text, s.ref, s.issued_at, s.gross_minor, s.customer_name, s.credit,
-			       CASE WHEN s.tries = 0 THEN 'none' ELSE 'failed' END
-			FROM status s
-			JOIN invoices o ON o.id = coalesce((SELECT x.credit_of_id FROM invoices x WHERE x.id = s.id), s.id)
-			WHERE NOT coalesce(s.reached, false) AND (s.tries = 0 OR coalesce(s.failed, false))
-			  -- A document whose invoice is paid up has evidently been received;
-			  -- chasing it is for what is still owed.
-			  AND (o.gross_minor
-			       + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = o.id), 0)
-			       - coalesce((SELECT sum(p.amount_minor + p.rounding_minor) FROM invoice_payments p WHERE p.invoice_id = o.id), 0)) <> 0
-			ORDER BY s.issued_at`, since)
-		if err != nil {
-			return fmt.Errorf("list undelivered: %w", err)
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var u Undelivered
-			if err := rows.Scan(&u.InvoiceID, &u.Reference, &u.IssuedAt, &u.GrossMinor, &u.Customer, &u.CreditNote, &u.Why); err != nil {
-				return fmt.Errorf("scan undelivered: %w", err)
-			}
-			out = append(out, u)
-		}
-		return rows.Err()
+		var err error
+		out, err = undeliveredTx(ctx, tx, since)
+		return err
 	})
 	return out, err
+}
+
+func undeliveredTx(ctx context.Context, tx pgx.Tx, since time.Time) ([]Undelivered, error) {
+	var out []Undelivered
+	rows, err := tx.Query(ctx, `
+		WITH status AS (
+		  SELECT i.id, i.series || '-' || i.number AS ref, i.issued_at, i.gross_minor, i.customer_name, i.credit_of_id IS NOT NULL AS credit,
+		         count(d.id) AS tries,
+		         bool_or(d.kind = 'handed' OR l.first_opened_at IS NOT NULL
+		                 OR (SELECT e.event FROM message_events e WHERE e.message_id = d.message_id ORDER BY e.at DESC, e.id DESC LIMIT 1) = 'delivered') AS reached,
+		         bool_or((SELECT e.event FROM message_events e WHERE e.message_id = d.message_id ORDER BY e.at DESC, e.id DESC LIMIT 1) = 'failed') AS failed
+		  FROM invoices i
+		  LEFT JOIN invoice_deliveries d ON d.invoice_id = i.id
+		  LEFT JOIN invoice_links l ON l.id = d.link_id
+		  WHERE i.issued_at >= $1
+		  GROUP BY i.id)
+		SELECT s.id::text, s.ref, s.issued_at, s.gross_minor, s.customer_name, s.credit,
+		       CASE WHEN s.tries = 0 THEN 'none' ELSE 'failed' END
+		FROM status s
+		JOIN invoices o ON o.id = coalesce((SELECT x.credit_of_id FROM invoices x WHERE x.id = s.id), s.id)
+		WHERE NOT coalesce(s.reached, false) AND (s.tries = 0 OR coalesce(s.failed, false))
+		  -- A document whose invoice is paid up has evidently been received;
+		  -- chasing it is for what is still owed.
+		  AND (o.gross_minor
+		       + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = o.id), 0)
+		       - coalesce((SELECT sum(p.amount_minor + p.rounding_minor) FROM invoice_payments p WHERE p.invoice_id = o.id), 0)) <> 0
+		ORDER BY s.issued_at`, since)
+	if err != nil {
+		return nil, fmt.Errorf("list undelivered: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var u Undelivered
+		if err := rows.Scan(&u.InvoiceID, &u.Reference, &u.IssuedAt, &u.GrossMinor, &u.Customer, &u.CreditNote, &u.Why); err != nil {
+			return nil, fmt.Errorf("scan undelivered: %w", err)
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
 }
 
 // CustomerDocument is the document a link opens, and the balance as of today,

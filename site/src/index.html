@@ -271,6 +271,7 @@
     <button type="button" role="tab" data-tab="17">Fakturan hem</button>
     <button type="button" role="tab" data-tab="18">Rätta en faktura</button>
     <button type="button" role="tab" data-tab="19">Obetalt</button>
+    <button type="button" role="tab" data-tab="20">Dagens slut</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1252,6 +1253,45 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog och beloppen ur dess pengakod när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare mot en riktig e-postserver: fakturan tas, ett samtal och ett löfte skrivs ner, en tvist spärrar och hävs, påminnelsen går med rätt belopp, och en del krediteras och betalas tillbaka &ndash; <a href="{{test "e2e/tests/30-followup.spec.ts" "an unpaid invoice followed up, reminded, then credited and paid back"}}">läs testet</a>. Namn och belopp är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>Dagen går ihop</h2>
+  <p class="lede">Vid stängning visar dagen vad som fakturerats och krediterats, för sig från vad som registrerats som inkommet och utbetalt, och varje summa är en länk till dokumentet eller posten den består av. Ägaren jämför med bankens utdrag, och skiljer sig siffrorna krävs en förklaring. Godkänns dagen och något ändras efteråt, till exempel en betalning som skrivs in sent, säger dagen att den ändrats. Allt som borde rättas först står som en lista.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: dagens försäljning och kassarörelse visas var för sig. Banken säger 980 där FreeSMS har 1 000 och en förklaring krävs. Ägaren godkänner dagen. Sedan betalas ett belopp tillbaka för samma dag och dagen säger att den ändrats sedan den granskades.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "owner"}}</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">{{t "Sales"}}</div>
+              <div class="cl-qrow"><span>{{t "Invoiced"}}</span><span>{{money 250000}}</span></div>
+              <div class="cl-qrow"><span>{{t "Credited"}}</span><span>{{money -50000}}</span></div>
+              <div class="wf-h">{{t "Money recorded"}}</div>
+              <div class="cl-qrow"><span>{{t "bank"}}</span><span>{{money 100000}}</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "Compare with the bank, the terminal and the till"}}</div>
+              <div class="cl-qrow"><span>{{t "theirs"}} {{money 98000}} &middot; {{t "ours"}} {{money 100000}}</span><span class="rd-tag rd-risk">{{t "difference"}}</span></div>
+              <div class="cl-qrow"><span>Bankavgift drogs före utdraget</span><span></span></div>
+              <span class="an-btn mo-btn an-fade" data-t="12.4">{{t "I have looked at this day"}}</span>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">{{t "The day"}}</div>
+              <div class="cl-qrow"><span>{{t "reviewed"}}</span><span class="rd-tag">{{t "Version %d by %s" 1 "Olle"}}</span></div>
+              <div class="cl-qrow"><span>{{t "the day has changed since it was reviewed"}}</span><span class="rd-tag rd-risk">{{t "refund"}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">Försäljningen och pengarna visas var för sig. Banken är inte antagen: det som registrerats är vad som skrevs in.</div>
+      <div class="an-cap" data-t="8,15.8">Banken säger något annat än FreeSMS. Skillnaden kräver en förklaring, och sedan godkänner ägaren dagen.</div>
+      <div class="an-cap" data-t="16,23.6">Ändras dagen efteråt, en betalning eller återbetalning som skrivs in sent, säger godkännandet att det inte längre stämmer. Historiken skrivs aldrig om.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog och beloppen ur dess pengakod när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: en dag med delbetalning och kredit jämförs med banken, godkänns, och ändras av en återbetalning &ndash; <a href="{{test "e2e/tests/31-day.spec.ts" "a day compared with the bank, signed off, and changed afterwards"}}">läs testet</a>. Namn och belopp är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>
