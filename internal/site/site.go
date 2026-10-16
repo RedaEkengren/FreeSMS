@@ -32,6 +32,7 @@ import (
 	_ "time/tzdata"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/barcode"
 	"github.com/RedaEkengren/FreeSMS/internal/i18n"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
 	"github.com/RedaEkengren/FreeSMS/internal/sie"
@@ -217,6 +218,15 @@ func Generate(root string, page Page) ([]byte, error) {
 		// booked by its accounting code, as the scene shows it.
 		"invoice": func(kind, description string, quantityMilli int, unitMinor int64, customer string, number int, issued string) (sceneInvoice, error) {
 			return invoiceFor(Locale, kind, description, quantityMilli, unitMinor, customer, number, issued)
+		},
+		// A label's bars, as the product prints them on the sheet at /labels:
+		// the product's own Code 128, not a drawing of one.
+		"barcode": func(text string) (template.HTML, error) {
+			svg, err := barcode.SVG(text, 240, 60)
+			if err != nil {
+				return "", fmt.Errorf("site: barcode %q: %w", text, err)
+			}
+			return template.HTML(svg), nil
 		},
 		// Whether a role is given a customer's personal data, as the
 		// product decides it where the data is read.

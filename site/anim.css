@@ -29,7 +29,8 @@
   border-radius: 9px; padding: .55em 1em; font-weight: 600; font-size: .88em; }
 .an-muted { color: #5b6270; }
 .an-cap { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); background: #1f2328; color: #fff;
-  border-radius: 99px; padding: .5em 1.15em; font-size: 15px; font-weight: 600; white-space: nowrap;
+  border-radius: 22px; padding: .5em 1.15em; font-size: 15px; font-weight: 600; line-height: 1.35;
+  white-space: normal; text-align: center; width: max-content; max-width: 860px;
   box-shadow: 0 6px 20px rgba(20,23,28,.25); z-index: 20; }
 .an-js .an-cap[data-t] { transform: translate(-50%, 8px); }
 .an-js .an-cap[data-t].an-on { transform: translate(-50%, 0); }
@@ -323,3 +324,8 @@
 .cl-quote { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background: #fff; padding: 14px 14px 0; }
 .cl-qrow { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; margin: 5px 0; }
 .cl-qrow > span:first-child { flex: 1; min-width: 0; }
+
+/* A label as the product prints it: the bars, then the number as text. */
+.bc-label { display: inline-block; border: 1px dashed #b8bfcc; border-radius: 6px; padding: 8px 10px; background: #fff; }
+.bc-label svg { display: block; width: 240px; height: 60px; }
+.bc-label .wf-h { margin: 2px 0 0; letter-spacing: .08em; }

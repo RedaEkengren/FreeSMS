@@ -134,8 +134,11 @@ type MergedRecord struct {
 // CustomerCard is everything held about a customer, for the front desk.
 type CustomerCard struct {
 	Customer
-	Revision     int
-	PersonID     string
+	Revision int
+	PersonID string
+	// Erased is set once the person asked to be, and the card says so rather
+	// than offering to do it twice.
+	Erased       bool
 	ContactName  string
 	AddressLine1 string
 	AddressLine2 string
@@ -176,11 +179,12 @@ func customerCardTx(ctx context.Context, tx pgx.Tx, id string) (CustomerCard, er
 	err := tx.QueryRow(ctx, `SELECT`+customerColumns+`,
 			c.revision, coalesce(c.person_id::text, ''), coalesce(p.display_name, ''),
 			coalesce(c.address_line1, ''), coalesce(c.address_line2, ''),
-			coalesce(c.postal_code, ''), coalesce(c.city, ''), c.merged_into::text
+			coalesce(c.postal_code, ''), coalesce(c.city, ''), c.merged_into::text,
+			coalesce(p.erased_at IS NOT NULL, false)
 		FROM customers c LEFT JOIN people p ON p.id = c.person_id
 		WHERE c.id = $1`, id).Scan(&c.ID, &c.Kind, &c.Name, &c.OrgNumber, &c.VATNumber,
 		&c.Phone, &c.Email, &c.Address, &c.Orders,
-		&c.Revision, &c.PersonID, &c.ContactName, &c.AddressLine1, &c.AddressLine2, &c.PostalCode, &c.City, &merged)
+		&c.Revision, &c.PersonID, &c.ContactName, &c.AddressLine1, &c.AddressLine2, &c.PostalCode, &c.City, &merged, &c.Erased)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return c, ErrNotFound
 	}

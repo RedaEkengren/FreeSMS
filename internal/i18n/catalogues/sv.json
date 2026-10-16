@@ -4711,6 +4711,45 @@
     "when did it go out? Not in the future": {
       "other": "när gick det ut? Inte i framtiden"
     },
+    "erased": {
+      "other": "raderad"
+    },
+    "Erase": {
+      "other": "Radera"
+    },
+    "Erase this person": {
+      "other": "Radera den här personen"
+    },
+    "I understand this cannot be undone": {
+      "other": "Jag förstår att det inte går att ångra"
+    },
+    "Download everything we hold about them": {
+      "other": "Hämta allt vi har om dem"
+    },
+    "Cleared at their request. What was kept, and why, is listed under Personal data.": {
+      "other": "Rensad på deras begäran. Vad som sparats, och varför, står under Personuppgifter."
+    },
+    "Name, telephone, email and address are cleared and cannot be brought back. Issued invoices keep the name they went out with, because bookkeeping law requires them for seven years.": {
+      "other": "Namn, telefon, e-post och adress rensas och går inte att få tillbaka. Utfärdade fakturor behåller det namn de gick ut med, eftersom bokföringslagen kräver dem i sju år."
+    },
+    "Name, email address, telephone number and postal address, where messages to them were sent, and the earlier values in the log of corrections.": {
+      "other": "Namn, e-postadress, telefonnummer och postadress, dit meddelanden till dem skickats, och de tidigare värdena i rättelseloggen."
+    },
+    "Issued invoices, including the name and address they were addressed to, because Swedish bookkeeping law requires them for seven years after issue. The technical history of vehicles, which belongs to the vehicle rather than to a person. Clocked hours, where the person was an employee, because they support payroll records.": {
+      "other": "Utfärdade fakturor, med namn och adress de ställdes till, eftersom svensk bokföringslag kräver dem i sju år efter utfärdandet. Fordonens tekniska historik, som tillhör fordonet och inte en person. Stämplad tid, där personen var anställd, eftersom den styrker löneunderlag."
+    },
+    "The server is busy. Try again in a moment.": {
+      "other": "Servern är upptagen. Försök igen om en stund."
+    },
+    "Choose at least one line to say yes to, or say no.": {
+      "other": "Välj minst en rad att tacka ja till, eller tacka nej."
+    },
+    "Nothing answers to that code.": {
+      "other": "Ingen del har den koden."
+    },
+    "Something went wrong. Try again.": {
+      "other": "Något gick fel. Försök igen."
+    },
     "this person has already been erased": {
       "other": "den här personen har redan raderats"
     },

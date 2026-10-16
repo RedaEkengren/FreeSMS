@@ -23,7 +23,12 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/freesms ./cmd/free
 #
 # which is a long way from where the mistake was made. The final image has no
 # shell, so there is nowhere else to do it.
-RUN mkdir -p /out/attachments
+#
+# The directory the whole-shop export is written to has the same trap: it was
+# a named volume nobody had given an owner, so the first export of a real
+# workshop ended as "failed" in the list. The browser test that takes the
+# export out is what found it.
+RUN mkdir -p /out/attachments /out/exports
 
 # Run.
 #
@@ -33,6 +38,7 @@ RUN mkdir -p /out/attachments
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/freesms /freesms
 COPY --from=build --chown=nonroot:nonroot /out/attachments /var/lib/freesms/attachments
+COPY --from=build --chown=nonroot:nonroot /out/exports /var/lib/freesms/exports
 
 # Attachments are the one thing here that cannot be regenerated from a database
 # dump. The directory is a mount point; the image must never be the only place

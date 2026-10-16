@@ -52,8 +52,8 @@
       <span>{{$.Date ($.Local .ErasedAt) "2 Jan 2006"}}</span>
       <span class="tag">{{$.T "by %s" .ErasedBy}}</span>
     </div>
-    <div class="waiting"><strong>{{$.T "Cleared:"}}</strong> {{.Cleared}}</div>
-    <div class="waiting"><strong>{{$.T "Kept:"}}</strong> {{.Kept}}</div>
+    <div class="waiting"><strong>{{$.T "Cleared:"}}</strong> {{$.T .Cleared}}</div>
+    <div class="waiting"><strong>{{$.T "Kept:"}}</strong> {{$.T .Kept}}</div>
     {{if .Reason}}<div class="waiting"><strong>{{$.T "Reason:"}}</strong> {{.Reason}}</div>{{end}}
   </li>
   {{end}}

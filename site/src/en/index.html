@@ -278,6 +278,9 @@
     <button type="button" role="tab" data-tab="24">Start from your file</button>
     <button type="button" role="tab" data-tab="25">Getting started</button>
     <button type="button" role="tab" data-tab="26">Swedish and accessible</button>
+    <button type="button" role="tab" data-tab="27">Barcodes</button>
+    <button type="button" role="tab" data-tab="28">Erasing a person</button>
+    <button type="button" role="tab" data-tab="29">Take it all with you</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1419,7 +1422,7 @@
               <div class="wf-h">{{t "row %s" "2"}} &middot; Åsa Öberg</div>
               <div class="cl-qrow"><span>Åsa Öberg</span><span class="rd-tag pass">{{t "would be created"}}</span></div>
               <div class="cl-qrow"><span>Åsa Öberg again · the same telephone number</span><span class="rd-tag rd-risk">{{t "Needs your answer"}}</span></div>
-              <div class="cl-qrow"><span>&ndash;</span><span class="rd-tag rd-risk">{{t "cannot be imported"}}</span></div>
+              <div class="cl-qrow"><span>{{t "row %s" "4"}} &middot; &ndash;</span><span class="rd-tag rd-risk">{{t "cannot be imported"}}</span></div>
             </div>            <div class="an-fade" data-t="8,16">
               <div class="wf-h">{{t "This may be somebody who is already here"}}</div>
               <div class="cl-qrow"><span>{{t "Leave it out"}}</span><span class="rd-tag pass">&#10003;</span></div>
@@ -1510,6 +1513,122 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue when the page is generated. The test is run against the real product in a browser: an automatic accessibility check in light and dark, in Swedish and English, a keyboard, a phone width and a refusal in Swedish &ndash; <a href="{{test "e2e/tests/37-accessibility.spec.ts" "the everyday pages have no automatic accessibility violations, in Swedish and in English"}}">read the test</a>. Names and numbers are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>Scan the shelf, don't copy it down</h2>
+  <p class="lede">Every part has a label that prints on an ordinary printer, with the number in plain text under the bars. A handheld scanner is a keyboard that types the code and presses Enter, so the scan screen has a single field. The technician takes the part out to the job with the same code. Each arrival, take-out and count is a row in the stock ledger: what is on the shelf is the sum of them, never a number typed over another.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: a label with a barcode and a number is printed. A code is scanned and the part is found; an unknown code is refused with an offer to add it. The technician scans the code and the part lands on the job, unpriced.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "parts"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">{{t "Labels"}}</div>
+              <div class="bc-label">{{barcode "BC-100"}}<div class="wf-h">BC-100</div><div class="an-muted">Oil filter &middot; A2</div></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "Scan"}}</div>
+              <div class="wf-field"><span class="lbl">{{t "Scan or type a code"}}</span><span data-type="8.4,1.2">ALT-OIL-1</span></div>
+              <div class="cl-qrow an-fade" data-t="10"><span>BC-100 &middot; Oil filter</span><span class="rd-tag pass">5</span></div>
+              <div class="wf-field an-fade" data-t="12"><span class="lbl">{{t "Scan or type a code"}}</span><span data-type="12.2,1.2">NOPE-000</span></div>
+              <div class="cl-qrow an-fade" data-t="14"><span>{{t "Nothing answers to that code."}}</span><span class="rd-tag rd-risk">{{t "Add it to stock"}}</span></div>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">{{role "technician"}}</div>
+              <div class="wf-field"><span class="lbl">{{t "Scan or type the part's code"}}</span><span data-type="16.4,1.2">ALT-OIL-1</span></div>
+              <div class="cl-qrow an-fade" data-t="18.2"><b>BC-100 &middot; Oil filter</b><span class="rd-tag rd-risk">{{t "taken out, not priced"}}</span></div>
+              <div class="cl-qrow an-fade" data-t="20.4"><span>{{t "taken out to a job"}}</span><span class="rd-tag">5 &rarr; 4</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">The label prints on an ordinary printer, with the number in plain text under the bars. Labels in a workshop get oily, torn and painted over.</div>
+      <div class="an-cap" data-t="8,15.8">Any code that belongs to the part finds it: its number or a supplier's barcode. A code nobody knows says so, and offers to add it.</div>
+      <div class="an-cap" data-t="16,23.6">The technician scans the code and the part lands on the job, unpriced until the counter prices it. The shelf drops by one row in the ledger, not a number typed over.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue and the bars are drawn by its own Code 128, when the page is generated. The flow is run against the real product in a browser: the label is printed, a code finds the part, an unknown code is refused, the technician takes the part out and the balance drops by one &ndash; <a href="{{test "e2e/tests/38-barcode.spec.ts" "a part is labelled, found by any of its codes, and taken out to a job by scanning"}}">read the test</a>. Parts, codes and names are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>Clear a person, keep the invoice</h2>
+  <p class="lede">A customer who asks to be erased is entitled to it, and the workshop must still keep the invoice for seven years. FreeSMS does both: name, telephone, email and address are cleared, issued invoices keep the name they went out with, and what was cleared and what was kept, with the reason, is written down. Before that the person can have a copy of everything held about them. An employee who can sign in is not erased; the account is switched off first.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: the customer card has two choices, download a copy or erase. Erasing needs an acknowledgement and says it cannot be undone. Last, what was cleared and what was kept is shown.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">Åsa Öberg</div>
+              <div class="wf-h">{{t "Personal data"}}</div>
+              <div class="cl-qrow"><span>{{t "Download everything we hold about them"}}</span><span class="rd-tag pass">&darr;</span></div>
+              <div class="cl-qrow"><span>{{t "Erase this person"}}</span><span class="rd-tag rd-risk">&rsaquo;</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "Erase this person"}}</div>
+              <div class="wf-field"><span class="lbl">{{t "Why, if it is worth saying"}}</span><span data-type="8.4,1.6">Request by email</span></div>
+              <div class="cl-qrow an-fade" data-t="10.6"><span>{{t "I understand this cannot be undone"}}</span><span class="rd-tag pass">&#10003;</span></div>
+              <span class="an-btn mo-btn an-fade" data-t="12.6">{{t "Erase"}}</span>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">{{t "Erasures actioned"}}</div>
+              <div class="cl-qrow"><span><b>{{t "Cleared:"}}</b> name, email, telephone, address</span><span class="rd-tag pass">&#10003;</span></div>
+              <div class="cl-qrow an-fade" data-t="18"><span><b>{{t "Kept:"}}</b> invoices, vehicle history, clocked hours</span><span class="rd-tag">&#10003;</span></div>
+              <div class="cl-qrow an-fade" data-t="20"><span>Åsa Öberg &middot; <b>A-12</b></span><span class="rd-tag">{{t "kept"}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">The customer card has two choices: download a copy of everything held about the person, or erase them. Both are shown only to roles that may see a customer's details.</div>
+      <div class="an-cap" data-t="8,15.8">It cannot be undone, and it says so plainly. You acknowledge it, and say why if it is worth saying.</div>
+      <div class="an-cap" data-t="16,23.6">What was cleared and what was kept is written down, with the reason. The invoice keeps the name, because the law requires it.</div>
+    </div>
+  </div>
+  <p class="truth">The labels and sentences come from the product's own language catalogue; the list of what is cleared and kept is shortened here, the full text is on the Personal data page. The flow is run against the real product in a browser: a copy is downloaded, the person is erased, the invoice keeps the name, it cannot be done twice and not from the shop floor &ndash; <a href="{{test "e2e/tests/39-erasure.spec.ts" "a customer is given a copy, then erased, and the invoice keeps the name it went out with"}}">read the test</a>. Names and details are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>The whole workshop in one file, without us</h2>
+  <p class="lede">The owner can take the whole workshop away at any time: customers, vehicles and their history, jobs, invoices as issued, inspections with their photographs, stock and clocked time. It is a zip with a CSV per table, a README that says how to read it and a manifest with the row counts, readable without FreeSMS. Passwords and sign-ins never go along, and every export is listed so you can see who took the workshop out and when.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: the owner presses the button to export the whole workshop. It is built in the background and becomes a download in the list. Last, what the file contains is shown.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "owner"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">{{t "Take everything with you"}}</div>
+              <span class="an-btn mo-btn">{{t "Export the whole workshop"}}</span>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "Take everything with you"}}</div>
+              <div class="fm-stack">
+                <div class="cl-qrow an-fade" data-t="8,12"><span>3 Nov 2026 14:02 &middot; {{role "owner"}}</span><span class="rd-tag warranty">{{t "being written"}}</span></div>
+                <div class="cl-qrow an-fade" data-t="12"><span>3 Nov 2026 14:02 &middot; {{role "owner"}}</span><span class="rd-tag pass">{{t "Download"}}</span></div>
+              </div>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">freesms-20261103.zip</div>
+              <div class="wj-scan"><code>manifest.json &middot; README.txt</code></div>
+              <div class="wj-scan an-fade" data-t="17.5"><code>customers.csv &middot; vehicles.csv &middot; work_orders.csv</code></div>
+              <div class="wj-scan an-fade" data-t="19"><code>invoices.csv &middot; invoice_lines.csv &middot; stock_movements.csv</code></div>
+              <div class="wj-scan an-fade" data-t="20.5"><code>photos/</code></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">Only the owner sees the button. The export is built in the background, so a large workshop does not lock the page.</div>
+      <div class="an-cap" data-t="8,15.8">Every export stays in the list, with who took it and when. The file is on the workshop's own server.</div>
+      <div class="an-cap" data-t="16,23.6">One CSV per table, the photographs in a folder, and a README that says how it all fits together. Passwords, sign-ins and the keys of links never go along.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue; the file listing is a selection of what the zip holds. The flow is run against the real product in a browser: the owner takes the workshop out, the file is built, it is a real zip with a manifest and a README, and neither the counter nor anybody else can get at it &ndash; <a href="{{test "e2e/tests/40-shop-export.spec.ts" "the owner takes the whole workshop out as one file, and nobody else can"}}">read the test</a>. Names and times are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

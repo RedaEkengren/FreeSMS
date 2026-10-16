@@ -57,7 +57,23 @@ func sourceStrings(t *testing.T) map[string]string {
 		for name, file := range pkg.Files {
 			ast.Inspect(file, func(n ast.Node) bool {
 				// A page's title: pageData{Title: "..."}.
+				// A message put on the page as data.Error = "..." reaches a reader
+				// as it is written, so it is a sentence too. The scan screen's
+				// "Nothing answers to that code." was one nobody had translated,
+				// found while drawing a scene of it.
+				if as, ok := n.(*ast.AssignStmt); ok && len(as.Lhs) == 1 && len(as.Rhs) == 1 {
+					if sel, ok := as.Lhs[0].(*ast.SelectorExpr); ok && sel.Sel.Name == "Error" {
+						if lit, ok := as.Rhs[0].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+							add(unquote(t, lit.Value), filepath.Base(name))
+						}
+					}
+				}
 				if kv, ok := n.(*ast.KeyValueExpr); ok {
+					if id, ok := kv.Key.(*ast.Ident); ok && id.Name == "Error" {
+						if lit, ok := kv.Value.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+							add(unquote(t, lit.Value), filepath.Base(name))
+						}
+					}
 					if id, ok := kv.Key.(*ast.Ident); ok && id.Name == "Title" {
 						if lit, ok := kv.Value.(*ast.BasicLit); ok && lit.Kind == token.STRING {
 							add(unquote(t, lit.Value), filepath.Base(name))

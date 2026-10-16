@@ -67,6 +67,25 @@
 {{end}}
 {{end}}
 
+{{if and .Private .PersonID}}
+<h2>{{$.T "Personal data"}}</h2>
+{{if .Erased}}
+<p class="waiting"><span class="tag">{{$.T "erased"}}</span> {{$.T "Cleared at their request. What was kept, and why, is listed under Personal data."}}
+  <a href="/privacy">{{$.T "Personal data"}}</a></p>
+{{else}}
+<p class="waiting"><a href="/people/{{.PersonID}}/export">{{$.T "Download everything we hold about them"}}</a></p>
+<details>
+  <summary>{{$.T "Erase this person"}}</summary>
+  <form class="mt-m" method="post" action="/people/{{.PersonID}}/erase">
+    <p class="waiting">{{$.T "Name, telephone, email and address are cleared and cannot be brought back. Issued invoices keep the name they went out with, because bookkeeping law requires them for seven years."}}</p>
+    <label><span>{{$.T "Why, if it is worth saying"}}</span><input name="reason" maxlength="300"></label>
+    <label class="tick"><input type="checkbox" required><span>{{$.T "I understand this cannot be undone"}}</span></label>
+    <button type="submit" class="secondary">{{$.T "Erase"}}</button>
+  </form>
+</details>
+{{end}}
+{{end}}
+
 {{if not .MergedInto}}
 <p class="waiting"><a href="/customers/{{.ID}}/merge">{{$.T "Is this the same as another record?"}}</a></p>
 {{end}}
