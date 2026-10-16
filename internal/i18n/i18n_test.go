@@ -168,3 +168,77 @@ func TestNumbersAndDatesAreWrittenInTheReadersLanguage(t *testing.T) {
 		t.Errorf("sv May = %q", got)
 	}
 }
+
+// A sentence that was formatted before it reached the page -- the words of a
+// refusal -- is translated by finding the message it was made from.
+func TestAFormattedSentenceIsTranslatedByItsPattern(t *testing.T) {
+	c, err := Load("en", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sv, en := c.For("sv"), c.For("en")
+	for name, c := range map[string]struct{ in, want string }{
+		"an exact message":          {"nobody by that name works here", "ingen med det namnet arbetar här"},
+		"a number in it":            {"line 3 is not on that invoice", "rad 3 finns inte på den fakturan"},
+		"a quoted word in it":       {`"admin2" is not a role`, `"admin2" är ingen roll`},
+		"a quoted word and a count": {`only 2.5 of "Oil" is left to credit`, `bara 2.5 av "Oil" är kvar att kreditera`},
+		"two words in it":           {"it is draft, and cannot go to ready", "det är draft och kan inte gå till ready"},
+		"a decimal in it":           {"11.5 hours is longer than anybody works in one go", "11.5 timmar är längre än någon arbetar i ett svep"},
+		"nothing it matches":        {"a sentence nobody wrote a message for", "a sentence nobody wrote a message for"},
+		"nothing at all":            {"", ""},
+	} {
+		if got := sv.Sentence(c.in); got != c.want {
+			t.Errorf("%s: %q -> %q, want %q", name, c.in, got, c.want)
+		}
+	}
+	// English is the language of the keys and is left exactly as it is.
+	if got := en.Sentence("line 3 is not on that invoice"); got != "line 3 is not on that invoice" {
+		t.Errorf("English changed: %q", got)
+	}
+	// A pattern with nothing but holes in it must not swallow every sentence.
+	if got := sv.Sentence("something quite unrelated"); got != "something quite unrelated" {
+		t.Errorf("a hole-only pattern matched: %q", got)
+	}
+}
+
+// One word for one thing. A workshop reads "kreditnota" in one place and
+// "kreditfaktura" in another and wonders whether they are different things.
+// Wherever an English message uses one of these terms, its Swedish uses the
+// agreed one (any of the listed stems, since Swedish inflects).
+func TestTheSwedishUsesOneWordForEachTerm(t *testing.T) {
+	c, err := Load("en", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	glossary := []struct{ en, sv string }{
+		{"final check", "slutkontroll"},
+		{"booking", "bokning|boka|bokad"},
+		{"invoice", "faktur"},
+		{"credit note", "kreditfaktur"},
+		{"payment", "betal"},
+		{"quote", "offert|offerer|pris"},
+		{"customer", "kund"},
+		{"collect", "hämt"},
+		{"approv", "godkän"},
+		{"stocktake", "inventering"},
+	}
+	for key, m := range c.Messages("sv") {
+		lower := strings.ToLower(key)
+		swedish := strings.ToLower(m.Other + " " + m.One)
+		if m.Other == key {
+			continue
+		}
+		for _, g := range glossary {
+			if !strings.Contains(lower, g.en) {
+				continue
+			}
+			ok := false
+			for _, stem := range strings.Split(g.sv, "|") {
+				ok = ok || strings.Contains(swedish, stem)
+			}
+			if !ok {
+				t.Errorf("%q uses %q, and its Swedish %q has none of %q", key, g.en, m.Other, g.sv)
+			}
+		}
+	}
+}

@@ -145,7 +145,18 @@ header {
   top: 0;
   z-index: 10;
 }
-header .who { color: var(--muted); font-size: 0.875rem; }
+/* A target of its own: 24 by 24 at the least, so it is not a sliver between two
+   other things to press. */
+header .who { color: var(--muted); font-size: 0.875rem; display: inline-flex; align-items: center; min-height: 1.5rem; padding: 0.25rem 0.5rem; }
+
+/* Past the navigation, for a keyboard. Off the screen until it is reached. */
+.skip { position: absolute; left: 0.5rem; top: -4rem; z-index: 20; background: var(--surface); color: var(--text);
+  border: 2px solid var(--accent); border-radius: var(--radius); padding: 0.5rem 0.75rem; }
+.skip:focus { top: 0.5rem; }
+main:focus { outline: none; }
+/* Read by a screen reader and not seen. */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 main {
   /* 16px gutter at phone width. */
@@ -260,7 +271,12 @@ input[type="checkbox"], input[type="radio"] {
 label.tick { display: flex; align-items: center; gap: 0.625rem; min-height: var(--tap); }
 label.tick span { display: inline; margin: 0; font-size: 1rem; color: var(--text); }
 
-input:focus-visible, textarea:focus-visible, button:focus-visible, .card:focus-visible {
+input:focus-visible, textarea:focus-visible, button:focus-visible, .card:focus-visible,
+select:focus-visible, a:focus-visible, summary:focus-visible,
+/* The focus of a date or time field is in the fields inside it, which are the
+   browser's own: the field itself is :focus-within and neither :focus nor
+   :focus-visible, so it would show no ring at all to a keyboard. */
+input[type=date]:focus-within, input[type=datetime-local]:focus-within, input[type=time]:focus-within, input[type=month]:focus-within, input[type=week]:focus-within {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }

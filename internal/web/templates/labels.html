@@ -1,10 +1,7 @@
 {{define "content"}}
-<h1>Labels</h1>
-<p class="waiting no-print">A sheet for an ordinary printer. A thermal label
-printer is the right tool and a painful one from a browser; this is the path
-that always works. The number is printed in readable text as well as in bars,
-because labels in a workshop get oily, torn and painted over.</p>
-<p class="no-print"><button data-print type="button">Print</button></p>
+<h1>{{.T "Labels"}}</h1>
+<p class="waiting no-print">{{.T "A sheet for an ordinary printer. A thermal label printer is the right tool and a painful one from a browser; this is the path that always works. The number is printed in readable text as well as in bars, because labels in a workshop get oily, torn and painted over."}}</p>
+<p class="no-print"><button data-print type="button">{{.T "Print"}}</button></p>
 
 <div class="labels">
   {{range .Labels}}

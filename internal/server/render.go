@@ -294,6 +294,16 @@ func (d pageData) T(key string, args ...any) string {
 	return d.printer.T(key, args...)
 }
 
+// Sentence translates a sentence that was formatted before it got here, such
+// as the words of a refusal. An exact message, or one it was made from with its
+// holes filled; anything else is left in English.
+func (d pageData) Sentence(msg string) string {
+	if d.printer == nil {
+		return msg
+	}
+	return d.printer.Sentence(msg)
+}
+
 // Money renders an amount for somebody to read.
 //
 // Templates call this rather than the fmt function, which stays the canonical

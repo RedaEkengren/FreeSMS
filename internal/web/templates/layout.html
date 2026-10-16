@@ -5,7 +5,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>{{.Title}}</title>
+<title>{{.Sentence .Title}}</title>
 {{if .Session.Scope.UserID}}<meta name="freesms-user" content="{{.Session.Scope.UserID}}">{{end}}
 <link rel="stylesheet" href="{{asset "app.css"}}">
 <script src="{{asset "htmx.min.js"}}" defer></script>
@@ -13,6 +13,8 @@
 {{if .Session.Scope.UserID}}<script src="{{asset "live.js"}}" defer></script>{{end}}
 </head>
 <body>
+{{/* The first thing a keyboard reaches: past the whole navigation to the page. */}}
+<a class="skip" href="#main">{{.T "Skip to the content"}}</a>
 {{if .Session.Scope.UserID}}
 <header>
   <nav>
@@ -56,7 +58,7 @@
 {{end}}
 {{/* The offline queue's words. keep.js has no catalogue of its own and
      reads them from here, so they are translated like everything else. */}}
-<div id="held" class="held" hidden
+<div id="held" class="held" role="status" hidden
      data-waiting-one="{{.Plural "%d thing is waiting to be sent." 1}}"
      data-waiting-other="{{.Plural "%d thing is waiting to be sent." 2}}"
      data-waiting-signin-one="{{.Plural "%d thing is waiting to be sent -- sign in again to send it." 1}}"
@@ -68,8 +70,11 @@
      data-dismiss="{{.T "Dismiss these?"}}"
      data-held="{{.T "No connection. This is being held and will be sent when there is one."}}"
      data-needs-connection="{{.T "This needs a connection. Nothing has been sent and nothing has been stored."}}"
+     data-updated="{{.T "This page was updated."}}"
      data-full="{{.T "This device has no room left to hold unsent work. Find a connection before carrying on."}}"></div>
-<main>
+{{/* What a screen reader hears when part of the page changes by itself. */}}
+<div id="announce" class="sr-only" role="status" aria-live="polite"></div>
+<main id="main" tabindex="-1">
 {{template "content" .}}
 </main>
 </body>

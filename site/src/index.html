@@ -277,6 +277,7 @@
     <button type="button" role="tab" data-tab="23">Arbete hos leverantör</button>
     <button type="button" role="tab" data-tab="24">Börja från din fil</button>
     <button type="button" role="tab" data-tab="25">Komma igång</button>
+    <button type="button" role="tab" data-tab="26">Svenska och tillgängligt</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1474,6 +1475,41 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Flödet körs mot den riktiga produkten i en webbläsare: ägaren fyller i uppgifterna genom formulären listan länkar till, tittar på en exempelfaktura och ser listan bli klar &ndash; <a href="{{test "e2e/tests/36-getting-started.spec.ts" "the owner works through the list until the workshop is ready"}}">läs testet</a>. Namn och nummer är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>På svenska hela vägen, på en telefon, med tangentbord</h2>
+  <p class="lede">Varje mening en läsare kan få se har en svensk översättning, och ett test går igenom en vanlig dags sidor på svenska och ger besked om en engelsk mening hamnat kvar. Ett avslag talar svenska och läses upp av en skärmläsare. Tangentbordet kommer förbi menyn med ett tryck, ser alltid var det är, och skärmen fungerar på 360 pixlar utan att skrolla i sidled. Det som verkstaden själv skrivit &ndash; en delbeskrivning, en anteckning &ndash; översätts aldrig.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: ett avslag visas på svenska med en länk förbi menyn. Därefter visas en telefonskärm där knapparna är stora och status står i ord. Sist: det som hålls kvar när anslutningen försvinner förklaras.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <span class="an-btn mo-btn">{{t "Skip to the content"}}</span>
+              <div class="cl-qrow"><span>filen har ingen kolumn "number"</span><span class="rd-tag rd-risk">{{t "problem"}}</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "Parts"}}</div>
+              <div class="cl-qrow"><span>BP-100 · Bromsklossar fram</span><span class="rd-tag rd-risk">{{t "overdue"}}</span></div>
+              <div class="cl-qrow"><span>{{t "Past its promised time"}}</span><span class="rd-tag rd-risk">{{t "late"}}</span></div>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">{{t "When the connection drops"}}</div>
+              <div class="cl-qrow"><span>{{t "Held and sent when the connection is back:"}}</span><span class="rd-tag pass">&#10003;</span></div>
+              <div class="cl-qrow"><span>{{t "Needs a connection:"}}</span><span class="rd-tag">{{t "Invoice"}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">Ett avslag säger på svenska vad som är fel, och en skärmläsare läser upp det. Ett tryck på Tab tar tangentbordet förbi menyn.</div>
+      <div class="an-cap" data-t="8,15.8">Knapparna är stora nog för en tumme, ingenting skrollar i sidled, och status står alltid i ord &ndash; aldrig bara en färg.</div>
+      <div class="an-cap" data-t="16,23.6">Det står rakt ut vad som hålls kvar när anslutningen försvinner och vad som kräver en. FreeSMS låtsas inte fungera offline.</div>
+    </div>
+  </div>
+  <p class="truth">Orden kommer ur produktens språkkatalog när sidan genereras. Testet körs mot den riktiga produkten i en webbläsare: automatisk tillgänglighetskontroll i ljust och mörkt, på svenska och engelska, tangentbord, en telefonbredd och ett avslag på svenska &ndash; <a href="{{test "e2e/tests/37-accessibility.spec.ts" "the everyday pages have no automatic accessibility violations, in Swedish and in English"}}">läs testet</a>. Namn och siffror är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

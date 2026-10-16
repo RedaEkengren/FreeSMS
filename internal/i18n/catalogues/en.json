@@ -94,6 +94,10 @@
       "one": "%d refund still to pay out",
       "other": "%d refunds still to pay out"
     },
+    "Really took %s h across %d job": {
+      "one": "Really took %s h across %d job",
+      "other": "Really took %s h across %d jobs"
+    },
     "%d visit": {
       "one": "%d visit",
       "other": "%d visits"

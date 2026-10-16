@@ -159,7 +159,7 @@
       "other": "Kreditera den"
     },
     "Credit note": {
-      "other": "Kreditnota"
+      "other": "Kreditfaktura"
     },
     "Credited by %s": {
       "other": "Krediterad av %s"
@@ -566,7 +566,7 @@
       "other": "kontrollerad av %s hos %s"
     },
     "credit note": {
-      "other": "kreditnota"
+      "other": "kreditfaktura"
     },
     "done": {
       "other": "klar"
@@ -2503,7 +2503,7 @@
       "other": "Väntad kredit"
     },
     "Credit note number": {
-      "other": "Kreditnotans nummer"
+      "other": "Kreditfakturans nummer"
     },
     "Delivery note": {
       "other": "Följesedel"
@@ -4368,6 +4368,1732 @@
     },
     "Put the details right under The workshop, then credit this invoice and make it again.": {
       "other": "Rätta uppgifterna under Verkstaden, kreditera sedan den här fakturan och gör den igen."
+    },
+    "the period ends before it starts": {
+      "other": "perioden slutar innan den börjar"
+    },
+    "the customer has not approved this": {
+      "other": "kunden har inte godkänt det här"
+    },
+    "a confirmation, a reminder, a move or a cancellation": {
+      "other": "en bekräftelse, en påminnelse, en flytt eller en avbokning"
+    },
+    "a reminder has to go before the booking": {
+      "other": "en påminnelse måste gå före bokningen"
+    },
+    "confirm who it is for and where it goes": {
+      "other": "bekräfta vem det är till och vart det går"
+    },
+    "nowhere to send it, or nothing to say": {
+      "other": "ingenstans att skicka det, eller inget att säga"
+    },
+    "say how, in 200 characters or fewer": {
+      "other": "säg hur, med högst 200 tecken"
+    },
+    "that was already sent for this time; send it again if it should go twice": {
+      "other": "det skickades redan för den här tiden; skicka det igen om det ska gå två gånger"
+    },
+    "the booking is %s, so there is nothing to confirm": {
+      "other": "bokningen är %s, så det finns inget att bekräfta"
+    },
+    "the booking is not cancelled": {
+      "other": "bokningen är inte avbokad"
+    },
+    "the booking's time has gone": {
+      "other": "bokningens tid har passerat"
+    },
+    "the name or the number is too long": {
+      "other": "namnet eller numret är för långt"
+    },
+    "a booking ends after it starts": {
+      "other": "en bokning slutar efter att den börjar"
+    },
+    "a booking is at most a day; book the next day as well": {
+      "other": "en bokning är högst en dag; boka nästa dag också"
+    },
+    "an estimate is more than nothing": {
+      "other": "en uppskattning är mer än ingenting"
+    },
+    "no such technician": {
+      "other": "ingen sådan tekniker"
+    },
+    "say what the booking is for": {
+      "other": "säg vad bokningen gäller"
+    },
+    "%q is not a reason to be away": {
+      "other": "%q är ingen orsak att vara borta"
+    },
+    "lifts are not negative": {
+      "other": "antalet lyftar är inte negativt"
+    },
+    "say why the shop is shut": {
+      "other": "säg varför verkstaden är stängd"
+    },
+    "the shop is already shut that day": {
+      "other": "verkstaden är redan stängd den dagen"
+    },
+    "the shop is shut that day (%s)": {
+      "other": "verkstaden är stängd den dagen (%s)"
+    },
+    "%d codes is more than %d": {
+      "other": "%d koder är fler än %d"
+    },
+    "%q is not a unit this system counts in": {
+      "other": "%q är ingen enhet som systemet räknar i"
+    },
+    "%s is already %s": {
+      "other": "%s är redan %s"
+    },
+    "a minimum cannot be below nothing": {
+      "other": "ett minimum kan inte vara under noll"
+    },
+    "a part needs a name somebody will recognise": {
+      "other": "en del behöver ett namn som någon känner igen"
+    },
+    "a part needs a number to be found by": {
+      "other": "en del behöver ett nummer att hittas på"
+    },
+    "a price cannot be below nothing": {
+      "other": "ett pris kan inte vara under noll"
+    },
+    "that number or code was just given to another part": {
+      "other": "det numret eller den koden gavs just till en annan del"
+    },
+    "the number or the name is too long": {
+      "other": "numret eller namnet är för långt"
+    },
+    "keep the reason under 500 characters": {
+      "other": "håll anledningen under 500 tecken"
+    },
+    "money is still owed on the invoice; say why it is closed anyway": {
+      "other": "pengar är fortfarande skyldiga på fakturan; säg varför den stängs ändå"
+    },
+    "%q is not a position": {
+      "other": "%q är inget ställningstagande"
+    },
+    "a car cannot come back from a job that has not been finished": {
+      "other": "en bil kan inte komma tillbaka från ett jobb som inte är klart"
+    },
+    "a claim is accepted, rejected or paid": {
+      "other": "ett krav är godkänt, avslaget eller betalt"
+    },
+    "a claim needs the case to be called warranty first": {
+      "other": "ett krav kräver att ärendet först kallas garanti"
+    },
+    "a paid claim is settled": {
+      "other": "ett betalt krav är reglerat"
+    },
+    "it is already %s": {
+      "other": "det är redan %s"
+    },
+    "only an accepted claim is paid": {
+      "other": "bara ett godkänt krav betalas"
+    },
+    "say which day it came back": {
+      "other": "säg vilken dag den kom tillbaka"
+    },
+    "that is already the position": {
+      "other": "det är redan ställningstagandet"
+    },
+    "that is not a reading": {
+      "other": "det är ingen mätarställning"
+    },
+    "that line is not on the original job": {
+      "other": "den raden finns inte på det ursprungliga jobbet"
+    },
+    "the reason is limited to 500 characters": {
+      "other": "anledningen är begränsad till 500 tecken"
+    },
+    "the symptoms are limited to 1000 characters": {
+      "other": "symptomen är begränsade till 1000 tecken"
+    },
+    "write a note of up to 500 characters": {
+      "other": "skriv en anteckning på högst 500 tecken"
+    },
+    "write what the customer says is wrong": {
+      "other": "skriv vad kunden säger är fel"
+    },
+    "%q is not a way of telling a customer": {
+      "other": "%q är inget sätt att säga till en kund"
+    },
+    "keep the note under 500 characters": {
+      "other": "håll anteckningen under 500 tecken"
+    },
+    "the car is not ready, so there is nothing to tell them yet": {
+      "other": "bilen är inte klar, så det finns inget att säga till dem än"
+    },
+    "a credit note cannot be credited": {
+      "other": "en kreditfaktura kan inte krediteras"
+    },
+    "a credit note cannot be rebilled": {
+      "other": "en kreditfaktura kan inte faktureras om"
+    },
+    "a credit takes something back": {
+      "other": "en kredit tar tillbaka något"
+    },
+    "an adjustment is an amount above nothing": {
+      "other": "en justering är ett belopp över noll"
+    },
+    "credit the whole invoice first; a replacement is for an invoice that has been taken back": {
+      "other": "kreditera hela fakturan först; en ersättning gäller en faktura som har tagits tillbaka"
+    },
+    "line %d is named twice": {
+      "other": "rad %d nämns två gånger"
+    },
+    "line %d is not on that invoice": {
+      "other": "rad %d finns inte på den fakturan"
+    },
+    "nothing is left of %q to credit": {
+      "other": "inget är kvar av %q att kreditera"
+    },
+    "only %s of %q is left to credit": {
+      "other": "bara %s av %q är kvar att kreditera"
+    },
+    "say what the adjustment is for": {
+      "other": "säg vad justeringen gäller"
+    },
+    "take back a quantity above nothing": {
+      "other": "ta tillbaka en mängd över noll"
+    },
+    "that credits more than is left of the invoice": {
+      "other": "det krediterar mer än vad som är kvar av fakturan"
+    },
+    "that is not a VAT rate": {
+      "other": "det är ingen momssats"
+    },
+    "that key is too long": {
+      "other": "den nyckeln är för lång"
+    },
+    "this invoice has already been replaced": {
+      "other": "den här fakturan har redan ersatts"
+    },
+    "a customer is either a person or a company": {
+      "other": "en kund är antingen en person eller ett företag"
+    },
+    "this order is finished; its invoice already says who it was addressed to": {
+      "other": "den här ordern är klar; dess faktura säger redan vem den ställdes till"
+    },
+    "%q is not a way of paying": {
+      "other": "%q är inget sätt att betala"
+    },
+    "a day that has not happened cannot be reviewed": {
+      "other": "en dag som inte har hänt kan inte granskas"
+    },
+    "keep the explanation to 500 characters": {
+      "other": "håll förklaringen till 500 tecken"
+    },
+    "that is not a day": {
+      "other": "det är ingen dag"
+    },
+    "the figures differ; say why": {
+      "other": "siffrorna skiljer sig; säg varför"
+    },
+    "nothing has been done on this job yet, so there is nothing to hand over": {
+      "other": "inget har gjorts på det här jobbet än, så det finns inget att lämna över"
+    },
+    "say what, in 300 characters or fewer, and when in 80": {
+      "other": "säg vad, med högst 300 tecken, och när med högst 80"
+    },
+    "say who it is being handed to": {
+      "other": "säg vem det lämnas till"
+    },
+    "that is not an odometer reading": {
+      "other": "det är ingen mätarställning"
+    },
+    "that suggestion was taken back": {
+      "other": "det förslaget drogs tillbaka"
+    },
+    "the instructions or the note are too long": {
+      "other": "instruktionerna eller anteckningen är för långa"
+    },
+    "a draft has to say which form it is": {
+      "other": "ett utkast måste säga vilket formulär det är"
+    },
+    "an idempotency key is 16 to 128 characters": {
+      "other": "en nyckel för säker återsändning är 16 till 128 tecken"
+    },
+    "%q is not a kind of line": {
+      "other": "%q är ingen sorts rad"
+    },
+    "a price is not negative": {
+      "other": "ett pris är inte negativt"
+    },
+    "a proposal stands for between 1 and 90 days": {
+      "other": "ett förslag gäller i mellan 1 och 90 dagar"
+    },
+    "a yes to none of the lines is a no": {
+      "other": "ett ja till ingen av raderna är ett nej"
+    },
+    "line %d is not on that proposal": {
+      "other": "rad %d finns inte på det förslaget"
+    },
+    "nothing has been put to the customer": {
+      "other": "inget har lagts för kunden"
+    },
+    "say what the customer is asking about": {
+      "other": "säg vad kunden frågar om"
+    },
+    "say what the line is": {
+      "other": "säg vad raden är"
+    },
+    "say whether the price is fixed or an estimate": {
+      "other": "säg om priset är fast eller en uppskattning"
+    },
+    "the customer has not accepted the latest proposal": {
+      "other": "kunden har inte accepterat det senaste förslaget"
+    },
+    "the quantity is more than nothing": {
+      "other": "mängden är mer än ingenting"
+    },
+    "there is nothing on the draft to put to the customer": {
+      "other": "det finns inget på utkastet att lägga för kunden"
+    },
+    "this enquiry is already booked; more work goes on the job and is agreed there": {
+      "other": "den här förfrågan är redan bokad; mer arbete läggs på jobbet och överenskoms där"
+    },
+    "what is agreed comes to %s including VAT, not %s": {
+      "other": "det som överenskommits blir %s inklusive moms, inte %s"
+    },
+    "a checklist with nothing on it cannot sign work off": {
+      "other": "en checklista utan innehåll kan inte godkänna arbete"
+    },
+    "no such checklist": {
+      "other": "ingen sådan checklista"
+    },
+    "the final check has nothing on it, so it does not show the work was checked": {
+      "other": "slutkontrollen har inget på sig, så den visar inte att arbetet kontrollerats"
+    },
+    "these checkpoints have no result yet: %s": {
+      "other": "de här kontrollpunkterna har inget resultat än: %s"
+    },
+    "%q is not a way money is paid": {
+      "other": "%q är inget sätt att betala pengar"
+    },
+    "a refund is an amount above nothing": {
+      "other": "en återbetalning är ett belopp över noll"
+    },
+    "an address, and a message that carries the link and what is owed": {
+      "other": "en adress och ett meddelande som innehåller länken och vad som är skyldigt"
+    },
+    "an amount, a day, and a note of 500 characters or fewer": {
+      "other": "ett belopp, en dag och en anteckning på högst 500 tecken"
+    },
+    "confirm who the reminder is for and where it goes": {
+      "other": "bekräfta vem påminnelsen är till och vart den går"
+    },
+    "keep the note to 500 characters": {
+      "other": "håll anteckningen till 500 tecken"
+    },
+    "nothing is owed back on that invoice": {
+      "other": "inget är skyldigt tillbaka på den fakturan"
+    },
+    "say how it was settled": {
+      "other": "säg hur det reglerades"
+    },
+    "say how, and what was said": {
+      "other": "säg hur, och vad som sades"
+    },
+    "say what is disputed, in 300 characters or fewer": {
+      "other": "säg vad som bestrids, med högst 300 tecken"
+    },
+    "that is more than is owed": {
+      "other": "det är mer än vad som är skyldigt"
+    },
+    "that is more than is owed back": {
+      "other": "det är mer än vad som är skyldigt tillbaka"
+    },
+    "that person does not work with invoices": {
+      "other": "den personen arbetar inte med fakturor"
+    },
+    "the charge is disputed; lift the hold before sending a reminder": {
+      "other": "avgiften bestrids; häv spärren innan en påminnelse skickas"
+    },
+    "when did it go out? Not in the future": {
+      "other": "när gick det ut? Inte i framtiden"
+    },
+    "this person has already been erased": {
+      "other": "den här personen har redan raderats"
+    },
+    "this person still has an account that can sign in; deactivate it first": {
+      "other": "den här personen har fortfarande ett konto som kan logga in; stäng av det först"
+    },
+    "No invoices were issued.": {
+      "other": "Inga fakturor utfärdades."
+    },
+    "Not exported": {
+      "other": "Inte exporterad"
+    },
+    "Nothing in that period": {
+      "other": "Inget under den perioden"
+    },
+    "Taking a vehicle in is done at the front desk.": {
+      "other": "Att ta in ett fordon görs i disken."
+    },
+    "The counter board shows customer details, so it is limited to the front desk and the owner.": {
+      "other": "Diskens tavla visar kunduppgifter, så den är begränsad till disken och ägaren."
+    },
+    "A text or an email.": {
+      "other": "Ett sms eller ett e-postmeddelande."
+    },
+    "Not saved": {
+      "other": "Inte sparat"
+    },
+    "That cannot be sent to.": {
+      "other": "Dit går det inte att skicka."
+    },
+    "There is no provider for that here; ring or give it on paper, and write it down.": {
+      "other": "Det finns ingen leverantör för det här; ring eller ge det på papper och skriv ner det."
+    },
+    "There is no time left to send a reminder inside the hours messages go.": {
+      "other": "Det finns ingen tid kvar att skicka en påminnelse inom de tider meddelanden går."
+    },
+    "Move, cancel or did not come.": {
+      "other": "Flytta, avboka eller kom inte."
+    },
+    "Not moved": {
+      "other": "Inte flyttad"
+    },
+    "Say what to do.": {
+      "other": "Säg vad som ska göras."
+    },
+    "Say which day it came back.": {
+      "other": "Säg vilken dag den kom tillbaka."
+    },
+    "Write the amount as 150 or 150,50.": {
+      "other": "Skriv beloppet som 150 eller 150,50."
+    },
+    "Write the odometer as a whole number of kilometres.": {
+      "other": "Skriv mätarställningen som ett helt antal kilometer."
+    },
+    "Not rebilled": {
+      "other": "Inte fakturerad om"
+    },
+    "The figures are for the owner and the front desk.": {
+      "other": "Siffrorna är för ägaren och disken."
+    },
+    "A newer version has been put to the customer. Open the enquiry and answer that one.": {
+      "other": "En nyare version har lagts för kunden. Öppna förfrågan och svara på den."
+    },
+    "Enquiries and proposals are the front desk's.": {
+      "other": "Förfrågningar och förslag är diskens."
+    },
+    "No such enquiry.": {
+      "other": "Ingen sådan förfrågan."
+    },
+    "No such version.": {
+      "other": "Ingen sådan version."
+    },
+    "Not booked": {
+      "other": "Inte bokad"
+    },
+    "Put a new version to the customer; nothing is answered on an old price.": {
+      "other": "Lägg en ny version för kunden; inget besvaras på ett gammalt pris."
+    },
+    "Say for how many days the price stands.": {
+      "other": "Säg hur många dagar priset gäller."
+    },
+    "That proposal has been replaced": {
+      "other": "Det förslaget har ersatts"
+    },
+    "That proposal has stopped standing": {
+      "other": "Det förslaget gäller inte längre"
+    },
+    "Those lines are not on the proposal.": {
+      "other": "De raderna finns inte på förslaget."
+    },
+    "Say how much, and by which day.": {
+      "other": "Säg hur mycket, och senast vilken dag."
+    },
+    "Say which day it was paid out.": {
+      "other": "Säg vilken dag det betalades ut."
+    },
+    "There is no provider for that here; ring or write yourself and record it.": {
+      "other": "Det finns ingen leverantör för det här; ring eller skriv själv och bokför det."
+    },
+    "It is not there any more.": {
+      "other": "Den finns inte längre."
+    },
+    "Open the record again to see what they changed, then make your change.": {
+      "other": "Öppna posten igen för att se vad de ändrade, och gör sedan din ändring."
+    },
+    "The parts list is for the parts desk and the front desk.": {
+      "other": "Dellistan är för reservdelsbordet och disken."
+    },
+    "Choose a file.": {
+      "other": "Välj en fil."
+    },
+    "Not imported": {
+      "other": "Inte importerad"
+    },
+    "Not read": {
+      "other": "Inte läst"
+    },
+    "That file cannot be imported": {
+      "other": "Den filen kan inte importeras"
+    },
+    "The file could not be read, or is larger than 5 MB.": {
+      "other": "Filen gick inte att läsa, eller är större än 5 MB."
+    },
+    "The file is larger than 5 MB.": {
+      "other": "Filen är större än 5 MB."
+    },
+    "There is no such template.": {
+      "other": "Det finns ingen sådan mall."
+    },
+    "Could not store it": {
+      "other": "Gick inte att spara"
+    },
+    "No photograph": {
+      "other": "Inget foto"
+    },
+    "Not a photograph": {
+      "other": "Inte ett foto"
+    },
+    "Nothing was attached.": {
+      "other": "Inget bifogades."
+    },
+    "That did not arrive": {
+      "other": "Det kom inte fram"
+    },
+    "That file is not an image this system can read.": {
+      "other": "Den filen är ingen bild som systemet kan läsa."
+    },
+    "The photograph was too large, or the upload was interrupted. Try again.": {
+      "other": "Fotot var för stort, eller uppladdningen avbröts. Försök igen."
+    },
+    "That cannot be read as a phone number.": {
+      "other": "Det går inte att läsa som ett telefonnummer."
+    },
+    "That cannot be sent to as an email address.": {
+      "other": "Dit går det inte att skicka som e-postadress."
+    },
+    "There is no provider for that here; print it or hand it over, and record it.": {
+      "other": "Det finns ingen leverantör för det här; skriv ut eller lämna över det och bokför det."
+    },
+    "Four digits.": {
+      "other": "Fyra siffror."
+    },
+    "Not for your role": {
+      "other": "Inte för din roll"
+    },
+    "That rate did not parse": {
+      "other": "Den taxan gick inte att läsa"
+    },
+    "That time did not parse": {
+      "other": "Den tiden gick inte att läsa"
+    },
+    "That year did not parse": {
+      "other": "Det året gick inte att läsa"
+    },
+    "The time library is kept at the front desk.": {
+      "other": "Tidboken sköts i disken."
+    },
+    "Try again.": {
+      "other": "Försök igen."
+    },
+    "Write it in hours: 1,5 or 1.5.": {
+      "other": "Skriv det i timmar: 1,5 eller 1.5."
+    },
+    "No such line.": {
+      "other": "Ingen sådan rad."
+    },
+    "That line version is not a number.": {
+      "other": "Radens version är inte ett tal."
+    },
+    "That tax rate did not parse": {
+      "other": "Den momssatsen gick inte att läsa"
+    },
+    "This line was changed while you were looking at it. Open it again and decide from what it says now.": {
+      "other": "Den här raden ändrades medan du tittade på den. Öppna den igen och bestäm utifrån vad den säger nu."
+    },
+    "Write it as a percentage, with a comma or a full stop: 25 or 12,5.": {
+      "other": "Skriv det som en procentsats, med komma eller punkt: 25 eller 12,5."
+    },
+    "That job is finished; nothing more can be sent out on it.": {
+      "other": "Det jobbet är klart; inget mer kan skickas iväg på det."
+    },
+    "Write the date as a date and the amount as 150 or 150,50.": {
+      "other": "Skriv datumet som ett datum och beloppet som 150 eller 150,50."
+    },
+    "Write the date as a date and the estimate as 150 or 150,50.": {
+      "other": "Skriv datumet som ett datum och uppskattningen som 150 eller 150,50."
+    },
+    "Not recorded": {
+      "other": "Inte bokfört"
+    },
+    "That date did not parse": {
+      "other": "Det datumet gick inte att läsa"
+    },
+    "Use the picker.": {
+      "other": "Använd väljaren."
+    },
+    "Give both when it starts and when it ends, with the pickers.": {
+      "other": "Ange både när det börjar och när det slutar, med väljarna."
+    },
+    "Put on, take off or hand over.": {
+      "other": "Lägg på, ta av eller lämna över."
+    },
+    "That did not parse": {
+      "other": "Det gick inte att läsa"
+    },
+    "That plan version is not a number.": {
+      "other": "Planens version är inte ett tal."
+    },
+    "That time will not do": {
+      "other": "Den tiden duger inte"
+    },
+    "Write the hours left as a number, with a comma or a full stop: 6 or 6,5.": {
+      "other": "Skriv kvarvarande timmar som ett tal, med komma eller punkt: 6 eller 6,5."
+    },
+    "Not ready": {
+      "other": "Inte klar"
+    },
+    "The export is still being written, or it failed.": {
+      "other": "Exporten skrivs fortfarande, eller så misslyckades den."
+    },
+    "That is not a date.": {
+      "other": "Det är inget datum."
+    },
+    "That is not a model year.": {
+      "other": "Det är ingen årsmodell."
+    },
+    "Busy": {
+      "other": "Upptaget"
+    },
+    "Try again in a moment.": {
+      "other": "Försök igen om en stund."
+    },
+    "Payment terms are a number of days.": {
+      "other": "Betalningsvillkor är ett antal dagar."
+    },
+    "That ceiling did not parse": {
+      "other": "Det taket gick inte att läsa"
+    },
+    "That fee did not parse": {
+      "other": "Den avgiften gick inte att läsa"
+    },
+    "That percentage did not parse": {
+      "other": "Den procentsatsen gick inte att läsa"
+    },
+    "Write it as 5 or 5,5.": {
+      "other": "Skriv det som 5 eller 5,5."
+    },
+    "Nobody by that name here.": {
+      "other": "Ingen med det namnet här."
+    },
+    "Staff are managed by whoever runs the workshop.": {
+      "other": "Personalen sköts av den som driver verkstaden."
+    },
+    "The server is busy": {
+      "other": "Servern är upptagen"
+    },
+    "%s: this is a test message from FreeSMS. If you can read it, messages to customers will reach them.": {
+      "other": "%s: det här är ett testmeddelande från FreeSMS. Om du kan läsa det når meddelanden kunderna."
+    },
+    "A test from %s": {
+      "other": "Ett test från %s"
+    },
+    "There is no provider for that here. Send messages from your own phone or email and write down that you did.": {
+      "other": "Det finns ingen leverantör för det här. Skicka meddelanden från din egen telefon eller e-post och skriv ner att du gjorde det."
+    },
+    "There is no such help.": {
+      "other": "Det finns ingen sådan hjälp."
+    },
+    "An invoice is the front desk's business.": {
+      "other": "En faktura är diskens sak."
+    },
+    "An order becomes invoiced by issuing an invoice. Use the invoice button.": {
+      "other": "En order blir fakturerad genom att en faktura utfärdas. Använd fakturaknappen."
+    },
+    "Invoicing is done at the front desk.": {
+      "other": "Fakturering görs i disken."
+    },
+    "No such answer on this job.": {
+      "other": "Inget sådant svar på det här jobbet."
+    },
+    "No such invoice.": {
+      "other": "Ingen sådan faktura."
+    },
+    "No such job.": {
+      "other": "Inget sådant jobb."
+    },
+    "No such line on this job.": {
+      "other": "Ingen sådan rad på det här jobbet."
+    },
+    "Nobody to bill": {
+      "other": "Ingen att fakturera"
+    },
+    "Not changed": {
+      "other": "Inte ändrad"
+    },
+    "Not credited": {
+      "other": "Inte krediterad"
+    },
+    "Not found": {
+      "other": "Hittades inte"
+    },
+    "Not from here": {
+      "other": "Inte härifrån"
+    },
+    "Not invoiced": {
+      "other": "Inte fakturerad"
+    },
+    "Pricing a job is done at the front desk.": {
+      "other": "Prissättning av ett jobb görs i disken."
+    },
+    "That is not a line.": {
+      "other": "Det är ingen rad."
+    },
+    "That line was not accepted": {
+      "other": "Den raden godtogs inte"
+    },
+    "That move belongs to the front desk.": {
+      "other": "Det draget är diskens."
+    },
+    "That price did not parse": {
+      "other": "Det priset gick inte att läsa"
+    },
+    "That quantity did not parse": {
+      "other": "Den mängden gick inte att läsa"
+    },
+    "That would write off work": {
+      "other": "Det skulle skriva av arbete"
+    },
+    "Write it as a number, with a comma or a full stop: 1,5 or 1.5.": {
+      "other": "Skriv det som ett tal, med komma eller punkt: 1,5 eller 1.5."
+    },
+    "A percentage: 45 or 45,5.": {
+      "other": "En procentsats: 45 eller 45,5."
+    },
+    "No count": {
+      "other": "Ingen räkning"
+    },
+    "Say how many; the direction comes from what you are doing.": {
+      "other": "Säg hur många; riktningen kommer av vad du gör."
+    },
+    "That count did not parse": {
+      "other": "Den räkningen gick inte att läsa"
+    },
+    "That markup did not parse": {
+      "other": "Det påslaget gick inte att läsa"
+    },
+    "Unknown movement": {
+      "other": "Okänd rörelse"
+    },
+    "Write it as a number: 4 or 4,5.": {
+      "other": "Skriv det som ett tal: 4 eller 4,5."
+    },
+    "Write what is on the shelf, 0 included if it is empty.": {
+      "other": "Skriv vad som finns på hyllan, 0 om den är tom."
+    },
+    "Write what is on the shelf: 8, or 2,5 for part of a pack.": {
+      "other": "Skriv vad som finns på hyllan: 8, eller 2,5 för en del av en förpackning."
+    },
+    "Handing the car back is a conversation at the counter.": {
+      "other": "Att lämna tillbaka bilen är ett samtal i disken."
+    },
+    "Say which day it is expected.": {
+      "other": "Säg vilken dag den väntas."
+    },
+    "That cost did not parse": {
+      "other": "Den kostnaden gick inte att läsa"
+    },
+    "That form could not be read.": {
+      "other": "Formuläret gick inte att läsa."
+    },
+    "Write it as a number: 1,5 or 1.5.": {
+      "other": "Skriv det som ett tal: 1,5 eller 1.5."
+    },
+    "Write it as an amount: 150 or 150,50.": {
+      "other": "Skriv det som ett belopp: 150 eller 150,50."
+    },
+    "Collected, back or a new date.": {
+      "other": "Hämtad, tillbaka eller ett nytt datum."
+    },
+    "Say which day it is expected back.": {
+      "other": "Säg vilken dag den väntas tillbaka."
+    },
+    "That date will not do": {
+      "other": "Det datumet duger inte"
+    },
+    "That end time will not do": {
+      "other": "Den sluttiden duger inte"
+    },
+    "That start time will not do": {
+      "other": "Den starttiden duger inte"
+    },
+    "Use the date picker.": {
+      "other": "Använd datumväljaren."
+    },
+    "Not accepted": {
+      "other": "Inte godtaget"
+    },
+    "That is not a date and time.": {
+      "other": "Det är inget datum och klockslag."
+    },
+    "%q is not where a part comes from": {
+      "other": "%q är inte varifrån en del kommer"
+    },
+    "a negative arrival is a return to the supplier": {
+      "other": "en negativ ankomst är en retur till leverantören"
+    },
+    "ask for at least one": {
+      "other": "be om minst en"
+    },
+    "say what is needed": {
+      "other": "säg vad som behövs"
+    },
+    "say what you found": {
+      "other": "säg vad du hittade"
+    },
+    "say why it is not coming": {
+      "other": "säg varför den inte kommer"
+    },
+    "%q is not something that can be imported": {
+      "other": "%q är inget som kan importeras"
+    },
+    "more than %d rows; split the file": {
+      "other": "fler än %d rader; dela filen"
+    },
+    "the column %q is there twice": {
+      "other": "kolumnen %q finns två gånger"
+    },
+    "the file has a header and no rows": {
+      "other": "filen har en rubrikrad och inga rader"
+    },
+    "the file has no %q column": {
+      "other": "filen har ingen kolumn %q"
+    },
+    "the first line should be the column names": {
+      "other": "första raden ska vara kolumnnamnen"
+    },
+    "%d rows cannot be imported; correct the file, or choose to import the others": {
+      "other": "%d rader kan inte importeras; rätta filen, eller välj att importera de andra"
+    },
+    "only a batch that has not been applied can be discarded": {
+      "other": "bara en omgång som inte genomförts kan kastas"
+    },
+    "row %d cannot be linked to that": {
+      "other": "rad %d kan inte kopplas till det"
+    },
+    "row %d: choose create, link or skip": {
+      "other": "rad %d: välj skapa, koppla eller hoppa över"
+    },
+    "say what to do about row %s: it may be somebody who is already here": {
+      "other": "säg vad som ska göras med rad %s: det kan vara någon som redan finns"
+    },
+    "that batch was discarded": {
+      "other": "den omgången kastades"
+    },
+    "%q is not pass, attention or fail": {
+      "other": "%q är inte godkänt, uppmärksamhet eller underkänt"
+    },
+    "%q is not a way to say who pays": {
+      "other": "%q är inget sätt att säga vem som betalar"
+    },
+    "a new customer needs a name": {
+      "other": "en ny kund behöver ett namn"
+    },
+    "choose which customer": {
+      "other": "välj vilken kund"
+    },
+    "choose who does the work": {
+      "other": "välj vem som gör arbetet"
+    },
+    "say what is wrong with it": {
+      "other": "säg vad som är fel på den"
+    },
+    "that technician is not working here": {
+      "other": "den teknikern arbetar inte här"
+    },
+    "the booking has no name to make a customer from": {
+      "other": "bokningen har inget namn att göra en kund av"
+    },
+    "this invoice has already been credited": {
+      "other": "den här fakturan har redan krediterats"
+    },
+    "confirm who it is for and where it is going": {
+      "other": "bekräfta vem det är till och vart det går"
+    },
+    "nowhere to send it": {
+      "other": "ingenstans att skicka det"
+    },
+    "printed, handed over or posted": {
+      "other": "utskrivet, överlämnat eller postat"
+    },
+    "say who it is for": {
+      "other": "säg vem det är till"
+    },
+    "say who it was given to": {
+      "other": "säg vem det gavs till"
+    },
+    "the message has to carry the link": {
+      "other": "meddelandet måste innehålla länken"
+    },
+    "a model without a make is not a scope anybody can reason about": {
+      "other": "en modell utan märke är ett omfång som ingen kan resonera om"
+    },
+    "a rate cannot be negative": {
+      "other": "en taxa kan inte vara negativ"
+    },
+    "the operation needs a name": {
+      "other": "momentet behöver ett namn"
+    },
+    "the time has to be more than nothing": {
+      "other": "tiden måste vara mer än noll"
+    },
+    "%q is not a language this installation has": {
+      "other": "%q är inget språk den här installationen har"
+    },
+    "a %s order's lines are part of an issued document; correct it with a credit note": {
+      "other": "raderna på en %s order är en del av ett utfärdat dokument; rätta det med en kreditfaktura"
+    },
+    "no such part": {
+      "other": "ingen sådan del"
+    },
+    "say why the line is withdrawn": {
+      "other": "säg varför raden dras tillbaka"
+    },
+    "that line was withdrawn": {
+      "other": "den raden drogs tillbaka"
+    },
+    "that work was done, so the line stays; correct what it says instead": {
+      "other": "det arbetet gjordes, så raden stannar; rätta vad den säger i stället"
+    },
+    "the customer declined that line; it stays as what was offered": {
+      "other": "kunden tackade nej till den raden; den stannar som det som erbjöds"
+    },
+    "the reason is limited to 300 characters": {
+      "other": "anledningen är begränsad till 300 tecken"
+    },
+    "the tax rate must be between 0 and 100 per cent": {
+      "other": "momssatsen måste vara mellan 0 och 100 procent"
+    },
+    "%q is not labour, part, sublet or fee": {
+      "other": "%q är inte arbete, del, underentreprenad eller avgift"
+    },
+    "%s has no price and no cost; give it one on the stock page": {
+      "other": "%s har varken pris eller kostnad; ange ett på lagersidan"
+    },
+    "a line the customer is not paying for must be free": {
+      "other": "en rad som kunden inte betalar för måste vara gratis"
+    },
+    "a negative price is a credit note, not a line": {
+      "other": "ett negativt pris är en kreditfaktura, inte en rad"
+    },
+    "a price from the part needs a part": {
+      "other": "ett pris från delen kräver en del"
+    },
+    "nothing can be added to a %s order": {
+      "other": "inget kan läggas till på en %s order"
+    },
+    "quantity cannot be negative": {
+      "other": "mängden kan inte vara negativ"
+    },
+    "the line needs a description": {
+      "other": "raden behöver en beskrivning"
+    },
+    "a customer cannot be merged into itself": {
+      "other": "en kund kan inte slås ihop med sig själv"
+    },
+    "a person and a company are not the same customer": {
+      "other": "en person och ett företag är inte samma kund"
+    },
+    "a vehicle cannot be merged into itself": {
+      "other": "ett fordon kan inte slås ihop med sig själv"
+    },
+    "one of them has already been merged into another": {
+      "other": "en av dem har redan slagits ihop med en annan"
+    },
+    "the periods overlap, so they cannot be put together": {
+      "other": "perioderna överlappar, så de kan inte läggas ihop"
+    },
+    "%q is not something to tell a customer": {
+      "other": "%q är inget att säga till en kund"
+    },
+    "a text or an email": {
+      "other": "ett sms eller ett e-postmeddelande"
+    },
+    "nobody to send it to, or nothing to say": {
+      "other": "ingen att skicka det till, eller inget att säga"
+    },
+    "%q is not something that can be recorded": {
+      "other": "%q är inget som kan antecknas"
+    },
+    "a part off the car or the car": {
+      "other": "en del från bilen eller bilen"
+    },
+    "an amount cannot be negative": {
+      "other": "ett belopp kan inte vara negativt"
+    },
+    "an estimate cannot be negative": {
+      "other": "en uppskattning kan inte vara negativ"
+    },
+    "it has been handed over already": {
+      "other": "det har redan lämnats över"
+    },
+    "it is %s, and cannot go to %s": {
+      "other": "det är %s och kan inte gå till %s"
+    },
+    "name the supplier, up to 100 characters": {
+      "other": "ange leverantören, högst 100 tecken"
+    },
+    "nobody by that name works here": {
+      "other": "ingen med det namnet arbetar här"
+    },
+    "say what came of it": {
+      "other": "säg vad det blev av det"
+    },
+    "say what is sent, up to 100 characters": {
+      "other": "säg vad som skickas, högst 100 tecken"
+    },
+    "say what it cost": {
+      "other": "säg vad det kostade"
+    },
+    "say what they are to do, up to 500 characters": {
+      "other": "säg vad de ska göra, högst 500 tecken"
+    },
+    "say who": {
+      "other": "säg vem"
+    },
+    "say why": {
+      "other": "säg varför"
+    },
+    "say why, or when it is now expected": {
+      "other": "säg varför, eller när den nu väntas"
+    },
+    "the contact and reference are limited to 200 and 100 characters": {
+      "other": "kontakten och referensen är begränsade till 200 och 100 tecken"
+    },
+    "the note is limited to 500 characters": {
+      "other": "anteckningen är begränsad till 500 tecken"
+    },
+    "the reference is limited to 100 characters": {
+      "other": "referensen är begränsad till 100 tecken"
+    },
+    "there is no supplier invoice to hand over": {
+      "other": "det finns ingen leverantörsfaktura att lämna över"
+    },
+    "write down their invoice number": {
+      "other": "skriv ner deras fakturanummer"
+    },
+    "write down what they report": {
+      "other": "skriv ner vad de rapporterar"
+    },
+    "%q is not a way money arrives": {
+      "other": "%q är inget sätt som pengar kommer in"
+    },
+    "a payment of nothing is not a payment": {
+      "other": "en betalning på noll är ingen betalning"
+    },
+    "money that has not arrived yet cannot be recorded as arrived": {
+      "other": "pengar som inte har kommit än kan inte bokföras som inkomna"
+    },
+    "nothing is owed on that invoice": {
+      "other": "inget är skyldigt på den fakturan"
+    },
+    "that is a credit note; record the payment against %s": {
+      "other": "det är en kreditfaktura; bokför betalningen mot %s"
+    },
+    "that is itself a reversal; record the payment again instead": {
+      "other": "det är i sig en återföring; bokför betalningen igen i stället"
+    },
+    "that payment has already been reversed": {
+      "other": "den betalningen har redan återförts"
+    },
+    "when did it arrive?": {
+      "other": "när kom det in?"
+    },
+    "a %s order's lines are settled": {
+      "other": "raderna på en %s order är reglerade"
+    },
+    "some of those lines are not on this order": {
+      "other": "några av de raderna finns inte på den här ordern"
+    },
+    "choose a technician": {
+      "other": "välj en tekniker"
+    },
+    "choose an active technician": {
+      "other": "välj en aktiv tekniker"
+    },
+    "choose who it moves from and to": {
+      "other": "välj vem det flyttas från och till"
+    },
+    "give both when it starts and when it ends, or neither": {
+      "other": "ange både när det börjar och när det slutar, eller ingetdera"
+    },
+    "it has to end after it starts": {
+      "other": "det måste sluta efter att det börjar"
+    },
+    "keep the reason and the note short": {
+      "other": "håll anledningen och anteckningen korta"
+    },
+    "the work left cannot be negative": {
+      "other": "återstående arbete kan inte vara negativt"
+    },
+    "there is no plan to carry over": {
+      "other": "det finns ingen plan att föra över"
+    },
+    "the car has already been collected": {
+      "other": "bilen har redan hämtats"
+    },
+    "the car is here; it cannot come back without having left": {
+      "other": "bilen är här; den kan inte komma tillbaka utan att ha åkt"
+    },
+    "the car is here; there is no return to move": {
+      "other": "bilen är här; det finns ingen återkomst att flytta"
+    },
+    "%q is not approved or declined": {
+      "other": "%q är inte godkänt eller avböjt"
+    },
+    "a %s order is not quoted": {
+      "other": "en %s order offereras inte"
+    },
+    "say whether it was by telephone or at the counter": {
+      "other": "säg om det var per telefon eller i disken"
+    },
+    "the quote comes to %s including VAT, not %s": {
+      "other": "offerten blir %s inklusive moms, inte %s"
+    },
+    "there is nothing on this order that the customer has not answered": {
+      "other": "det finns inget på den här ordern som kunden inte har svarat på"
+    },
+    "a step is done, skipped, or taken back": {
+      "other": "ett steg är klart, överhoppat eller återtaget"
+    },
+    "a workshop is solo or has a team": {
+      "other": "en verkstad är ensam eller har ett team"
+    },
+    "that is not a step": {
+      "other": "det är inget steg"
+    },
+    "the note is limited to 300 characters": {
+      "other": "anteckningen är begränsad till 300 tecken"
+    },
+    "write down who": {
+      "other": "skriv ner vem"
+    },
+    "a 17-character chassis number has no I, O or Q": {
+      "other": "ett chassinummer på 17 tecken har inget I, O eller Q"
+    },
+    "a change of plate cannot be dated in the future": {
+      "other": "ett skyltbyte kan inte dateras i framtiden"
+    },
+    "a chassis number has letters and digits only": {
+      "other": "ett chassinummer har bara bokstäver och siffror"
+    },
+    "a customer needs a name to address an invoice to": {
+      "other": "en kund behöver ett namn att adressera en faktura till"
+    },
+    "a sale cannot be dated in the future": {
+      "other": "en försäljning kan inte dateras i framtiden"
+    },
+    "a telephone number needs at least five digits": {
+      "other": "ett telefonnummer behöver minst fem siffror"
+    },
+    "an organisation number has digits and a hyphen only": {
+      "other": "ett organisationsnummer har bara siffror och ett bindestreck"
+    },
+    "keep the reason to 300 characters": {
+      "other": "håll anledningen till 300 tecken"
+    },
+    "keep the title to 80 characters": {
+      "other": "håll titeln till 80 tecken"
+    },
+    "name the contact person to give them a telephone number or email": {
+      "other": "ange kontaktpersonen för att ge dem ett telefonnummer eller en e-postadress"
+    },
+    "nobody owns it on record, so there is nothing to end": {
+      "other": "ingen äger den enligt registret, så det finns inget att avsluta"
+    },
+    "only a company has more than one contact": {
+      "other": "bara ett företag har mer än en kontakt"
+    },
+    "say who it is": {
+      "other": "säg vem det är"
+    },
+    "that is not a model year": {
+      "other": "det är ingen årsmodell"
+    },
+    "that is not the length of a chassis number": {
+      "other": "det är inte längden på ett chassinummer"
+    },
+    "that is not the length of an organisation number": {
+      "other": "det är inte längden på ett organisationsnummer"
+    },
+    "that is the plate it already carries; to fix a typing mistake, correct it instead": {
+      "other": "det är skylten den redan har; för att rätta ett skrivfel, rätta den i stället"
+    },
+    "that overlaps another owner's period": {
+      "other": "det överlappar en annan ägares period"
+    },
+    "the change cannot be dated before the current plate was put on": {
+      "other": "bytet kan inte dateras före den nuvarande skyltens uppsättning"
+    },
+    "the sale cannot be dated before the owner bought it": {
+      "other": "försäljningen kan inte dateras före ägarens köp"
+    },
+    "they already own it": {
+      "other": "de äger den redan"
+    },
+    "this customer was merged into another; edit that one": {
+      "other": "den här kunden slogs ihop med en annan; ändra den"
+    },
+    "this vehicle has no plate to correct; add one as a change": {
+      "other": "det här fordonet har ingen skylt att rätta; lägg till en som ett byte"
+    },
+    "this vehicle was merged into another": {
+      "other": "det här fordonet slogs ihop med ett annat"
+    },
+    "this vehicle was merged into another; edit that one": {
+      "other": "det här fordonet slogs ihop med ett annat; ändra det"
+    },
+    "type the new registration": {
+      "other": "skriv det nya registreringsnumret"
+    },
+    "type the registration as it should be": {
+      "other": "skriv registreringsnumret som det ska vara"
+    },
+    "%q is not a time": {
+      "other": "%q är ingen tid"
+    },
+    "a day outside the rota": {
+      "other": "en dag utanför schemat"
+    },
+    "a rota repeats every one to four weeks": {
+      "other": "ett schema upprepas var en till fyra veckor"
+    },
+    "a shift starts and ends at %s": {
+      "other": "ett pass börjar och slutar %s"
+    },
+    "give both times, or neither to follow the rota": {
+      "other": "ange båda tiderna, eller ingen för att följa schemat"
+    },
+    "a password needs at least %d characters": {
+      "other": "ett lösenord behöver minst %d tecken"
+    },
+    "that is not your current password": {
+      "other": "det är inte ditt nuvarande lösenord"
+    },
+    "that is the last owner who can sign in": {
+      "other": "det är den sista ägaren som kan logga in"
+    },
+    "you cannot switch yourself off": {
+      "other": "du kan inte stänga av dig själv"
+    },
+    "a workshop needs a name to put on an invoice": {
+      "other": "en verkstad behöver ett namn att skriva på en faktura"
+    },
+    "payment terms cannot be negative": {
+      "other": "betalningsvillkor kan inte vara negativa"
+    },
+    "the password needs at least %d characters": {
+      "other": "lösenordet behöver minst %d tecken"
+    },
+    "the workshop needs a name": {
+      "other": "verkstaden behöver ett namn"
+    },
+    "your name is needed for the first account": {
+      "other": "ditt namn behövs för det första kontot"
+    },
+    "%q is not a role": {
+      "other": "%q är ingen roll"
+    },
+    "%s already belongs to somebody in this workshop": {
+      "other": "%s tillhör redan någon i den här verkstaden"
+    },
+    "a name, so colleagues know who it is": {
+      "other": "ett namn, så kollegor vet vem det är"
+    },
+    "that does not look like an email address": {
+      "other": "det ser inte ut som en e-postadress"
+    },
+    "close it with CloseJob": {
+      "other": "stäng den med CloseJob"
+    },
+    "work with a supplier is not back and checked yet: %s": {
+      "other": "arbete hos en leverantör är inte tillbaka och kontrollerat än: %s"
+    },
+    "%q is not a kind of stock movement": {
+      "other": "%q är ingen sorts lagerrörelse"
+    },
+    "%q is not a reason this system knows": {
+      "other": "%q är ingen anledning som systemet känner till"
+    },
+    "a markup between 0 and 1000%% please": {
+      "other": "ett påslag mellan 0 och 1000%% tack"
+    },
+    "a movement of nothing is not a movement": {
+      "other": "en rörelse på noll är ingen rörelse"
+    },
+    "a shelf cannot hold fewer than none": {
+      "other": "en hylla kan inte hålla färre än inga"
+    },
+    "a write-off needs a reason, and nothing else takes one": {
+      "other": "en avskrivning behöver en anledning, och inget annat tar någon"
+    },
+    "consume a positive quantity": {
+      "other": "förbruka en positiv mängd"
+    },
+    "reserve a positive quantity": {
+      "other": "reservera en positiv mängd"
+    },
+    "%q is no longer being waited for": {
+      "other": "%q väntas inte längre"
+    },
+    "a credit was already recorded for it": {
+      "other": "en kredit bokfördes redan för den"
+    },
+    "an amount of zero or more, and a reference of 100 characters or fewer": {
+      "other": "ett belopp på noll eller mer, och en referens på högst 100 tecken"
+    },
+    "an order has at least one line": {
+      "other": "en order har minst en rad"
+    },
+    "an uncatalogued part cannot go onto a shelf; take it straight to the car": {
+      "other": "en del som inte finns i katalogen kan inte läggas på en hylla; ta den direkt till bilen"
+    },
+    "decide about the substitute first; turning it down plans its return": {
+      "other": "bestäm först om ersättningen; att avböja den planerar dess retur"
+    },
+    "it was already sent back": {
+      "other": "den skickades redan tillbaka"
+    },
+    "it was not cancelled here": {
+      "other": "den avbokades inte här"
+    },
+    "no part in the catalogue is numbered %q": {
+      "other": "ingen del i katalogen har numret %q"
+    },
+    "only %s came, and %s is already going back": {
+      "other": "bara %s kom, och %s är redan på väg tillbaka"
+    },
+    "only something waiting for a decision can be turned down": {
+      "other": "bara något som väntar på ett beslut kan avböjas"
+    },
+    "onto the shelf, straight to the car, or brought by the customer": {
+      "other": "till hyllan, direkt till bilen eller medtaget av kunden"
+    },
+    "order at least one of each thing": {
+      "other": "beställ minst en av varje sak"
+    },
+    "say what is ordered": {
+      "other": "säg vad som beställs"
+    },
+    "say when it is expected": {
+      "other": "säg när den väntas"
+    },
+    "say who it was ordered from": {
+      "other": "säg vem den beställdes från"
+    },
+    "say why, in 300 characters or fewer": {
+      "other": "säg varför, med högst 300 tecken"
+    },
+    "send back at least one, with a note of 300 characters or fewer": {
+      "other": "skicka tillbaka minst en, med en anteckning på högst 300 tecken"
+    },
+    "something else than was ordered cannot go onto the shelf under the ordered part's number; take it straight to the car once it is accepted": {
+      "other": "något annat än det som beställdes kan inte läggas på hyllan under den beställda delens nummer; ta det direkt till bilen när det godtagits"
+    },
+    "something has to have arrived": {
+      "other": "något måste ha kommit"
+    },
+    "that was what was ordered": {
+      "other": "det var vad som beställdes"
+    },
+    "the reference or description is too long": {
+      "other": "referensen eller beskrivningen är för lång"
+    },
+    "the reference or the note is too long": {
+      "other": "referensen eller anteckningen är för lång"
+    },
+    "this delivery was not for a job, so there is no job to ask again for": {
+      "other": "den här leveransen gällde inget jobb, så det finns inget jobb att be om igen för"
+    },
+    "wrong part, damaged, not needed or something else": {
+      "other": "fel del, skadad, behövs inte eller något annat"
+    },
+    "an amount cannot be below nothing": {
+      "other": "ett belopp kan inte vara under noll"
+    },
+    "förbrukningsmaterial between 0 and 25 per cent of the labour": {
+      "other": "förbrukningsmaterial mellan 0 och 25 procent av arbetet"
+    },
+    "no part has the code %s": {
+      "other": "ingen del har koden %s"
+    },
+    "only %v was taken out to this job": {
+      "other": "bara %v togs ut till det här jobbet"
+    },
+    "put back a positive quantity": {
+      "other": "lägg tillbaka en positiv mängd"
+    },
+    "scan or type the part's code": {
+      "other": "skanna eller skriv delens kod"
+    },
+    "take out a positive quantity": {
+      "other": "ta ut en positiv mängd"
+    },
+    "the job is %s; its parts are settled": {
+      "other": "jobbet är %s; dess delar är reglerade"
+    },
+    "keep the note to 300 characters": {
+      "other": "håll anteckningen till 300 tecken"
+    },
+    "no such finding": {
+      "other": "inget sådant fynd"
+    },
+    "no such finding on this job": {
+      "other": "inget sådant fynd på det här jobbet"
+    },
+    "not a status": {
+      "other": "ingen status"
+    },
+    "say what is in the way": {
+      "other": "säg vad som är i vägen"
+    },
+    "say what is to be done, in 120 characters or fewer": {
+      "other": "säg vad som ska göras, med högst 120 tecken"
+    },
+    "say what it is waiting for": {
+      "other": "säg vad det väntar på"
+    },
+    "say what the customer decided, in 300 characters or fewer": {
+      "other": "säg vad kunden bestämde, med högst 300 tecken"
+    },
+    "say why it is being left out": {
+      "other": "säg varför det lämnas utanför"
+    },
+    "that line is not on this job": {
+      "other": "den raden finns inte på det här jobbet"
+    },
+    "that line was taken back": {
+      "other": "den raden drogs tillbaka"
+    },
+    "there is work left on the list: %s": {
+      "other": "det finns arbete kvar på listan: %s"
+    },
+    "%d checkpoints is more than %d": {
+      "other": "%d kontrollpunkter är fler än %d"
+    },
+    "%q is longer than %d characters": {
+      "other": "%q är längre än %d tecken"
+    },
+    "%q is on the list twice": {
+      "other": "%q finns två gånger på listan"
+    },
+    "a checklist needs a name to be picked by": {
+      "other": "en checklista behöver ett namn att väljas på"
+    },
+    "a checklist needs at least one thing to check": {
+      "other": "en checklista behöver minst en sak att kontrollera"
+    },
+    "the name is longer than %d characters": {
+      "other": "namnet är längre än %d tecken"
+    },
+    "%.1f hours is longer than anybody works in one go": {
+      "other": "%.1f timmar är längre än någon arbetar i ett svep"
+    },
+    "the end has to be after the start": {
+      "other": "slutet måste vara efter början"
+    },
+    "this job has been invoiced, and the invoice cannot change": {
+      "other": "det här jobbet har fakturerats, och fakturan kan inte ändras"
+    },
+    "a note or a conversation": {
+      "other": "en anteckning eller ett samtal"
+    },
+    "say whether it was on the telephone or in person": {
+      "other": "säg om det var i telefon eller på plats"
+    },
+    "that has not happened yet": {
+      "other": "det har inte hänt än"
+    },
+    "that is from long before the job was opened": {
+      "other": "det är från långt innan jobbet öppnades"
+    },
+    "write something, in 1000 characters or fewer": {
+      "other": "skriv något, med högst 1000 tecken"
+    },
+    "That is not an odometer reading.": {
+      "other": "Det är ingen mätarställning."
+    },
+    "%s-%d has %d.%02d%%": {
+      "other": "%s-%d har %d.%02d%%"
+    },
+    "%s available": {
+      "other": "%s tillgängliga"
+    },
+    "%s h": {
+      "other": "%s h"
+    },
+    "%s reserved": {
+      "other": "%s reserverade"
+    },
+    "%s units": {
+      "other": "%s enheter"
+    },
+    "180 days": {
+      "other": "180 dagar"
+    },
+    "90 days": {
+      "other": "90 dagar"
+    },
+    "A clock that ran longer than anybody works in one go. It was closed when the next job was started; somebody has to say what it should have been.": {
+      "other": "En klocka som gick längre än någon arbetar i ett svep. Den stängdes när nästa jobb startades; någon måste säga vad den borde ha varit."
+    },
+    "A sheet for an ordinary printer. A thermal label printer is the right tool and a painful one from a browser; this is the path that always works. The number is printed in readable text as well as in bars, because labels in a workshop get oily, torn and painted over.": {
+      "other": "Ett ark för en vanlig skrivare. En termisk etikettskrivare är rätt verktyg men plågsam från en webbläsare; det här är vägen som alltid fungerar. Numret skrivs ut som läsbar text och som streckkod, eftersom etiketter i en verkstad blir oljiga, trasiga och överlackade."
+    },
+    "A vehicle's technical history": {
+      "other": "Ett fordons tekniska historik"
+    },
+    "Add 15 minutes if the bolts are seized": {
+      "other": "Lägg till 15 minuter om bultarna har kärvat"
+    },
+    "Add a time": {
+      "other": "Lägg till en tid"
+    },
+    "Add it to stock": {
+      "other": "Lägg in den i lagret"
+    },
+    "Before the current owner — what was done is shown, who paid and what they paid is not.": {
+      "other": "Före nuvarande ägare — vad som gjordes visas, vem som betalade och vad de betalade visas inte."
+    },
+    "Cleared:": {
+      "other": "Rensat:"
+    },
+    "Clocked hours": {
+      "other": "Stämplade timmar"
+    },
+    "Corrected by %s": {
+      "other": "Rättat av %s"
+    },
+    "Costs under": {
+      "other": "Kostar under"
+    },
+    "Counting by volume? Scan the container and type the quantity — oil is not a count.": {
+      "other": "Räknar du i volym? Skanna behållaren och skriv mängden — olja är inget antal."
+    },
+    "Customer inspection links": {
+      "other": "Kundens besiktningslänkar"
+    },
+    "Ended": {
+      "other": "Slutade"
+    },
+    "Erasures actioned": {
+      "other": "Genomförda raderingar"
+    },
+    "Failed sign-in attempts": {
+      "other": "Misslyckade inloggningsförsök"
+    },
+    "Forgot to clock out, went home at 17:00": {
+      "other": "Glömde stämpla ut, gick hem klockan 17:00"
+    },
+    "From year": {
+      "other": "Från år"
+    },
+    "Hourly rate, excluding VAT": {
+      "other": "Timpris, exklusive moms"
+    },
+    "Issued invoices": {
+      "other": "Utfärdade fakturor"
+    },
+    "It belongs to the vehicle, not to a person, and survives a sale. The next owner sees what was done and not who paid.": {
+      "other": "Den hör till fordonet, inte till en person, och finns kvar efter en försäljning. Nästa ägare ser vad som gjordes och inte vem som betalade."
+    },
+    "Kept:": {
+      "other": "Sparat:"
+    },
+    "Labels": {
+      "other": "Etiketter"
+    },
+    "Leave make, model, engine or the years blank to make a time apply more widely. When two stored times match a car, the narrower one wins and the page says which it used.": {
+      "other": "Lämna märke, modell, motor eller åren tomma för att låta en tid gälla bredare. När två sparade tider passar en bil vinner den smalare, och sidan säger vilken den använde."
+    },
+    "Look it up": {
+      "other": "Slå upp den"
+    },
+    "Lower than an earlier reading": {
+      "other": "Lägre än en tidigare avläsning"
+    },
+    "Markup": {
+      "other": "Påslag"
+    },
+    "Markup %": {
+      "other": "Påslag %"
+    },
+    "Mine, the last fortnight": {
+      "other": "Mina, de senaste två veckorna"
+    },
+    "Needs a second look": {
+      "other": "Behöver en andra titt"
+    },
+    "No bands set, so cost is price. A five-krona clip and a five-thousand-krona turbo do not carry the same markup.": {
+      "other": "Inga band inställda, så inköpspris är pris. En clips för fem kronor och en turbo för fem tusen bär inte samma påslag."
+    },
+    "None yet.": {
+      "other": "Inga än."
+    },
+    "Nothing clocked.": {
+      "other": "Inget stämplat."
+    },
+    "Nothing else on this page takes a keystroke. A handheld scanner is a keyboard — it types very fast and presses Enter — and on a page with several fields that lands wherever the focus happened to be.": {
+      "other": "Inget annat på den här sidan tar en tangenttryckning. En handskanner är ett tangentbord — det skriver mycket snabbt och trycker Enter — och på en sida med flera fält hamnar det där fokus råkade vara."
+    },
+    "Nothing matched “%s”.": {
+      "other": "Inget matchade “%s”."
+    },
+    "Nothing recorded for this vehicle yet.": {
+      "other": "Inget är bokfört för det här fordonet än."
+    },
+    "Nothing stocked yet.": {
+      "other": "Inget finns i lager än."
+    },
+    "Nothing stored yet.": {
+      "other": "Inget sparat än."
+    },
+    "Operation": {
+      "other": "Moment"
+    },
+    "Personal data": {
+      "other": "Personuppgifter"
+    },
+    "Plates it has carried": {
+      "other": "Skyltar den har haft"
+    },
+    "Reason:": {
+      "other": "Anledning:"
+    },
+    "Registration, chassis number": {
+      "other": "Registreringsnummer, chassinummer"
+    },
+    "Registration, chassis number or a name": {
+      "other": "Registreringsnummer, chassinummer eller ett namn"
+    },
+    "Replace front brake pads and discs": {
+      "other": "Byt främre bromsklossar och bromsskivor"
+    },
+    "Required by Swedish bookkeeping law, including the name and address they were addressed to. This is why erasure anonymises a person rather than deleting them.": {
+      "other": "Krävs enligt svensk bokföringslag, inklusive namn och adress de ställdes till. Därför anonymiserar radering en person i stället för att ta bort dem."
+    },
+    "Save the band": {
+      "other": "Spara bandet"
+    },
+    "Save the rate": {
+      "other": "Spara timpriset"
+    },
+    "Scan or type a code": {
+      "other": "Skanna eller skriv en kod"
+    },
+    "Started": {
+      "other": "Startade"
+    },
+    "Store it": {
+      "other": "Spara den"
+    },
+    "The link itself stops working after a fortnight; the record that one was sent is kept a while longer, then removed.": {
+      "other": "Själva länken slutar fungera efter två veckor; uppgiften att en skickades sparas en stund längre och tas sedan bort."
+    },
+    "The shop's own times. The paid guides get these wrong often enough that shops keep their own anyway; this is that, written down.": {
+      "other": "Verkstadens egna tider. De betalda tidböckerna har ofta fel, så verkstäder för ändå sina egna; det här är det, nedskrivet."
+    },
+    "There is no national identity number and no driving licence field anywhere in this system. A field with no purpose does not exist.": {
+      "other": "Det finns inget personnummer och inget fält för körkort någonstans i det här systemet. Ett fält utan syfte finns inte."
+    },
+    "They exist to slow down guessing over minutes. Keeping them longer would be keeping a record of who tried to sign in, with no remaining purpose.": {
+      "other": "De finns för att bromsa gissning under några minuter. Att spara dem längre vore att föra en förteckning över vem som försökte logga in, utan kvarvarande syfte."
+    },
+    "They support payroll records and stay attributable to a person whose name may have been cleared.": {
+      "other": "De stöder löneunderlag och går att knyta till en person vars namn kan ha rensats."
+    },
+    "Time library": {
+      "other": "Tidbok"
+    },
+    "Times": {
+      "other": "Tider"
+    },
+    "To year": {
+      "other": "Till år"
+    },
+    "What is kept, and for how long": {
+      "other": "Vad som sparas, och hur länge"
+    },
+    "What is on the shelf is the sum of every movement, never a number typed over another. That is what lets the shop ask what a year of wrongly ordered parts cost.": {
+      "other": "Det som finns på hyllan är summan av varje rörelse, aldrig ett tal som skrivits över ett annat. Det är vad som låter verkstaden fråga vad ett år av felbeställda delar kostade."
+    },
+    "Written off this month": {
+      "other": "Avskrivet den här månaden"
+    },
+    "blank for the top band": {
+      "other": "tomt för det översta bandet"
+    },
+    "includes the shop's own %d min": {
+      "other": "inkluderar verkstadens egna %d min"
+    },
+    "now": {
+      "other": "nu"
+    },
+    "seven years": {
+      "other": "sju år"
+    },
+    "was": {
+      "other": "var"
+    },
+    "Really took %s h across %d job": {
+      "one": "Tog i verkligheten %s h över %d jobb",
+      "other": "Tog i verkligheten %s h över %d jobb"
+    },
+    "Job": {
+      "other": "Jobb"
+    },
+    "Booking": {
+      "other": "Bokning"
+    },
+    "Credit": {
+      "other": "Kredit"
+    },
+    "Wrong buyer": {
+      "other": "Fel köpare"
+    },
+    "Is this somebody we have?": {
+      "other": "Är det här någon vi har?"
+    },
+    "Your vehicle": {
+      "other": "Ditt fordon"
+    },
+    "Merge": {
+      "other": "Slå ihop"
+    },
+    "Set up this workshop": {
+      "other": "Ställ in den här verkstaden"
+    },
+    "Timeline": {
+      "other": "Tidslinje"
+    },
+    "Skip to the content": {
+      "other": "Hoppa till innehållet"
+    },
+    "This page was updated.": {
+      "other": "Sidan uppdaterades."
+    },
+    "When the connection drops": {
+      "other": "När anslutningen försvinner"
+    },
+    "FreeSMS does not work offline as a whole. A page you have open stays readable, and what you type in a form stays on this device until you send it.": {
+      "other": "FreeSMS fungerar inte offline som helhet. En sida du har öppen går att läsa, och det du skriver i ett formulär ligger kvar på den här enheten tills du skickar det."
+    },
+    "Held and sent when the connection is back:": {
+      "other": "Hålls kvar och skickas när anslutningen är tillbaka:"
+    },
+    "ticking off work, a note, a finding, a line added, a part asked for or taken out, an inspection answer, a stock movement, and moving a job on. The page says that it is holding it.": {
+      "other": "att bocka av arbete, en anteckning, ett fynd, en tillagd rad, en del som begärts eller tagits ut, ett besiktningssvar, en lagerrörelse och att flytta ett jobb vidare. Sidan säger att den håller kvar det."
+    },
+    "Needs a connection:": {
+      "other": "Kräver anslutning:"
+    },
+    "signing in, invoicing, payments, importing, and everything to do with a customer's details. If you try, nothing is sent and nothing is stored.": {
+      "other": "att logga in, fakturera, betalningar, import och allt som rör en kunds uppgifter. Om du försöker skickas ingenting och ingenting sparas."
     },
     "Final check": {
       "other": "Slutkontroll"

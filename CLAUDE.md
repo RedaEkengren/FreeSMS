@@ -127,17 +127,22 @@ not exist.
   answer, and there are no old invoices in production because nothing is
   deployed.
 
-- **The translation is partial.** The mechanism is in place and Swedish
-  ships. Converted: the navigation and the role in the header, every work
-  order state, the technician's list and job, the counter board, the parts
-  desk, the customer's page, the invoice document, taking a car in, the
-  accounting export and the inspection. Still carrying English literals: the bodies of the
-  administrative screens -- figures, stock, privacy, the time library -- and
-  some headings on the job page.
-  A page can therefore declare `lang="sv"` and show English, which is honest
-  about the state and wrong for a screen reader. Converting the rest is
-  mechanical; adding a string without a catalogue key is not acceptable in
-  new work.
+- **The translation is complete, and two tests keep it so.** Every sentence a
+  reader can be shown -- a template string through `T` or `N`, a page title, a
+  handler's message for the error page, the printer's own calls, and the
+  sentences the workshop's refusals carry -- must have a Swedish translation
+  (`TestEverySentenceAReaderCanBeShownHasASwedishTranslation`). And a walk
+  through the pages of an ordinary day as each role, read in Swedish, fails on
+  any English sentence or label from the catalogue left on a page
+  (`TestNoPageReadInSwedishShowsAnEnglishSentenceFromTheCatalogue`): that
+  catches a Go-side label that never went through `T`. A refusal is a
+  formatted sentence by the time it reaches the page, so the error page
+  translates it by finding the message it was made from
+  (`Printer.Sentence`). One word per term is held by
+  `TestTheSwedishUsesOneWordForEachTerm` (final check, booking, invoice,
+  credit note, ...). Adding a string without a catalogue key now fails the
+  build. The pre-setup page (`setup.html`) is English by design: nobody has
+  chosen a language yet.
 
   Which language a page picks: the person's (/account), then the
   workshop's (/shop, created in `DEFAULT_LOCALE` at setup), then English.

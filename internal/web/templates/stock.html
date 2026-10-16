@@ -1,23 +1,21 @@
 {{define "content"}}
-<h1>Stock</h1>
-<p class="waiting">What is on the shelf is the sum of every movement, never a
-number typed over another. That is what lets the shop ask what a year of
-wrongly ordered parts cost.</p>
+<h1>{{.T "Stock"}}</h1>
+<p class="waiting">{{.T "What is on the shelf is the sum of every movement, never a number typed over another. That is what lets the shop ask what a year of wrongly ordered parts cost."}}</p>
 
 {{if .WriteOffs}}
-<h2>Written off this month</h2>
+<h2>{{.T "Written off this month"}}</h2>
 <ul class="lines">
   {{range .WriteOffs}}
-  <li><div class="row"><span>{{.Label}}</span><span class="tag late">{{$.Money .CostMinor}}</span></div>
-      <div class="waiting">{{$.Num .Quantity}} units</div></li>
+  <li><div class="row"><span>{{$.T .Label}}</span><span class="tag late">{{$.Money .CostMinor}}</span></div>
+      <div class="waiting">{{$.T "%s units" ($.Num .Quantity)}}</div></li>
   {{end}}
 </ul>
 {{end}}
 
-<h2>Parts</h2>
+<h2>{{.T "Parts"}}</h2>
 <p><a href="/stock/parts/new">{{.T "Add a part"}}</a></p>
 {{if not .Parts}}
-  <p class="empty">Nothing stocked yet.</p>
+  <p class="empty">{{.T "Nothing stocked yet."}}</p>
 {{else}}
 {{/* The whole shelf, because this is the parts desk's screen and it needs
      it. But a form per part is a wall: at two thousand parts the page was
@@ -55,7 +53,7 @@ wrongly ordered parts cost.</p>
         <span>{{$.T "If written off, why"}}</span>
         <select name="reason">
           <option value="">&mdash;</option>
-          {{range $key, $label := $.Reasons}}<option value="{{$key}}">{{$label}}</option>{{end}}
+          {{range $key, $label := $.Reasons}}<option value="{{$key}}">{{$.T $label}}</option>{{end}}
         </select>
       </label>
       <button type="submit" class="secondary">{{$.T "Record it"}}</button>
@@ -93,7 +91,7 @@ wrongly ordered parts cost.</p>
 </ul>
 {{end}}
 
-<h2>Markup</h2>
+<h2>{{.T "Markup"}}</h2>
 {{if .PriceBands}}
 <ul class="lines">
   {{range .PriceBands}}
@@ -101,16 +99,15 @@ wrongly ordered parts cost.</p>
   {{end}}
 </ul>
 {{else}}
-  <p class="waiting">No bands set, so cost is price. A five-krona clip and a
-  five-thousand-krona turbo do not carry the same markup.</p>
+  <p class="waiting">{{.T "No bands set, so cost is price. A five-krona clip and a five-thousand-krona turbo do not carry the same markup."}}</p>
 {{end}}
 {{if .Session.Scope.Role.SeesCustomerPersonalData}}
 <form method="post" action="/stock/bands">
   <div class="pair">
-    <label><span>Costs under</span><input name="up_to" placeholder="blank for the top band"></label>
-    <label><span>Markup %</span><input name="markup" value="45" inputmode="decimal"></label>
+    <label><span>{{.T "Costs under"}}</span><input name="up_to" placeholder="{{.T "blank for the top band"}}"></label>
+    <label><span>{{.T "Markup %"}}</span><input name="markup" value="45" inputmode="decimal"></label>
   </div>
-  <button type="submit" class="secondary">Save the band</button>
+  <button type="submit" class="secondary">{{.T "Save the band"}}</button>
 </form>
 {{end}}
 {{end}}

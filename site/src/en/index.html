@@ -277,6 +277,7 @@
     <button type="button" role="tab" data-tab="23">Work at a supplier</button>
     <button type="button" role="tab" data-tab="24">Start from your file</button>
     <button type="button" role="tab" data-tab="25">Getting started</button>
+    <button type="button" role="tab" data-tab="26">Swedish and accessible</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1474,6 +1475,41 @@
     </div>
   </div>
   <p class="truth">The words come from the product's own language catalogue when the page is generated. The flow is run against the real product in a browser: the owner fills in the details through the forms the list links to, looks at an example invoice and sees the list become ready &ndash; <a href="{{test "e2e/tests/36-getting-started.spec.ts" "the owner works through the list until the workshop is ready"}}">read the test</a>. Names and numbers are <span class="wf-example">examples</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>In Swedish all the way, on a phone, with a keyboard</h2>
+  <p class="lede">Every sentence a reader can be shown has a Swedish translation, and a test walks the pages of an ordinary day in Swedish and fails if an English sentence is left. A refusal speaks Swedish and is read out by a screen reader. A keyboard gets past the menu with one press, always sees where it is, and the screen works at 360 pixels without scrolling sideways. What the workshop wrote itself &ndash; a part description, a note &ndash; is never translated.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animation: a refusal is shown in Swedish with a link past the menu. Then a phone screen where the buttons are large and status is in words. Last: what is held when the connection drops is explained.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Example</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <span class="an-btn mo-btn">{{t "Skip to the content"}}</span>
+              <div class="cl-qrow"><span>the file has no "number" column</span><span class="rd-tag rd-risk">{{t "problem"}}</span></div>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "Parts"}}</div>
+              <div class="cl-qrow"><span>BP-100 · Front brake pads</span><span class="rd-tag rd-risk">{{t "overdue"}}</span></div>
+              <div class="cl-qrow"><span>{{t "Past its promised time"}}</span><span class="rd-tag rd-risk">{{t "late"}}</span></div>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">{{t "When the connection drops"}}</div>
+              <div class="cl-qrow"><span>{{t "Held and sent when the connection is back:"}}</span><span class="rd-tag pass">&#10003;</span></div>
+              <div class="cl-qrow"><span>{{t "Needs a connection:"}}</span><span class="rd-tag">{{t "Invoice"}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">A refusal says in Swedish what is wrong, and a screen reader reads it out. One press of Tab takes the keyboard past the menu.</div>
+      <div class="an-cap" data-t="8,15.8">The buttons are big enough for a thumb, nothing scrolls sideways, and status is always in words &ndash; never only a colour.</div>
+      <div class="an-cap" data-t="16,23.6">It says plainly what is held when the connection drops and what needs one. FreeSMS does not pretend to work offline.</div>
+    </div>
+  </div>
+  <p class="truth">The words come from the product's own language catalogue when the page is generated. The test is run against the real product in a browser: an automatic accessibility check in light and dark, in Swedish and English, a keyboard, a phone width and a refusal in Swedish &ndash; <a href="{{test "e2e/tests/37-accessibility.spec.ts" "the everyday pages have no automatic accessibility violations, in Swedish and in English"}}">read the test</a>. Names and numbers are <span class="wf-example">examples</span>.</p>
 </section>
 
   </div>

@@ -1,20 +1,18 @@
 {{define "content"}}
-<h1>Scan</h1>
+<h1>{{.T "Scan"}}</h1>
 
 <form method="get" action="/scan" class="scan">
   <label>
-    <span>Scan or type a code</span>
+    <span>{{.T "Scan or type a code"}}</span>
     <input name="code" value="" autofocus autocomplete="off"
            autocapitalize="characters" autocorrect="off" spellcheck="false">
   </label>
-  <button type="submit">Look it up</button>
+  <button type="submit">{{.T "Look it up"}}</button>
 </form>
-<p class="waiting">Nothing else on this page takes a keystroke. A handheld
-scanner is a keyboard — it types very fast and presses Enter — and on a page
-with several fields that lands wherever the focus happened to be.</p>
+<p class="waiting">{{.T "Nothing else on this page takes a keystroke. A handheld scanner is a keyboard — it types very fast and presses Enter — and on a page with several fields that lands wherever the focus happened to be."}}</p>
 
 {{if .Error}}
-  <p class="error">{{.Error}} <a href="/stock">Add it to stock</a></p>
+  <p class="error" role="alert">{{.Sentence .Error}} <a href="/stock">{{.T "Add it to stock"}}</a></p>
 {{end}}
 
 {{if .Part.ID}}
@@ -27,33 +25,32 @@ with several fields that lands wherever the focus happened to be.</p>
   </div>
   <div class="waiting">
     {{if .Part.Location}}{{.Part.Location}} &middot; {{end}}
-    {{.Part.Available}} available{{if ne .Part.Reserved 0.0}} &middot; {{.Part.Reserved}} reserved{{end}}
+    {{.T "%s available" (.Num .Part.Available)}}{{if ne .Part.Reserved 0.0}} &middot; {{.T "%s reserved" (.Num .Part.Reserved)}}{{end}}
   </div>
 
   <form class="mt-m" method="post" action="/stock/move" data-offline>
     <input type="hidden" name="part_id" value="{{.Part.ID}}">
     <div class="pair">
-      <label><span>How many</span><input name="quantity" value="1" inputmode="decimal"></label>
+      <label><span>{{.T "How many"}}</span><input name="quantity" value="1" inputmode="decimal"></label>
       <label>
-        <span>What happened</span>
+        <span>{{.T "What happened"}}</span>
         <select name="kind">
-          <option value="counted">Stocktake difference</option>
-          <option value="received">Arrived</option>
-          <option value="written_off">Written off</option>
+          <option value="counted">{{.T "Stocktake difference"}}</option>
+          <option value="received">{{.T "Arrived"}}</option>
+          <option value="written_off">{{.T "Written off"}}</option>
         </select>
       </label>
     </div>
     <label>
-      <span>If written off, why</span>
+      <span>{{.T "If written off, why"}}</span>
       <select name="reason">
         <option value="">—</option>
-        {{range $key, $label := .Reasons}}<option value="{{$key}}">{{$label}}</option>{{end}}
+        {{range $key, $label := .Reasons}}<option value="{{$key}}">{{$.T $label}}</option>{{end}}
       </select>
     </label>
-    <button type="submit" class="secondary">Record it</button>
+    <button type="submit" class="secondary">{{.T "Record it"}}</button>
   </form>
-  <p class="waiting">Counting by volume? Scan the container and type the
-  quantity — oil is not a count.</p>
+  <p class="waiting">{{.T "Counting by volume? Scan the container and type the quantity — oil is not a count."}}</p>
 </div>
 
 {{if .Movements}}

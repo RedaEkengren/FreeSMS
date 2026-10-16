@@ -5,8 +5,8 @@
 <p class="vehicle">{{.Vehicle.Make}} {{.Vehicle.Model}}{{if .Vehicle.ModelYear}} {{.Vehicle.ModelYear}}{{end}}{{if .Vehicle.Engine}} &middot; {{.Vehicle.Engine}}{{end}}</p>
 
 <dl>
-  {{if .Vehicle.VIN}}<dt>Chassis number</dt><dd>{{.Vehicle.VIN}}</dd>{{end}}
-  {{if .Vehicle.OwnerName}}<dt>Owner</dt><dd>{{if .Vehicle.OwnerID}}<a href="/customers/{{.Vehicle.OwnerID}}">{{.Vehicle.OwnerName}}</a>{{else}}{{.Vehicle.OwnerName}}{{end}}</dd>{{end}}
+  {{if .Vehicle.VIN}}<dt>{{.T "Chassis number"}}</dt><dd>{{.Vehicle.VIN}}</dd>{{end}}
+  {{if .Vehicle.OwnerName}}<dt>{{.T "Owner"}}</dt><dd>{{if .Vehicle.OwnerID}}<a href="/customers/{{.Vehicle.OwnerID}}">{{.Vehicle.OwnerName}}</a>{{else}}{{.Vehicle.OwnerName}}{{end}}</dd>{{end}}
 </dl>
 
 {{if .Vehicle.MergedInto}}
@@ -50,14 +50,14 @@
 {{end}}
 
 {{if gt (len .Vehicle.Registrations) 1}}
-<h2>Plates it has carried</h2>
+<h2>{{.T "Plates it has carried"}}</h2>
 <ul class="lines">
   {{range .Vehicle.Registrations}}
   <li>
     <div class="row">
       <span class="plate plate-small">{{.Registration}}</span>
-      {{if .Current}}<span class="tag pass">now</span>
-      {{else}}<span class="tag">until {{$.Date ($.Local .ValidTo) "2 Jan 2006"}}</span>{{end}}
+      {{if .Current}}<span class="tag pass">{{$.T "now"}}</span>
+      {{else}}<span class="tag">{{$.T "until %s" ($.Date ($.Local .ValidTo) "2 Jan 2006")}}</span>{{end}}
     </div>
   </li>
   {{end}}
@@ -76,9 +76,9 @@
 </ul>
 {{end}}
 
-<h2>History</h2>
+<h2>{{.T "History"}}</h2>
 {{if not .Vehicle.History}}
-  <p class="empty">Nothing recorded for this vehicle yet.</p>
+  <p class="empty">{{.T "Nothing recorded for this vehicle yet."}}</p>
 {{else}}
   {{range .Vehicle.History}}
   <div class="card">
@@ -98,14 +98,14 @@
       {{if .TotalMinor}} &middot; {{$.MoneyOrBlank .TotalMinor}}{{end}}
     </div>
     {{if .PreviousOwner}}
-      <div class="waiting">Before the current owner — what was done is shown, who paid and what they paid is not.</div>
+      <div class="waiting">{{$.T "Before the current owner — what was done is shown, who paid and what they paid is not."}}</div>
     {{end}}
   </div>
   {{end}}
 {{end}}
 
 {{if .Vehicle.Readings}}
-<h2>Odometer</h2>
+<h2>{{.T "Odometer"}}</h2>
 <ul class="lines">
   {{range .Vehicle.Readings}}
   <li>
@@ -113,7 +113,7 @@
       <span>{{.Km}} km</span>
       <span class="tag{{if .Decreasing}} late{{end}}">{{$.Date ($.Local .ReadAt) "2 Jan 2006"}}</span>
     </div>
-    {{if .Decreasing}}<div class="waiting">Lower than an earlier reading</div>{{end}}
+    {{if .Decreasing}}<div class="waiting">{{$.T "Lower than an earlier reading"}}</div>{{end}}
   </li>
   {{end}}
 </ul>

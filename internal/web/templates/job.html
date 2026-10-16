@@ -547,9 +547,9 @@
   <tfoot>
     <tr class="add">
       <td><input form="add-line" name="description" required
-                 placeholder="{{.T "What"}}"></td>
-      <td class="num"><input form="add-line" name="quantity" value="1" inputmode="decimal"></td>
-      <td class="num"><input form="add-line" name="unit_price" value="0" inputmode="decimal"></td>
+                 placeholder="{{.T "What"}}" aria-label="{{.T "What"}}"></td>
+      <td class="num"><input form="add-line" name="quantity" value="1" inputmode="decimal" aria-label="{{.T "Quantity"}}"></td>
+      <td class="num"><input form="add-line" name="unit_price" value="0" inputmode="decimal" aria-label="{{.T "Unit price"}}"></td>
       <td class="num"><button form="add-line" type="submit" class="secondary">{{.T "Add"}}</button></td>
     </tr>
     <tr class="add">

@@ -9,7 +9,9 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -49,6 +51,9 @@ type Catalogues struct {
 	byLocale map[string]*Catalogue
 	fallback string
 	strict   bool
+	// Messages with verbs in them, compiled to match a formatted sentence;
+	// built when first wanted.
+	patterns map[string][]pattern
 }
 
 // Load reads the embedded catalogues.
@@ -238,4 +243,150 @@ func (p *Printer) format(text, key string, args ...any) string {
 		return text
 	}
 	return fmt.Sprintf(text, args...)
+}
+
+// Messages are a locale's messages as shipped, for a test that wants to know
+// whether a sentence has a translation. Nil for a locale that did not ship.
+func (c *Catalogues) Messages(locale string) map[string]Message {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if cat, ok := c.byLocale[locale]; ok {
+		return cat.Messages
+	}
+	return nil
+}
+
+// A pattern is a message with verbs in it, turned into something that can be
+// matched against a sentence that has already been formatted.
+type pattern struct {
+	key    string
+	re     *regexp.Regexp
+	verbs  []byte
+	weight int
+}
+
+var verbExpr = regexp.MustCompile(`%(?:\.\d+)?[sdqfv]|%%`)
+
+func compilePatterns(cat *Catalogue) []pattern {
+	var out []pattern
+	for key := range cat.Messages {
+		if !strings.Contains(key, "%") {
+			continue
+		}
+		literal := verbExpr.ReplaceAllString(key, "")
+		if len(strings.TrimSpace(literal)) < 8 {
+			continue
+		}
+		var expr strings.Builder
+		var verbs []byte
+		expr.WriteString("^")
+		rest := key
+		for {
+			loc := verbExpr.FindStringIndex(rest)
+			if loc == nil {
+				expr.WriteString(regexp.QuoteMeta(rest))
+				break
+			}
+			expr.WriteString(regexp.QuoteMeta(rest[:loc[0]]))
+			verb := rest[loc[0]:loc[1]]
+			switch {
+			case verb == "%%":
+				expr.WriteString("%")
+			case strings.HasSuffix(verb, "d"):
+				expr.WriteString(`(-?\d+)`)
+				verbs = append(verbs, 'd')
+			case strings.HasSuffix(verb, "f"):
+				expr.WriteString(`(-?\d+(?:\.\d+)?)`)
+				verbs = append(verbs, 'f')
+			case strings.HasSuffix(verb, "q"):
+				expr.WriteString(`("(?:[^"\\]|\\.)*")`)
+				verbs = append(verbs, 'q')
+			default:
+				expr.WriteString(`(.+?)`)
+				verbs = append(verbs, 's')
+			}
+			rest = rest[loc[1]:]
+		}
+		expr.WriteString("$")
+		re, err := regexp.Compile(expr.String())
+		if err != nil {
+			continue
+		}
+		out = append(out, pattern{key: key, re: re, verbs: verbs, weight: len(literal)})
+	}
+	// The most specific first: a pattern with more fixed words in it wins over
+	// one that is mostly holes.
+	sort.Slice(out, func(i, j int) bool { return out[i].weight > out[j].weight })
+	return out
+}
+
+// Sentence translates a sentence that has already been formatted -- the words
+// of a refusal, "line 3 is not on that invoice" -- by finding the message it
+// was made from. A sentence with no translation, or that matches no message,
+// comes back as it was: an English refusal is better than none.
+func (p *Printer) Sentence(msg string) string {
+	if msg == "" || p.locale == p.c.fallback {
+		return msg
+	}
+	p.c.mu.RLock()
+	cat, ok := p.c.byLocale[p.locale]
+	p.c.mu.RUnlock()
+	if !ok {
+		return msg
+	}
+	if m, ok := cat.Messages[msg]; ok && m.Other != "" {
+		return m.Other
+	}
+	p.c.mu.Lock()
+	if p.c.patterns == nil {
+		p.c.patterns = map[string][]pattern{}
+	}
+	pats, ok := p.c.patterns[p.locale]
+	if !ok {
+		pats = compilePatterns(cat)
+		p.c.patterns[p.locale] = pats
+	}
+	p.c.mu.Unlock()
+	for _, pt := range pats {
+		m := pt.re.FindStringSubmatch(msg)
+		if m == nil {
+			continue
+		}
+		// The sentence is in the language of the key, which is English; what
+		// it is made from is the key's translation.
+		translated := cat.Messages[pt.key].Other
+		if translated == "" {
+			continue
+		}
+		args := make([]any, len(pt.verbs))
+		good := true
+		for i, v := range pt.verbs {
+			switch v {
+			case 'd':
+				n, err := strconv.Atoi(m[i+1])
+				if err != nil {
+					good = false
+				}
+				args[i] = n
+			case 'f':
+				f, err := strconv.ParseFloat(m[i+1], 64)
+				if err != nil {
+					good = false
+				}
+				args[i] = f
+			case 'q':
+				s, err := strconv.Unquote(m[i+1])
+				if err != nil {
+					good = false
+				}
+				args[i] = s
+			default:
+				args[i] = m[i+1]
+			}
+		}
+		if good {
+			return fmt.Sprintf(translated, args...)
+		}
+	}
+	return msg
 }

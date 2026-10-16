@@ -1,17 +1,17 @@
 {{define "content"}}
-<h1>Search</h1>
+<h1>{{.T "Search"}}</h1>
 <form method="get" action="/search">
   <label>
-    <span>Registration, chassis number{{if .Session.Scope.Role.SeesCustomerPersonalData}} or a name{{end}}</span>
+    <span>{{if .Session.Scope.Role.SeesCustomerPersonalData}}{{.T "Registration, chassis number or a name"}}{{else}}{{.T "Registration, chassis number"}}{{end}}</span>
     <input name="q" value="{{.Query}}" autocapitalize="characters" autocorrect="off"
            spellcheck="false" autofocus>
   </label>
-  <button type="submit">Look</button>
+  <button type="submit">{{.T "Look"}}</button>
 </form>
 
 {{if .Query}}
   {{if not .Results}}
-    <p class="empty">Nothing matched “{{.Query}}”.</p>
+    <p class="empty">{{.T "Nothing matched “%s”." .Query}}</p>
   {{else}}
     {{range .Results}}
     <a class="card" href="/vehicles/{{.VehicleID}}">

@@ -3,6 +3,7 @@
   "private": true,
   "description": "Browser tests: a real browser against a real server and an empty database. Run with deploy/browser-test.sh.",
   "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
     "@playwright/test": "1.63.0"
   }
 }

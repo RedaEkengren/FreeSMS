@@ -85,7 +85,22 @@
       });
       if (window.htmx) window.htmx.process(old);
       old.dispatchEvent(new CustomEvent("freesms:refreshed", { bubbles: true }));
+      announce();
     });
+  }
+
+  // Part of the page changed by itself. Somebody who cannot see it change is
+  // told that it did, once per burst, in the page's own language.
+  var announced = null;
+  function announce() {
+    var held = document.getElementById("held");
+    var live = document.getElementById("announce");
+    if (!held || !live) return;
+    var said = held.getAttribute("data-updated");
+    if (!said) return;
+    window.clearTimeout(announced);
+    live.textContent = "";
+    announced = window.setTimeout(function () { live.textContent = said; }, 100);
   }
 
   function refresh() {
