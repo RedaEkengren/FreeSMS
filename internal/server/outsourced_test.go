@@ -60,6 +60,9 @@ func TestWorkAtASupplierThroughThePages(t *testing.T) {
 		t.Errorf("the counter's list does not show the overdue item: %s", list)
 	}
 
+	if _, cal := page(t, desk, base+"/calendar"); !strings.Contains(cal, "Away at suppliers") || !strings.Contains(cal, "Turbo-Verkstan") || !strings.Contains(cal, "overdue") {
+		t.Error("the planning view does not show the overdue item at the supplier")
+	}
 	_, tb := page(t, tech, job+"/outsourced")
 	if !strings.Contains(tb, "Turbocharger") || !strings.Contains(tb, "at the supplier") {
 		t.Error("the technician cannot see where the part is")

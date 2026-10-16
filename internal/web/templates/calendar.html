@@ -21,6 +21,14 @@
 </ul>
 {{end}}
 
+{{if .Away}}
+<h2>{{$.T "Away at suppliers"}}</h2>
+<ul class="lines">
+  {{range .Away}}<li><div class="row"><a href="/jobs/{{.JobID}}/outsourced">#{{.JobNumber}} {{.Plate}} &middot; {{.Supplier}}: {{.Item}}{{if eq .ItemKind "vehicle"}} ({{$.T "the car itself"}}){{end}}</a>
+    <span class="waiting">{{if .ExpectedBack}}{{$.T "Expected back"}} {{$.Date ($.Local .ExpectedBack) "Mon 2 Jan"}}{{end}}{{if .Overdue}} <span class="tag late">{{$.T "overdue"}}</span>{{end}}</span></div></li>{{end}}
+</ul>
+{{end}}
+
 {{/* What a block's colour means, said once. Red is not used: on this
      system red is urgency and nothing else. */}}
 <p class="legend">

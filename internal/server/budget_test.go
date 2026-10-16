@@ -52,7 +52,7 @@ var queryBudgets = map[string]int{
 	"desk GET /receivables": 17,
 	"desk GET /parts":       11,
 	"desk GET /stock":       26,
-	"desk GET /calendar":    34, // #113: open jobs drawn from their plans, one read in its own scope
+	"desk GET /calendar":    39, // #113: open jobs drawn from their plans, one read in its own scope; #128 (34 to 39): what is away at a supplier, which the page reads in its own scope and the header count reads again for the queue
 	// 15: the bookings whose message did not reach the customer, one read in its
 	// own scope, for the counter and the owner. 16: work due back from a
 	// supplier and supplier invoices nobody handed on (#128), one read in its

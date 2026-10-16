@@ -50,6 +50,20 @@ func (s *Server) handleCalendar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	bookings = workshop.PlannedBlocks(planned, bookings)
+	// Work at a supplier is not on the calendar's days, but a promise that
+	// matters to what can be planned: what is out, and what is late.
+	var away []workshop.Outsourced
+	if session.Scope.Role.SeesParts() {
+		open, err := workshop.OutsourcedOpen(r.Context(), s.pool, session.Scope)
+		if s.handoverError(w, r, err) {
+			return
+		}
+		for _, o := range open {
+			if o.Away() {
+				away = append(away, o)
+			}
+		}
+	}
 	var found []workshop.Booking
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if q != "" {
@@ -81,6 +95,7 @@ func (s *Server) handleCalendar(w http.ResponseWriter, r *http.Request) {
 			Searched:  q != "",
 			Lifts:     capacity.Lifts,
 			Reasons:   workshop.AbsenceReasons,
+			Away:      away,
 		},
 	})
 }
@@ -97,6 +112,7 @@ type plannerPage struct {
 	Query      string
 	Found      []workshop.Booking
 	Searched   bool
+	Away       []workshop.Outsourced
 }
 
 // bookingForm reads a booking as the counter types it: a day, a start, a
