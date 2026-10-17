@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -483,9 +484,31 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 		return
 	}
 
+	translateErasedName(buf, data.printer)
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	_, _ = buf.WriteTo(w)
+}
+
+// translateErasedName puts the reader's language on the name an erased person
+// was replaced with. The database holds one English sentence, because it is
+// data and a row has no language; the sentence is found in the finished page
+// instead of at the eighty places a name is printed, where the next template
+// to be written would forget it. A form field is left alone: a value that is
+// posted back must be what is stored, not its translation.
+func translateErasedName(buf *bytes.Buffer, p *i18n.Printer) {
+	stored := template.HTMLEscapeString(workshop.ErasedName)
+	shown := template.HTMLEscapeString(p.T(workshop.ErasedName))
+	if shown == stored || !bytes.Contains(buf.Bytes(), []byte(stored)) {
+		return
+	}
+	const guard = "\x00"
+	out := bytes.ReplaceAll(buf.Bytes(), []byte(`value="`+stored), []byte(`value="`+guard))
+	out = bytes.ReplaceAll(out, []byte(stored), []byte(shown))
+	out = bytes.ReplaceAll(out, []byte(`value="`+guard), []byte(`value="`+stored))
+	buf.Reset()
+	buf.Write(out)
 }
 
 // renderPartial writes one named block, for htmx to swap in.
@@ -509,6 +532,7 @@ func (s *Server) renderPartial(w http.ResponseWriter, r *http.Request, page, blo
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	translateErasedName(buf, data.printer)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = buf.WriteTo(w)
 }

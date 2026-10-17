@@ -61,6 +61,14 @@ test('a customer is given a copy, then erased, and the invoice keeps the name it
   await form.getByRole('button', { name: 'Erase' }).click();
   await expect(page).toHaveURL(new RegExp('^' + card.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   await expect(form.locator('input[type=checkbox]')).toBeVisible();
+  // The browser's own box is not the only door: a post without the acknowledgement is refused too.
+  const origin = { Origin: new URL(page.url()).origin };
+  const unconfirmed = await page.request.post(`/people/${personID}/erase`, { form: { reason: 'utan kryss' }, headers: origin });
+  expect(unconfirmed.status()).toBe(400);
+  await page.reload();
+  await expect(page.getByText('erased').first()).toHaveCount(0);
+  await page.locator('details', { hasText: 'Erase this person' }).locator('summary').click();
+  await form.locator('input[name=reason]').fill('Begäran via e-post');
   await form.locator('input[type=checkbox]').check();
   await form.getByRole('button', { name: 'Erase' }).click();
 
@@ -87,11 +95,11 @@ test('a customer is given a copy, then erased, and the invoice keeps the name it
   // Not twice, and not from the shop floor.
   // A bare POST is refused for its origin whatever the role, so say where it comes from.
   const from = { Origin: new URL(page.url()).origin };
-  const again = await page.request.post(`/people/${personID}/erase`, { form: { reason: 'igen' }, headers: from });
+  const again = await page.request.post(`/people/${personID}/erase`, { form: { reason: 'igen', confirm: 'yes' }, headers: from });
   expect(again.status()).toBe(400);
   await signOut(page);
   await signIn(page, tech);
-  expect((await page.request.post(`/people/${personID}/erase`, { form: { reason: 'tekniker' }, headers: from })).status()).toBe(403);
+  expect((await page.request.post(`/people/${personID}/erase`, { form: { reason: 'tekniker', confirm: 'yes' }, headers: from })).status()).toBe(403);
   expect((await page.request.get(href)).status()).toBe(403);
   await signOut(page);
   await signIn(page, owner);

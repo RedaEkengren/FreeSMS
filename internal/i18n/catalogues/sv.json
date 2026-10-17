@@ -4750,6 +4750,15 @@
     "Something went wrong. Try again.": {
       "other": "Något gick fel. Försök igen."
     },
+    "Erased at the person's request": {
+      "other": "Raderad på personens begäran"
+    },
+    "Not erased": {
+      "other": "Inte raderad"
+    },
+    "Tick the box to say you understand it cannot be undone.": {
+      "other": "Kryssa i rutan för att säga att du förstår att det inte går att ångra."
+    },
     "this person has already been erased": {
       "other": "den här personen har redan raderats"
     },

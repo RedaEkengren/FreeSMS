@@ -39,6 +39,12 @@ func (s *Server) handleErasePerson(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	id := r.PathValue("id")
 
+	// The checkbox is `required` in the browser, which stops a person and
+	// nothing else: a script, or a form posted by hand, never meets it.
+	if r.FormValue("confirm") != "yes" {
+		s.renderError(w, r, http.StatusBadRequest, "Not erased", "Tick the box to say you understand it cannot be undone.")
+		return
+	}
 	if err := workshop.ErasePerson(r.Context(), s.pool, session.Scope, id, r.FormValue("reason")); s.handoverError(w, r, err) {
 		return
 	}

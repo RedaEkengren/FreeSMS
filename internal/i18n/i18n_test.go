@@ -242,3 +242,20 @@ func TestTheSwedishUsesOneWordForEachTerm(t *testing.T) {
 		}
 	}
 }
+
+// A key that is an identifier -- an event's name stored as it was written --
+// would be shown to an English reader as the identifier, because English is
+// the fallback and the key is its text. Each needs an English message of its
+// own; nothing else catches one, since the Swedish for it is complete.
+func TestAnIdentifierKeyReadsAsEnglishToAnEnglishReader(t *testing.T) {
+	c := load(t, false)
+	en := c.For("en")
+	for key := range c.Messages("sv") {
+		if !strings.Contains(key, "_") || strings.Contains(key, " ") {
+			continue
+		}
+		if got := en.T(key); got == key || strings.Contains(got, "_") {
+			t.Errorf("%q reads as %q to an English reader; add it to en.json", key, got)
+		}
+	}
+}

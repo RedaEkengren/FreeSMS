@@ -164,3 +164,33 @@ test('a refusal is announced, and says what is wrong in the language of the read
   }
   await signOut(page);
 });
+
+// The customer card has a section that is shut by default -- erasing a person --
+// and a closed <details> is skipped by the scan, so it is opened first.
+test('the customer card, with its personal-data section open, has no violations in either language', async ({ page }) => {
+  await signIn(page, desk);
+  await page.goto('/customers');
+  // Not every card has the section: a company has no person to erase, and a person already erased has nothing left to.
+  const links = await page.locator('a[href^="/customers/"]').evaluateAll(els => els.map(e => e.getAttribute('href') as string));
+  let card = '';
+  for (const href of [...new Set(links)]) {
+    await page.goto(href);
+    if (await page.locator('form[action$="/erase"]').count() === 1) { card = href; break; }
+  }
+  expect(card, 'no customer card with an erase form').not.toBe('');
+  const found: string[] = [];
+  for (const locale of ['', 'sv']) {
+    await inLanguage(page, locale);
+    try {
+      await page.goto(card);
+      await expect(page.locator('form[action$="/erase"]')).toHaveCount(1);
+      await page.locator('details').evaluateAll(els => els.forEach(e => ((e as HTMLDetailsElement).open = true)));
+      const r = await new AxeBuilder({ page }).withTags(rules).analyze();
+      for (const v of r.violations) found.push(`${locale || 'en'}: ${v.id} (${v.impact}) ${v.nodes[0]?.html.slice(0, 100)}`);
+    } finally {
+      await inLanguage(page, '');
+    }
+  }
+  expect(found, found.join('\n')).toEqual([]);
+  await signOut(page);
+});

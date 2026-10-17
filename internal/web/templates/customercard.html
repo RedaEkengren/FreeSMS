@@ -79,7 +79,7 @@
   <form class="mt-m" method="post" action="/people/{{.PersonID}}/erase">
     <p class="waiting">{{$.T "Name, telephone, email and address are cleared and cannot be brought back. Issued invoices keep the name they went out with, because bookkeeping law requires them for seven years."}}</p>
     <label><span>{{$.T "Why, if it is worth saying"}}</span><input name="reason" maxlength="300"></label>
-    <label class="tick"><input type="checkbox" required><span>{{$.T "I understand this cannot be undone"}}</span></label>
+    <label class="tick"><input type="checkbox" name="confirm" value="yes" required><span>{{$.T "I understand this cannot be undone"}}</span></label>
     <button type="submit" class="secondary">{{$.T "Erase"}}</button>
   </form>
 </details>

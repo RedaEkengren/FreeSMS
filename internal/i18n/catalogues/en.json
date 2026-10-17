@@ -153,6 +153,15 @@
     "%d booking": {
       "one": "%d booking",
       "other": "%d bookings"
+    },
+    "confirmed_by_hand": {
+      "other": "confirmed by hand"
+    },
+    "contact_corrected": {
+      "other": "contact details corrected"
+    },
+    "no_show": {
+      "other": "did not come"
     }
   }
 }

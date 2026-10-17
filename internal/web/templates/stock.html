@@ -27,7 +27,7 @@
   <div class="row">
     <a href="/stock/parts/{{.ID}}">{{.Number}} &middot; {{.Name}}</a>
     <span class="tag{{if .Negative}} late{{else if .Short}} warranty{{end}}">
-      {{.OnHand}} {{.Unit}}
+      {{.OnHand}} {{$.T .Unit}}
     </span>
   </div>
   <div class="waiting">{{$.Dot ($.T .ReservedNote .Reserved .Available) .Location ($.MoneyOrBlank .PriceMinor)}}</div>

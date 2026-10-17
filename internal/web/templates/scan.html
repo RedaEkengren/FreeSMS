@@ -20,7 +20,7 @@
   <div class="row">
     <span>{{.Part.Number}} &middot; {{.Part.Name}}</span>
     <span class="tag{{if .Part.Negative}} late{{else if .Part.Short}} warranty{{end}}">
-      {{.Part.OnHand}} {{.Part.Unit}}
+      {{.Part.OnHand}} {{$.T .Part.Unit}}
     </span>
   </div>
   <div class="waiting">
