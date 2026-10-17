@@ -1317,10 +1317,13 @@
             <div class="an-fade" data-t="0,8">
               <div class="wf-h">{{t "This is what will be sent:"}}</div>
               <div class="cl-qrow"><span>The workshop: your booking is confirmed for 2026-11-03 09:00 (Inspection service).</span><span></span></div>
+              <div class="cl-qrow"><span>Kör in på gården och ring på klockan.</span><span></span></div>
+              <div class="cl-qrow"><span>{{t "Replies to this are not read."}}</span><span></span></div>
               <span class="an-btn mo-btn an-fade" data-t="5">{{t "Queue it"}}</span>
             </div>            <div class="an-fade" data-t="8,16">
               <div class="wf-h">{{t "Tell the customer"}}</div>
               <div class="cl-qrow"><span>{{t "A reminder about your booking"}}</span><span class="rd-tag">{{t "queued"}}</span></div>
+              <span class="an-btn mo-btn an-fade" data-t="9,12">{{t "Move it"}}</span>
               <div class="cl-qrow an-fade" data-t="12"><span>The booking was moved before this went; nothing was sent.</span><span class="rd-tag rd-risk">{{t "cancelled"}}</span></div>
             </div>            <div class="an-fade" data-t="16">
               <div class="wf-h">{{t "Told another way"}}</div>
@@ -1352,12 +1355,13 @@
             <div class="an-fade" data-t="0,8">
               <div class="wf-h">{{t "What was reported"}}</div>
               <div class="cl-qrow"><span>Squeals again at low speed</span><span class="rd-tag">{{t "reported"}}</span></div>
+              <div class="cl-qrow"><span>{{t "A claim can be filed once the case is called warranty."}}</span><span></span></div>
             </div>            <div class="an-fade" data-t="8,16">
               <div class="wf-h">{{t "Where the shop stands"}}</div>
               <div class="cl-qrow"><span>The pad let go of its backing</span><span class="rd-tag pass">{{t "warranty"}}</span></div>
             </div>            <div class="an-fade" data-t="16">
               <div class="wf-h">{{t "Claims on suppliers"}}</div>
-              <div class="cl-qrow"><span>Bromsgrossen &middot; 900</span><span class="rd-tag rd-risk">{{t "claim rejected"}}</span></div>
+              <div class="cl-qrow"><span>Bromsgrossen &middot; 900 &middot; Wear, they say</span><span class="rd-tag rd-risk">{{t "claim rejected"}}</span></div>
               <div class="cl-qrow an-fade" data-t="20"><span>Bromsgrossen &middot; 600</span><span class="rd-tag pass">{{t "claim accepted"}}</span></div>
             </div>
           </div>
@@ -1457,14 +1461,17 @@
           <div class="fm-stack ml-stack">
             <div class="an-fade" data-t="0,8">
               <div class="wf-h">{{t "Your company details"}}</div>
+              <div class="cl-qrow"><span>{{t "%s of %s needed things are done" "3" "5"}}</span><span></span></div>
               <div class="cl-qrow"><span>{{t "address"}}, {{t "company number"}}</span><span class="rd-tag rd-risk">{{t "to do"}}</span></div>
               <div class="cl-qrow"><span>{{t "Who owns the backups"}}</span><span class="rd-tag rd-risk">{{t "to do"}}</span></div>
             </div>            <div class="an-fade" data-t="8,16">
               <div class="wf-h">{{t "Look at the invoice"}}</div>
               <div class="cl-qrow"><span>EXAMPLE-0 · Verkstadsgatan 1 · 556677-8899</span><span class="rd-tag warranty">{{t "Example"}}</span></div>
               <div class="cl-qrow"><span>{{t "Your company details"}}</span><span class="rd-tag pass">{{t "done"}}</span></div>
+              <span class="an-btn mo-btn an-fade" data-t="12">{{t "The invoice looks right"}}</span>
             </div>            <div class="an-fade" data-t="16">
               <div class="wf-h">{{t "Who owns the backups"}}</div>
+              <div class="cl-qrow"><span>{{t "%s of %s needed things are done" "5" "5"}}</span><span></span></div>
               <div class="cl-qrow"><span>Olle Ägare, 070-111 22 33</span><span class="rd-tag pass">{{t "done"}}</span></div>
               <div class="cl-qrow an-fade" data-t="20"><span>{{t "Ready for the first customer"}}</span><span class="rd-tag pass">&#10003;</span></div>
             </div>

@@ -71,15 +71,23 @@ test.describe.serial('the wifi scene', () => {
       await expect(card).toContainText('1 sak upptäckt, inte prissatt');
       expect(await board.evaluate(() => (window as any).__notReloaded)).toBe(true);
     } finally {
-      // The rest of the suite reads English.
-      await readIn(board, '').catch(() => {});
-      await deskCtx.close();
-      await shopLanguage(browser, 'en');
-      await context.setOffline(false);
-      await readIn(phone, '');
-      await leave(phone);
-      await signIn(phone, tech);
-      await readIn(phone, '');
+      // The rest of the suite reads English. Each step is bounded and its
+      // failure swallowed: this runs after a failure too, with the phone
+      // wherever the failure left it -- on the sign-in page, say, where
+      // there is no language control to wait for. Unbounded, the first
+      // step waits out the whole test timeout and the report is "timeout
+      // in cleanup" instead of the assertion that failed.
+      const tidy = (step: () => Promise<unknown>) =>
+        Promise.race([step(), new Promise(r => setTimeout(r, 8_000))]).catch(() => {});
+      await tidy(() => readIn(board, ''));
+      await tidy(() => deskCtx.close());
+      await tidy(() => shopLanguage(browser, 'en'));
+      await tidy(() => context.setOffline(false));
+      await tidy(async () => {
+        if (!/\/login/.test(phone.url())) await leave(phone);
+        await signIn(phone, tech);
+        await readIn(phone, '');
+      });
     }
   });
 });
