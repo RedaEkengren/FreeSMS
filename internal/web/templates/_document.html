@@ -35,6 +35,7 @@
   {{if .CustomerAddress}}<div class="waiting">{{.CustomerAddress}}</div>{{end}}
   {{if .CustomerOrgNumber}}<div class="waiting">{{$.T "Company number"}} {{.CustomerOrgNumber}}</div>{{end}}
   {{if .CustomerVATNumber}}<div class="waiting">{{$.T "VAT number"}} {{.CustomerVATNumber}}</div>{{end}}
+  {{if .CustomerReference}}<div class="waiting">{{$.T "Your reference"}} {{.CustomerReference}}</div>{{end}}
   {{if .Registration}}<div class="waiting">{{$.T "Vehicle"}} {{.Registration}}</div>{{end}}
 
   <h2>{{$.T "Lines"}}</h2>

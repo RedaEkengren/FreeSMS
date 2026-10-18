@@ -161,8 +161,13 @@ type ShopDetails struct {
 	PaymentReference string
 	PaymentTermsDays int
 	FTax             bool
-	Locale           string
-	Currency         string
+	// The shop's address on the Peppol network, and what its payment
+	// reference is (bankgiro, plusgiro or iban). Both are kept for the day an
+	// invoice is sent electronically; blank is allowed.
+	EndpointID    string
+	PaymentScheme string
+	Locale        string
+	Currency      string
 }
 
 // ShopDetailsFor returns the shop's own particulars.
@@ -175,15 +180,16 @@ func ShopDetailsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope)
 		return ShopDetails{}, access.ErrForbidden
 	}
 	var d ShopDetails
-	var line1, line2, postal, city, org, vat, phone, email, ref *string
+	var line1, line2, postal, city, org, vat, phone, email, ref, endpoint, scheme *string
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `
 			SELECT name, address_line1, address_line2, postal_code, city,
 			       org_number, vat_number, phone, email,
-			       payment_reference, payment_terms_days, f_tax, locale, currency
+			       payment_reference, payment_terms_days, f_tax, locale, currency,
+			       endpoint_id, payment_scheme
 			FROM shops WHERE id = $1`, scope.ShopID).
 			Scan(&d.Name, &line1, &line2, &postal, &city, &org, &vat, &phone, &email,
-				&ref, &d.PaymentTermsDays, &d.FTax, &d.Locale, &d.Currency)
+				&ref, &d.PaymentTermsDays, &d.FTax, &d.Locale, &d.Currency, &endpoint, &scheme)
 	})
 	if err != nil {
 		return ShopDetails{}, fmt.Errorf("read shop details: %w", err)
@@ -192,6 +198,7 @@ func ShopDetailsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope)
 	d.PostalCode, d.City = deref(postal), deref(city)
 	d.OrgNumber, d.VATNumber = deref(org), deref(vat)
 	d.Phone, d.Email, d.PaymentReference = deref(phone), deref(email), deref(ref)
+	d.EndpointID, d.PaymentScheme = deref(endpoint), deref(scheme)
 	d.Currency = strings.TrimSpace(d.Currency)
 	return d, nil
 }
@@ -211,6 +218,11 @@ func SaveDetails(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d 
 	if d.PaymentTermsDays < 0 {
 		return fmt.Errorf("%w: payment terms cannot be negative", ErrInvalid)
 	}
+	switch d.PaymentScheme = strings.TrimSpace(d.PaymentScheme); d.PaymentScheme {
+	case "", "bankgiro", "plusgiro", "iban":
+	default:
+		return fmt.Errorf("%w: the payment reference is a bankgiro, a plusgiro or an iban", ErrInvalid)
+	}
 	// Blank keeps the language the shop has: a form that does not carry the
 	// field has not asked for English.
 	if d.Locale = strings.TrimSpace(d.Locale); d.Locale != "" {
@@ -228,14 +240,16 @@ func SaveDetails(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d 
 			  phone = nullif($9,''), email = nullif($10,''),
 			  payment_reference = nullif($11,''),
 			  payment_terms_days = $12, f_tax = $13,
-			  locale = coalesce(nullif($14, ''), locale)
+			  locale = coalesce(nullif($14, ''), locale),
+			  endpoint_id = nullif($15,''), payment_scheme = nullif($16,'')
 			WHERE id = $1`,
 			scope.ShopID, strings.TrimSpace(d.Name),
 			strings.TrimSpace(d.AddressLine1), strings.TrimSpace(d.AddressLine2),
 			strings.TrimSpace(d.PostalCode), strings.TrimSpace(d.City),
 			strings.TrimSpace(d.OrgNumber), strings.TrimSpace(d.VATNumber),
 			strings.TrimSpace(d.Phone), strings.TrimSpace(d.Email),
-			strings.TrimSpace(d.PaymentReference), d.PaymentTermsDays, d.FTax, d.Locale)
+			strings.TrimSpace(d.PaymentReference), d.PaymentTermsDays, d.FTax, d.Locale,
+			strings.TrimSpace(d.EndpointID), d.PaymentScheme)
 		if err != nil {
 			return fmt.Errorf("save shop details: %w", err)
 		}

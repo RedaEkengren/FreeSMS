@@ -121,6 +121,8 @@ func (s *Server) handleSaveShop(w http.ResponseWriter, r *http.Request) {
 		PaymentTermsDays: terms,
 		FTax:             r.FormValue("f_tax") == "yes",
 		Locale:           r.FormValue("locale"),
+		EndpointID:       r.FormValue("endpoint_id"),
+		PaymentScheme:    r.FormValue("payment_scheme"),
 	}
 
 	err := workshop.SaveDetails(r.Context(), s.pool, session.Scope, details)

@@ -46,6 +46,7 @@ func (s *Server) handleEditCustomer(w http.ResponseWriter, r *http.Request) {
 		Phone: r.FormValue("phone"), Email: r.FormValue("email"),
 		AddressLine1: r.FormValue("address_line1"), AddressLine2: r.FormValue("address_line2"),
 		PostalCode: r.FormValue("postal_code"), City: r.FormValue("city"),
+		Country: r.FormValue("country"), EndpointID: r.FormValue("endpoint_id"), BuyerReference: r.FormValue("buyer_reference"),
 		Reason: r.FormValue("reason"),
 	})
 	if s.handoverError(w, r, err) {

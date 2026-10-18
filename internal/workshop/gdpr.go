@@ -67,6 +67,10 @@ type ExportedAddress struct {
 	PostalCode string `json:"postal_code,omitempty"`
 	City       string `json:"city,omitempty"`
 	Country    string `json:"country,omitempty"`
+	// Where they receive electronic invoices, and the reference they asked
+	// to have printed: held about them, so part of what they are given.
+	EndpointID string `json:"electronic_invoice_address,omitempty"`
+	Reference  string `json:"invoice_reference,omitempty"`
 }
 
 type ExportedVehicle struct {
@@ -135,14 +139,15 @@ func ExportPerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 
 		addrs, err := tx.Query(ctx, `
 			SELECT coalesce(address_line1,''), coalesce(address_line2,''),
-			       coalesce(postal_code,''), coalesce(city,''), coalesce(country,'')
+			       coalesce(postal_code,''), coalesce(city,''), coalesce(country,''),
+			       coalesce(endpoint_id,''), coalesce(buyer_reference,'')
 			FROM customers WHERE person_id = $1`, personID)
 		if err != nil {
 			return fmt.Errorf("read addresses: %w", err)
 		}
 		for addrs.Next() {
 			var a ExportedAddress
-			if err := addrs.Scan(&a.Line1, &a.Line2, &a.PostalCode, &a.City, &a.Country); err != nil {
+			if err := addrs.Scan(&a.Line1, &a.Line2, &a.PostalCode, &a.City, &a.Country, &a.EndpointID, &a.Reference); err != nil {
 				addrs.Close()
 				return err
 			}
@@ -329,7 +334,8 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE customers SET address_line1 = NULL, address_line2 = NULL,
-			                     postal_code = NULL, city = NULL, updated_at = now()
+			                     postal_code = NULL, city = NULL, country = NULL,
+			                     endpoint_id = NULL, buyer_reference = NULL, updated_at = now()
 			WHERE person_id = $1`, personID); err != nil {
 			return fmt.Errorf("clear addresses: %w", err)
 		}

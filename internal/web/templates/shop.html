@@ -39,6 +39,19 @@
     <label><span>{{.T "Payment terms, days"}}</span><input name="payment_terms_days" value="{{.Shop.PaymentTermsDays}}" inputmode="numeric"></label>
   </div>
 
+  {{/* For sending invoices electronically, which nothing here does yet. They
+       are kept now because an invoice cannot be given them afterwards. */}}
+  <div class="pair">
+    <label><span>{{.T "What the payment details are"}}</span>
+      <select name="payment_scheme">
+        <option value="" {{if eq .Shop.PaymentScheme ""}}selected{{end}}>{{.T "Not stated"}}</option>
+        <option value="bankgiro" {{if eq .Shop.PaymentScheme "bankgiro"}}selected{{end}}>{{.T "Bankgiro"}}</option>
+        <option value="plusgiro" {{if eq .Shop.PaymentScheme "plusgiro"}}selected{{end}}>{{.T "Plusgiro"}}</option>
+        <option value="iban" {{if eq .Shop.PaymentScheme "iban"}}selected{{end}}>{{.T "IBAN"}}</option>
+      </select></label>
+    <label><span>{{.T "Electronic invoice address"}}</span><input name="endpoint_id" value="{{.Shop.EndpointID}}" placeholder="0007:5566778899"></label>
+  </div>
+
   <label class="tick">
     <input type="checkbox" name="f_tax" value="yes" {{if .Shop.FTax}}checked{{end}}>
     <span>{{.T "Approved for F-tax"}}</span>

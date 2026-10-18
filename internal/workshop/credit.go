@@ -99,6 +99,7 @@ type creditPlan struct {
 	address    *string
 	orgNumber  *string
 	vatNumber  *string
+	buyer      Buyer
 	lines      []invoiceLine
 	left       int64 // gross still creditable
 	grossBack  int64 // gross this request credits, positive
@@ -119,7 +120,9 @@ func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRe
 	var p creditPlan
 	q := `SELECT id, series, number, work_order_id, credit_of_id IS NOT NULL, customer_name,
 	             customer_address, customer_org_number, customer_vat_number,
-	             net_minor, vat_minor, gross_minor
+	             net_minor, vat_minor, gross_minor,
+	             customer_postal_code, customer_city, customer_country,
+	             customer_endpoint_id, customer_reference
 	      FROM invoices WHERE id = $1`
 	if lock {
 		// The lock first, then the question: two corrections of one invoice
@@ -129,7 +132,8 @@ func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRe
 	var isCredit bool
 	err := tx.QueryRow(ctx, q, invoiceID).Scan(&p.original.ID, &p.original.Series, &p.original.Number, &p.original.WorkOrderID,
 		&isCredit, &p.original.CustomerName, &p.address, &p.orgNumber, &p.vatNumber,
-		&p.original.NetMinor, &p.original.VATMinor, &p.original.GrossMinor)
+		&p.original.NetMinor, &p.original.VATMinor, &p.original.GrossMinor,
+		&p.buyer.PostalCode, &p.buyer.City, &p.buyer.Country, &p.buyer.EndpointID, &p.buyer.Reference)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return p, ErrNotFound
 	}
@@ -163,12 +167,14 @@ func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRe
 		net, vat                 int64
 		creditedQty, creditedNet int64
 		creditedVAT              int64
+		unitCode                 string
 	}
 	rows, err := tx.Query(ctx, `
 		SELECT l.id::text, l.position, l.kind, l.description, (l.quantity * 1000)::bigint, l.unit_price_minor, l.vat_rate_bp, l.net_minor, l.vat_minor,
 		       coalesce((SELECT -sum((c.quantity * 1000)::bigint) FROM invoice_lines c WHERE c.credits_line_id = l.id), 0),
 		       coalesce((SELECT -sum(c.net_minor) FROM invoice_lines c WHERE c.credits_line_id = l.id), 0),
-		       coalesce((SELECT -sum(c.vat_minor) FROM invoice_lines c WHERE c.credits_line_id = l.id), 0)
+		       coalesce((SELECT -sum(c.vat_minor) FROM invoice_lines c WHERE c.credits_line_id = l.id), 0),
+		       coalesce(l.unit_code, '')
 		FROM invoice_lines l WHERE l.invoice_id = $1 ORDER BY l.position`, invoiceID)
 	if err != nil {
 		return p, fmt.Errorf("read invoice lines: %w", err)
@@ -177,7 +183,7 @@ func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRe
 	byPos := map[int]*orig{}
 	for rows.Next() {
 		var o orig
-		if err := rows.Scan(&o.id, &o.position, &o.kind, &o.description, &o.qty, &o.unit, &o.rate, &o.net, &o.vat, &o.creditedQty, &o.creditedNet, &o.creditedVAT); err != nil {
+		if err := rows.Scan(&o.id, &o.position, &o.kind, &o.description, &o.qty, &o.unit, &o.rate, &o.net, &o.vat, &o.creditedQty, &o.creditedNet, &o.creditedVAT, &o.unitCode); err != nil {
 			rows.Close()
 			return p, fmt.Errorf("scan invoice line: %w", err)
 		}
@@ -235,7 +241,7 @@ func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRe
 		}
 		p.lines = append(p.lines, invoiceLine{
 			Kind: o.kind, Description: o.description, QuantityMilli: -qty, UnitPriceMinor: o.unit, VATRateBasis: o.rate,
-			NetMinor: -net, VATMinor: -vat, CreditsLineID: o.id,
+			NetMinor: -net, VATMinor: -vat, CreditsLineID: o.id, UnitCode: o.unitCode,
 		})
 	}
 	for _, a := range req.Adjustments {
@@ -252,7 +258,7 @@ func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRe
 		vat := money.VAT(a.NetMinor, a.VATRateBasis)
 		p.lines = append(p.lines, invoiceLine{
 			Kind: "fee", Description: desc, QuantityMilli: -1000, UnitPriceMinor: a.NetMinor, VATRateBasis: a.VATRateBasis,
-			NetMinor: -a.NetMinor, VATMinor: -vat,
+			NetMinor: -a.NetMinor, VATMinor: -vat, UnitCode: "C62",
 		})
 	}
 	if len(p.lines) == 0 {
@@ -415,17 +421,20 @@ func IssueCredit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in
 			   seller_name, seller_address, seller_org_number, seller_vat_number,
 			   seller_phone, seller_email, seller_payment_reference,
 			   seller_payment_terms_days, seller_f_tax,
-			   net_minor, vat_minor, gross_minor)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+			   net_minor, vat_minor, gross_minor,
+			   ` + electronicColumns + `)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
+			        $23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33)
 			RETURNING id, issued_at`
-		if err := tx.QueryRow(ctx, insert,
+		args := append([]any{
 			scope.ShopID, p.original.Series, number, p.original.WorkOrderID, p.original.ID, scope.UserID,
 			p.original.CustomerName, p.address, p.orgNumber, p.vatNumber,
 			sold.Name, sold.Address, sold.OrgNumber, sold.VATNumber,
 			sold.Phone, sold.Email, sold.PaymentReference,
 			sold.PaymentTermsDays, sold.FTax,
-			net, vat, net+vat,
-		).Scan(&note.ID, &note.IssuedAt); err != nil {
+			net, vat, net + vat,
+		}, electronicArgs(sold, p.buyer)...)
+		if err := tx.QueryRow(ctx, insert, args...).Scan(&note.ID, &note.IssuedAt); err != nil {
 			return fmt.Errorf("write credit note: %w", err)
 		}
 		for i := range p.lines {
@@ -525,13 +534,16 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 		}
 
 		var name, address, org, vat *string
+		var buyer Buyer
 		var customerID string
 		if err := tx.QueryRow(ctx, `
 			SELECT c.id::text, coalesce(CASE WHEN c.kind = 'company' THEN c.company_name END, p.display_name),
 			       nullif(concat_ws(', ', c.address_line1, c.address_line2, concat_ws(' ', c.postal_code, c.city)), ''),
-			       c.org_number, c.vat_number
+			       c.org_number, c.vat_number,
+			       c.postal_code, c.city, c.country, c.endpoint_id, c.buyer_reference
 			FROM customers c LEFT JOIN people p ON p.id = c.person_id
-			WHERE c.id = $1 AND c.merged_into IS NULL`, req.CustomerID).Scan(&customerID, &name, &address, &org, &vat); err != nil {
+			WHERE c.id = $1 AND c.merged_into IS NULL`, req.CustomerID).Scan(&customerID, &name, &address, &org, &vat,
+			&buyer.PostalCode, &buyer.City, &buyer.Country, &buyer.EndpointID, &buyer.Reference); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrNotFound
 			}
@@ -554,7 +566,8 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 		}
 
 		rows, err := tx.Query(ctx, `
-			SELECT position, kind, description, (quantity * 1000)::bigint, unit_price_minor, vat_rate_bp, net_minor, vat_minor
+			SELECT position, kind, description, (quantity * 1000)::bigint, unit_price_minor, vat_rate_bp, net_minor, vat_minor,
+			       coalesce(unit_code, '')
 			FROM invoice_lines WHERE invoice_id = $1 AND credits_line_id IS NULL ORDER BY position`, invoiceID)
 		if err != nil {
 			return fmt.Errorf("read lines: %w", err)
@@ -562,7 +575,7 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 		var lines []invoiceLine
 		for rows.Next() {
 			var l invoiceLine
-			if err := rows.Scan(&l.Position, &l.Kind, &l.Description, &l.QuantityMilli, &l.UnitPriceMinor, &l.VATRateBasis, &l.NetMinor, &l.VATMinor); err != nil {
+			if err := rows.Scan(&l.Position, &l.Kind, &l.Description, &l.QuantityMilli, &l.UnitPriceMinor, &l.VATRateBasis, &l.NetMinor, &l.VATMinor, &l.UnitCode); err != nil {
 				rows.Close()
 				return fmt.Errorf("scan line: %w", err)
 			}
@@ -587,16 +600,20 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 			   seller_name, seller_address, seller_org_number, seller_vat_number,
 			   seller_phone, seller_email, seller_payment_reference,
 			   seller_payment_terms_days, seller_f_tax,
-			   net_minor, vat_minor, gross_minor)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+			   net_minor, vat_minor, gross_minor,
+			   ` + electronicColumns + `)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
+			        $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)
 			RETURNING id, issued_at`
-		if err := tx.QueryRow(ctx, insert,
+		args := append([]any{
 			scope.ShopID, orig.Series, newNumber, jobID, scope.UserID,
 			*name, address, org, vat,
 			sold.Name, sold.Address, sold.OrgNumber, sold.VATNumber,
 			sold.Phone, sold.Email, sold.PaymentReference,
 			sold.PaymentTermsDays, sold.FTax,
-			orig.NetMinor, orig.VATMinor, orig.GrossMinor).Scan(&out.ID, &out.IssuedAt); err != nil {
+			orig.NetMinor, orig.VATMinor, orig.GrossMinor,
+		}, electronicArgs(sold, buyer)...)
+		if err := tx.QueryRow(ctx, insert, args...).Scan(&out.ID, &out.IssuedAt); err != nil {
 			return fmt.Errorf("write replacement: %w", err)
 		}
 		if err := writeInvoiceLines(ctx, tx, scope.ShopID, out.ID, lines); err != nil {

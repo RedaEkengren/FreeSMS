@@ -144,6 +144,11 @@ type CustomerCard struct {
 	AddressLine2 string
 	PostalCode   string
 	City         string
+	// For an electronic invoice: the country as two letters, where they
+	// receive invoices, and the reference they ask to have printed.
+	Country        string
+	EndpointID     string
+	BuyerReference string
 
 	People   []CustomerPerson
 	Vehicles []OwnedVehicle
@@ -180,11 +185,13 @@ func customerCardTx(ctx context.Context, tx pgx.Tx, id string) (CustomerCard, er
 			c.revision, coalesce(c.person_id::text, ''), coalesce(p.display_name, ''),
 			coalesce(c.address_line1, ''), coalesce(c.address_line2, ''),
 			coalesce(c.postal_code, ''), coalesce(c.city, ''), c.merged_into::text,
-			coalesce(p.erased_at IS NOT NULL, false)
+			coalesce(p.erased_at IS NOT NULL, false),
+			coalesce(c.country, ''), coalesce(c.endpoint_id, ''), coalesce(c.buyer_reference, '')
 		FROM customers c LEFT JOIN people p ON p.id = c.person_id
 		WHERE c.id = $1`, id).Scan(&c.ID, &c.Kind, &c.Name, &c.OrgNumber, &c.VATNumber,
 		&c.Phone, &c.Email, &c.Address, &c.Orders,
-		&c.Revision, &c.PersonID, &c.ContactName, &c.AddressLine1, &c.AddressLine2, &c.PostalCode, &c.City, &merged, &c.Erased)
+		&c.Revision, &c.PersonID, &c.ContactName, &c.AddressLine1, &c.AddressLine2, &c.PostalCode, &c.City, &merged, &c.Erased,
+		&c.Country, &c.EndpointID, &c.BuyerReference)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return c, ErrNotFound
 	}
@@ -369,7 +376,11 @@ type CustomerEdit struct {
 	AddressLine2 string
 	PostalCode   string
 	City         string
-	Reason       string
+	Country      string
+	EndpointID   string
+	// BuyerReference is what the customer asks to have printed on their invoices.
+	BuyerReference string
+	Reason         string
 }
 
 func logChangeTx(ctx context.Context, tx pgx.Tx, scope access.Scope, subject, subjectID, personID, field, oldV, newV, reason string) error {
@@ -418,6 +429,10 @@ func EditCustomer(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 	e.VATNumber = strings.TrimSpace(e.VATNumber)
 	e.AddressLine1, e.AddressLine2 = strings.TrimSpace(e.AddressLine1), strings.TrimSpace(e.AddressLine2)
 	e.PostalCode, e.City = strings.TrimSpace(e.PostalCode), strings.TrimSpace(e.City)
+	e.EndpointID, e.BuyerReference = strings.TrimSpace(e.EndpointID), strings.TrimSpace(e.BuyerReference)
+	if e.Country = strings.ToUpper(strings.TrimSpace(e.Country)); e.Country != "" && !isCountryCode(e.Country) {
+		return nil, fmt.Errorf("%w: write the country as two letters, such as SE", ErrInvalid)
+	}
 
 	var changes []Change
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
@@ -428,11 +443,13 @@ func EditCustomer(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 			SELECT c.kind, c.revision, c.merged_into::text, coalesce(c.person_id::text, ''),
 			       coalesce(c.company_name, ''), coalesce(c.org_number, ''), coalesce(c.vat_number, ''),
 			       coalesce(c.address_line1, ''), coalesce(c.address_line2, ''), coalesce(c.postal_code, ''), coalesce(c.city, ''),
-			       coalesce(p.display_name, ''), coalesce(p.phone, ''), coalesce(p.email, '')
+			       coalesce(p.display_name, ''), coalesce(p.phone, ''), coalesce(p.email, ''),
+			       coalesce(c.country, ''), coalesce(c.endpoint_id, ''), coalesce(c.buyer_reference, '')
 			FROM customers c LEFT JOIN people p ON p.id = c.person_id
 			WHERE c.id = $1 FOR UPDATE OF c`, id).Scan(&cur.Kind, &rev, &merged, &cur.PersonID,
 			&cur.Name, &cur.OrgNumber, &cur.VATNumber, &cur.AddressLine1, &cur.AddressLine2, &cur.PostalCode, &cur.City,
-			&cur.ContactName, &cur.Phone, &cur.Email); err != nil {
+			&cur.ContactName, &cur.Phone, &cur.Email,
+			&cur.Country, &cur.EndpointID, &cur.BuyerReference); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrNotFound
 			}
@@ -459,6 +476,9 @@ func EditCustomer(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 			{"address line 2", cur.AddressLine2, e.AddressLine2, private, "address_line2"},
 			{"postal code", cur.PostalCode, e.PostalCode, private, "postal_code"},
 			{"city", cur.City, e.City, private, "city"},
+			{"country", cur.Country, e.Country, private, "country"},
+			{"electronic invoice address", cur.EndpointID, e.EndpointID, private, "endpoint_id"},
+			{"their reference", cur.BuyerReference, e.BuyerReference, private, "buyer_reference"},
 			{"phone", cur.Phone, e.Phone, true, ""},
 			{"email", cur.Email, e.Email, true, ""},
 		}
@@ -1014,4 +1034,11 @@ func VehicleChanges(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		return err
 	})
 	return out, err
+}
+
+// isCountryCode reports whether s looks like an ISO 3166 alpha-2 code: two
+// capital letters. It does not know which pairs are assigned; a wrong pair is
+// a typing mistake the person sees printed, and the list changes.
+func isCountryCode(s string) bool {
+	return len(s) == 2 && s[0] >= 'A' && s[0] <= 'Z' && s[1] >= 'A' && s[1] <= 'Z'
 }

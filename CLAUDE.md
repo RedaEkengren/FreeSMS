@@ -127,6 +127,15 @@ not exist.
   answer, and there are no old invoices in production because nothing is
   deployed.
 
+- **Invoices issued before 0062 cannot be sent electronically.** An EN 16931
+  invoice (Peppol BIS Billing 3.0, issue #82) needs the address taken apart, an
+  electronic address for each party, the buyer's reference, a unit and a VAT
+  category per line. 0062 freezes them onto every invoice from then on and,
+  like 0021, backfills nothing. A line at 0 per cent has no category on
+  purpose: exempt, zero-rated, reverse charge and outside scope are a decision
+  about the sale, not something a rate can say, and there is no way yet to
+  state it. The export itself is not built.
+
 - **The translation is complete, and two tests keep it so.** Every sentence a
   reader can be shown -- a template string through `T` or `N`, a page title, a
   handler's message for the error page, the printer's own calls, and the

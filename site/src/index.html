@@ -281,6 +281,7 @@
     <button type="button" role="tab" data-tab="27">Streckkoder</button>
     <button type="button" role="tab" data-tab="28">Radera en person</button>
     <button type="button" role="tab" data-tab="29">Ta med dig allt</button>
+    <button type="button" role="tab" data-tab="30">Redo för e-faktura</button>
   </div>
   <div class="panes">
 <section class="scene pane" role="tabpanel">
@@ -1636,6 +1637,45 @@
     </div>
   </div>
   <p class="truth">Orden kommer ur produktens språkkatalog; filförteckningen är ett urval av vad zippen innehåller. Flödet körs mot den riktiga produkten i en webbläsare: ägaren tar ut verkstaden, filen byggs, det är en riktig zip med förteckning och README, och varken disken eller någon annan kommer åt den &ndash; <a href="{{test "e2e/tests/40-shop-export.spec.ts" "the owner takes the whole workshop out as one file, and nobody else can"}}">läs testet</a>. Namn och tider är <span class="wf-example">exempel</span>.</p>
+</section>
+
+<section class="scene pane" role="tabpanel">
+  <h2>Fakturan som kan skickas elektroniskt</h2>
+  <p class="lede">En elektronisk faktura vill ha mer än en pappersfaktura: landet och orten som egna uppgifter, en adress för e-faktura hos båda parterna, kundens referens och hur verkstaden får betalt. En utfärdad faktura går inte att komplettera, så uppgifterna frågas efter nu och skrivs in på fakturan när den utfärdas. FreeSMS skickar inga e-fakturor än. Det som sparas är det som annars skulle saknas den dag någon vill ha det.</p>
+
+  <div class="an-wrap" data-loop="24" data-still="14">
+    <div class="an-canvas" role="img" aria-label="Animering: kundkortet får ett land, en referens och en adress för e-faktura. Fakturan skriver ut referensen. Kortet ändras efteråt men fakturan gör det inte. Sist visas verkstadens egna uppgifter för e-faktura.">
+
+      <div class="an-card ml-desk">
+        <div class="an-head"><span class="an-dots"></span><span>{{role "service_advisor"}}</span><span class="wf-example">Exempel</span></div>
+        <div class="wf-body">
+          <div class="fm-stack ml-stack">
+            <div class="an-fade" data-t="0,8">
+              <div class="wf-h">Ellinor Referens</div>
+              <div class="wf-field"><span class="lbl">{{t "Country, two letters"}}</span><span data-type="0.6,1">SE</span></div>
+              <div class="wf-field"><span class="lbl">{{t "Their reference on invoices"}}</span><span data-type="1.8,2">Avd 4, Anna A</span></div>
+              <div class="wf-field"><span class="lbl">{{t "Electronic invoice address"}}</span><span data-type="4,2.4">0007:1122334455</span></div>
+              <span class="an-btn mo-btn an-fade" data-t="6.8">{{t "Save the changes"}}</span>
+            </div>            <div class="an-fade" data-t="8,16">
+              <div class="wf-h">{{t "Invoice"}} A-14</div>
+              <div class="an-muted">{{t "Billed to"}}: Ellinor Referens</div>
+              <div class="cl-qrow an-fade" data-t="9"><span>{{t "Your reference"}} Avd 4, Anna A</span><span class="rd-tag pass">&#10003;</span></div>
+              <div class="an-muted an-fade" data-t="12.5">{{t "Invoices already issued keep the name and address they went out with."}}</div>
+            </div>            <div class="an-fade" data-t="16">
+              <div class="wf-h">{{t "The workshop"}}</div>
+              <div class="wf-field"><span class="lbl">{{t "What the payment details are"}}</span><span data-type="16.4,1.4">{{t "Bankgiro"}}</span></div>
+              <div class="wf-field"><span class="lbl">{{t "Electronic invoice address"}}</span><span data-type="18,2.4">0007:5566778899</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="an-cap" data-t="0.3,7.8">Kundkortet har tre nya uppgifter: landet med två bokstäver, den referens kunden vill ha på sina fakturor och var de tar emot e-fakturor. Lämnar man dem tomma sparas ingenting påhittat.</div>
+      <div class="an-cap" data-t="8,15.8">Referensen skrivs ut på fakturan och fryses med den. Ändras kortet efteråt står fakturan kvar som den gick ut.</div>
+      <div class="an-cap" data-t="16,23.6">Ägaren anger en gång hur betalningen görs och verkstadens egen adress för e-faktura. De frysta fälten på fakturan, enhet och momskategori per rad, syns inte här: de finns för den dag exporten byggs.</div>
+    </div>
+  </div>
+  <p class="truth">Etiketterna och meningarna kommer ur produktens språkkatalog. Flödet körs mot den riktiga produkten i en webbläsare: verkstaden anger sina uppgifter, kundkortet fylls i, ett felaktigt land avvisas, fakturan skriver ut referensen och behåller den när kortet ändras &ndash; <a href="{{test "e2e/tests/41-einvoice-details.spec.ts" "the details an electronic invoice needs are asked for and frozen onto the invoice"}}">läs testet</a>. Namn och uppgifter är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>

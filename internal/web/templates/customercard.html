@@ -30,6 +30,11 @@
     <label><span>{{$.T "City"}}</span><input name="city" value="{{.City}}"></label>
   </div>
   <div class="pair">
+    <label><span>{{$.T "Country, two letters"}}</span><input name="country" value="{{.Country}}" maxlength="2" placeholder="SE"></label>
+    <label><span>{{$.T "Their reference on invoices"}}</span><input name="buyer_reference" value="{{.BuyerReference}}"></label>
+  </div>
+  <label><span>{{$.T "Electronic invoice address"}}</span><input name="endpoint_id" value="{{.EndpointID}}" placeholder="0007:5566778899"></label>
+  <div class="pair">
     <label><span>{{$.T "Company number"}}</span><input name="org_number" value="{{.OrgNumber}}"></label>
     <label><span>{{$.T "VAT number"}}</span><input name="vat_number" value="{{.VATNumber}}"></label>
   </div>

@@ -109,16 +109,19 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 		// next year must not reprint this document to a place they did not
 		// live.
 		var name, address, orgNumber, vatNumber *string
+		var buyer Buyer
 		const customer = `
 			SELECT coalesce(p.display_name, c.company_name),
 			       nullif(concat_ws(', ', c.address_line1, c.address_line2,
 			                        concat_ws(' ', c.postal_code, c.city)), ''),
-			       c.org_number, c.vat_number
+			       c.org_number, c.vat_number,
+			       c.postal_code, c.city, c.country, c.endpoint_id, c.buyer_reference
 			FROM work_orders w
 			JOIN customers c ON c.id = w.customer_id
 			LEFT JOIN people p ON p.id = c.person_id
 			WHERE w.id = $1`
-		if err := tx.QueryRow(ctx, customer, workOrderID).Scan(&name, &address, &orgNumber, &vatNumber); err != nil {
+		if err := tx.QueryRow(ctx, customer, workOrderID).Scan(&name, &address, &orgNumber, &vatNumber,
+			&buyer.PostalCode, &buyer.City, &buyer.Country, &buyer.EndpointID, &buyer.Reference); err != nil {
 			return fmt.Errorf("read customer: %w", err)
 		}
 		if name == nil || *name == "" {
@@ -163,17 +166,20 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 			   seller_name, seller_address, seller_org_number, seller_vat_number,
 			   seller_phone, seller_email, seller_payment_reference,
 			   seller_payment_terms_days, seller_f_tax,
-			   net_minor, vat_minor, gross_minor)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+			   net_minor, vat_minor, gross_minor,
+			   ` + electronicColumns + `)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
+			        $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)
 			RETURNING id, issued_at`
-		if err := tx.QueryRow(ctx, insert,
+		args := append([]any{
 			scope.ShopID, DefaultSeries, number, workOrderID, scope.UserID,
 			*name, address, orgNumber, vatNumber,
 			sold.Name, sold.Address, sold.OrgNumber, sold.VATNumber,
 			sold.Phone, sold.Email, sold.PaymentReference,
 			sold.PaymentTermsDays, sold.FTax,
 			totals.NetMinor, totals.VATMinor, totals.GrossMinor,
-		).Scan(&inv.ID, &inv.IssuedAt); err != nil {
+		}, electronicArgs(sold, buyer)...)
+		if err := tx.QueryRow(ctx, insert, args...).Scan(&inv.ID, &inv.IssuedAt); err != nil {
 			if dup := alreadyThere(err, ErrAlreadyInvoiced); errors.Is(dup, ErrAlreadyInvoiced) {
 				return dup
 			}
@@ -342,16 +348,19 @@ type invoiceLine struct {
 	VATMinor       int64
 	// The line of the original invoice this one takes back, if it is a credit.
 	CreditsLineID string
+	// UN/ECE Recommendation 20 code for the unit; see unitCode.
+	UnitCode string
 }
 
 func chargeableLines(ctx context.Context, tx pgx.Tx, workOrderID string) ([]invoiceLine, error) {
 	rows, err := tx.Query(ctx, `
-		SELECT position, kind, description, (quantity * 1000)::bigint,
-		       unit_price_minor, vat_rate_bp
-		FROM work_order_lines
-		WHERE work_order_id = $1 AND cost_bearer = 'customer' AND declined_at IS NULL AND withdrawn_at IS NULL
-		  AND (approved_at IS NOT NULL OR customer_decision_id IS NULL)
-		ORDER BY position`, workOrderID)
+		SELECT l.position, l.kind, l.description, (l.quantity * 1000)::bigint,
+		       l.unit_price_minor, l.vat_rate_bp, p.unit
+		FROM work_order_lines l
+		LEFT JOIN parts p ON p.id = l.part_id
+		WHERE l.work_order_id = $1 AND l.cost_bearer = 'customer' AND l.declined_at IS NULL AND l.withdrawn_at IS NULL
+		  AND (l.approved_at IS NOT NULL OR l.customer_decision_id IS NULL)
+		ORDER BY l.position`, workOrderID)
 	if err != nil {
 		return nil, fmt.Errorf("read lines: %w", err)
 	}
@@ -360,10 +369,12 @@ func chargeableLines(ctx context.Context, tx pgx.Tx, workOrderID string) ([]invo
 	var out []invoiceLine
 	for rows.Next() {
 		var l invoiceLine
+		var partUnit *string
 		if err := rows.Scan(&l.Position, &l.Kind, &l.Description, &l.QuantityMilli,
-			&l.UnitPriceMinor, &l.VATRateBasis); err != nil {
+			&l.UnitPriceMinor, &l.VATRateBasis, &partUnit); err != nil {
 			return nil, fmt.Errorf("scan line: %w", err)
 		}
+		l.UnitCode = unitCode(l.Kind, deref(partUnit))
 		l.NetMinor = money.LineNet(l.QuantityMilli, l.UnitPriceMinor)
 		l.VATMinor = money.VAT(l.NetMinor, l.VATRateBasis)
 		out = append(out, l)
@@ -395,11 +406,14 @@ func writeInvoiceLines(ctx context.Context, tx pgx.Tx, shopID, invoiceID string,
 	const insert = `
 		INSERT INTO invoice_lines
 		  (shop_id, invoice_id, position, kind, description, quantity,
-		   unit_price_minor, vat_rate_bp, net_minor, vat_minor, credits_line_id)
-		VALUES ($1,$2,$3,$4,$5,($6::bigint)::numeric / 1000,$7,$8,$9,$10,nullif($11, '')::uuid)`
+		   unit_price_minor, vat_rate_bp, net_minor, vat_minor, credits_line_id,
+		   unit_code, vat_category)
+		VALUES ($1,$2,$3,$4,$5,($6::bigint)::numeric / 1000,$7,$8,$9,$10,nullif($11, '')::uuid,
+		        nullif($12, ''), nullif($13, ''))`
 	for _, l := range lines {
 		if _, err := tx.Exec(ctx, insert, shopID, invoiceID, l.Position, l.Kind, l.Description,
-			l.QuantityMilli, l.UnitPriceMinor, l.VATRateBasis, l.NetMinor, l.VATMinor, l.CreditsLineID); err != nil {
+			l.QuantityMilli, l.UnitPriceMinor, l.VATRateBasis, l.NetMinor, l.VATMinor, l.CreditsLineID,
+			l.UnitCode, vatCategory(l.VATRateBasis)); err != nil {
 			return fmt.Errorf("write invoice line %d: %w", l.Position, err)
 		}
 	}
@@ -422,6 +436,76 @@ type Seller struct {
 	PaymentReference string
 	PaymentTermsDays int
 	FTax             bool
+
+	// The same address, taken apart, and the facts an electronic invoice
+	// wants on top of the paper one. Empty on an invoice issued before they
+	// were kept.
+	Street        string
+	PostalCode    string
+	City          string
+	Country       string
+	EndpointID    string
+	PaymentScheme string
+}
+
+// Buyer is what an electronic invoice wants of the customer beyond the paper
+// one: the address taken apart, where they receive invoices, and the reference
+// they ask to have printed. Nil is "not stated", which is not the same as
+// empty and is kept apart so that nothing is guessed.
+type Buyer struct {
+	PostalCode, City, Country, EndpointID, Reference *string
+}
+
+// electronicColumns are the columns of an invoice that exist for the
+// electronic invoice, in the order electronicArgs gives their values.
+const electronicColumns = `seller_street, seller_postal_code, seller_city, seller_country,
+			   seller_endpoint_id, seller_payment_scheme,
+			   customer_postal_code, customer_city, customer_country,
+			   customer_endpoint_id, customer_reference`
+
+func electronicArgs(s Seller, b Buyer) []any {
+	blank := func(v string) *string {
+		if v = strings.TrimSpace(v); v == "" {
+			return nil
+		}
+		return &v
+	}
+	return []any{
+		blank(s.Street), blank(s.PostalCode), blank(s.City), blank(s.Country),
+		blank(s.EndpointID), blank(s.PaymentScheme),
+		b.PostalCode, b.City, b.Country, b.EndpointID, b.Reference,
+	}
+}
+
+// unitCode is the UN/ECE Recommendation 20 code an electronic invoice needs on
+// every line. Work is by the hour; a part is in the unit it is stocked in; the
+// rest is "one", which is what C62 means.
+func unitCode(kind, partUnit string) string {
+	if kind == "labour" {
+		return "HUR"
+	}
+	switch partUnit {
+	case "litre":
+		return "LTR"
+	case "metre":
+		return "MTR"
+	case "kilogram":
+		return "KGM"
+	case "hour":
+		return "HUR"
+	}
+	return "C62"
+}
+
+// vatCategory is the UNCL5305 category for a line. A rate above nothing is the
+// standard category. A rate of nothing could be exempt, zero-rated, reverse
+// charge or outside the scope of VAT, and the rate does not say which, so the
+// category is left unstated.
+func vatCategory(rateBasis int) string {
+	if rateBasis > 0 {
+		return "S"
+	}
+	return ""
 }
 
 // readSeller assembles the address into the shape it is printed in, because
@@ -430,14 +514,15 @@ type Seller struct {
 // and that decision belongs where the shop's own details are entered.
 func readSeller(ctx context.Context, tx pgx.Tx, shopID string) (Seller, error) {
 	var s Seller
-	var line1, line2, postal, city, org, vat, phone, email, ref *string
+	var line1, line2, postal, city, org, vat, phone, email, ref, country, endpoint, scheme *string
 	err := tx.QueryRow(ctx, `
 		SELECT name, address_line1, address_line2, postal_code, city,
 		       org_number, vat_number, phone, email,
-		       payment_reference, payment_terms_days, f_tax
+		       payment_reference, payment_terms_days, f_tax,
+		       country, endpoint_id, payment_scheme
 		FROM shops WHERE id = $1`, shopID).
 		Scan(&s.Name, &line1, &line2, &postal, &city, &org, &vat, &phone, &email,
-			&ref, &s.PaymentTermsDays, &s.FTax)
+			&ref, &s.PaymentTermsDays, &s.FTax, &country, &endpoint, &scheme)
 	if err != nil {
 		return Seller{}, fmt.Errorf("read seller: %w", err)
 	}
@@ -453,6 +538,9 @@ func readSeller(ctx context.Context, tx pgx.Tx, shopID string) (Seller, error) {
 		parts = append(parts, town)
 	}
 	s.Address = strings.Join(parts, ", ")
+	s.Street = strings.Join(parts[:len(parts)-btoi(town != "")], ", ")
+	s.PostalCode, s.City = strings.TrimSpace(deref(postal)), strings.TrimSpace(deref(city))
+	s.Country, s.EndpointID, s.PaymentScheme = deref(country), deref(endpoint), deref(scheme)
 	s.OrgNumber, s.VATNumber = deref(org), deref(vat)
 	s.Phone, s.Email, s.PaymentReference = deref(phone), deref(email), deref(ref)
 	return s, nil
@@ -496,9 +584,15 @@ type Document struct {
 
 	// The customer as they were when it was issued. An address typed over
 	// later does not rewrite what was sent.
-	CustomerAddress   string
-	CustomerOrgNumber string
-	CustomerVATNumber string
+	CustomerAddress    string
+	CustomerOrgNumber  string
+	CustomerVATNumber  string
+	CustomerPostalCode string
+	CustomerCity       string
+	CustomerCountry    string
+	CustomerEndpointID string
+	// What the buyer asked to have printed so the invoice reaches the right desk.
+	CustomerReference string
 
 	IssuedBy string
 	Lines    []DocumentLine
@@ -540,6 +634,8 @@ type DocumentLine struct {
 	VATRateBasis   int
 	NetMinor       int64
 	VATMinor       int64
+	UnitCode       string
+	VATCategory    string
 }
 
 // Quantity renders thousandths the way a work order line does.
@@ -584,6 +680,8 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 	// No join to shops. The seller is read from the document's own
 	// columns, which is the whole point of freezing them.
 	var sName, sAddr, sOrg, sVat, sPhone, sEmail, sRef *string
+	var sStreet, sPostal, sCity, sCountry, sEndpoint, sScheme *string
+	var cPostal, cCity, cCountry, cEndpoint, cRef *string
 	var sTerms *int
 	var sFTax *bool
 	err := tx.QueryRow(ctx, `
@@ -595,6 +693,10 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 		       i.seller_vat_number, i.seller_phone, i.seller_email,
 		       i.seller_payment_reference, i.seller_payment_terms_days,
 		       i.seller_f_tax,
+		       i.seller_street, i.seller_postal_code, i.seller_city, i.seller_country,
+		       i.seller_endpoint_id, i.seller_payment_scheme,
+		       i.customer_postal_code, i.customer_city, i.customer_country,
+		       i.customer_endpoint_id, i.customer_reference,
 		       p.display_name, coalesce(r.registration, '')
 		FROM invoices i
 		LEFT JOIN users u ON u.id = i.issued_by
@@ -607,6 +709,8 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 			&d.CustomerName, &address, &org, &vat, &d.Currency,
 			&d.NetMinor, &d.VATMinor, &d.GrossMinor,
 			&sName, &sAddr, &sOrg, &sVat, &sPhone, &sEmail, &sRef, &sTerms, &sFTax,
+			&sStreet, &sPostal, &sCity, &sCountry, &sEndpoint, &sScheme,
+			&cPostal, &cCity, &cCountry, &cEndpoint, &cRef,
 			&issuedBy, &d.Registration)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Not visible under this shop's policy is the same answer as not
@@ -626,6 +730,12 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 		Phone:            deref(sPhone),
 		Email:            deref(sEmail),
 		PaymentReference: deref(sRef),
+		Street:           deref(sStreet),
+		PostalCode:       deref(sPostal),
+		City:             deref(sCity),
+		Country:          deref(sCountry),
+		EndpointID:       deref(sEndpoint),
+		PaymentScheme:    deref(sScheme),
 	}
 	if sTerms != nil {
 		d.Seller.PaymentTermsDays = *sTerms
@@ -636,6 +746,8 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 	d.CustomerAddress = deref(address)
 	d.CustomerOrgNumber = deref(org)
 	d.CustomerVATNumber = deref(vat)
+	d.CustomerPostalCode, d.CustomerCity, d.CustomerCountry = deref(cPostal), deref(cCity), deref(cCountry)
+	d.CustomerEndpointID, d.CustomerReference = deref(cEndpoint), deref(cRef)
 	d.IssuedBy = deref(issuedBy)
 	d.Currency = strings.TrimSpace(d.Currency)
 
@@ -668,7 +780,7 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 	rows, err := tx.Query(ctx, `
 		SELECT position, kind, description,
 		       (quantity * 1000)::bigint, unit_price_minor, vat_rate_bp,
-		       net_minor, vat_minor
+		       net_minor, vat_minor, coalesce(unit_code, ''), coalesce(vat_category, '')
 		FROM invoice_lines WHERE invoice_id = $1 ORDER BY position`, id)
 	if err != nil {
 		return fmt.Errorf("read invoice lines: %w", err)
@@ -678,7 +790,7 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 		var l DocumentLine
 		if err := rows.Scan(&l.Position, &l.Kind, &l.Description,
 			&l.QuantityMilli, &l.UnitPriceMinor, &l.VATRateBasis,
-			&l.NetMinor, &l.VATMinor); err != nil {
+			&l.NetMinor, &l.VATMinor, &l.UnitCode, &l.VATCategory); err != nil {
 			return fmt.Errorf("scan invoice line: %w", err)
 		}
 		d.Lines = append(d.Lines, l)
@@ -706,6 +818,13 @@ func bandsFrom(lines []DocumentLine) []money.VATBand {
 		out = append(out, *byRate[r])
 	}
 	return out
+}
+
+func btoi(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 func deref(s *string) string {

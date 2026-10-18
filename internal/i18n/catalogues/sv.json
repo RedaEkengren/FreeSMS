@@ -326,6 +326,48 @@
     "Password": {
       "other": "Lösenord"
     },
+    "What the payment details are": {
+      "other": "Vad betaluppgifterna är"
+    },
+    "Not stated": {
+      "other": "Inte angivet"
+    },
+    "Bankgiro": {
+      "other": "Bankgiro"
+    },
+    "Plusgiro": {
+      "other": "Plusgiro"
+    },
+    "IBAN": {
+      "other": "IBAN"
+    },
+    "Electronic invoice address": {
+      "other": "Adress för e-faktura"
+    },
+    "Country, two letters": {
+      "other": "Land, två bokstäver"
+    },
+    "Their reference on invoices": {
+      "other": "Deras referens på fakturor"
+    },
+    "Your reference": {
+      "other": "Er referens"
+    },
+    "country": {
+      "other": "land"
+    },
+    "electronic invoice address": {
+      "other": "adress för e-faktura"
+    },
+    "their reference": {
+      "other": "deras referens"
+    },
+    "write the country as two letters, such as SE": {
+      "other": "skriv landet med två bokstäver, till exempel SE"
+    },
+    "the payment reference is a bankgiro, a plusgiro or an iban": {
+      "other": "betalningsuppgiften är ett bankgiro, ett plusgiro eller ett iban"
+    },
     "Pay to": {
       "other": "Betalas till"
     },

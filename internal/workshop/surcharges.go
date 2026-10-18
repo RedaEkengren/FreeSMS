@@ -157,6 +157,7 @@ func chargeLine(kind, text string, net int64, rate int) invoiceLine {
 	return invoiceLine{
 		Kind: kind, Description: text, QuantityMilli: 1000, UnitPriceMinor: net,
 		VATRateBasis: rate, NetMinor: net, VATMinor: money.VAT(net, rate),
+		UnitCode: "C62",
 	}
 }
 

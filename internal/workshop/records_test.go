@@ -33,6 +33,7 @@ func editOf(c workshop.CustomerCard) workshop.CustomerEdit {
 		Name: c.Name, ContactName: c.ContactName, OrgNumber: c.OrgNumber, VATNumber: c.VATNumber,
 		Phone: c.Phone, Email: c.Email, AddressLine1: c.AddressLine1, AddressLine2: c.AddressLine2,
 		PostalCode: c.PostalCode, City: c.City,
+		Country: c.Country, EndpointID: c.EndpointID, BuyerReference: c.BuyerReference,
 	}
 }
 
