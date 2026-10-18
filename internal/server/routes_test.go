@@ -131,6 +131,7 @@ var swept = map[string]string{
 	"GET /k/{token}/summary":                         "token, not an identifier",
 	"GET /d/{token}":                                 "token, not an identifier",
 	"GET /invoices/{id}/followup":                    "sweep",
+	"GET /invoices/{id}/einvoice.xml":                "sweep",
 	"GET /jobs/{id}/comeback":                        "sweep",
 	"POST /jobs/{id}/comeback":                       "sweep",
 	"GET /jobs/{id}/outsourced":                      "sweep",

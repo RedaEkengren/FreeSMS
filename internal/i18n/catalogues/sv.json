@@ -368,6 +368,57 @@
     "the payment reference is a bankgiro, a plusgiro or an iban": {
       "other": "betalningsuppgiften är ett bankgiro, ett plusgiro eller ett iban"
     },
+    "Electronic invoice": {
+      "other": "E-faktura"
+    },
+    "This invoice cannot be written as an electronic invoice yet, because it was issued without:": {
+      "other": "Den här fakturan går inte att skriva som e-faktura än, eftersom den utfärdades utan:"
+    },
+    "An issued invoice is not changed, so what is missing cannot be added to this one. Fill the details in before the next invoice is issued.": {
+      "other": "En utfärdad faktura ändras inte, så det som saknas går inte att lägga till på den här. Fyll i uppgifterna innan nästa faktura utfärdas."
+    },
+    "The document as a Peppol BIS Billing 3.0 file, to send through an invoicing service of your own choice. FreeSMS does not send it.": {
+      "other": "Dokumentet som en Peppol BIS Billing 3.0-fil, att skicka med en fakturatjänst som du väljer själv. FreeSMS skickar den inte."
+    },
+    "Download the electronic invoice": {
+      "other": "Hämta e-fakturan"
+    },
+    "the workshop's details, which this invoice was issued without": {
+      "other": "verkstadens uppgifter, som den här fakturan utfärdades utan"
+    },
+    "the workshop's postal code and town": {
+      "other": "verkstadens postnummer och ort"
+    },
+    "the workshop's VAT number": {
+      "other": "verkstadens momsnummer"
+    },
+    "the workshop's company number": {
+      "other": "verkstadens organisationsnummer"
+    },
+    "the workshop's electronic invoice address": {
+      "other": "verkstadens adress för e-faktura"
+    },
+    "how the workshop is paid: bankgiro, plusgiro or IBAN, and the number": {
+      "other": "hur verkstaden får betalt: bankgiro, plusgiro eller IBAN, och numret"
+    },
+    "the customer's country": {
+      "other": "kundens land"
+    },
+    "the customer's postal code and town": {
+      "other": "kundens postnummer och ort"
+    },
+    "the customer's electronic invoice address": {
+      "other": "kundens adress för e-faktura"
+    },
+    "the customer's reference": {
+      "other": "kundens referens"
+    },
+    "a VAT category for a line at 0 per cent": {
+      "other": "en momskategori för en rad med 0 procent"
+    },
+    "a unit on every line": {
+      "other": "en enhet på varje rad"
+    },
     "Pay to": {
       "other": "Betalas till"
     },

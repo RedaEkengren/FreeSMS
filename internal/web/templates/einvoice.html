@@ -1,0 +1,9 @@
+{{define "content"}}
+<h1>{{.T "Electronic invoice"}}</h1>
+<p>{{.T "This invoice cannot be written as an electronic invoice yet, because it was issued without:"}}</p>
+<ul class="lines">
+  {{range .Missing}}<li>{{$.T .}}</li>{{end}}
+</ul>
+<p class="waiting">{{.T "An issued invoice is not changed, so what is missing cannot be added to this one. Fill the details in before the next invoice is issued."}}</p>
+<p><a href="/invoices/{{.Document.ID}}">{{.T "Back to the invoice"}}</a></p>
+{{end}}

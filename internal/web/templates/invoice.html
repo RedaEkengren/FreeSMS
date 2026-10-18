@@ -58,6 +58,12 @@
 </section>
 {{end}}
 
+<section class="no-print mt-l">
+<h2>{{$.T "Electronic invoice"}}</h2>
+<p class="waiting">{{$.T "The document as a Peppol BIS Billing 3.0 file, to send through an invoicing service of your own choice. FreeSMS does not send it."}}</p>
+<a class="button secondary" href="/invoices/{{$.Document.ID}}/einvoice.xml">{{$.T "Download the electronic invoice"}}</a>
+</section>
+
 {{if and (not $.Document.IsCreditNote) (not $.Document.CreditOf)}}
 <section class="no-print mt-l">
 <h2>{{$.T "Correct it"}}</h2>

@@ -134,7 +134,14 @@ not exist.
   like 0021, backfills nothing. A line at 0 per cent has no category on
   purpose: exempt, zero-rated, reverse charge and outside scope are a decision
   about the sale, not something a rate can say, and there is no way yet to
-  state it. The export itself is not built.
+  state it; such an invoice is refused with a list of what it lacks rather
+  than written wrongly. `internal/ubl` writes a Peppol BIS Billing 3.0 file
+  (`GET /invoices/{id}/einvoice.xml`) from the frozen document and nothing
+  sends it: which service it goes through is the shop's choice. **It has not
+  been checked against the official Peppol rules**, only against the EN 16931
+  arithmetic in `internal/ubl`'s tests. One thing it is known to risk: a line
+  is rounded one at a time, so the VAT of a category can differ by an öre from
+  taxable amount times rate, which BR-CO-17 may refuse.
 
 - **The translation is complete, and two tests keep it so.** Every sentence a
   reader can be shown -- a template string through `T` or `N`, a page title, a

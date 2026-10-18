@@ -1695,7 +1695,7 @@
 
 <section class="scene pane" role="tabpanel">
   <h2>An invoice that can be sent electronically</h2>
-  <p class="lede">An electronic invoice wants more than a paper one: the country and the town as facts of their own, an electronic address for both parties, the customer's reference and how the workshop is paid. An issued invoice cannot be completed afterwards, so the details are asked for now and written onto the invoice when it is issued. FreeSMS does not send electronic invoices yet. What is kept is what would otherwise be missing the day somebody wants it.</p>
+  <p class="lede">An electronic invoice wants more than a paper one: the country and the town as facts of their own, an electronic address for both parties, the customer's reference and how the workshop is paid. An issued invoice cannot be completed afterwards, so the details are asked for now and written onto the invoice when it is issued. The invoice can be downloaded as a Peppol BIS Billing 3.0 file, to send through an invoicing service you choose yourself; FreeSMS does not send it. If something is missing the page says what, and it cannot be added to an invoice that has already been issued.</p>
 
   <div class="an-wrap" data-loop="24" data-still="14">
     <div class="an-canvas" role="img" aria-label="Animation: the customer card gets a country, a reference and an electronic invoice address. The invoice prints the reference. The card is changed afterwards but the invoice is not. Last, the workshop's own details for electronic invoices.">
@@ -1715,6 +1715,7 @@
               <div class="an-muted">Billed to: Elin Reference</div>
               <div class="cl-qrow an-fade" data-t="9"><span>Your reference Avd 4, Anna A</span><span class="rd-tag pass">&#10003;</span></div>
               <div class="an-muted an-fade" data-t="12.5">Invoices already issued keep the name and address they went out with.</div>
+              <span class="an-btn mo-btn an-fade" data-t="14">Download the electronic invoice</span>
             </div>            <div class="an-fade an-off" data-t="16">
               <div class="wf-h">The workshop</div>
               <div class="wf-field"><span class="lbl">What the payment details are</span><span data-type="16.4,1.4">Bankgiro</span></div>
@@ -1725,11 +1726,11 @@
       </div>
 
       <div class="an-cap an-off" data-t="0.3,7.8">The customer card has three new details: the country in two letters, the reference the customer wants on their invoices, and where they receive electronic invoices. Left empty, nothing invented is stored.</div>
-      <div class="an-cap" data-t="8,15.8">The reference is printed on the invoice and frozen with it. If the card is changed afterwards, the invoice stays as it went out.</div>
-      <div class="an-cap an-off" data-t="16,23.6">The owner states once how payment is made and the workshop's own electronic invoice address. The frozen fields on the invoice, the unit and the VAT category on each line, are not shown here: they are there for the day the export is built.</div>
+      <div class="an-cap" data-t="8,15.8">The reference is printed on the invoice and frozen with it. If the card is changed afterwards, the invoice stays as it went out, and it can be downloaded as an electronic invoice in an open format.</div>
+      <div class="an-cap an-off" data-t="16,23.6">The owner states once how payment is made and the workshop's own electronic invoice address. The unit and the VAT category of each line are frozen on the invoice too, but are not shown in the picture.</div>
     </div>
   </div>
-  <p class="truth">The labels and sentences come from the product's own language catalogue. The flow is run against the real product in a browser: the workshop states its details, the customer card is filled in, a wrong country is refused, and the invoice prints the reference and keeps it when the card is changed &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/41-einvoice-details.spec.ts">read the test</a>. Names and details are <span class="wf-example">example</span>.</p>
+  <p class="truth">The labels and sentences come from the product's own language catalogue. The flow is run against the real product in a browser: the workshop states its details, the customer card is filled in, a wrong country is refused, and the invoice prints the reference and keeps it when the card is changed &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/41-einvoice-details.spec.ts">read the test</a> and <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/41-einvoice-details.spec.ts">the test of the file itself</a>. Names and details are <span class="wf-example">example</span>.</p>
 </section>
 
   </div>

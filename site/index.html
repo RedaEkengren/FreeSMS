@@ -1695,7 +1695,7 @@
 
 <section class="scene pane" role="tabpanel">
   <h2>Fakturan som kan skickas elektroniskt</h2>
-  <p class="lede">En elektronisk faktura vill ha mer än en pappersfaktura: landet och orten som egna uppgifter, en adress för e-faktura hos båda parterna, kundens referens och hur verkstaden får betalt. En utfärdad faktura går inte att komplettera, så uppgifterna frågas efter nu och skrivs in på fakturan när den utfärdas. FreeSMS skickar inga e-fakturor än. Det som sparas är det som annars skulle saknas den dag någon vill ha det.</p>
+  <p class="lede">En elektronisk faktura vill ha mer än en pappersfaktura: landet och orten som egna uppgifter, en adress för e-faktura hos båda parterna, kundens referens och hur verkstaden får betalt. En utfärdad faktura går inte att komplettera, så uppgifterna frågas efter nu och skrivs in på fakturan när den utfärdas. Fakturan går att hämta som en Peppol BIS Billing 3.0-fil att skicka med en fakturatjänst du väljer själv; FreeSMS skickar den inte. Saknas något säger sidan vad, och det går inte att lägga till på en faktura som redan är utfärdad.</p>
 
   <div class="an-wrap" data-loop="24" data-still="14">
     <div class="an-canvas" role="img" aria-label="Animering: kundkortet får ett land, en referens och en adress för e-faktura. Fakturan skriver ut referensen. Kortet ändras efteråt men fakturan gör det inte. Sist visas verkstadens egna uppgifter för e-faktura.">
@@ -1715,6 +1715,7 @@
               <div class="an-muted">Faktureras till: Ellinor Referens</div>
               <div class="cl-qrow an-fade" data-t="9"><span>Er referens Avd 4, Anna A</span><span class="rd-tag pass">&#10003;</span></div>
               <div class="an-muted an-fade" data-t="12.5">Fakturor som redan skickats behåller det namn och den adress de gick ut med.</div>
+              <span class="an-btn mo-btn an-fade" data-t="14">Hämta e-fakturan</span>
             </div>            <div class="an-fade an-off" data-t="16">
               <div class="wf-h">Verkstaden</div>
               <div class="wf-field"><span class="lbl">Vad betaluppgifterna är</span><span data-type="16.4,1.4">Bankgiro</span></div>
@@ -1725,11 +1726,11 @@
       </div>
 
       <div class="an-cap an-off" data-t="0.3,7.8">Kundkortet har tre nya uppgifter: landet med två bokstäver, den referens kunden vill ha på sina fakturor och var de tar emot e-fakturor. Lämnar man dem tomma sparas ingenting påhittat.</div>
-      <div class="an-cap" data-t="8,15.8">Referensen skrivs ut på fakturan och fryses med den. Ändras kortet efteråt står fakturan kvar som den gick ut.</div>
-      <div class="an-cap an-off" data-t="16,23.6">Ägaren anger en gång hur betalningen görs och verkstadens egen adress för e-faktura. De frysta fälten på fakturan, enhet och momskategori per rad, syns inte här: de finns för den dag exporten byggs.</div>
+      <div class="an-cap" data-t="8,15.8">Referensen skrivs ut på fakturan och fryses med den. Ändras kortet efteråt står fakturan kvar som den gick ut, och den kan hämtas som e-faktura i öppet format.</div>
+      <div class="an-cap an-off" data-t="16,23.6">Ägaren anger en gång hur betalningen görs och verkstadens egen adress för e-faktura. Enhet och momskategori per rad fryses också på fakturan, men syns inte i bilden.</div>
     </div>
   </div>
-  <p class="truth">Etiketterna och meningarna kommer ur produktens språkkatalog. Flödet körs mot den riktiga produkten i en webbläsare: verkstaden anger sina uppgifter, kundkortet fylls i, ett felaktigt land avvisas, fakturan skriver ut referensen och behåller den när kortet ändras &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/41-einvoice-details.spec.ts">läs testet</a>. Namn och uppgifter är <span class="wf-example">exempel</span>.</p>
+  <p class="truth">Etiketterna och meningarna kommer ur produktens språkkatalog. Flödet körs mot den riktiga produkten i en webbläsare: verkstaden anger sina uppgifter, kundkortet fylls i, ett felaktigt land avvisas, fakturan skriver ut referensen och behåller den när kortet ändras &ndash; <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/41-einvoice-details.spec.ts">läs testet</a> och <a href="https://github.com/RedaEkengren/FreeSMS/blob/main/e2e/tests/41-einvoice-details.spec.ts">testet av själva filen</a>. Namn och uppgifter är <span class="wf-example">exempel</span>.</p>
 </section>
 
   </div>
