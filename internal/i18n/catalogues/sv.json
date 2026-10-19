@@ -419,6 +419,12 @@
     "a unit on every line": {
       "other": "en enhet på varje rad"
     },
+    "the workshop's electronic invoice address: a Swedish company number has ten digits and a check digit that must add up": {
+      "other": "verkstadens adress för e-faktura: ett svenskt organisationsnummer har tio siffror och en kontrollsiffra som ska stämma"
+    },
+    "the customer's electronic invoice address: a Swedish company number has ten digits and a check digit that must add up": {
+      "other": "kundens adress för e-faktura: ett svenskt organisationsnummer har tio siffror och en kontrollsiffra som ska stämma"
+    },
     "Pay to": {
       "other": "Betalas till"
     },

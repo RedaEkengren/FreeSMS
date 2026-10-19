@@ -24,9 +24,11 @@ const (
 	needSellerCompany  = "the workshop's company number"
 	needSellerEndpoint = "the workshop's electronic invoice address"
 	needSellerPayment  = "how the workshop is paid: bankgiro, plusgiro or IBAN, and the number"
+	needSellerCheck    = "the workshop's electronic invoice address: a Swedish company number has ten digits and a check digit that must add up"
 	needBuyerCountry   = "the customer's country"
 	needBuyerAddress   = "the customer's postal code and town"
 	needBuyerEndpoint  = "the customer's electronic invoice address"
+	needBuyerCheck     = "the customer's electronic invoice address: a Swedish company number has ten digits and a check digit that must add up"
 	needBuyerReference = "the customer's reference"
 	needLineCategory   = "a VAT category for a line at 0 per cent"
 	needLineUnit       = "a unit on every line"
@@ -89,6 +91,7 @@ func ublInvoice(d Document, loc *time.Location) (ubl.Invoice, []string) {
 	need(companyNumber(s.OrgNumber) != "", needSellerCompany)
 	sScheme, sValue, sOK := endpoint(s.EndpointID)
 	need(sOK, needSellerEndpoint)
+	need(!sOK || sScheme != swedishOrgScheme || validOrgNumber(sValue), needSellerCheck)
 	account := paymentAccount(s.PaymentScheme, s.PaymentReference)
 	need(account != "", needSellerPayment)
 
@@ -96,6 +99,7 @@ func ublInvoice(d Document, loc *time.Location) (ubl.Invoice, []string) {
 	need(d.CustomerCountry != "", needBuyerCountry)
 	need(d.CustomerPostalCode != "" && d.CustomerCity != "", needBuyerAddress)
 	need(bOK, needBuyerEndpoint)
+	need(!bOK || bScheme != swedishOrgScheme || validOrgNumber(bValue), needBuyerCheck)
 	need(d.CustomerReference != "", needBuyerReference)
 
 	in := ubl.Invoice{
@@ -159,10 +163,39 @@ func companyNumber(s string) string {
 	if len(n) == 12 && strings.HasPrefix(n, "16") {
 		n = n[2:]
 	}
-	if len(n) != 10 {
+	if !validOrgNumber(n) {
 		return ""
 	}
 	return n
+}
+
+// swedishOrgScheme is the Peppol identifier scheme for a Swedish company number.
+const swedishOrgScheme = "0007"
+
+// validOrgNumber is true for ten digits whose last is the check digit of the
+// Luhn sum over the ten (every second digit from the left doubled, the digits
+// of each product added). Peppol refuses a Swedish number that fails it
+// (PEPPOL-COMMON-R049), so a typo is caught here, with a sentence, rather than
+// by the receiver.
+func validOrgNumber(n string) bool {
+	if len(n) != 10 {
+		return false
+	}
+	sum := 0
+	for i, r := range n {
+		if r < '0' || r > '9' {
+			return false
+		}
+		d := int(r - '0')
+		if i%2 == 0 {
+			d *= 2
+			if d > 9 {
+				d -= 9
+			}
+		}
+		sum += d
+	}
+	return sum%10 == 0
 }
 
 // paymentAccount is the number out of what the shop typed beside it: "Bankgiro

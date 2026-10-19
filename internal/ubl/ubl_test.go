@@ -15,7 +15,7 @@ func sample() Invoice {
 		Seller: Party{Name: "Verkstaden AB", Street: "Verkstadsgatan 1", PostalCode: "123 45", City: "Stockholm", Country: "SE",
 			EndpointScheme: "0007", EndpointValue: "5566778899", VATID: "SE556677889901", LegalID: "5566778899", LegalScheme: "0007"},
 		Buyer: Party{Name: "Åkeri & Söner <AB>", PostalCode: "111 22", City: "Göteborg", Country: "SE",
-			EndpointScheme: "0007", EndpointValue: "1122334455", LegalID: "1122334455", LegalScheme: "0007"},
+			EndpointScheme: "0007", EndpointValue: "5560160680", LegalID: "5560160680", LegalScheme: "0007"},
 		Payment: PaymentMeans{Kind: "bankgiro", Account: "1234567"},
 		Terms:   "30 days net",
 		Lines: []Line{

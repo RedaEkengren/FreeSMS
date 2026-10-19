@@ -137,11 +137,21 @@ not exist.
   state it; such an invoice is refused with a list of what it lacks rather
   than written wrongly. `internal/ubl` writes a Peppol BIS Billing 3.0 file
   (`GET /invoices/{id}/einvoice.xml`) from the frozen document and nothing
-  sends it: which service it goes through is the shop's choice. **It has not
-  been checked against the official Peppol rules**, only against the EN 16931
-  arithmetic in `internal/ubl`'s tests. One thing it is known to risk: a line
-  is rounded one at a time, so the VAT of a category can differ by an öre from
-  taxable amount times rate, which BR-CO-17 may refuse.
+  sends it: which service it goes through is the shop's choice. **It was
+  checked once, by hand, against the official rules** (2026-10-19): the
+  Peppol BIS Billing 3.0 v3.0.20 schematron (`PEPPOL-EN16931-UBL.sch`) and the
+  CEN EN 16931 one (`CEN-EN16931-UBL.sch`), compiled with the ISO Schematron
+  skeleton and run by Saxon-HE 12.5 on Java 21 in Docker. Peppol's own
+  `base-example.xml` passed as a control, an invoice and a credit note from
+  `internal/ubl`'s sample passed, and a deliberately wrong VAT amount failed.
+  Nothing re-runs that, so a change to the writer is not checked against the
+  rules until somebody does it again. Two things it taught: rounding a line at
+  a time is safe, because BR-CO-17 tolerates a whole krona per category (it
+  takes some two hundred lines, all rounded the same way, to reach it); and a
+  Swedish company number must pass its check digit
+  (PEPPOL-COMMON-R049), which `EInvoice` now tests and reports as a missing
+  detail rather than send a file the receiver would refuse. It has not been
+  sent through a real access point.
 
 - **The translation is complete, and two tests keep it so.** Every sentence a
   reader can be shown -- a template string through `T` or `N`, a page title, a

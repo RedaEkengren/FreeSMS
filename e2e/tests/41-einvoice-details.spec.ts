@@ -54,7 +54,7 @@ test('the details an electronic invoice needs are asked for and frozen onto the 
   await page.goto(card);
   await page.fill('input[name=country]', 'se');
   await page.fill('input[name=buyer_reference]', 'Avd 4, Anna A');
-  await page.fill('input[name=endpoint_id]', '0007:1122334455');
+  await page.fill('input[name=endpoint_id]', '0007:5560160680');
   await page.getByRole('button', { name: 'Save the changes' }).click();
   await expect(page.getByText('saved').first()).toBeVisible();
   await expect(page.locator('input[name=country]')).toHaveValue('SE');
@@ -144,7 +144,7 @@ test('an invoice that was issued without the details says what it lacks, and one
   await page.fill('input[name=city]', 'Göteborg');
   await page.fill('input[name=country]', 'SE');
   await page.fill('input[name=buyer_reference]', 'Avd 4, Anna A');
-  await page.fill('input[name=endpoint_id]', '0007:1122334455');
+  await page.fill('input[name=endpoint_id]', '0007:5560160680');
   await page.getByRole('button', { name: 'Save the changes' }).click();
   await expect(page.getByText('saved').first()).toBeVisible();
   await page.goto(whole);
@@ -158,7 +158,7 @@ test('an invoice that was issued without the details says what it lacks, and one
   const xml = await file.text();
   expect(xml).toContain('urn:fdc:peppol.eu:2017:poacc:billing:01:1.0');
   expect(xml).toContain('<cbc:BuyerReference>Avd 4, Anna A</cbc:BuyerReference>');
-  expect(xml).toContain('<cbc:EndpointID schemeID="0007">1122334455</cbc:EndpointID>');
+  expect(xml).toContain('<cbc:EndpointID schemeID="0007">5560160680</cbc:EndpointID>');
   expect(xml).toContain('SE:BANKGIRO');
   expect(xml).toContain('<cbc:ID>1234567</cbc:ID>');
   expect(xml).toMatch(/unitCode="(C62|HUR)"/);

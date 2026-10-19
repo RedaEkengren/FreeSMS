@@ -26,7 +26,7 @@ func TestAnInvoiceWithEverythingIsWrittenAsAnElectronicInvoice(t *testing.T) {
 	edit := editOf(card)
 	edit.Name, edit.AddressLine1 = card.Name, "Kundgatan 2"
 	edit.PostalCode, edit.City, edit.Country = "111 22", "Göteborg", "SE"
-	edit.EndpointID, edit.BuyerReference = "0007:1122334455", "Avd 4"
+	edit.EndpointID, edit.BuyerReference = "0007:5560160680", "Avd 4"
 	if _, err := workshop.EditCustomer(ctx, pool, advisor(), fixtureCustomer, card.Revision, edit); err != nil {
 		t.Fatal(err)
 	}
@@ -109,5 +109,37 @@ func TestOnlyTheFrontDeskCanWriteAnElectronicInvoice(t *testing.T) {
 	}
 	if _, _, err := workshop.EInvoice(ctx, pool, advisor(), "not-an-id"); !errors.Is(err, workshop.ErrNotFound) {
 		t.Errorf("a bad id = %v, want ErrNotFound", err)
+	}
+}
+
+func TestACompanyNumberThatFailsItsCheckDigitIsRefusedBeforeItIsSent(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	if err := workshop.SaveDetails(ctx, pool, owner(), workshop.ShopDetails{
+		Name: "Verkstaden AB", AddressLine1: "Verkstadsgatan 1", PostalCode: "123 45", City: "Stockholm",
+		OrgNumber: "556677-8899", VATNumber: "SE556677889901",
+		PaymentReference: "Bankgiro 123-4567", PaymentScheme: "bankgiro", EndpointID: "0007:5566778899", PaymentTermsDays: 30,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	card := cardOf(t, pool, fixtureCustomer)
+	edit := editOf(card)
+	edit.Name, edit.AddressLine1 = card.Name, "Kundgatan 2"
+	edit.PostalCode, edit.City, edit.Country = "111 22", "Göteborg", "SE"
+	// Every digit is there, one is wrong: Peppol would refuse it at the other end.
+	edit.EndpointID, edit.BuyerReference = "0007:5560160681", "Avd 4"
+	if _, err := workshop.EditCustomer(ctx, pool, advisor(), fixtureCustomer, card.Revision, edit); err != nil {
+		t.Fatal(err)
+	}
+	inv, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, missing, err := workshop.EInvoice(ctx, pool, advisor(), inv.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body != nil || len(missing) != 1 || !strings.Contains(missing[0], "check digit") || !strings.Contains(missing[0], "customer") {
+		t.Errorf("body %d bytes, missing %v", len(body), missing)
 	}
 }
