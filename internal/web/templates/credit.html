@@ -20,7 +20,7 @@
   <dt>{{$.T "Could be credited before"}}</dt><dd>{{$.Money .LeftBefore}}</dd>
   <dt>{{$.T "Could be credited after"}}</dt><dd>{{$.Money .LeftAfter}}{{if .Everything}} <span class="tag">{{$.T "nothing left"}}</span>{{end}}</dd>
   <dt>{{$.T "Owed by the customer now"}}</dt><dd>{{$.Money .OwedBefore}}</dd>
-  <dt class="grand">{{if lt .OwedAfter 0}}{{$.T "Owed back to the customer after"}}{{else}}{{$.T "Owed by the customer after"}}{{end}}</dt><dd class="grand">{{$.Money .OwedAfter}}</dd>
+  <dt class="grand">{{if lt .OwedAfter 0}}{{$.T "Owed back to the customer after"}}{{else}}{{$.T "Owed by the customer after"}}{{end}}</dt><dd class="grand">{{$.Money (abs .OwedAfter)}}</dd>
 </dl>
 <p class="waiting">{{$.T "A credit is money. It does not put a part back on the shelf; if one comes back, that is recorded on its own."}}</p>
 {{end}}

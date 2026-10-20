@@ -68,7 +68,7 @@ func (s *Server) handleSetState(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusConflict, "That would write off work", err.Error())
 		return
 	case errors.As(err, &illegal):
-		s.renderError(w, r, http.StatusConflict, "Not from here", illegal.Error())
+		s.renderIllegal(w, r, illegal)
 		return
 	case errors.Is(err, workshop.ErrInvalid):
 		s.renderError(w, r, http.StatusBadRequest, "Not accepted", trimInvalid(err))
@@ -289,7 +289,11 @@ func (s *Server) handleInvoice(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	id := r.PathValue("id")
 
-	_, err := workshop.Issue(r.Context(), s.pool, session.Scope, id)
+	var opts []workshop.IssueOption
+	if r.FormValue("confirm_unagreed") != "" {
+		opts = append(opts, workshop.InvoiceUnagreedLines())
+	}
+	_, err := workshop.Issue(r.Context(), s.pool, session.Scope, id, opts...)
 
 	var illegal workshop.ErrIllegalTransition
 	switch {
@@ -306,7 +310,10 @@ func (s *Server) handleInvoice(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusConflict, "Not invoiced", err.Error())
 		return
 	case errors.As(err, &illegal):
-		s.renderError(w, r, http.StatusConflict, "Not from here", illegal.Error())
+		s.renderIllegal(w, r, illegal)
+		return
+	case errors.Is(err, workshop.ErrUnagreedLines):
+		s.renderError(w, r, http.StatusConflict, "Not invoiced", trimInvalid(err))
 		return
 	case err != nil:
 		s.fault(w, r, "issue invoice", err)

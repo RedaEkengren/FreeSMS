@@ -14,7 +14,8 @@ import (
 func (s *Server) handleRecordPayment(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	id := r.PathValue("id")
-	p := workshop.NewPayment{Method: r.FormValue("method"), Reference: r.FormValue("reference")}
+	p := workshop.NewPayment{Method: r.FormValue("method"), Reference: r.FormValue("reference"),
+		ConfirmedOverpayment: r.FormValue("confirm_over") != ""}
 	if v := strings.TrimSpace(r.FormValue("amount")); v != "" {
 		negative := strings.HasPrefix(v, "-")
 		n, err := parseMinorUnits(strings.TrimPrefix(v, "-"))

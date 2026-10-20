@@ -25,6 +25,8 @@ func invoicedJob(t *testing.T, pool *pgxpool.Pool) (job, invoiceID string) {
 		UnitPriceMinor: 100000, VATRateBasis: 2500}); err != nil {
 		t.Fatal(err)
 	}
+	// Put on after the job was approved, so it is put to the customer too.
+	agree(t, pool, job)
 	move(t, pool, job, workshop.StateInProgress, workshop.StateReady)
 	inv, err := workshop.Issue(ctx, pool, advisor(), job)
 	if err != nil {

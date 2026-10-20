@@ -1,5 +1,5 @@
 {{define "content"}}
 <h1>{{.T .Title}}</h1>
-<p class="error" role="alert">{{.Sentence .Error}}</p>
+<p class="error" role="alert">{{if .Illegal}}{{.IllegalSays}}{{else}}{{.Sentence .Error}}{{end}}</p>
 <p><a href="/">{{.T "Back"}}</a></p>
 {{end}}

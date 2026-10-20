@@ -59,13 +59,30 @@ func (i Invoice) Net() string   { return money.Format(i.NetMinor) }
 func (i Invoice) VAT() string   { return money.Format(i.VATMinor) }
 func (i Invoice) Gross() string { return money.Format(i.GrossMinor) }
 
+// ErrUnagreedLines is refusing to invoice a line the customer has not agreed
+// to, until somebody says that is what they mean.
+var ErrUnagreedLines = fmt.Errorf("%w: a line was put on after the customer agreed and has no agreement; put it to the customer, take it off, or tick that it is to be invoiced anyway", ErrInvalid)
+
+type issueOptions struct{ unagreed bool }
+
+// IssueOption changes how Issue behaves.
+type IssueOption func(*issueOptions)
+
+// InvoiceUnagreedLines lets Issue include lines the customer has not agreed
+// to. The invoice still marks them.
+func InvoiceUnagreedLines() IssueOption { return func(o *issueOptions) { o.unagreed = true } }
+
 // Issue turns a work order into an invoice and moves it to invoiced.
 //
 // One transaction, from allocating the number to setting the state. That is
 // what makes the series gap-free: a failure anywhere un-allocates the number
 // along with everything else, which a sequence could not do because sequences
 // do not roll back.
-func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrderID string) (Invoice, error) {
+func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrderID string, opts ...IssueOption) (Invoice, error) {
+	var o issueOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
 	if !scope.Role.SeesCustomerPersonalData() {
 		return Invoice{}, access.ErrForbidden
 	}
@@ -96,6 +113,11 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 		}
 		if exists {
 			return ErrAlreadyInvoiced
+		}
+
+		var wasDeclined bool
+		if err := tx.QueryRow(ctx, `SELECT state = 'declined' FROM work_orders WHERE id = $1`, workOrderID).Scan(&wasDeclined); err != nil {
+			return fmt.Errorf("read state: %w", err)
 		}
 
 		// The state machine decides whether this order may be invoiced at all,
@@ -134,6 +156,21 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 		}
 		if len(lines) == 0 {
 			return ErrNothingToInvoice
+		}
+		// A line put on after the customer said yes is not part of what they
+		// said yes to. Invoicing it is possible, but somebody decides to.
+		if !o.unagreed && !wasDeclined {
+			var n int
+			if err := tx.QueryRow(ctx, `
+				SELECT count(*) FROM work_order_lines
+				WHERE work_order_id = $1 AND cost_bearer = 'customer' AND declined_at IS NULL
+				  AND withdrawn_at IS NULL AND approved_at IS NULL AND customer_decision_id IS NULL`,
+				workOrderID).Scan(&n); err != nil {
+				return fmt.Errorf("count unagreed lines: %w", err)
+			}
+			if n > 0 {
+				return ErrUnagreedLines
+			}
 		}
 		// Förbrukningsmaterial and the invoicing fee, as lines of their own
 		// on the document, at the shop's settings as they are now. Frozen

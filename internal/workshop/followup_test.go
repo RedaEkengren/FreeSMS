@@ -264,7 +264,7 @@ func TestAnOverpaymentIsOwedBack(t *testing.T) {
 	ctx := context.Background()
 	_, inv := issued(t, pool)
 	over := inv.GrossMinor + 5000
-	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{AmountMinor: &over, Method: "bank", PaidOn: time.Now()}); err != nil {
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{AmountMinor: &over, Method: "bank", PaidOn: time.Now(), ConfirmedOverpayment: true}); err != nil {
 		t.Fatal(err)
 	}
 	items, _ := workshop.Worklist(ctx, pool, advisor(), time.Now())

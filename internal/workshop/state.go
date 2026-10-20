@@ -83,6 +83,9 @@ func (e ErrIllegalTransition) Error() string {
 	return fmt.Sprintf("a %s order cannot become %s; it can only become %v", e.From, e.To, allowed)
 }
 
+// MovesFrom is where an order in this state can go next.
+func MovesFrom(s State) []State { return append([]State(nil), transitions[s]...) }
+
 // ErrWouldLoseWork is returned when cancelling an order that has work on it.
 //
 // Cancelled means it never happened, and nothing is owed. An order with

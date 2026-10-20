@@ -42,6 +42,10 @@ type pageData struct {
 	zone    *time.Location
 	Session auth.Session
 	Error   string
+
+	// Set instead of Error when a job was asked to move where it cannot, so the
+	// page can name the moves in the words of the buttons.
+	Illegal *workshop.ErrIllegalTransition
 	Email   string
 
 	Jobs            []workshop.Job
@@ -275,6 +279,13 @@ var templateFuncs = template.FuncMap{
 	"fmt":    money.Format,
 	"divide": func(a, b int) int { return a / b },
 	"add":    func(a, b int) int { return a + b },
+	// The size of an amount, for a label that already says which way it runs.
+	"abs": func(n int64) int64 {
+		if n < 0 {
+			return -n
+		}
+		return n
+	},
 	// Minutes as hours with a point, for Num to write in the reader's way.
 	"hours": workshop.Hours,
 	"date":  func(t time.Time) string { return t.Format("2006-01-02") },
@@ -562,4 +573,41 @@ func (d pageData) ClashSays(c workshop.Clash) string {
 		return d.T("%s already has %s then", c.Who, c.Detail)
 	}
 	return d.T("More cars than lifts: %s", c.Detail)
+}
+
+// renderIllegal answers a move the state machine does not allow.
+func (s *Server) renderIllegal(w http.ResponseWriter, r *http.Request, e workshop.ErrIllegalTransition) {
+	s.render(w, r, http.StatusConflict, "error", pageData{
+		Title:   "Not from here",
+		Illegal: &e,
+		Session: sessionFrom(r.Context()),
+	})
+}
+
+// IllegalSays says why a job cannot move, and which moves it can make, using
+// the words on the buttons rather than the codes the states are stored under.
+func (d pageData) IllegalSays() string {
+	e := d.Illegal
+	moves := workshop.MovesFrom(e.From)
+	if len(moves) == 0 {
+		return d.T("This job (%s) cannot be changed; reopening one means a new job.", d.T(e.From.Label()))
+	}
+	var actions []string
+	for _, m := range moves {
+		actions = append(actions, d.T(m.Action()))
+	}
+	return d.T("This job (%s) cannot be moved to %s. From there it can be: %s.",
+		d.T(e.From.Label()), d.T(e.To.Label()), strings.Join(actions, ", "))
+}
+
+// NotAgreedLines counts the lines the customer is to pay for that nobody has
+// agreed to: put on after the yes, so the invoice would carry them unasked.
+func (d pageData) NotAgreedLines() int {
+	n := 0
+	for _, l := range d.Lines {
+		if l.CostBearer == "customer" && l.ApprovedAt == nil && l.DeclinedAt == nil && l.WithdrawnAt == nil && !l.FromAnswer {
+			n++
+		}
+	}
+	return n
 }

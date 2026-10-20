@@ -779,6 +779,10 @@
        invoiced -- and this is the only button that gets it there. */}}
   {{if .Session.Scope.Role.SeesCustomerPersonalData}}
   <form class="my" method="post" action="/jobs/{{.Job.ID}}/invoice">
+    {{if and .NotAgreedLines (ne .Job.State "declined")}}
+    <p class="waiting">{{.N "%d line was put on after the customer agreed, and has no agreement." .NotAgreedLines}}</p>
+    <label class="tick"><input type="checkbox" name="confirm_unagreed" value="1"> <span>{{.T "Invoice it with the lines nobody agreed to"}}</span></label>
+    {{end}}
     <button type="submit">{{.T "Invoice it"}}</button>
   </form>
   {{end}}

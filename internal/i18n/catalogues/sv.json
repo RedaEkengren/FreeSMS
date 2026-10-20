@@ -437,6 +437,31 @@
     "One of the values is outside what is allowed: too long, too large or not valid.": {
       "other": "Ett av värdena är utanför det som tillåts: för långt, för stort eller ogiltigt."
     },
+    "This job (%s) cannot be changed; reopening one means a new job.": {
+      "other": "Jobbet (%s) kan inte ändras; att öppna det igen innebär ett nytt jobb."
+    },
+    "This job (%s) cannot be moved to %s. From there it can be: %s.": {
+      "other": "Jobbet (%s) kan inte flyttas till %s. Därifrån kan det bli: %s."
+    },
+    "that is more than is owed on the invoice; if the customer really paid more, tick that and record it again": {
+      "other": "det är mer än fakturan står på; om kunden verkligen betalade mer, kryssa i det och registrera igen"
+    },
+    "that is more than %d days before the invoice was issued, on %s": {
+      "other": "det är mer än %d dagar före fakturan utfärdades, den %s"
+    },
+    "The customer really paid more than is owed": {
+      "other": "Kunden betalade verkligen mer än fakturan"
+    },
+    "a line was put on after the customer agreed and has no agreement; put it to the customer, take it off, or tick that it is to be invoiced anyway": {
+      "other": "en rad lades till efter att kunden godkänt och saknar godkännande; lägg fram den för kunden, ta bort den, eller kryssa i att den ändå ska faktureras"
+    },
+    "%d line was put on after the customer agreed, and has no agreement.": {
+      "one": "%d rad lades till efter att kunden godkänt och saknar godkännande.",
+      "other": "%d rader lades till efter att kunden godkänt och saknar godkännande."
+    },
+    "Invoice it with the lines nobody agreed to": {
+      "other": "Fakturera med raderna ingen godkänt"
+    },
     "Pay to": {
       "other": "Betalas till"
     },

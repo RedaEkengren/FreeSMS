@@ -4,7 +4,7 @@
   {{if .Disputed}}<span class="tag late">{{$.T "disputed"}}</span>{{end}}</div>
 <p class="waiting"><a href="/invoices/{{.InvoiceID}}">{{$.T "Back to the invoice"}}</a></p>
 <dl>
-  <dt>{{if lt .Outstanding 0}}{{$.T "Owed back to the customer"}}{{else}}{{$.T "Outstanding"}}{{end}}</dt><dd class="grand">{{$.Money .Outstanding}}</dd>
+  <dt>{{if lt .Outstanding 0}}{{$.T "Owed back to the customer"}}{{else}}{{$.T "Outstanding"}}{{end}}</dt><dd class="grand">{{$.Money (abs .Outstanding)}}</dd>
   <dt>{{$.T "Has it"}}</dt><dd>{{if .Owner}}{{.Owner}}{{else}}{{$.T "Nobody"}}{{end}}</dd>
   <dt>{{$.T "Next"}}</dt><dd>{{if .Next}}{{$.Date ($.Local .Next) "Mon 2 Jan 2006"}}{{else}}&ndash;{{end}}</dd>
 </dl>

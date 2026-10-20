@@ -16,7 +16,7 @@
   {{if .CreditedMinor}}<dt>{{$.T "Credited"}}</dt><dd>{{$.Money .CreditedMinor}}</dd>{{end}}
   <dt>{{$.T "Paid"}}</dt><dd>{{$.Money .PaidMinor}}</dd>
   <dt class="grand">{{if lt .OutstandingMinor 0}}{{$.T "Owed back to the customer"}}{{else}}{{$.T "Outstanding"}}{{end}}</dt>
-  <dd class="grand">{{$.Money .OutstandingMinor}}
+  <dd class="grand">{{$.Money (abs .OutstandingMinor)}}
     {{if .Overdue}}<span class="tag late">{{$.T "overdue"}}</span>{{else if .Settled}}<span class="tag">{{$.T "settled"}}</span>{{end}}</dd>
   <dt>{{$.T "Due"}}</dt><dd>{{$.Date ($.Local .Due) "2 Jan 2006"}}</dd>
 </dl>
@@ -52,6 +52,7 @@
       <select name="method">{{range $.Methods}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
     <label><span>{{$.T "Reference"}}</span><input name="reference" placeholder="OCR"></label>
   </div>
+  <label class="tick"><input type="checkbox" name="confirm_over" value="1"> <span>{{$.T "The customer really paid more than is owed"}}</span></label>
   <p class="waiting">{{$.T "Left empty, the amount is whatever is owed; in cash it is rounded to the krona and the difference kept apart."}}</p>
   <button type="submit">{{$.T "Record the payment"}}</button>
 </form>

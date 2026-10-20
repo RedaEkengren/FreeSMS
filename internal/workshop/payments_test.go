@@ -85,7 +85,7 @@ func TestAnOverpaymentAfterACreditNoteShows(t *testing.T) {
 		t.Errorf("a payment against the credit note: %v, want it sent to the invoice", err)
 	}
 	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
-		AmountMinor: amount(inv.GrossMinor), Method: "bank", PaidOn: time.Now()}); err != nil {
+		AmountMinor: amount(inv.GrossMinor), Method: "bank", PaidOn: time.Now(), ConfirmedOverpayment: true}); err != nil {
 		t.Fatalf("RecordPayment: %v", err)
 	}
 	b, _ := workshop.BalanceFor(ctx, pool, advisor(), credit.ID)

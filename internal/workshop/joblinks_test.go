@@ -51,6 +51,7 @@ func TestTheCustomersLinkFollowsTheJob(t *testing.T) {
 	}
 
 	move(t, pool, job, workshop.StateReady)
+	agree(t, pool, job)
 	if _, err := workshop.Issue(ctx, pool, advisor(), job); err != nil {
 		t.Fatalf("Issue: %v", err)
 	}

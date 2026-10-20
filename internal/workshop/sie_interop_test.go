@@ -107,7 +107,7 @@ func TestAnIndependentReaderReadsTheExportAsMeant(t *testing.T) {
 	// And money that came in for it anyway, in cash, before the credit:
 	// a voucher in series B, rounded at the counter.
 	paid, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
-		AmountMinor: func() *int64 { v := int64(256300); return &v }(), Method: "cash", PaidOn: time.Now()})
+		AmountMinor: func() *int64 { v := int64(256300); return &v }(), Method: "cash", PaidOn: time.Now(), ConfirmedOverpayment: true})
 	if err != nil {
 		t.Fatalf("RecordPayment: %v", err)
 	}

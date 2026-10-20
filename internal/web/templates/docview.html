@@ -12,7 +12,7 @@
   {{if .CreditedMinor}}<dt>{{$.T "Credited"}}</dt><dd>{{$.Money .CreditedMinor}}</dd>{{end}}
   <dt>{{$.T "Paid"}}</dt><dd>{{$.Money .PaidMinor}}</dd>
   <dt class="grand">{{if lt .OutstandingMinor 0}}{{$.T "Owed back to the customer"}}{{else}}{{$.T "Outstanding"}}{{end}}</dt>
-  <dd class="grand">{{$.Money .OutstandingMinor}}{{if .Settled}} <span class="tag">{{$.T "settled"}}</span>{{end}}</dd>
+  <dd class="grand">{{$.Money (abs .OutstandingMinor)}}{{if .Settled}} <span class="tag">{{$.T "settled"}}</span>{{end}}</dd>
   {{if gt .OutstandingMinor 0}}<dt>{{$.T "Due"}}</dt><dd>{{$.Date ($.Local .Due) "2 Jan 2006"}}</dd>{{end}}
 </dl>
 </section>

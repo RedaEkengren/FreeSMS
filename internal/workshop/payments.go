@@ -87,7 +87,22 @@ type NewPayment struct {
 	Method      string
 	PaidOn      time.Time
 	Reference   string
+
+	// Set when the person has been told the amount is more than is owed and
+	// says it is meant. Without it an extra zero is recorded as money that
+	// arrived.
+	ConfirmedOverpayment bool
 }
+
+// overpaymentMargin is how far above what is owed a payment may go before
+// somebody is asked: a krona covers cash rounding and an öre typed wrong.
+const overpaymentMargin = 100
+
+const maxPaidBeforeInvoiceDays = 31
+
+// ErrOverpayment is refusing a payment far above what is owed until the person
+// says that is what they mean.
+var ErrOverpayment = fmt.Errorf("%w: that is more than is owed on the invoice; if the customer really paid more, tick that and record it again", ErrInvalid)
 
 // ErrNothingOwed is refusing to settle a balance that is already settled.
 var ErrNothingOwed = fmt.Errorf("%w: nothing is owed on that invoice", ErrInvalid)
@@ -210,6 +225,16 @@ func RecordPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		}
 		if b.InvoiceID != invoiceID {
 			return fmt.Errorf("%w: that is a credit note; record the payment against %s", ErrInvalid, b.Reference)
+		}
+		// Money can arrive before the invoice is written -- paid at the
+		// counter on Friday, written up on Monday -- but not a month before.
+		// A year typed wrong moves it into a day that had nothing to do
+		// with this job, and the day's figures read these dates.
+		if issued := b.IssuedAt.In(b.Today.Location()); p.PaidOn.Format("2006-01-02") < issued.AddDate(0, 0, -maxPaidBeforeInvoiceDays).Format("2006-01-02") {
+			return fmt.Errorf("%w: that is more than %d days before the invoice was issued, on %s", ErrInvalid, maxPaidBeforeInvoiceDays, issued.Format("2006-01-02"))
+		}
+		if p.AmountMinor != nil && *p.AmountMinor > b.OutstandingMinor()+overpaymentMargin && !p.ConfirmedOverpayment {
+			return ErrOverpayment
 		}
 		out = Payment{Method: p.Method, PaidOn: p.PaidOn, Reference: strings.TrimSpace(p.Reference)}
 		if p.AmountMinor != nil {
