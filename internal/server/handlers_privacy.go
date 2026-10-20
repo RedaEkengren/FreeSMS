@@ -23,8 +23,7 @@ func (s *Server) handleExportPerson(w http.ResponseWriter, r *http.Request) {
 	}
 	body, err := workshop.MarshalExport(export)
 	if err != nil {
-		s.log.Error("marshal export", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "marshal export", err)
 		return
 	}
 

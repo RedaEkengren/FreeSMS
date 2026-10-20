@@ -43,8 +43,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		s.log.Error("dashboard", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "dashboard", err)
 		return
 	}
 

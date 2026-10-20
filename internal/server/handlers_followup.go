@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/notify"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
@@ -20,7 +21,8 @@ func (s *Server) handleFollowUpPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	people, err := workshop.DeskPeople(r.Context(), s.pool, session.Scope)
-	if err != nil {
+	// A role that may not see the desk's people is not an error: the list is left out.
+	if err != nil && !errors.Is(err, access.ErrForbidden) {
 		s.log.Error("read people", "error", err)
 	}
 	doc, err := workshop.DocumentByID(r.Context(), s.pool, session.Scope, f.InvoiceID)

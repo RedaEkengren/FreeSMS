@@ -50,6 +50,22 @@ func divRound(numerator, denominator int64) int64 {
 	return -((-numerator + denominator/2) / denominator)
 }
 
+// The largest price and quantity a line can carry: ten million in the
+// currency, and a hundred thousand units. With both at the limit a line is
+// 10^14 minor units, so a hundred thousand such lines still fit in an int64;
+// without a limit, a quantity and a price each small enough to be typed
+// multiply to a number that wraps around and is shown as a total.
+const (
+	MaxUnitPriceMinor = 1_000_000_000
+	MaxQuantityMilli  = 100_000_000
+)
+
+// LineWithinLimits reports whether a line's quantity and unit price are both
+// ones a line can carry.
+func LineWithinLimits(quantityMilli, unitPriceMinor int64) bool {
+	return quantityMilli <= MaxQuantityMilli && unitPriceMinor <= MaxUnitPriceMinor
+}
+
 // LineNet is the amount charged for a line before VAT.
 //
 // quantityMilli is thousandths of a unit; unitPriceMinor is the price of one

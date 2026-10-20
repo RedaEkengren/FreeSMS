@@ -74,8 +74,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	case err != nil:
-		s.log.Error("setup", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "setup", err)
 		return
 	}
 

@@ -56,8 +56,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	case err != nil:
-		s.log.Error("login", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "login", err)
 		return
 	}
 
@@ -79,8 +78,7 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	jobs, err := workshop.OpenJobs(r.Context(), s.pool, session.Scope)
 	if err != nil {
-		s.log.Error("list jobs", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "list jobs", err)
 		return
 	}
 	s.render(w, r, http.StatusOK, "jobs", pageData{
@@ -182,8 +180,7 @@ func (s *Server) renderJob(w http.ResponseWriter, r *http.Request, linkURL strin
 		return
 	}
 	if err != nil {
-		s.log.Error("read job", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "read job", err)
 		return
 	}
 	s.render(w, r, http.StatusOK, "job", page)

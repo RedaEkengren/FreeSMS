@@ -19,8 +19,7 @@ func (s *Server) handleTime(w http.ResponseWriter, r *http.Request) {
 	// and this one.
 	mine, err := workshop.MyTime(r.Context(), s.pool, session.Scope, time.Now().AddDate(0, 0, -14))
 	if err != nil {
-		s.log.Error("my time", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "my time", err)
 		return
 	}
 

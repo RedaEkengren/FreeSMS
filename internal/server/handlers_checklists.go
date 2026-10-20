@@ -85,8 +85,7 @@ func (s *Server) checklistError(w http.ResponseWriter, r *http.Request, err erro
 	case errors.Is(err, workshop.ErrInvalid):
 		s.renderError(w, r, http.StatusBadRequest, "Not accepted", trimInvalid(err))
 	default:
-		s.log.Error("checklists", "error", err, "path", r.URL.Path)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "checklists", err)
 	}
 	return true
 }

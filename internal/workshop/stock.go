@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -62,7 +63,12 @@ type Part struct {
 }
 
 // Available is what can be promised to another job.
-func (p Part) Available() float64 { return p.OnHand - p.Reserved }
+func (p Part) Available() float64 { return round3(p.OnHand - p.Reserved) }
+
+// round3 rounds a quantity to the three decimals the ledger holds. A float
+// subtraction of two of them is not one of them -- 0.3 less 0.1 is
+// 0.19999999999999998 -- and the page prints what it is given.
+func round3(f float64) float64 { return math.Round(f*1000) / 1000 }
 
 // Short reports whether stock has fallen to or below the minimum.
 func (p Part) Short() bool { return p.Minimum > 0 && p.Available() <= p.Minimum }

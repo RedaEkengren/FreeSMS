@@ -398,6 +398,12 @@ func TestOnlyTheCounterPlansAndAFinishedJobCannotBe(t *testing.T) {
 	if _, err := workshop.PlanJob(ctx, pool, advisor(), job, bad); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("a plan that ends before it starts: %v", err)
 	}
+	// The planner walks the days between the two, so a form that says year 9999
+	// would hold a request for seconds; a plan longer than a year is refused.
+	long := plan(at("2030-04-01", 8, 0), at("2035-04-01", 8, 0), 0)
+	if _, err := workshop.PlanJob(ctx, pool, advisor(), job, long); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a plan of five years: %v", err)
+	}
 	gone := newJob(t, pool)
 	if err := workshop.SetState(ctx, pool, advisor(), gone, workshop.StateCancelled); err != nil {
 		t.Fatal(err)

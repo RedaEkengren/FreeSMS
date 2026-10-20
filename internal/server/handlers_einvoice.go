@@ -22,15 +22,13 @@ func (s *Server) handleEInvoice(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusNotFound, "Not found", "No such invoice.")
 		return
 	case err != nil:
-		s.log.Error("write the electronic invoice", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "write the electronic invoice", err)
 		return
 	}
 	if len(missing) > 0 {
 		doc, err := workshop.DocumentByID(r.Context(), s.pool, session.Scope, id)
 		if err != nil {
-			s.log.Error("read invoice", "error", err)
-			s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+			s.fault(w, r, "read invoice", err)
 			return
 		}
 		s.render(w, r, http.StatusConflict, "einvoice", pageData{
@@ -40,8 +38,7 @@ func (s *Server) handleEInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 	doc, err := workshop.DocumentByID(r.Context(), s.pool, session.Scope, id)
 	if err != nil {
-		s.log.Error("read invoice", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "read invoice", err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")

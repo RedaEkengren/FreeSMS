@@ -19,8 +19,7 @@ func (s *Server) handleLabour(w http.ResponseWriter, r *http.Request) {
 
 	times, err := workshop.LabourTimes(r.Context(), s.pool, session.Scope)
 	if err != nil {
-		s.log.Error("labour times", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "labour times", err)
 		return
 	}
 	rate, err := workshop.LabourRate(r.Context(), s.pool, session.Scope)

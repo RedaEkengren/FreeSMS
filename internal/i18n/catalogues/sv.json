@@ -425,6 +425,18 @@
     "the customer's electronic invoice address: a Swedish company number has ten digits and a check digit that must add up": {
       "other": "kundens adress för e-faktura: ett svenskt organisationsnummer har tio siffror och en kontrollsiffra som ska stämma"
     },
+    "A text cannot contain a null character.": {
+      "other": "En text får inte innehålla ett nolltecken."
+    },
+    "That email address already belongs to another customer; open that customer instead.": {
+      "other": "Den e-postadressen tillhör redan en annan kund; öppna den kunden i stället."
+    },
+    "That already exists.": {
+      "other": "Det finns redan."
+    },
+    "One of the values is outside what is allowed: too long, too large or not valid.": {
+      "other": "Ett av värdena är utanför det som tillåts: för långt, för stort eller ogiltigt."
+    },
     "Pay to": {
       "other": "Betalas till"
     },
@@ -5568,6 +5580,15 @@
     },
     "give both when it starts and when it ends, or neither": {
       "other": "ange både när det börjar och när det slutar, eller ingetdera"
+    },
+    "a plan cannot run for more than a year": {
+      "other": "en plan kan inte vara längre än ett år"
+    },
+    "the price or the quantity is larger than a line can hold": {
+      "other": "priset eller antalet är större än en rad kan rymma"
+    },
+    "that is larger than anything can be here": {
+      "other": "det är större än något kan vara här"
     },
     "it has to end after it starts": {
       "other": "det måste sluta efter att det börjar"

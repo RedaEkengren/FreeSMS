@@ -86,7 +86,7 @@ func (s *Server) handleEditVehicle(w http.ResponseWriter, r *http.Request) {
 	}
 	if y := strings.TrimSpace(r.FormValue("model_year")); y != "" {
 		n, err := strconv.Atoi(y)
-		if err != nil || n < -32768 || n > 32767 {
+		if err != nil || n < minModelYear || n > maxModelYear {
 			s.renderError(w, r, http.StatusBadRequest, "Not accepted", "That is not a model year.")
 			return
 		}

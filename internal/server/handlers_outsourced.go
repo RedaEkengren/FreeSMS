@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
@@ -25,7 +26,8 @@ func (s *Server) handleOutsourcedPage(w http.ResponseWriter, r *http.Request) {
 		Today: s.today(r).Format("2006-01-02"), Outcomes: outcomeOptions()}
 	if session.Scope.Role.SeesParts() {
 		people, err := workshop.DeskPeople(r.Context(), s.pool, session.Scope)
-		if err != nil {
+		// A role that may not see the desk's people is not an error: the list is left out.
+		if err != nil && !errors.Is(err, access.ErrForbidden) {
 			s.log.Error("read people", "error", err)
 		}
 		data.DeskPeople = people

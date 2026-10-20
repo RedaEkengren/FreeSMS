@@ -54,7 +54,7 @@ func (p PartRequest) Stage() string {
 func (p PartRequest) Open() bool { return p.ArrivedAt == nil && p.CancelledAt == nil }
 
 // Rest is what is still owed. Never negative: five of four is done.
-func (p PartRequest) Rest() float64 { return max(p.Quantity-p.Received, 0) }
+func (p PartRequest) Rest() float64 { return round3(max(p.Quantity-p.Received, 0)) }
 
 // Partly reports some of it here and some still owed -- the normal case, not
 // an error.

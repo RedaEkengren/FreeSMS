@@ -34,8 +34,7 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		s.log.Error("board", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "board", err)
 		return
 	}
 
@@ -206,7 +205,9 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 			return -1
 		}, form.OdometerKm)
 		km, err := strconv.ParseInt(digits, 10, 64)
-		if err != nil || digits == "" {
+		// A minus sign is refused rather than dropped with the other
+		// punctuation, and so is a reading the database would not hold.
+		if err != nil || digits == "" || strings.Contains(form.OdometerKm, "-") || km >= 10_000_000 {
 			again(http.StatusBadRequest, "The odometer reading should be a number of kilometres.")
 			return
 		}
@@ -222,10 +223,13 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 		VIN:    strings.TrimSpace(r.FormValue("vin")),
 	}
 	if v := strings.TrimSpace(r.FormValue("model_year")); v != "" {
-		if n, err := strconv.ParseInt(v, 10, 16); err == nil {
-			y := int16(n)
-			details.ModelYear = &y
+		n, err := strconv.ParseInt(v, 10, 16)
+		if err != nil || n < minModelYear || n > maxModelYear {
+			again(http.StatusBadRequest, "That is not a model year.")
+			return
 		}
+		y := int16(n)
+		details.ModelYear = &y
 	}
 
 	var id string
@@ -271,8 +275,7 @@ func (s *Server) handleNewJob(w http.ResponseWriter, r *http.Request) {
 		again(http.StatusBadRequest, strings.TrimPrefix(err.Error(), "workshop: invalid: "))
 		return
 	case err != nil:
-		s.log.Error("take in", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "take in", err)
 		return
 	}
 

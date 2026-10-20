@@ -16,8 +16,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 
 	results, err := workshop.Search(r.Context(), s.pool, session.Scope, query)
 	if err != nil {
-		s.log.Error("search", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "search", err)
 		return
 	}
 

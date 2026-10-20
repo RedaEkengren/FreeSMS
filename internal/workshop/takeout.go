@@ -36,7 +36,7 @@ type JobPart struct {
 func (p JobPart) NotTakenOut() bool { return p.Priced > p.TakenOut }
 
 // Remaining is what is priced and still on the shelf.
-func (p JobPart) Remaining() float64 { return max(p.Priced-p.TakenOut, 0) }
+func (p JobPart) Remaining() float64 { return round3(max(p.Priced-p.TakenOut, 0)) }
 
 // NotPriced is taken out to the job and not on its lines: the cue that stops
 // a part being fitted for nothing.

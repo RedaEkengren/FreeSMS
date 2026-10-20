@@ -464,6 +464,9 @@ func PlanJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 	return clashes, err
 }
 
+// maxPlannedStretch is the longest a job can be planned to take.
+const maxPlannedStretch = 366 * 24 * time.Hour
+
 func checkPlanInput(in *PlanInput) error {
 	in.Override = strings.TrimSpace(in.Override)
 	in.Note = strings.TrimSpace(in.Note)
@@ -472,6 +475,10 @@ func checkPlanInput(in *PlanInput) error {
 		return fmt.Errorf("%w: give both when it starts and when it ends, or neither", ErrInvalid)
 	case in.Starts != nil && !in.Ends.After(*in.Starts):
 		return fmt.Errorf("%w: it has to end after it starts", ErrInvalid)
+	case in.Starts != nil && in.Ends.Sub(*in.Starts) > maxPlannedStretch:
+		// The planner walks the days between the two, so the length is bounded
+		// by what a job can take, not by what a form can be made to say.
+		return fmt.Errorf("%w: a plan cannot run for more than a year", ErrInvalid)
 	case in.RemainingMinutes != nil && *in.RemainingMinutes < 0:
 		return fmt.Errorf("%w: the work left cannot be negative", ErrInvalid)
 	case len(in.Override) > 300 || len(in.Note) > 300:

@@ -35,7 +35,7 @@ type SupplyLine struct {
 }
 
 // Rest is what is still owed on the line.
-func (l SupplyLine) Rest() float64 { return max(l.Ordered-l.Received, 0) }
+func (l SupplyLine) Rest() float64 { return round3(max(l.Ordered-l.Received, 0)) }
 
 // Late reports whether it was due before today and is still owed.
 func (l SupplyLine) Late(today time.Time) bool {
@@ -71,7 +71,7 @@ func (r Receipt) Returnable() float64 {
 	for _, x := range r.Returns {
 		left -= x.Quantity
 	}
-	return max(left, 0)
+	return round3(max(left, 0))
 }
 
 // ReturnItem is something going back, or gone back.

@@ -20,8 +20,7 @@ func (s *Server) handleParts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		s.log.Error("part requests", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "part requests", err)
 		return
 	}
 	s.render(w, r, http.StatusOK, "parts", pageData{
@@ -121,8 +120,7 @@ func (s *Server) handoverError(w http.ResponseWriter, r *http.Request, err error
 	case errors.Is(err, workshop.ErrInvalid):
 		s.renderError(w, r, http.StatusBadRequest, "Not accepted", trimInvalid(err))
 	default:
-		s.log.Error("handover", "error", err, "path", r.URL.Path)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "handover", err)
 	}
 	return true
 }

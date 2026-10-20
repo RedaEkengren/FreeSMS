@@ -22,8 +22,7 @@ func (s *Server) handleShop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		s.log.Error("read shop details", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "read shop details", err)
 		return
 	}
 
@@ -134,8 +133,7 @@ func (s *Server) handleSaveShop(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusBadRequest, "Not saved", trimInvalid(err))
 		return
 	case err != nil:
-		s.log.Error("save shop details", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "save shop details", err)
 		return
 	}
 

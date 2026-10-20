@@ -31,8 +31,7 @@ func (s *Server) enquiryError(w http.ResponseWriter, r *http.Request, err error)
 	case errors.Is(err, workshop.ErrInvalid):
 		s.renderError(w, r, http.StatusBadRequest, "Not accepted", trimInvalid(err))
 	default:
-		s.log.Error("enquiry", "error", err, "path", r.URL.Path)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "enquiry", err)
 	}
 	return true
 }

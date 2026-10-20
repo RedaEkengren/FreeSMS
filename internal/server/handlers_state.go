@@ -78,8 +78,7 @@ func (s *Server) handleSetState(w http.ResponseWriter, r *http.Request) {
 			"That move belongs to the front desk.")
 		return
 	case err != nil:
-		s.log.Error("set state", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "set state", err)
 		return
 	}
 
@@ -107,8 +106,7 @@ func (s *Server) handleMarkPerformed(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusConflict, "Not changed", trimInvalid(err))
 		return
 	case err != nil:
-		s.log.Error("mark performed", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "mark performed", err)
 		return
 	}
 	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
@@ -172,8 +170,7 @@ func (s *Server) handleAddLine(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusBadRequest, "That line was not accepted", trimInvalid(err))
 		return
 	case err != nil:
-		s.log.Error("add line", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "add line", err)
 		return
 	}
 	s.submitted(w, r)
@@ -222,8 +219,7 @@ func (s *Server) handlePriceAnswer(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusBadRequest, "That line was not accepted", trimInvalid(err))
 		return
 	case err != nil:
-		s.log.Error("price answer", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "price answer", err)
 		return
 	}
 	s.submitted(w, r)
@@ -262,6 +258,11 @@ func parseScaled(s string, decimals int) (int64, error) {
 	major, err := strconv.ParseInt(whole, 10, 64)
 	if err != nil || major < 0 {
 		return 0, errors.New("write it as a number, for example 1295 or 1295,50")
+	}
+	// Twelve digits is a trillion: nothing a form asks for is larger, and
+	// multiplied by the scale below it stays far from wrapping an int64.
+	if major > 999_999_999_999 {
+		return 0, errors.New("that is larger than anything can be here")
 	}
 
 	var minor int64
@@ -308,8 +309,7 @@ func (s *Server) handleInvoice(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusConflict, "Not from here", illegal.Error())
 		return
 	case err != nil:
-		s.log.Error("issue invoice", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "issue invoice", err)
 		return
 	}
 	http.Redirect(w, r, "/jobs/"+id, http.StatusSeeOther)
@@ -332,8 +332,7 @@ func (s *Server) handleCreditNote(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusConflict, "Not credited", trimInvalid(err))
 		return
 	case err != nil:
-		s.log.Error("credit note", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "credit note", err)
 		return
 	}
 	http.Redirect(w, r, "/jobs/"+jobID, http.StatusSeeOther)
@@ -358,8 +357,7 @@ func (s *Server) handleInvoiceDocument(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusNotFound, "Not found", "No such invoice.")
 		return
 	case err != nil:
-		s.log.Error("read invoice", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "read invoice", err)
 		return
 	}
 
@@ -478,8 +476,7 @@ func (s *Server) quoteError(w http.ResponseWriter, r *http.Request, err error) b
 	case errors.Is(err, workshop.ErrInvalid):
 		s.renderError(w, r, http.StatusBadRequest, "Not accepted", trimInvalid(err))
 	default:
-		s.log.Error("quote", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "quote", err)
 	}
 	return true
 }

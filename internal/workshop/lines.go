@@ -7,6 +7,7 @@ import (
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
+	"github.com/RedaEkengren/FreeSMS/internal/money"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -68,6 +69,8 @@ func checkLine(line *NewLine) error {
 		return fmt.Errorf("%w: quantity cannot be negative", ErrInvalid)
 	case line.UnitPriceMinor < 0:
 		return fmt.Errorf("%w: a negative price is a credit note, not a line", ErrInvalid)
+	case !money.LineWithinLimits(line.QuantityMilli, line.UnitPriceMinor):
+		return fmt.Errorf("%w: the price or the quantity is larger than a line can hold", ErrInvalid)
 	}
 	switch line.Kind {
 	case "labour", "part", "sublet", "fee":

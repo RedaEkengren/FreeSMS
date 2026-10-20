@@ -24,8 +24,7 @@ func (s *Server) handleCustomerForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		s.log.Error("read job", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "read job", err)
 		return
 	}
 	if !session.Scope.Role.SeesCustomerPersonalData() {
@@ -121,8 +120,7 @@ func (s *Server) customerError(w http.ResponseWriter, r *http.Request, err error
 	case errors.Is(err, workshop.ErrInvalid):
 		s.renderError(w, r, http.StatusBadRequest, "Not saved", trimInvalid(err))
 	default:
-		s.log.Error("customer", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "customer", err)
 	}
 	return true
 }

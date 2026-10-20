@@ -201,6 +201,8 @@ func AddEnquiryLine(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		return fmt.Errorf("%w: the quantity is more than nothing", ErrInvalid)
 	case l.UnitPriceMinor < 0:
 		return fmt.Errorf("%w: a price is not negative", ErrInvalid)
+	case !money.LineWithinLimits(l.QuantityMilli, l.UnitPriceMinor):
+		return fmt.Errorf("%w: the price or the quantity is larger than a line can hold", ErrInvalid)
 	}
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := lockEnquiryTx(ctx, tx, enquiryID); err != nil {

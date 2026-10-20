@@ -33,7 +33,7 @@ func TestParseMinorUnits(t *testing.T) {
 }
 
 func TestParseMinorUnitsRefusesNonsense(t *testing.T) {
-	for _, in := range []string{"-5", "abc", "12.345", "1295,505", "1.2.3"} {
+	for _, in := range []string{"-5", "abc", "12.345", "1295,505", "1.2.3", "9999999999999", "92233720368547758"} {
 		if got, err := parseMinorUnits(in); err == nil {
 			t.Errorf("parseMinorUnits(%q) = %d, want an error", in, got)
 		}

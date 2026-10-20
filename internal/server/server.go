@@ -294,7 +294,7 @@ func (s *Server) canLookUp() bool {
 }
 
 func (s *Server) routes() (http.Handler, error) {
-	mux := http.NewServeMux()
+	mux := routeMux{ServeMux: http.NewServeMux(), s: s}
 
 	// Health is outside the session middleware on purpose: a health check must
 	// not depend on authentication working.
@@ -525,7 +525,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/clock-in", s.requireSession(s.handleClock(true)))
 	mux.HandleFunc("POST /jobs/{id}/clock-out", s.requireSession(s.handleClock(false)))
 
-	return s.securityHeaders(s.checkOrigin(s.requireSetup(s.withSession(s.idempotent(mux))))), nil
+	return s.securityHeaders(s.checkOrigin(s.requireSetup(s.withSession(s.refuseNUL(s.idempotent(mux)))))), nil
 }
 
 // versioned sets how long a static file may be kept.

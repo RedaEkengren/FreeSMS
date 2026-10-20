@@ -85,8 +85,7 @@ func (s *Server) staffError(w http.ResponseWriter, r *http.Request, err error) b
 		w.Header().Set("Retry-After", "3")
 		s.renderError(w, r, http.StatusServiceUnavailable, "The server is busy", "Try again in a moment.")
 	default:
-		s.log.Error("staff", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "staff", err)
 	}
 	return true
 }
@@ -130,8 +129,7 @@ func (s *Server) handleMyLanguage(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusBadRequest, "Not saved", trimInvalid(err))
 		return
 	case err != nil:
-		s.log.Error("save own language", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "save own language", err)
 		return
 	}
 	http.Redirect(w, r, "/account", http.StatusSeeOther)
@@ -159,8 +157,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		s.render(w, r, http.StatusServiceUnavailable, "account", page)
 		return
 	case err != nil:
-		s.log.Error("change password", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+		s.fault(w, r, "change password", err)
 		return
 	}
 	page.Changed = true
