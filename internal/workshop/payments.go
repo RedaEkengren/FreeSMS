@@ -98,6 +98,20 @@ type NewPayment struct {
 // somebody is asked: a krona covers cash rounding and an öre typed wrong.
 const overpaymentMargin = 100
 
+// maxPaidBeforeInvoiceDays is how long before its invoice a payment may be
+// dated. It is not zero, which is what #133 first asked for ("not before the
+// invoice date"), because money is taken before the document is written as a
+// matter of course: a deposit when a part is ordered, the counter paid on
+// Friday and the invoice written up on Monday, a prepaid booking. A month
+// holds all of those and still refuses a year typed wrong (1999 for 2026),
+// which is the mistake that moves money into a day with nothing to do with the
+// job. A payment may not be dated more than a day ahead either: money that has
+// not arrived has not arrived.
+//
+// A day that has been signed off (day.go) is not protected by refusing a
+// payment dated into it. The payment is recorded and the sign-off says the
+// day has changed since, the way it does for anything recorded late: refusing
+// would leave money that did arrive with nowhere to be written down.
 const maxPaidBeforeInvoiceDays = 31
 
 // ErrOverpayment is refusing a payment far above what is owed until the person

@@ -165,3 +165,46 @@ func TestCashRoundingAndPartPaymentsAreNotTakenForAnOverpayment(t *testing.T) {
 		t.Errorf("a part payment past the total = %v, want ErrOverpayment", err)
 	}
 }
+
+// #133: money may be dated before its invoice -- up to a month, for a deposit
+// or the counter paid before the invoice was written -- but not further back,
+// and not ahead. A payment dated into a day that was signed off is recorded,
+// and the sign-off says the day has changed since.
+func TestAPaymentDateIsCheckedAgainstTheInvoiceAndASignedOffDayIsToldOfIt(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	_, inv := issued(t, pool)
+	issuedOn := inv.IssuedAt.In(shopZone())
+	day := func(back int) time.Time {
+		d := issuedOn.AddDate(0, 0, -back)
+		return time.Date(d.Year(), d.Month(), d.Day(), 12, 0, 0, 0, shopZone())
+	}
+
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: amount(1000), Method: "bank", PaidOn: day(32)}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("32 days before the invoice = %v, want refused", err)
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: amount(1000), Method: "bank", PaidOn: time.Now().AddDate(0, 0, 2)}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("two days ahead = %v, want refused", err)
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: amount(1000), Method: "bank", PaidOn: day(31)}); err != nil {
+		t.Errorf("31 days before the invoice = %v, want recorded", err)
+	}
+
+	signed := day(3).Format("2006-01-02")
+	if _, err := workshop.ReviewDay(ctx, pool, owner(), signed, "Nothing that day"); err != nil {
+		t.Fatalf("ReviewDay: %v", err)
+	}
+	if d := dayOf(t, pool, signed); d.Review == nil || d.Stale {
+		t.Fatalf("the signed-off day before the payment: review %v, stale %v", d.Review, d.Stale)
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: amount(2000), Method: "card", PaidOn: day(3)}); err != nil {
+		t.Fatalf("a payment dated into a signed-off day = %v, want recorded", err)
+	}
+	if d := dayOf(t, pool, signed); !d.Stale || method(d, "card").Received != 2000 {
+		t.Errorf("the signed-off day after a payment dated into it: stale %v, card %d", d.Stale, method(d, "card").Received)
+	}
+}
