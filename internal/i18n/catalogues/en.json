@@ -154,6 +154,10 @@
       "one": "%d booking",
       "other": "%d bookings"
     },
+    "%d line was put on after the customer agreed, and has no agreement.": {
+      "one": "%d line was put on after the customer agreed, and has no agreement.",
+      "other": "%d lines were put on after the customer agreed, and have no agreement."
+    },
     "confirmed_by_hand": {
       "other": "confirmed by hand"
     },
