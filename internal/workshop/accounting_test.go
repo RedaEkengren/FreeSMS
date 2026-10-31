@@ -16,9 +16,29 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// period is a run of whole days on the shop's calendar (stockholm, the zone
+// shops.timezone defaults to), from yesterday to
+// tomorrow, for a test about what a period contains rather than where it
+// ends. Everything a test writes "now" falls inside it whatever the clock
+// says.
+//
+// It used to be the calendar month from midnight UTC. Between midnight in
+// Stockholm and midnight UTC on the first of a month -- the first one or two
+// hours of the month -- "this month" by the process's clock began after the
+// invoice just issued, and a dozen tests failed for those hours and passed for
+// the rest of the month. The code was right; the tests asked for a period no
+// handler would ever ask for.
 func period() (time.Time, time.Time) {
-	now := time.Now()
-	from := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	now := time.Now().In(stockholm)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, stockholm)
+	return today.AddDate(0, 0, -1), today.AddDate(0, 0, 2)
+}
+
+// monthOf is the shop's calendar month containing at, the way the handlers
+// work out the month: from midnight on the first in the shop's own zone.
+func monthOf(at time.Time) (time.Time, time.Time) {
+	local := at.In(stockholm)
+	from := time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, stockholm)
 	return from, from.AddDate(0, 1, 0)
 }
 
@@ -372,7 +392,6 @@ func TestAVoucherIsDatedOnTheShopsCalendar(t *testing.T) {
 		t.Fatalf("move the invoice: %v", err)
 	}
 
-	stockholm, _ := time.LoadLocation("Europe/Stockholm")
 	from := time.Date(2026, 11, 1, 0, 0, 0, 0, stockholm)
 	body, count, err := workshop.ExportAccounting(ctx, pool, advisor(), from, from.AddDate(0, 1, 0), false)
 	if err != nil {

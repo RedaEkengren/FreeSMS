@@ -194,7 +194,7 @@ func TestAPaymentIsBookedAgainstTheReceivable(t *testing.T) {
 	if posted[1910] != p.AmountMinor || posted[3740] != p.RoundingMinor {
 		t.Errorf("till %d and rounding %d, want %d and %d", posted[1910], posted[3740], p.AmountMinor, p.RoundingMinor)
 	}
-	if !containsLine(body, `#VER "B" "1" `+time.Now().Format("20060102")+` "Betalning A-1 A Customer"`) {
+	if !containsLine(body, `#VER "B" "1" `+p.PaidOn.Format("20060102")+` "Betalning A-1 A Customer"`) {
 		t.Errorf("no voucher B 1 dated today:\n%s", body)
 	}
 }
