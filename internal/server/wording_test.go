@@ -95,3 +95,50 @@ func TestAPaymentThatCannotBeRightIsNotRecordedUnasked(t *testing.T) {
 		t.Errorf("a confirmed overpayment answered %d, want 303", got)
 	}
 }
+
+// #131: the question about a line nobody agreed to, and the decision to
+// invoice it anyway, are the front desk's. The technician's page of the same
+// job does not ask it, and a technician who posts the tick is refused.
+//
+// The technician's page does show the line table with its prices, for every
+// line, agreed or not; that is how the job page has always been built and is
+// not changed here.
+func TestATechnicianIsNotAskedAboutALineNobodyAgreedTo(t *testing.T) {
+	ts, pool := testServer(t)
+	desk, tech := signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	job := ts.URL + "/jobs/" + jobA
+
+	postStatus(t, desk, job+"/lines", url.Values{"kind": {"labour"}, "description": {"Service"}, "quantity": {"1"}, "unit_price": {"1000"}})
+	for _, to := range []string{"estimated", "awaiting_approval", "approved", "in_progress"} {
+		if to == "approved" {
+			agreeAtTheCounter(t, ts.URL, jobA, desk, pool)
+		}
+		if status := postStatus(t, desk, job+"/state", url.Values{"state": {to}}); status != http.StatusSeeOther {
+			t.Fatalf("moving to %s answered %d", to, status)
+		}
+	}
+	if status := postStatus(t, desk, job+"/lines", url.Values{"kind": {"labour"}, "description": {"Extra wiper blades"},
+		"quantity": {"1"}, "unit_price": {"4321"}}); status != http.StatusSeeOther {
+		t.Fatalf("adding the extra line answered %d", status)
+	}
+	if status := postStatus(t, tech, job+"/state", url.Values{"state": {"ready"}}); status != http.StatusSeeOther {
+		t.Fatalf("marking it ready answered %d", status)
+	}
+
+	_, counter := page(t, desk, job)
+	if !strings.Contains(counter, "Invoice it with the lines nobody agreed to") {
+		t.Fatalf("the front desk is not asked about the unagreed line:\n%s", firstLines(counter, 60))
+	}
+	_, spanner := page(t, tech, job)
+	if !strings.Contains(spanner, "Extra wiper blades") {
+		t.Error("the technician does not see the work")
+	}
+	for _, hidden := range []string{"Invoice it with the lines nobody agreed to", "has no agreement", "confirm_unagreed"} {
+		if strings.Contains(spanner, hidden) {
+			t.Errorf("the technician's page shows %q", hidden)
+		}
+	}
+	if status := postStatus(t, tech, job+"/invoice", url.Values{"confirm_unagreed": {"1"}}); status != http.StatusForbidden {
+		t.Errorf("a technician invoicing with the tick answered %d, want 403", status)
+	}
+}
