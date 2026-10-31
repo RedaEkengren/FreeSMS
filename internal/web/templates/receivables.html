@@ -23,7 +23,7 @@
   <li>
     <div class="row">
       <a href="/invoices/{{.InvoiceID}}">{{.Reference}} &middot; {{.Customer}}</a>
-      <span>{{$.Money .Outstanding}}{{if .Overdue}} <span class="tag late">{{$.T "overdue"}}</span>{{end}}</span>
+      <span>{{$.Money (abs .Outstanding)}}{{if .Overdue}} <span class="tag late">{{$.T "overdue"}}</span>{{end}}</span>
     </div>
     <div class="waiting">
       {{if .Refund}}<span class="tag warranty">{{$.T "owed back to the customer"}}</span>{{else}}{{$.T "Due %s" ($.Date ($.Local .Due) "2 Jan 2006")}}{{if .Overdue}} &middot; {{$.N "%d day late" .DaysLate}}{{end}}{{end}}
