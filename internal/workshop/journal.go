@@ -126,7 +126,7 @@ var (
 	errReversedRefund   = fmt.Errorf("%w: that payment has been reversed, so there is nothing of it to give back", ErrInvalid)
 	errRefundsStand     = fmt.Errorf("%w: that payment has refunds; reverse them first, then the payment", ErrInvalid)
 	errDepositShort     = fmt.Errorf("%w: that is more than the deposit still holds", ErrInvalid)
-	errGivenBackTooMuch = fmt.Errorf("%w: that is more than is owed back to the customer; to give back a payment, refund it", ErrInvalid)
+	errGivenBackTooMuch = fmt.Errorf("%w: that is more than the customer paid beyond the invoice; if the invoice was wrong, credit it first", ErrInvalid)
 	// ErrReversalNoReason is reversing a payment without saying why.
 	ErrReversalNoReason = fmt.Errorf("%w: say why the payment is reversed, in 300 characters or fewer", ErrInvalid)
 	// ErrRefundNoReason is refunding a payment without saying why.
@@ -532,8 +532,11 @@ func replayedApplicationTx(ctx context.Context, tx pgx.Tx, key, depositID, invoi
 
 // RefundPayment gives back part or all of one payment received -- into an
 // invoice or a deposit -- as its own row linked to it, never an edit. Why
-// is required. Refunds of one payment never add up to more than it was;
-// the database holds that too (0078).
+// is required. Refunds of one payment never add up to more than it was
+// (0081), and everything given back on an invoice, by any path, is at most
+// what the customer paid beyond it, credits counted: an invoice paid
+// exactly is credited before its money goes back (0086). The database
+// holds both.
 func RefundPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, paymentID string, p NewPayment, reason string) (Payment, error) {
 	// Which payment, the operation decides once it knows what it is
 	// against; somebody who moves money on nothing at all is refused first.

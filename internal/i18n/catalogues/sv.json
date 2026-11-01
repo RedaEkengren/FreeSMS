@@ -7502,8 +7502,8 @@
     "A registration looked up": {
       "other": "Ett registreringsnummer som slås upp"
     },
-    "that is more than is owed back to the customer; to give back a payment, refund it": {
-      "other": "det är mer än det kunden har tillgodo; för att betala tillbaka en betalning, återbetala den"
+    "that is more than the customer paid beyond the invoice; if the invoice was wrong, credit it first": {
+      "other": "det är mer än kunden har betalat utöver fakturan; om fakturan var fel, skriv först en kreditfaktura"
     },
     "a car taken in is looked up at the counter, not in a list": {
       "other": "en bil som tas in slås upp vid disken, inte i en lista"
@@ -7537,6 +7537,12 @@
     },
     "the payments add up to more or less than the invoice; only the last may be the rest": {
       "other": "betalningarna blir mer eller mindre än fakturan; bara den sista får vara resten"
+    },
+    "that payment is how a cash invoice was paid on issue, and stands; correct the invoice with a credit note": {
+      "other": "den betalningen är hur en kontantfaktura betalades när den utfärdades, och står kvar; rätta fakturan med en kreditfaktura"
+    },
+    "Paid on issue: it stands with the invoice, and a mistake is corrected with a credit note.": {
+      "other": "Betald när den utfärdades: den står kvar med fakturan, och ett fel rättas med en kreditfaktura."
     },
     "there is a flow by that name already": {
       "other": "det finns redan ett betalflöde med det namnet"
