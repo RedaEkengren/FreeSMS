@@ -605,10 +605,11 @@
   <p class="waiting">{{.T "Nothing has been put to the customer yet."}}</p>
 {{end}}
 
-{{/* A job taken back to a draft or an estimate is not being asked: an
-     answer written down now would be refused (#136). Putting the quote
-     forward again asks the customer again. */}}
-{{$asked := not (or (eq .Job.State "draft") (eq .Job.State "estimated"))}}
+{{/* A job taken back to a draft or an estimate after the quote went out
+     is not being asked: an answer written down now would be refused (#136).
+     Putting the quote forward again asks the customer again. A quote put
+     forward on a draft before #136, never taken back, is still answered. */}}
+{{$asked := not .Quote.TakenBack}}
 {{if and .Quote.Latest (not $asked)}}
 <p class="waiting">{{.T "Taken back from the customer: their answer is written down once the quote is put to them again."}}</p>
 {{end}}
