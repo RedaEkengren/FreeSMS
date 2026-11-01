@@ -119,4 +119,6 @@ var core = map[string]string{
 	// a shop that stops selling cars keeps the history it made.
 	"StockUnitByID": "a car's history in stock", "StockUnitsOfVehicle": "a car's history in stock",
 	"PurchaseOfUnit": "a car's history in stock", "VATEligibilityOfUnit": "a car's history in stock",
+	"StockChecks": "a car's history in stock", "ChecksOutstanding": "a car's history in stock",
+	"StockCheckSettings": "a car's history in stock", "PurchaseSplitOf": "a car's history in stock",
 }

@@ -258,10 +258,7 @@ func TestTheYearInPersonIsSalesTakenInPerson(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A car bought from a private seller, paid out by Swish: not counted.
-	payout, err := workshop.CreatePayout(ctx, pool, buyerScope(), workshop.NewHolding{PartyID: privateSeller(t, pool), Purpose: "purchase"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	payout := purchasePayout(t, pool, buyerScope(), privateSeller(t, pool))
 	if _, err := workshop.RecordPayout(ctx, pool, buyerScope(), payout, workshop.NewPayment{AmountMinor: minor(20000000), Method: "swish", PaidOn: time.Now()}); err != nil {
 		t.Fatal(err)
 	}

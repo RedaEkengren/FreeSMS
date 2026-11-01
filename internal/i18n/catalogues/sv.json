@@ -7901,6 +7901,25 @@
     "A new means of transport (at most 6 months or 6,000 km)": {"other": "Ett nytt transportmedel (högst 6 månader eller 6 000 km)"},
     "Not eligible until the evidence is added": {"other": "Inte berättigad förrän underlaget har lagts till"},
     "Not eligible until the accountant has said what evidence a margin-scheme invoice from an EU dealer needs (#221)": {"other": "Inte berättigad förrän redovisningskonsulten har sagt vilket underlag en faktura med vinstmarginalbeskattning från en EU-handlare behöver (#221)"},
-    "Not eligible until the accountant has said how a car bought back after a rescinded sale is treated (#221)": {"other": "Inte berättigad förrän redovisningskonsulten har sagt hur en bil som köpts tillbaka efter ett hävt köp behandlas (#221)"}
+    "Not eligible until the accountant has said how a car bought back after a rescinded sale is treated (#221)": {"other": "Inte berättigad förrän redovisningskonsulten har sagt hur en bil som köpts tillbaka efter ett hävt köp behandlas (#221)"},
+    "that is not a check": {"other": "det är inte en kontroll"},
+    "a check passed, failed or is not known": {"other": "en kontroll är godkänd, underkänd eller okänd"},
+    "a note is at most 500 characters": {"other": "en anteckning är högst 500 tecken"},
+    "a check stands for between an hour and 30 days": {"other": "en kontroll gäller mellan en timme och 30 dagar"},
+    "that car's cycle is over; check it again in a new one": {"other": "bilens lagervarv är avslutat; kontrollera den igen i ett nytt"},
+    "say what is owed on the car, above nothing": {"other": "ange vad som är skuld på bilen, mer än noll"},
+    "say the reference the loan is settled with, in 100 characters or fewer": {"other": "ange referensen lånet löses med, med högst 100 tecken"},
+    "that lender's loan is already recorded on this purchase": {"other": "den långivarens lån finns redan registrerat på inköpet"},
+    "not every check the shop requires has passed in time; check again, or have the owner let it through with a reason": {"other": "inte alla kontroller som verksamheten kräver är godkända i tid; kontrollera igen, eller låt ägaren släppa igenom betalningen med en motivering"},
+    "say why the money may leave anyway, in 300 characters or fewer": {"other": "säg varför pengarna får betalas ut ändå, med högst 300 tecken"},
+    "a payout for a car names the purchase it pays, so its checks can be read": {"other": "en utbetalning för en bil anger inköpet den betalar, så att dess kontroller kan läsas"},
+    "No driving ban": {"other": "Inget körförbud"},
+    "No credit purchase or undisclosed lender": {"other": "Inget kreditköp eller okänd långivare"},
+    "No unpaid vehicle tax or fees": {"other": "Ingen obetald fordonsskatt eller avgift"},
+    "Inspection status known": {"other": "Besiktningsstatus känd"},
+    "Not leased, or the lessor has consented": {"other": "Inte leasad, eller leasegivaren har samtyckt"},
+    "Chassis number matches the registration": {"other": "Chassinumret stämmer med registreringen"},
+    "Odometer fits earlier readings": {"other": "Mätarställningen stämmer med tidigare avläsningar"},
+    "Lower than a reading held before": {"other": "Lägre än en tidigare avläsning"}
   }
 }

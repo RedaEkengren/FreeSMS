@@ -70,6 +70,8 @@ var AuditedTransitions = []AuditTransition{
 	// A car bought (#161), and its VAT eligibility assessed again.
 	{"purchase.recorded", "purchase", "audit_events", false},
 	{"vat_eligibility.corrected", "purchase", "audit_events", true},
+	// Money let leave for a car before its checks passed (#162).
+	{"stock_checks.overridden", "stock_unit", "audit_events", true},
 }
 
 func auditTransition(event string) (AuditTransition, bool) {

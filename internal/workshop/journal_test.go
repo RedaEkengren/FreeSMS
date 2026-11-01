@@ -163,10 +163,7 @@ func TestAPayoutIsTheBuyersAndMoneyOut(t *testing.T) {
 	if _, err := workshop.CreatePayout(ctx, pool, otherRoles(access.Of(access.RoleSales)), workshop.NewHolding{PartyID: seller, Purpose: "purchase"}); !errors.Is(err, access.ErrForbidden) {
 		t.Errorf("a salesperson opened a payout: %v", err)
 	}
-	payout, err := workshop.CreatePayout(ctx, pool, buyerScope(), workshop.NewHolding{PartyID: seller, Purpose: "purchase"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	payout := purchasePayout(t, pool, buyerScope(), seller)
 	out, err := workshop.RecordPayout(ctx, pool, buyerScope(), payout, workshop.NewPayment{
 		AmountMinor: minor(8500000), Method: "bank", PaidOn: time.Now(), Reference: "Köp ABC 12D"})
 	if err != nil {

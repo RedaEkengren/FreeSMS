@@ -36,6 +36,12 @@ func buy(t *testing.T, pool *pgxpool.Pool, reason string) workshop.Purchase {
 // else is in stock.
 func boughtCar(t *testing.T, pool *pgxpool.Pool) workshop.Purchase {
 	t.Helper()
+	return boughtCarFrom(t, pool, theSeller(t, pool))
+}
+
+// boughtCarFrom is boughtCar from seller.
+func boughtCarFrom(t *testing.T, pool *pgxpool.Pool, seller string) workshop.Purchase {
+	t.Helper()
 	ctx := context.Background()
 	var vehicle string
 	if err := pool.QueryRow(ctx, `INSERT INTO vehicles (shop_id, make, model, vin)
@@ -43,7 +49,7 @@ func boughtCar(t *testing.T, pool *pgxpool.Pool) workshop.Purchase {
 		t.Fatal(err)
 	}
 	p, err := workshop.RecordPurchase(ctx, pool, buyerScope(), workshop.NewPurchase{VehicleID: vehicle, Reason: workshop.StockFromPurchase,
-		SellerPartyID: theSeller(t, pool), PurchasedOn: time.Now(), PriceMinor: 20_000_000, SellerType: workshop.SellerPrivate})
+		SellerPartyID: seller, PurchasedOn: time.Now(), PriceMinor: 20_000_000, SellerType: workshop.SellerPrivate})
 	if err != nil {
 		t.Fatalf("RecordPurchase: %v", err)
 	}
@@ -57,8 +63,8 @@ func contractFor(t *testing.T, pool *pgxpool.Pool, purchaseID string) string {
 	id, err := workshop.ProduceDocument(context.Background(), pool, buyerScope(), workshop.NewDocumentRecord{
 		Kind: workshop.DocPurchaseAgreement, SubjectKind: "purchase", SubjectID: purchaseID,
 		TemplateVersionID: tpl.VersionID, Title: "Köpeavtal ABC 12D",
-		Parties:           []workshop.DocumentPartyRole{{PartyID: theSeller(t, pool), Role: "seller"}},
-		Data:              map[string]string{"seller": "Sven Säljare", "registration": "ABC 12D", "price": "85 000 kr"}})
+		Parties: []workshop.DocumentPartyRole{{PartyID: theSeller(t, pool), Role: "seller"}},
+		Data:    map[string]string{"seller": "Sven Säljare", "registration": "ABC 12D", "price": "85 000 kr"}})
 	if err != nil {
 		t.Fatalf("ProduceDocument: %v", err)
 	}

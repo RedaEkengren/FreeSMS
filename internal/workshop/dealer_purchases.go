@@ -295,6 +295,13 @@ func RecordPurchase(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		if err := assessTx(ctx, tx, scope, id, "", n.SellerType, n.Reason, n.EvidenceDocumentIDs, ""); err != nil {
 			return err
 		}
+		// Whether the reading fits those before it is the system's to say,
+		// as a check before money leaves (#162).
+		if reading != nil {
+			if err := odometerCheckTx(ctx, tx, scope, unit.ID, *reading); err != nil {
+				return err
+			}
+		}
 		if err := auditTx(ctx, tx, scope, id, "purchase.recorded", "", "", "",
 			map[string]any{"stock_unit_id": unit.ID, "vehicle_id": n.VehicleID}); err != nil {
 			return err
