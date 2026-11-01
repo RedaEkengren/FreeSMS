@@ -144,16 +144,6 @@ func CreateBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	}
 	var id string
 	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		if !nb.ConfirmedPast {
-			loc, err := shopLocationTx(ctx, tx)
-			if err != nil {
-				return err
-			}
-			now := time.Now().In(loc)
-			if nb.Starts.Before(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)) {
-				return ErrBookingInThePast
-			}
-		}
 		var err error
 		id, err = createBookingTx(ctx, tx, scope, nb, "", "")
 		return err
@@ -163,7 +153,15 @@ func CreateBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 
 // createBookingTx writes the booking and its first event. A booking made from
 // an enquiry carries it and the accepted version along.
+//
+// A day that has gone is asked about here, so every way of booking asks:
+// the calendar's form and an enquiry's.
 func createBookingTx(ctx context.Context, tx pgx.Tx, scope access.Scope, nb NewBooking, enquiryID, quoteID string) (string, error) {
+	if !nb.ConfirmedPast {
+		if err := notInThePastTx(ctx, tx, nb.Starts); err != nil {
+			return "", err
+		}
+	}
 	if err := closedTx(ctx, tx, nb.Starts); err != nil {
 		return "", err
 	}
@@ -181,11 +179,39 @@ func createBookingTx(ctx context.Context, tx pgx.Tx, scope access.Scope, nb NewB
 	return id, bookingEventTx(ctx, tx, scope, id, "booked", &nb.Starts, &nb.Ends, "")
 }
 
+// notInThePastTx refuses a start before today on the shop's calendar with
+// ErrBookingInThePast.
+func notInThePastTx(ctx context.Context, tx pgx.Tx, starts time.Time) error {
+	loc, err := shopLocationTx(ctx, tx)
+	if err != nil {
+		return err
+	}
+	now := time.Now().In(loc)
+	if starts.Before(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)) {
+		return ErrBookingInThePast
+	}
+	return nil
+}
+
+// MoveOption changes how MoveBooking behaves.
+type MoveOption func(*moveOptions)
+
+type moveOptions struct{ past bool }
+
+// MoveIntoThePast says a booking moved to a day that has gone is meant: the
+// visit written down where it really happened.
+func MoveIntoThePast() MoveOption { return func(o *moveOptions) { o.past = true } }
+
 // MoveBooking gives a booking another time or another technician. A row of
-// its own records the move.
-func MoveBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id string, starts, ends time.Time, technicianID string) error {
+// its own records the move. A day that has gone is asked about, as it is
+// when booking.
+func MoveBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id string, starts, ends time.Time, technicianID string, opts ...MoveOption) error {
 	if !scope.Role.SeesCustomerPersonalData() {
 		return access.ErrForbidden
+	}
+	var o moveOptions
+	for _, opt := range opts {
+		opt(&o)
 	}
 	nb := NewBooking{Starts: starts, Ends: ends, TechnicianID: technicianID, What: "x"}
 	if err := checkBooking(&nb); err != nil {
@@ -194,6 +220,11 @@ func MoveBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := closedTx(ctx, tx, starts); err != nil {
 			return err
+		}
+		if !o.past {
+			if err := notInThePastTx(ctx, tx, starts); err != nil {
+				return err
+			}
 		}
 		tag, err := tx.Exec(ctx, `
 			UPDATE bookings SET starts_at = $2, ends_at = $3, technician_id = nullif($4, '')::uuid

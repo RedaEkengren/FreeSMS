@@ -69,6 +69,41 @@ func TestABookingOnADayThatHasGoneIsAskedAbout(t *testing.T) {
 	}
 }
 
+// The same question is asked of every way a booking gets a day: moving one,
+// and booking what a customer accepted on an enquiry (#141). Only the
+// calendar's form asked before.
+func TestMovingOrBookingFromAnEnquiryOntoADayThatHasGoneIsAskedAbout(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	past := time.Date(2020, 3, 2, 9, 0, 0, 0, stockholm)
+	soon := time.Now().Add(48 * time.Hour)
+	id, err := workshop.CreateBooking(ctx, pool, advisor(), workshop.NewBooking{
+		Starts: soon, Ends: soon.Add(time.Hour), What: "Service"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.MoveBooking(ctx, pool, advisor(), id, past, past.Add(time.Hour), ""); !errors.Is(err, workshop.ErrBookingInThePast) {
+		t.Errorf("moving a booking to 2020 = %v, want ErrBookingInThePast", err)
+	}
+	if err := workshop.MoveBooking(ctx, pool, advisor(), id, past, past.Add(time.Hour), "", workshop.MoveIntoThePast()); err != nil {
+		t.Errorf("moving it to 2020, said to be meant = %v", err)
+	}
+
+	enq := enquired(t, pool)
+	if _, err := workshop.PresentEnquiry(ctx, pool, advisor(), enq, fixed); err != nil {
+		t.Fatal(err)
+	}
+	accept(t, pool, enq, 2)
+	if _, err := workshop.BookEnquiry(ctx, pool, advisor(), enq, workshop.NewBooking{
+		Starts: past, Ends: past.Add(time.Hour)}); !errors.Is(err, workshop.ErrBookingInThePast) {
+		t.Errorf("booking an enquiry in 2020 = %v, want ErrBookingInThePast", err)
+	}
+	if _, err := workshop.BookEnquiry(ctx, pool, advisor(), enq, workshop.NewBooking{
+		Starts: past, Ends: past.Add(time.Hour), ConfirmedPast: true}); err != nil {
+		t.Errorf("booking an enquiry in 2020, said to be meant = %v", err)
+	}
+}
+
 // Accepted. Stopping a clock that is not running leaves it stopped, which is
 // what was asked; the page answers with the clock as it really is. A double
 // tap, a clock already closed by clocking in on another car and the offline

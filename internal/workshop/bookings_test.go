@@ -91,7 +91,7 @@ func TestMovingCancellingAndArrivingAreRecorded(t *testing.T) {
 	if !b.Overbooked() {
 		t.Error("ninety minutes of work in an hour's slot is not flagged")
 	}
-	if err := workshop.MoveBooking(ctx, pool, advisor(), id, at("2026-10-16", 13, 0), at("2026-10-16", 15, 0), ""); err != nil {
+	if err := workshop.MoveBooking(ctx, pool, advisor(), id, at("2026-10-16", 13, 0), at("2026-10-16", 15, 0), "", workshop.MoveIntoThePast()); err != nil {
 		t.Fatalf("MoveBooking: %v", err)
 	}
 	found, err := workshop.SearchBookings(ctx, pool, advisor(), "xyz789")

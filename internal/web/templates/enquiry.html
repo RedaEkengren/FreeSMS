@@ -138,6 +138,7 @@
         {{range $.Planner.Rows}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></label>
   </div>
   <p class="waiting">{{$.T "Booking it does not make the car present. What they accepted comes with it, at the price they were shown."}}</p>
+  <label class="tick"><input type="checkbox" name="confirm_past" value="1"><span>{{$.T "It is meant to be on a day that has gone"}}</span></label>
   <button type="submit">{{$.T "Book it"}}</button>
 </form>
 {{end}}{{end}}

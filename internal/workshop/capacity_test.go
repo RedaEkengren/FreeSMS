@@ -42,13 +42,13 @@ func TestABookingOnAShutDayIsRefused(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the day before is open: %v", err)
 	}
-	if err := workshop.MoveBooking(ctx, pool, advisor(), id, at("2026-06-19", 8, 0), at("2026-06-19", 9, 0), ""); !errors.Is(err, workshop.ErrInvalid) {
+	if err := workshop.MoveBooking(ctx, pool, advisor(), id, at("2026-06-19", 8, 0), at("2026-06-19", 9, 0), "", workshop.MoveIntoThePast()); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("moved onto a shut day: %v", err)
 	}
 	if err := workshop.OpenDay(ctx, pool, owner(), at("2026-06-19", 0, 0)); err != nil {
 		t.Fatal(err)
 	}
-	if err := workshop.MoveBooking(ctx, pool, advisor(), id, at("2026-06-19", 8, 0), at("2026-06-19", 9, 0), ""); err != nil {
+	if err := workshop.MoveBooking(ctx, pool, advisor(), id, at("2026-06-19", 8, 0), at("2026-06-19", 9, 0), "", workshop.MoveIntoThePast()); err != nil {
 		t.Errorf("opened again and still refused: %v", err)
 	}
 }

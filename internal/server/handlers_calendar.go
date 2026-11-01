@@ -207,7 +207,11 @@ func (s *Server) handleBookingAction(w http.ResponseWriter, r *http.Request) {
 			s.renderError(w, r, http.StatusBadRequest, "Not moved", ferr.Error())
 			return
 		}
-		err = workshop.MoveBooking(r.Context(), s.pool, session.Scope, id, nb.Starts, nb.Ends, nb.TechnicianID)
+		var opts []workshop.MoveOption
+		if nb.ConfirmedPast {
+			opts = append(opts, workshop.MoveIntoThePast())
+		}
+		err = workshop.MoveBooking(r.Context(), s.pool, session.Scope, id, nb.Starts, nb.Ends, nb.TechnicianID, opts...)
 	case "cancel":
 		err = workshop.CancelBooking(r.Context(), s.pool, session.Scope, id, r.FormValue("reason"))
 	case "no_show":
