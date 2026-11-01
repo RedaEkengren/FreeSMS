@@ -10,16 +10,17 @@
 </form>
 
 {{if .Query}}
-  {{if not .Results}}
+  {{if not .Found}}
     <p class="empty">{{.T "Nothing matched “%s”." .Query}}</p>
   {{else}}
-    {{range .Results}}
-    <a class="card" href="/vehicles/{{.VehicleID}}">
+    {{range .Found}}
+    <a class="card" href="{{.Link}}">
       <div class="row">
-        <span class="plate">{{.Describe}}</span>
-        <span class="tag">{{.MatchedOn}}</span>
+        <span class="plate">{{if eq .Kind "vehicle"}}{{$.T .Heading}}{{else}}{{.Heading}}{{end}}</span>
+        <span class="tag">{{$.T .MatchedOn}}</span>
+        {{range .ActiveIn}}<span class="tag running">{{$.T .Label}}</span>{{end}}
       </div>
-      <div class="vehicle">{{.Make}} {{.Model}}{{if .ModelYear}} {{.ModelYear}}{{end}}{{if .OwnerName}} &middot; {{.OwnerName}}{{end}}</div>
+      {{if .Detail}}<div class="vehicle">{{.Detail}}</div>{{end}}
     </a>
     {{end}}
   {{end}}

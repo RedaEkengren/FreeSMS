@@ -77,7 +77,7 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 			       CASE
 			         WHEN m.normalised = $1 AND m.valid_to IS NULL THEN 'registration'
 			         WHEN m.normalised = $1 THEN 'a plate it used to carry'
-			         WHEN $1 <> '' AND upper(coalesce(v.vin, '')) LIKE '%' || $1 || '%' THEN 'chassis number'
+			         WHEN $5 <> '' AND upper(coalesce(v.vin, '')) LIKE '%' || $5 || '%' THEN 'chassis number'
 			         WHEN v.label ILIKE '%' || $2 || '%' THEN 'description'
 			         ELSE 'owner'
 			       END,
@@ -91,7 +91,7 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 			LEFT JOIN customers c ON c.id = o.customer_id
 			LEFT JOIN people cp   ON cp.id = c.person_id
 			WHERE v.merged_into IS NULL AND (($1 <> '' AND m.normalised = $1)
-			   OR ($1 <> '' AND upper(coalesce(v.vin, '')) LIKE '%' || $1 || '%')
+			   OR ($5 <> '' AND upper(coalesce(v.vin, '')) LIKE '%' || $5 || '%')
 			   OR ($4 AND (cp.display_name ILIKE '%' || $2 || '%'
 			            OR c.company_name ILIKE '%' || $2 || '%'))
 			   OR ($2 <> '' AND v.label ILIKE '%' || $2 || '%'))
@@ -100,7 +100,7 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 			-- almost always the one being looked for.
 			ORDER BY v.id, (m.valid_to IS NULL) DESC NULLS LAST, m.valid_from DESC NULLS LAST
 			LIMIT $3`
-		rows, err := tx.Query(ctx, q, normalised, query, 25, scope.Role.SeesCustomerPersonalData())
+		rows, err := tx.Query(ctx, q, normalised, query, 25, scope.Role.SeesCustomerPersonalData(), vinLike(normalised))
 		if err != nil {
 			return fmt.Errorf("search: %w", err)
 		}
@@ -116,6 +116,14 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 		return rows.Err()
 	})
 	return out, err
+}
+
+// vinLike is a typed chassis number as a chassis number can be: one has
+// no I, O or Q, so a letter typed for a digit that looks like it -- O for
+// 0, I for 1 -- is read as the digit (#159). Q is read as 0, which it is
+// mistaken for as often.
+func vinLike(normalised string) string {
+	return strings.NewReplacer("O", "0", "Q", "0", "I", "1").Replace(normalised)
 }
 
 // Vehicle is everything known about one car.

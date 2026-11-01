@@ -15,7 +15,13 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 
-	results, err := workshop.Search(r.Context(), s.pool, session.Scope, query)
+	// One box across every module the shop runs (#159), each result only
+	// what the caller's role may see.
+	results, err := workshop.SearchAll(r.Context(), s.pool, session.Scope, query)
+	if errors.Is(err, workshop.ErrInvalid) {
+		s.renderError(w, r, http.StatusBadRequest, "Not accepted", trimInvalid(err))
+		return
+	}
 	if err != nil {
 		s.fault(w, r, "search", err)
 		return
@@ -25,7 +31,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	// is a tap for nothing, and at a counter with a telephone in the other
 	// hand that tap is the difference.
 	if len(results) == 1 {
-		http.Redirect(w, r, "/vehicles/"+results[0].VehicleID, http.StatusSeeOther)
+		http.Redirect(w, r, results[0].Link(), http.StatusSeeOther)
 		return
 	}
 
@@ -33,7 +39,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		Title:   "Search",
 		Session: session,
 		Query:   query,
-		Results: results,
+		Found:   results,
 	})
 }
 

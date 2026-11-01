@@ -37,6 +37,7 @@ var everyRole = map[string]string{
 	// Each role is given its own kind of item, decided inside by role; the
 	// technician's carry the job and the shop's own words, never a customer.
 	"WaitingFor": "what is waiting for the caller, per role", "CountWaiting": "how many of WaitingFor",
+	"SearchAll": "each provider asks only what the caller's role may find, in its own query",
 	"HomeFor":   "each card is read only for the roles it says may see it",
 
 	// The job as the person holding the spanner sees it. Job carries the

@@ -203,6 +203,7 @@ type pageData struct {
 
 	Query   string
 	Results []workshop.SearchResult
+	Found   []workshop.Found
 	Vehicle workshop.Vehicle
 
 	TimeMine    []workshop.TimeEntry

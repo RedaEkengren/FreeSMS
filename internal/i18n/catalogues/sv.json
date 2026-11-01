@@ -7681,6 +7681,30 @@
     },
     "Work ready to invoice, before VAT": {
       "other": "Arbete klart att fakturera, före moms"
+    },
+    "registration": {
+      "other": "registreringsnummer"
+    },
+    "a plate it used to carry": {
+      "other": "ett registreringsnummer den haft"
+    },
+    "description": {
+      "other": "beskrivning"
+    },
+    "owner": {
+      "other": "ägare"
+    },
+    "customer": {
+      "other": "kund"
+    },
+    "job number": {
+      "other": "jobbnummer"
+    },
+    "unidentified vehicle": {
+      "other": "oidentifierat fordon"
+    },
+    "a search is at most %d characters, with no null character": {
+      "other": "en sökning är högst %d tecken, utan nolltecken"
     }
   }
 }

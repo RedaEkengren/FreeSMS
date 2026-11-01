@@ -79,9 +79,9 @@ var core = map[string]string{
 	"AddCustomerPerson": "customers", "RemoveCustomerPerson": "customers",
 	"CustomerDuplicates": "customers", "LikelySame": "customers", "PreviewCustomerMerge": "customers",
 	"MergeCustomers": "customers",
-	// The home page (#157): Core's, asking each module's cards only while
-	// the shop runs it.
-	"HomeFor": "the home page across every module",
+	// The one search and the home page (#159, #157): Core's, asking each
+	// module's provider only while the shop runs it.
+	"SearchAll": "the one search across every module", "HomeFor": "the home page across every module",
 	"WaitingFor": "the one queue across every module (#158)", "CountWaiting": "the one queue across every module (#158)",
 	"Search": "vehicles", "VehicleByID": "vehicles, with their history", "EditVehicle": "vehicles",
 	"VehicleRevision": "vehicles", "VehicleChanges": "vehicles", "ChangeRegistration": "vehicles",
