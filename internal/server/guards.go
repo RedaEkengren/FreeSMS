@@ -1,14 +1,19 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // The model years the vehicles table accepts (its CHECK constraint says the
@@ -237,10 +242,67 @@ func (s *Server) runs(r *http.Request, m access.Module) bool {
 	if session := sessionFrom(r.Context()); session.Scope.ShopID != "" {
 		return session.Scope.Uses(m)
 	}
-	on, err := workshop.ShopRuns(r.Context(), s.pool, s.shop(), m)
+	on, err := s.modules.runs(r.Context(), s.pool, s.shop(), m)
 	if err != nil {
 		s.log.Warn("read the shop's modules", "error", err)
 		return false
 	}
 	return on
+}
+
+// moduleCacheFor is how long the modules read for a request with no session
+// are kept. A customer's link to a job with twenty photographs is
+// twenty-one requests in a second, and each read them in a transaction of
+// its own. A switch made in this process clears it at once (forget); the
+// time only bounds a change made another way, such as a restore.
+const moduleCacheFor = 5 * time.Second
+
+// moduleCache keeps what each shop runs for a moment, for requests nobody is
+// signed in to. Never for a session's: those carry the modules read with the
+// session, on every request, so a switch counts from the next click.
+type moduleCache struct {
+	mu    sync.Mutex
+	shops map[string]cachedModules
+	// Reads made, for the test that counts them.
+	reads atomic.Int64
+}
+
+type cachedModules struct {
+	on map[access.Module]bool
+	at time.Time
+}
+
+func (c *moduleCache) runs(ctx context.Context, pool *pgxpool.Pool, shopID string, m access.Module) (bool, error) {
+	if shopID == "" {
+		return false, nil
+	}
+	c.mu.Lock()
+	cached, ok := c.shops[shopID]
+	c.mu.Unlock()
+	if ok && time.Since(cached.at) < moduleCacheFor {
+		return cached.on[m], nil
+	}
+	c.reads.Add(1)
+	modules, err := workshop.ShopModules(ctx, pool, shopID)
+	if err != nil {
+		return false, err
+	}
+	on := map[access.Module]bool{}
+	for _, mod := range modules {
+		on[mod] = true
+	}
+	c.mu.Lock()
+	if c.shops == nil {
+		c.shops = map[string]cachedModules{}
+	}
+	c.shops[shopID] = cachedModules{on: on, at: time.Now()}
+	c.mu.Unlock()
+	return on[m], nil
+}
+
+// forget drops what is kept, after a switch or a setup.
+func (c *moduleCache) forget() {
+	c.mu.Lock()
+	c.shops = nil
+	c.mu.Unlock()
 }

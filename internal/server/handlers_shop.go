@@ -89,6 +89,7 @@ func (s *Server) handleSwitchModule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if changed {
+		s.modules.forget()
 		s.log.Info("module switched", "module", module, "on", r.FormValue("on") == "yes", "by", session.Scope.UserID)
 	}
 	http.Redirect(w, r, "/shop", http.StatusSeeOther)

@@ -236,3 +236,26 @@ func TestSetupAsksWhatTheShopRuns(t *testing.T) {
 		t.Errorf("the board after setup: %v %v", resp, err)
 	}
 }
+
+// A request with nobody signed in reads what the shop runs once for a
+// moment, not once per request: a customer's link with twenty photographs
+// is twenty-one requests. A switch clears it (the route test above asks as
+// nobody straight after switching).
+func TestWhatTheShopRunsIsReadOnceForABurstOfRequestsWithNoSession(t *testing.T) {
+	_, pool := testServer(t)
+	var c moduleCache
+	ctx := context.Background()
+	for i := 0; i < 21; i++ {
+		on, err := c.runs(ctx, pool, shopA, access.Workshop)
+		if err != nil || !on {
+			t.Fatalf("request %d: %v, %v", i, on, err)
+		}
+	}
+	if n := c.reads.Load(); n != 1 {
+		t.Errorf("%d reads for 21 requests, want 1", n)
+	}
+	c.forget()
+	if _, err := c.runs(ctx, pool, shopA, access.Workshop); err != nil || c.reads.Load() != 2 {
+		t.Errorf("after forget: %v, %d reads; want it read again", err, c.reads.Load())
+	}
+}

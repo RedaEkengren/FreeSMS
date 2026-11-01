@@ -60,6 +60,9 @@ type Server struct {
 	// Pinned by SHOP_ID when an installation serves a named shop.
 	configuredShopID string
 
+	// What the shop runs, for requests with nobody signed in (moduleCache).
+	modules moduleCache
+
 	// Resolved once there is a shop. It starts empty on a fresh installation
 	// and is filled in by setup, while the process is running -- hence the
 	// mutex rather than a plain field read at boot.
