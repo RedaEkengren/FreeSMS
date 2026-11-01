@@ -111,24 +111,7 @@ CREATE POLICY shop_isolation ON rental_booking_lines
 REVOKE ALL ON rental_booking_lines FROM freesms_app;
 GRANT SELECT, INSERT ON rental_booking_lines TO freesms_app;
 
--- audit_events about a rental booking: a price a person changed. Widened by
--- what the constraint lists now, so another module's own additions to it,
--- made before or after this, stay.
-DO $$
-DECLARE
-    def    text;
-    kinds  text[];
-BEGIN
-    SELECT pg_get_constraintdef(c.oid) INTO def
-      FROM pg_constraint c
-     WHERE c.conrelid = 'audit_events'::regclass AND c.conname = 'audit_events_subject_kind_check';
-    SELECT array_agg(m[1]) INTO kinds FROM regexp_matches(def, '''([a-z_]+)''::text', 'g') AS m;
-    IF NOT 'rental_booking' = ANY(kinds) THEN
-        kinds := kinds || 'rental_booking'::text;
-    END IF;
-    ALTER TABLE audit_events DROP CONSTRAINT audit_events_subject_kind_check;
-    -- As an IN list, so the constraint reads back in the form this reads.
-    EXECUTE format('ALTER TABLE audit_events ADD CONSTRAINT audit_events_subject_kind_check CHECK (subject_kind IN (%s))',
-                   (SELECT string_agg(quote_literal(k), ', ') FROM unnest(kinds) AS k));
-END;
-$$;
+-- audit_events about a rental booking: a price a person changed. Added to
+-- the list as it stands (widen_text_check, 0093), so another module's own
+-- additions to it, made before or after this, stay.
+SELECT widen_text_check('audit_events', 'audit_events_subject_kind_check', 'subject_kind', ARRAY['rental_booking']);

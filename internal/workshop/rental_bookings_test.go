@@ -353,9 +353,9 @@ func rentalAudited(t *testing.T, pool *pgxpool.Pool, made func(event, kind, id s
 	made("rental.price_overridden", "rental_booking", id)
 }
 
-// 0303 widens audit_events' subjects by what the constraint lists, so a
-// subject Core had and Rental's are both taken, the constraint still reads
-// back in the form the next widening reads, and nothing else is let in.
+// After every migration, audit_events takes a subject Core had and
+// Rental's (0303, through widen_text_check), and refuses one nobody added:
+// a list widened into nothing would let every value in.
 func TestAuditSubjectsWidenedKeepWhatWasThere(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
