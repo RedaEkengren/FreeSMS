@@ -123,6 +123,9 @@ var (
 	errKeyOtherPayment = fmt.Errorf("%w: that request was already used to record another payment", ErrInvalid)
 	errRefundTooMuch   = fmt.Errorf("%w: that is more than is left of the payment to give back", ErrInvalid)
 	errNotAPayment     = fmt.Errorf("%w: only money received is refunded", ErrInvalid)
+	errReversedRefund  = fmt.Errorf("%w: that payment has been reversed, so there is nothing of it to give back", ErrInvalid)
+	errRefundsStand    = fmt.Errorf("%w: that payment has refunds; reverse them first, then the payment", ErrInvalid)
+	errDepositShort    = fmt.Errorf("%w: that is more than the deposit still holds", ErrInvalid)
 	// ErrReversalNoReason is reversing a payment without saying why.
 	ErrReversalNoReason = fmt.Errorf("%w: say why the payment is reversed, in 300 characters or fewer", ErrInvalid)
 	// ErrRefundNoReason is refunding a payment without saying why.
@@ -516,6 +519,9 @@ func RefundPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		if orig.AmountMinor <= 0 || orig.Reverses != "" || orig.RefundsID != "" || orig.Method == "deposit" {
 			return errNotAPayment
 		}
+		if orig.Reversed {
+			return errReversedRefund
+		}
 		out = Payment{InvoiceID: orig.InvoiceID, DepositID: orig.DepositID, RefundsID: paymentID, AmountMinor: -*p.AmountMinor,
 			Method: p.Method, PaidOn: p.PaidOn, Reference: strings.TrimSpace(p.Reference), Provider: p.Provider,
 			ExternalID: p.ExternalID, Key: p.Key, Reason: reason}
@@ -530,7 +536,7 @@ func RefundPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 				return err
 			}
 			if *p.AmountMinor > d.Held() {
-				return fmt.Errorf("%w: that is more than the deposit still holds", ErrInvalid)
+				return errDepositShort
 			}
 		}
 		_, err = insertPaymentOnce(ctx, tx, scope, &out)
@@ -548,9 +554,10 @@ func paymentTargetTx(ctx context.Context, tx pgx.Tx, scope access.Scope, payment
 	var p Payment
 	err := tx.QueryRow(ctx, `
 		SELECT id, coalesce(invoice_id::text, ''), coalesce(deposit_id::text, ''), coalesce(payout_id::text, ''),
-		       amount_minor, rounding_minor, method, coalesce(reverses_id::text, ''), coalesce(refunds_id::text, '')
-		FROM invoice_payments WHERE id = $1`, paymentID).Scan(&p.ID, &p.InvoiceID, &p.DepositID, &p.PayoutID,
-		&p.AmountMinor, &p.RoundingMinor, &p.Method, &p.Reverses, &p.RefundsID)
+		       amount_minor, rounding_minor, method, coalesce(reverses_id::text, ''), coalesce(refunds_id::text, ''),
+		       EXISTS (SELECT 1 FROM invoice_payments r WHERE r.reverses_id = p.id)
+		FROM invoice_payments p WHERE id = $1`, paymentID).Scan(&p.ID, &p.InvoiceID, &p.DepositID, &p.PayoutID,
+		&p.AmountMinor, &p.RoundingMinor, &p.Method, &p.Reverses, &p.RefundsID, &p.Reversed)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return p, ErrNotFound
 	}

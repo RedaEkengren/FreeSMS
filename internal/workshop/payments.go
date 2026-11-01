@@ -331,6 +331,11 @@ func RecordPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 // the reversal beside it: the ledger is no easier to quietly rewrite than
 // the invoice. Any payment -- into an invoice or a deposit, a payout, a
 // refund -- by whoever may move money on what it is against.
+//
+// A reversal undoes the whole payment, so one with refunds standing is
+// refused until they are reversed, and a deposit's receipt only while the
+// deposit still holds it: what was given back or applied did move. The
+// database holds both (0081).
 func ReversePayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, paymentID, reason string) error {
 	if !scope.Role.SeesCustomerPersonalData() && !scope.Role.SellsVehicles() && !scope.Role.HandsOverRentals() && !scope.Role.SeesPurchasePrice() {
 		return access.ErrForbidden
@@ -349,6 +354,18 @@ func ReversePayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		}
 		if orig.Reverses != "" {
 			return fmt.Errorf("%w: that is itself a reversal; record the payment again instead", ErrInvalid)
+		}
+		if orig.RefundsID == "" {
+			var standing bool
+			if err := tx.QueryRow(ctx, `
+				SELECT EXISTS (SELECT 1 FROM invoice_payments r WHERE r.refunds_id = $1
+				               AND NOT EXISTS (SELECT 1 FROM invoice_payments x WHERE x.reverses_id = r.id))`,
+				paymentID).Scan(&standing); err != nil {
+				return fmt.Errorf("read refunds: %w", err)
+			}
+			if standing {
+				return errRefundsStand
+			}
 		}
 		undo := Payment{InvoiceID: orig.InvoiceID, DepositID: orig.DepositID, PayoutID: orig.PayoutID,
 			AmountMinor: -orig.AmountMinor, RoundingMinor: -orig.RoundingMinor, Method: orig.Method, PaidOn: time.Now(),
@@ -433,9 +450,21 @@ func insertPayment(ctx context.Context, tx pgx.Tx, scope access.Scope, p *Paymen
 	if isUniqueViolation(err, "invoice_payments_external_idx") {
 		return errExternalTwice
 	}
+	// The database holds what is handed back within what came in (0081);
+	// the checks before this say so first, and these are for the request
+	// that lost a race with another.
 	var pg *pgconn.PgError
-	if errors.As(err, &pg) && pg.Code == "23514" && strings.Contains(pg.Message, "refund of more") {
-		return errRefundTooMuch
+	if errors.As(err, &pg) && pg.Code == "23514" {
+		switch {
+		case strings.Contains(pg.Message, "refund of more"):
+			return errRefundTooMuch
+		case strings.Contains(pg.Message, "reversed payment is not refunded"):
+			return errReversedRefund
+		case strings.Contains(pg.Message, "reversed only once they are"):
+			return errRefundsStand
+		case strings.Contains(pg.Message, "more taken from a deposit"):
+			return errDepositShort
+		}
 	}
 	return err
 }

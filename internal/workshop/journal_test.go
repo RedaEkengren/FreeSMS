@@ -3,11 +3,13 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
@@ -273,5 +275,151 @@ func TestTheManualProviderOnlyRecords(t *testing.T) {
 	}
 	if _, err := p.VerifyWebhook(nil, []byte("{}")); !errors.Is(err, workshop.ErrNoWebhooks) {
 		t.Errorf("VerifyWebhook: %v", err)
+	}
+}
+
+// rawPayment writes a payment row as the application would, past every
+// check in Go: what the database alone lets through.
+func rawPayment(t *testing.T, pool *pgxpool.Pool, cols string, args ...any) error {
+	t.Helper()
+	return database.InShop(context.Background(), pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `INSERT INTO invoice_payments (shop_id, series, number, method, paid_on, recorded_by, `+cols+`)
+			VALUES ($1, 'B', $2, 'bank', now(), $3`+placeholders(4, len(args)-1)+`)`, append([]any{shopID, args[0], userID}, args[1:]...)...)
+		return err
+	})
+}
+
+func placeholders(from, n int) string {
+	var s string
+	for i := range n {
+		s += fmt.Sprintf(", $%d", from+i)
+	}
+	return s
+}
+
+func depositWith(t *testing.T, pool *pgxpool.Pool, amount int64) (string, workshop.Payment) {
+	t.Helper()
+	ctx := context.Background()
+	desk := everything(advisor())
+	dep, err := workshop.CreateDeposit(ctx, pool, desk, workshop.NewHolding{PartyID: partyOf(t, pool, fixtureCustomer), Purpose: "rental"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	in, err := workshop.RecordDepositPayment(ctx, pool, desk, dep, workshop.NewPayment{AmountMinor: minor(amount), Method: "swish", PaidOn: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dep, in
+}
+
+// Money handed back for a payment -- its refunds and its reversal -- never
+// adds up to more than it was, and a deposit never holds less than
+// nothing: in Go, in the database, and with two people at it at once. A
+// reversed payment is not refunded; one with refunds standing is reversed
+// only once they are, because a reversal undoes the whole payment.
+func TestMoneyHandedBackNeverExceedsWhatCameIn(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	desk := everything(advisor())
+
+	// Reversed, then refunded: once handed back already.
+	inv, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{Method: "bank", PaidOn: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ReversePayment(ctx, pool, advisor(), p.ID, "Fel faktura"); err != nil {
+		t.Fatal(err)
+	}
+	if err := rawPayment(t, pool, "invoice_id, amount_minor, refunds_id, reason", 990, inv.ID, -p.AmountMinor, p.ID, "x"); err == nil {
+		t.Error("the database let a reversed payment be refunded")
+	}
+	if _, err := workshop.RefundPayment(ctx, pool, advisor(), p.ID, workshop.NewPayment{
+		AmountMinor: minor(p.AmountMinor), Method: "bank", PaidOn: time.Now()}, "Tillbaka"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a reversed payment refunded: %v", err)
+	}
+	if b, _ := workshop.BalanceFor(ctx, pool, advisor(), inv.ID); b.OutstandingMinor() != inv.GrossMinor {
+		t.Errorf("the invoice owes %d, want %d", b.OutstandingMinor(), inv.GrossMinor)
+	}
+
+	// Refunded in part, then reversed: refused until the refund is.
+	dep, in := depositWith(t, pool, 500000)
+	back, err := workshop.RefundPayment(ctx, pool, desk, in.ID, workshop.NewPayment{AmountMinor: minor(300000), Method: "bank", PaidOn: time.Now()}, "Del tillbaka")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rawPayment(t, pool, "deposit_id, amount_minor, reverses_id, reason", 991, dep, -500000, in.ID, "x"); err == nil {
+		t.Error("the database let a refunded payment be reversed whole")
+	}
+	if err := workshop.ReversePayment(ctx, pool, desk, in.ID, "Fel belopp"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a refunded payment reversed whole: %v", err)
+	}
+	if d, _ := workshop.DepositBalanceFor(ctx, pool, desk, dep); d.Held() != 200000 {
+		t.Errorf("the deposit holds %d, want 200000", d.Held())
+	}
+	if err := workshop.ReversePayment(ctx, pool, desk, back.ID, "Återbetalningen var fel"); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ReversePayment(ctx, pool, desk, in.ID, "Fel belopp"); err != nil {
+		t.Errorf("reversed once its refund was: %v", err)
+	}
+	if d, _ := workshop.DepositBalanceFor(ctx, pool, desk, dep); d.Held() != 0 {
+		t.Errorf("the deposit holds %d after both reversals, want 0", d.Held())
+	}
+
+	// A deposit partly applied: its receipt cannot be reversed whole, and
+	// nothing takes it below nothing.
+	dep, in = depositWith(t, pool, 500000)
+	inv2, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ApplyDeposit(ctx, pool, desk, dep, inv2.ID, 200000, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ReversePayment(ctx, pool, desk, in.ID, "Fel belopp"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a deposit's receipt reversed with part of it applied: %v", err)
+	}
+	if err := rawPayment(t, pool, "deposit_id, amount_minor", 992, dep, -300001); err == nil {
+		t.Error("the database let a deposit hold less than nothing")
+	}
+	if d, _ := workshop.DepositBalanceFor(ctx, pool, desk, dep); d.Held() != 300000 {
+		t.Errorf("the deposit holds %d, want 300000", d.Held())
+	}
+
+	// A reversal undoes exactly one payment, and not a reversal.
+	p3, err := workshop.RecordPayment(ctx, pool, advisor(), inv2.ID, workshop.NewPayment{AmountMinor: minor(1000), Method: "bank", PaidOn: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rawPayment(t, pool, "invoice_id, amount_minor, reverses_id, reason", 993, inv2.ID, -999, p3.ID, "x"); err == nil {
+		t.Error("the database let a reversal undo a different amount")
+	}
+
+	// Two at once: one refunds the whole payment, the other reverses it.
+	// One wins; the money is handed back once.
+	for round := range 4 {
+		dep, in := depositWith(t, pool, 100000)
+		errs := make(chan error, 2)
+		go func() {
+			_, err := workshop.RefundPayment(ctx, pool, desk, in.ID, workshop.NewPayment{AmountMinor: minor(100000), Method: "bank", PaidOn: time.Now()}, "Tillbaka")
+			errs <- err
+		}()
+		go func() { errs <- workshop.ReversePayment(ctx, pool, desk, in.ID, "Fel") }()
+		var ok int
+		for range 2 {
+			if err := <-errs; err == nil {
+				ok++
+			} else if !errors.Is(err, workshop.ErrInvalid) {
+				t.Errorf("round %d: %v", round, err)
+			}
+		}
+		d, _ := workshop.DepositBalanceFor(ctx, pool, desk, dep)
+		if ok != 1 || d.Held() != 0 {
+			t.Errorf("round %d: %d of the two went through and the deposit holds %d; want one, and nothing", round, ok, d.Held())
+		}
 	}
 }

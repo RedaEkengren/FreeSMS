@@ -2440,6 +2440,12 @@
     "only money received is refunded": {
       "other": "bara pengar som har tagits emot betalas tillbaka"
     },
+    "that payment has been reversed, so there is nothing of it to give back": {
+      "other": "den betalningen är återförd, så det finns inget av den att betala tillbaka"
+    },
+    "that payment has refunds; reverse them first, then the payment": {
+      "other": "den betalningen har återbetalningar; återför dem först och sedan betalningen"
+    },
     "say how much, above nothing": {
       "other": "säg hur mycket, mer än noll"
     },
