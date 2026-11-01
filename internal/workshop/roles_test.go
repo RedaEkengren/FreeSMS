@@ -1,17 +1,9 @@
 package workshop_test
 
-import (
-	"go/ast"
-	"go/parser"
-	"go/token"
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
-)
-
 // everyRole is the exported business operations any signed-in role may call,
-// each with the reason. Everything else that takes a scope checks its role
+// each with the reason. Read from the source by the permission contract
+// (#144, internal/testsupport/contract.go), which fails on an operation that
+// checks no role and is not here. Everything else that takes a scope checks its role
 // itself, where the data is read or written -- not in the handler that
 // happens to call it today.
 //
@@ -36,7 +28,6 @@ var everyRole = map[string]string{
 	"PresenceFor":        "whether the car is here, which a technician needs before looking for it; no customer data",
 	"PartsOnJob":         "which parts are priced and taken out on a job: numbers and names, no cost, no customer data",
 	"FinalCheckFor":      "whether the work is signed off, which the technician needs before saying it is ready; no customer data",
-	"ChangePassword":     "the caller's own password, checked against the current one",
 	"MyLocale":           "the caller's own language", "SetMyLocale": "the caller's own language",
 	"SetMyTheme": "the caller's own light or dark",
 	"AlertSound": "the caller's own setting", "SetAlertSound": "the caller's own setting",
@@ -65,62 +56,4 @@ var everyRole = map[string]string{
 
 	// Delegates to TakeInWith, which checks.
 	"TakeIn": "delegates to TakeInWith",
-}
-
-// Every exported operation that takes a scope either checks the role itself
-// or is in everyRole with a reason.
-//
-// Found otherwise: AddLine, InvoicesFor, the time library, the customer's
-// links and auth.Deactivate relied on the one handler that called them. None
-// was reachable over HTTP by the wrong role; the next caller would not have
-// known it had to check.
-func TestEveryOperationSaysWhoMayCallIt(t *testing.T) {
-	checked := 0
-	for _, dir := range []string{".", "../auth"} {
-		fset := token.NewFileSet()
-		pkgs, err := parser.ParseDir(fset, dir, func(fi os.FileInfo) bool {
-			return !strings.HasSuffix(fi.Name(), "_test.go")
-		}, 0)
-		if err != nil {
-			t.Fatalf("parse %s: %v", dir, err)
-		}
-		for _, pkg := range pkgs {
-			for name, file := range pkg.Files {
-				src, _ := os.ReadFile(name)
-				for _, decl := range file.Decls {
-					fn, ok := decl.(*ast.FuncDecl)
-					if !ok || fn.Recv != nil || !fn.Name.IsExported() || !takesScope(fn) {
-						continue
-					}
-					checked++
-					body := string(src[fset.Position(fn.Body.Pos()).Offset:fset.Position(fn.Body.End()).Offset])
-					checks := strings.Contains(body, "scope.Role.") || strings.Contains(body, "(scope.Role,") ||
-						strings.Contains(body, "scope.PlansStaff()")
-					_, open := everyRole[fn.Name.Name]
-					switch {
-					case !checks && !open:
-						t.Errorf("%s (%s) takes a scope and checks no role; check it, or add it to everyRole with the reason",
-							fn.Name.Name, filepath.Base(name))
-					case checks && open:
-						t.Errorf("%s checks a role and is also listed as open to every role; one of the two is wrong",
-							fn.Name.Name)
-					}
-				}
-			}
-		}
-	}
-	if checked < 60 {
-		t.Errorf("only %d operations found; the parser has stopped seeing them", checked)
-	}
-}
-
-func takesScope(fn *ast.FuncDecl) bool {
-	for _, p := range fn.Type.Params.List {
-		if se, ok := p.Type.(*ast.SelectorExpr); ok && se.Sel.Name == "Scope" {
-			if x, ok := se.X.(*ast.Ident); ok && x.Name == "access" {
-				return true
-			}
-		}
-	}
-	return false
 }

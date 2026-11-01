@@ -71,10 +71,15 @@ populated for employees who do not drive.
 
 Roles are checked the same way, in the business operation and not only in
 the handler that calls it today. Every exported function that takes an
-`access.Scope` checks its role, or is listed in `everyRole` in
-`internal/workshop/roles_test.go` with the reason any role may call it; the
-test reads the code and fails on anything else. `TestTheRoleMatrix` calls
-the privileged operations directly as each role.
+`access.Scope`, in every package under `internal/`, checks its role, or is
+listed in its package's `everyRole` map (a `_test.go` file) with the reason
+any role may call it; `TestEveryOperationSaysWhoMayCallItAndInWhichModule`
+(`internal/testsupport/contract.go`, which says which checks it recognises)
+reads the code and fails on anything else, including a package that takes
+scopes and declares no map. `TestTheRoleMatrix` calls the privileged
+operations directly as each role, and again with the workshop switched off.
+What a role may not see is asserted on the value it is handed
+(`testsupport.Handed`, `testsupport.FieldsLike`), never on a page.
 
 Modules are checked the same way
 ([#143](https://github.com/RedaEkengren/FreeSMS/issues/143)). A shop runs
@@ -85,9 +90,9 @@ shop does not run answers exactly as a path that does not exist. Every
 workshop operation reads through `inWorkshop` (or checks `scope.Require`)
 and refuses with `access.ErrModuleOff`; the ones that must keep working
 whatever is switched on -- documents, payments, customers, vehicles, people,
-privacy -- are listed in `core` in
-`internal/workshop/modules_contract_test.go` with the reason, and the test
-fails on anything else. Switched off, a module's history stays readable
+privacy -- are listed in the package's `core` map
+(`internal/workshop/core_test.go`) with the reason, and the same contract
+test fails on anything else. Switched off, a module's history stays readable
 through Core; only new work is refused.
 
 So: a technician's default payload is the vehicle and the job. Customer

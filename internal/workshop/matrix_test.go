@@ -126,6 +126,27 @@ func TestTheRoleMatrix(t *testing.T) {
 		}
 	}
 
+	// And per module (#144): each operation again, as a role that may call
+	// it, in a shop that has switched the workshop off. The workshop's refuse
+	// with ErrModuleOff and hand back nothing; Core's go on.
+	for _, op := range ops {
+		if len(op.allowed) == 0 {
+			continue
+		}
+		off := roles[op.allowed[0]]
+		off.Modules = nil
+		payload, err := op.do(off)
+		_, isCore := core[op.name]
+		switch {
+		case isCore && errors.Is(err, access.ErrModuleOff):
+			t.Errorf("%s is Core and refused with the workshop off", op.name)
+		case !isCore && !errors.Is(err, access.ErrModuleOff):
+			t.Errorf("%s with the workshop off: %v, want ErrModuleOff", op.name, err)
+		case !isCore && payload != 0:
+			t.Errorf("%s with the workshop off: refused, and handed back something anyway", op.name)
+		}
+	}
+
 	// The refused writes changed nothing. The allowed ones above added one
 	// line each for the front desk and the owner, and nothing else.
 	_, lines, _ := workshop.JobByID(ctx, pool, advisor(), job)

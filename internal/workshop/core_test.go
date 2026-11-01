@@ -1,16 +1,5 @@
 package workshop_test
 
-import (
-	"go/ast"
-	"go/parser"
-	"go/token"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
-	"testing"
-)
-
 // core is the exported operations of this package that are not the
 // workshop module's but Core's, each with the reason (#143). They keep
 // working whatever the shop runs: a shop that has switched the workshop off
@@ -18,7 +7,9 @@ import (
 //
 // Everything else that takes a scope belongs to the workshop and checks that
 // the shop runs it -- through inWorkshop, scope.Require or scope.Uses, itself
-// or in what it calls -- where the data is read, not in a handler.
+// or in what it calls -- where the data is read, not in a handler. The
+// permission contract (#144, internal/testsupport/contract.go) reads this map
+// from the source and fails on anything else.
 var core = map[string]string{
 	// Documents and money: issued whatever made them, corrected, paid and
 	// handed to the accountant as long as the books are kept.
@@ -76,90 +67,4 @@ var core = map[string]string{
 	"ReadinessFor": "getting started", "ReadinessStatus": "getting started", "InvoiceExample": "getting started",
 	"PreviewImport": "bringing records in", "ApplyImport": "bringing records in", "DiscardImport": "bringing records in",
 	"ImportBatches": "bringing records in", "ImportBatchByID": "bringing records in",
-}
-
-// The ways an operation says it is the workshop's.
-var moduleCheck = regexp.MustCompile(`inWorkshop\(|scope\.Require\(access\.|scope\.Uses\(access\.`)
-
-// Every exported operation that takes a scope is Core's, with a reason, or
-// checks that the shop runs the workshop -- itself or in a function of this
-// package it calls (#143).
-func TestEveryWorkshopOperationChecksTheModule(t *testing.T) {
-	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, ".", func(fi os.FileInfo) bool {
-		return !strings.HasSuffix(fi.Name(), "_test.go")
-	}, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	bodies := map[string]string{}
-	type op struct{ name, file string }
-	var ops []op
-	for _, pkg := range pkgs {
-		for name, file := range pkg.Files {
-			src, _ := os.ReadFile(name)
-			for _, decl := range file.Decls {
-				fn, ok := decl.(*ast.FuncDecl)
-				if !ok || fn.Recv != nil || fn.Body == nil {
-					continue
-				}
-				bodies[fn.Name.Name] = string(src[fset.Position(fn.Body.Pos()).Offset:fset.Position(fn.Body.End()).Offset])
-				if fn.Name.IsExported() && takesScope(fn) {
-					ops = append(ops, op{fn.Name.Name, filepath.Base(name)})
-				}
-			}
-		}
-	}
-	checks := moduleChecker(bodies)
-	for _, o := range ops {
-		_, isCore := core[o.name]
-		switch c := checks(o.name); {
-		case !c && !isCore:
-			t.Errorf("%s (%s) takes a scope and checks no module; route it through inWorkshop, "+
-				"or add it to core with the reason it is not the workshop's", o.name, o.file)
-		case c && isCore:
-			t.Errorf("%s (%s) is listed as Core and checks the workshop; a Core operation must keep "+
-				"working when the workshop is off", o.name, o.file)
-		}
-	}
-	for name := range core {
-		if _, ok := bodies[name]; !ok {
-			t.Errorf("core lists %s, which is not an operation of this package any more", name)
-		}
-	}
-	if len(ops) < 250 {
-		t.Errorf("only %d operations found; the parser has stopped seeing them", len(ops))
-	}
-}
-
-// moduleChecker answers whether a function checks the module, directly or
-// through a function of the package it calls.
-func moduleChecker(bodies map[string]string) func(string) bool {
-	memo := map[string]bool{}
-	visiting := map[string]bool{}
-	var checks func(string) bool
-	checks = func(name string) bool {
-		if v, ok := memo[name]; ok {
-			return v
-		}
-		if visiting[name] {
-			return false
-		}
-		visiting[name] = true
-		body := bodies[name]
-		found := moduleCheck.MatchString(body)
-		for callee := range bodies {
-			if found {
-				break
-			}
-			if callee != name && strings.Contains(body, callee+"(") &&
-				regexp.MustCompile(`\b`+callee+`\(`).MatchString(body) && checks(callee) {
-				found = true
-			}
-		}
-		visiting[name] = false
-		memo[name] = found
-		return found
-	}
-	return checks
 }
