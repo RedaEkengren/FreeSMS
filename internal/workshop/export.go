@@ -41,6 +41,9 @@ var ExportTables = []string{
 	"supplier_orders", "supplier_order_lines", "supplier_line_etas", "supplier_receipts", "supplier_returns", "job_recommendations", "delivery_summaries", "invoice_deliveries", "invoice_corrections", "receivable_cases", "receivable_events", "day_settlements", "day_reviews", "comebacks", "comeback_claims", "comeback_events", "outsourced_work", "outsourced_events", "import_batches", "import_refs", "setup_steps", "shop_module_changes", "user_roles", "protocol_photo_removals", "parties", "party_roles", "resources", "resource_block_jobs", "resource_retirements", "audit_events", "deposits", "deposit_applications", "vehicle_lookups", "cash_invoices", "payment_flows", "payment_flow_checks", "cash_register_settings", "payouts", "bank_statement_lines", "payment_matches", "identity_retention_settings", "outbox", "outbox_events", "document_templates", "document_template_versions", "document_record_parties", "document_retention_settings",
 	// What technicians see (#225): the shop's decisions, with who and why.
 	"technician_view_changes", "technician_view_exceptions",
+	// Rental
+	"rental_permits", "rental_permit_revocations", "rental_profiles", "rental_units", "fleet_memberships",
+	"rate_plans", "rate_plan_seasons", "rental_extras",
 }
 
 // exportQueries are tables exported with chosen columns, because one of
@@ -70,6 +73,11 @@ var exportQueries = map[string]string{
 		ended_at, ended_by, end_reason, value_removed_at FROM identity_records`,
 	"resource_block_changes": `SELECT id, shop_id, block_id, change, lower(old_period) AS old_starts_at, upper(old_period) AS old_ends_at,
 		lower(new_period) AS new_starts_at, upper(new_period) AS new_ends_at, by_user, at, reason FROM resource_block_changes`,
+	// Rental: a profile's cleaning buffer in seconds, as a block's buffers.
+	"rental_profile_versions": `SELECT id, shop_id, profile_id, version, permit_required, registration_required,
+		licence_check_required, licence_categories, reporting_required, check_out_template_id, check_in_template_id,
+		extract(epoch FROM cleaning_buffer)::bigint AS cleaning_buffer_seconds, mileage_allowance, default_deposit_minor,
+		minimum_age, sublet_banned, unconfirmed, created_at, created_by FROM rental_profile_versions`,
 }
 
 // exportExcluded are the tables that do not go, and why.
