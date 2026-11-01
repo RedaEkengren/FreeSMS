@@ -242,6 +242,9 @@ type LicenceCheckResult struct {
 	Failure   string
 	CheckedAt time.Time
 	CheckedBy string
+	// Until when the licence is valid; nil for a check made before it
+	// was kept (0305), which does not pass.
+	ValidUntil *time.Time
 }
 
 var (
@@ -365,7 +368,7 @@ func rentalDriversTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]Rental
 		SELECT d.id, d.party_id,
 		       coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, ''),
 		       d.main, d.added_at, d.removed_at IS NOT NULL,
-		       k.passed, coalesce(k.failure, ''), k.checked_at, coalesce(kp.display_name, '')
+		       k.passed, coalesce(k.failure, ''), k.checked_at, coalesce(kp.display_name, ''), k.valid_until
 		FROM rental_drivers d
 		JOIN parties pa ON pa.id = d.party_id
 		LEFT JOIN customers c ON c.id = pa.customer_id
@@ -384,12 +387,12 @@ func rentalDriversTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]Rental
 		var d RentalDriver
 		var passed *bool
 		var failure, by string
-		var at *time.Time
-		if err := rows.Scan(&d.ID, &d.PartyID, &d.Name, &d.Main, &d.AddedAt, &d.Removed, &passed, &failure, &at, &by); err != nil {
+		var at, until *time.Time
+		if err := rows.Scan(&d.ID, &d.PartyID, &d.Name, &d.Main, &d.AddedAt, &d.Removed, &passed, &failure, &at, &by, &until); err != nil {
 			return nil, err
 		}
 		if passed != nil {
-			d.Check = &LicenceCheckResult{Passed: *passed, Failure: failure, CheckedAt: *at, CheckedBy: by}
+			d.Check = &LicenceCheckResult{Passed: *passed, Failure: failure, CheckedAt: *at, CheckedBy: by, ValidUntil: until}
 		}
 		out = append(out, d)
 	}
@@ -463,13 +466,12 @@ func RecordLicenceCheck(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		}
 		cats = append(cats, c)
 	}
-	// Who, and under which rules, read first; refused before anything is
-	// recorded.
-	var party, booking string
-	var accepted []string
-	var needed, removed bool
-	var ends time.Time
+	var passed bool
 	err := inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var party, booking string
+		var accepted []string
+		var needed, removed bool
+		var ends time.Time
 		err := tx.QueryRow(ctx, `
 			SELECT d.party_id, d.booking_id, d.removed_at IS NOT NULL, v.licence_check_required, v.licence_categories, b.ends_at
 			FROM rental_drivers d JOIN rental_bookings b ON b.id = d.booking_id
@@ -493,40 +495,81 @@ func RecordLicenceCheck(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		case !needed:
 			return errNoProfileNeed
 		}
-		return nil
-	})
-	if err != nil {
-		return false, err
-	}
-	failure := ""
-	switch {
-	case !l.Shown:
-		failure = licenceNotShown
-	case !slices.ContainsFunc(cats, func(c string) bool { return slices.Contains(accepted, c) }):
-		failure = licenceCategory
-	case dateOnly(l.ValidUntil).Before(dateOnly(ends)):
-		failure = licenceExpires
-	}
-	ref := "not shown; " + l.Method
-	if l.Shown {
-		ref = fmt.Sprintf("shown; categories %s; valid until %s; %s", strings.Join(cats, ","), l.ValidUntil.Format("2006-01-02"), l.Method)
-	}
-	if l.Note != "" {
-		ref += "; " + l.Note
-	}
-	record, err := RecordIdentity(ctx, pool, scope, nil, NewIdentityRecord{PartyID: party, Kind: IdentityLicence,
-		Purpose: "licence_check", Reference: ref})
-	if err != nil {
-		return false, err
-	}
-	err = inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `
-			INSERT INTO rental_licence_checks (shop_id, booking_id, driver_id, identity_record_id, passed, failure, checked_by)
-			VALUES ($1, $2, $3, $4, $5, nullif($6, ''), $7)`,
-			scope.ShopID, booking, driverID, record, failure == "", failure, scope.UserID)
+		loc, err := shopLocationTx(ctx, tx)
+		if err != nil {
+			return err
+		}
+		failure := ""
+		switch {
+		case !l.Shown:
+			failure = licenceNotShown
+		case !slices.ContainsFunc(cats, func(c string) bool { return slices.Contains(accepted, c) }):
+			failure = licenceCategory
+		case !licenceLasts(l.ValidUntil, b.ends, loc):
+			failure = licenceExpires
+		}
+		ref := "not shown; " + l.Method
+		if l.Shown {
+			ref = fmt.Sprintf("shown; categories %s; valid until %s; %s", strings.Join(cats, ","), l.ValidUntil.Format("2006-01-02"), l.Method)
+		}
+		if l.Note != "" {
+			ref += "; " + l.Note
+		}
+		record, err := recordLicenceReferenceTx(ctx, tx, scope, party, ref)
+		if err != nil {
+			return err
+		}
+		var until any
+		if l.Shown {
+			until = l.ValidUntil.Format("2006-01-02")
+		}
+		passed = failure == ""
+		_, err = tx.Exec(ctx, `
+			INSERT INTO rental_licence_checks (shop_id, booking_id, driver_id, identity_record_id, passed, failure, checked_by, valid_until)
+			VALUES ($1, $2, $3, $4, $5, nullif($6, ''), $7, $8::date)`,
+			scope.ShopID, booking, driverID, record, passed, failure, scope.UserID, until)
 		return err
 	})
-	return failure == "" && err == nil, err
+	return passed && err == nil, err
+}
+
+// licenceLasts reports whether a licence valid until a day -- a date, as
+// the card prints it -- lasts a rental ending at ends, that day read in the
+// shop's zone: valid on the day the rental ends.
+func licenceLasts(validUntil, ends time.Time, loc *time.Location) bool {
+	e := ends.In(loc)
+	last := time.Date(e.Year(), e.Month(), e.Day(), 0, 0, 0, 0, time.UTC)
+	return !dateOnly(validUntil).Before(last)
+}
+
+// recordLicenceReferenceTx is RecordIdentity for a licence check, in the
+// caller's transaction: the reference to the check, for the licence
+// check's purpose, never a value. The same checks: the role records that
+// purpose, the module runs, the party is one the caller may see.
+func recordLicenceReferenceTx(ctx context.Context, tx pgx.Tx, scope access.Scope, partyID, ref string) (string, error) {
+	p, ok := identityPurpose("licence_check")
+	if !ok || !scope.Role.SeesIdentityRecords() || !p.Records(scope.Role) {
+		return "", access.ErrForbidden
+	}
+	if err := scope.Require(access.Rental); err != nil {
+		return "", err
+	}
+	if err := partySeenTx(ctx, tx, scope, partyID); err != nil {
+		return "", err
+	}
+	retention, err := identityRetentionTx(ctx, tx, p)
+	if err != nil {
+		return "", err
+	}
+	var id string
+	err = tx.QueryRow(ctx, `
+		INSERT INTO identity_records (shop_id, party_id, kind, purpose, legal_basis, recorded_by, expires_at, verification_ref)
+		VALUES ($1, party_now($2), $3, $4, $5, $6, clock_timestamp() + make_interval(secs => $7), $8) RETURNING id`,
+		scope.ShopID, partyID, IdentityLicence, p.Name, p.LegalBasis, scope.UserID, retention.Seconds(), ref).Scan(&id)
+	if err != nil {
+		return "", fmt.Errorf("record the check: %w", err)
+	}
+	return id, nil
 }
 
 // The gaps a booking can have before handover, beyond its profile's.
@@ -564,13 +607,19 @@ func rentalBookingGapsTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]Ha
 	if err != nil {
 		return nil, err
 	}
+	loc, err := shopLocationTx(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
 	listed := 0
 	for _, d := range drivers {
 		if d.Removed {
 			continue
 		}
 		listed++
-		if d.Check == nil || !d.Check.Passed {
+		// Asked again against the rental as it is now: extended since the
+		// check, the licence may not last it.
+		if d.Check == nil || !d.Check.Passed || d.Check.ValidUntil == nil || !licenceLasts(*d.Check.ValidUntil, ends, loc) {
 			gaps = append(gaps, HandoverGap{Code: GapLicence, Who: d.Name,
 				Sentence: "%s has not shown a valid licence for this rental."})
 		}

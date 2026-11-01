@@ -326,3 +326,47 @@ func TestALicenceCheckKeepsNoNumber(t *testing.T) {
 		t.Errorf("a note with no number: %v", err)
 	}
 }
+
+// A passed check is asked again against the rental as it is when the gaps
+// are read: extended past the licence's end, the driver has a gap again;
+// and the day a rental ends is the shop's day, not UTC's (review #2).
+func TestALicenceCheckIsAskedAgainstTheRentalAsItIsNow(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	if _, err := workshop.RecordRentalPermit(ctx, pool, rentalOwner(), workshop.NewRentalPermit{
+		Reference: "TSV 1", DecidedOn: day("2020-01-01"), Responsible: "Anna"}); err != nil {
+		t.Fatal(err)
+	}
+	id, err := v.book(pool, wallAt("2031-06-08 09:00"), wallAt("2031-06-09 09:00"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver, _ := workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, v.renter, true)
+	if ok, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true,
+		Categories: []string{"B"}, ValidUntil: day("2031-06-10"), Method: workshop.LicenceCardInspected}); err != nil || !ok {
+		t.Fatalf("a licence valid past the end: %v, %v", ok, err)
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, wallAt("2031-06-20 09:00"), ""); err != nil {
+		t.Fatal(err)
+	}
+	gaps, _ := workshop.RentalBookingGaps(ctx, pool, rentalDesk(), id)
+	if len(gaps) != 1 || gaps[0].Code != workshop.GapLicence {
+		t.Errorf("extended past the licence's end: %+v", gaps)
+	}
+	// Ends at half past midnight on 12 July, Stockholm: 22:30 UTC on the
+	// 11th. A licence valid until the 11th does not last the rental --
+	// whatever zone the server's clock is in, as in a container: UTC.
+	was := time.Local
+	time.Local = time.UTC
+	defer func() { time.Local = was }()
+	late, err := v.book(pool, wallAt("2031-07-10 09:00"), wallAt("2031-07-12 00:30"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	d2, _ := workshop.AddRentalDriver(ctx, pool, rentalDesk(), late, v.renter, true)
+	if ok, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), d2, workshop.LicenceShown{Shown: true,
+		Categories: []string{"B"}, ValidUntil: day("2031-07-11"), Method: workshop.LicenceCardInspected}); err != nil || ok {
+		t.Errorf("a licence that ends the day before the rental does, by the shop's clock: %v, %v", ok, err)
+	}
+}
