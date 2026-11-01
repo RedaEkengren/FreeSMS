@@ -47,8 +47,10 @@ var queryBudgets = map[string]int{
 	// the top of the one queue above it, read in a transaction of their own.
 	// The owner's queue is the counter's, the parts desk's and Core's --
 	// payment flows, documents, the outbox -- and two money cards besides.
-	"desk GET /":      35,
-	"owner GET /":     43,
+	// 35 to 20 and 43 to 28: the board, what is owed and the backlog read
+	// once, in the page's transaction, for the queue and the board alike.
+	"desk GET /":      20,
+	"owner GET /":     28,
 	"desk GET /board": 21,
 	// 35: the quote the customer was shown and what they answered to it
 	// (two statements), which the counter reads on every live refresh.

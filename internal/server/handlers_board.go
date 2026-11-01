@@ -28,7 +28,19 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	scope := session.Scope
 	var home workshop.Home
 	var failed []error
+	// The counter's board is read once, in the page's one transaction, and
+	// handed both to the queue above it and to the board itself: the cards,
+	// the queue and the board are one moment, and the board is not read
+	// twice.
+	board := scope.Uses(access.Workshop) && scope.Role.WorksInTheWorkshop() && scope.Role.SeesCustomerPersonalData()
+	var desk *workshop.Desk
 	database.Reading(r.Context(), s.pool, scope, func(ctx context.Context) {
+		if board {
+			if d, err := workshop.ReadDesk(ctx, s.pool, scope); err == nil {
+				desk = &d
+				ctx = workshop.WithDesk(ctx, desk)
+			}
+		}
 		home, failed = workshop.HomeFor(ctx, s.pool, scope)
 	})
 	for _, err := range failed {
@@ -38,40 +50,45 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		s.render(w, r, http.StatusOK, "home", pageData{Title: "Start page", Session: session, Home: &home})
 		return
 	}
-	if scope.Role.SeesCustomerPersonalData() {
-		s.renderBoard(w, r, &home)
+	if board {
+		s.renderBoard(w, r, &home, desk)
 		return
 	}
 	s.renderJobs(w, r, &home)
 }
 
 func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
-	s.renderBoard(w, r, nil)
+	s.renderBoard(w, r, nil, nil)
 }
 
 // renderBoard is the counter board, with the home page's cards above it
-// when it is the home page.
-func (s *Server) renderBoard(w http.ResponseWriter, r *http.Request, home *workshop.Home) {
+// when it is the home page; desk is the board already read for them, or
+// nil to read it now.
+func (s *Server) renderBoard(w http.ResponseWriter, r *http.Request, home *workshop.Home, desk *workshop.Desk) {
 	session := sessionFrom(r.Context())
 
-	entries, err := workshop.Board(r.Context(), s.pool, session.Scope)
-	if errors.Is(err, access.ErrForbidden) {
-		s.renderError(w, r, http.StatusForbidden, "Not for your role",
-			"The counter board shows customer details, so it is limited to the front desk and the owner.")
-		return
+	if desk == nil {
+		d, err := workshop.ReadDesk(r.Context(), s.pool, session.Scope)
+		if errors.Is(err, access.ErrForbidden) {
+			s.renderError(w, r, http.StatusForbidden, "Not for your role",
+				"The counter board shows customer details, so it is limited to the front desk and the owner.")
+			return
+		}
+		if err != nil {
+			s.fault(w, r, "board", err)
+			return
+		}
+		desk = &d
 	}
-	if err != nil {
-		s.fault(w, r, "board", err)
-		return
-	}
+	entries := append([]workshop.BoardEntry(nil), desk.Board...)
 
 	// An invoiced car still on the board with its invoice overdue says so:
 	// the counter is where the customer collecting it is standing.
-	if owed, err := workshop.Receivables(r.Context(), s.pool, session.Scope); err != nil {
-		s.log.Error("receivables", "error", err)
+	if desk.OwedErr != nil {
+		s.log.Error("receivables", "error", desk.OwedErr)
 	} else {
 		overdue := map[string]bool{}
-		for _, b := range owed {
+		for _, b := range desk.Owed {
 			if b.Overdue() {
 				overdue[b.WorkOrderID] = true
 			}
@@ -80,17 +97,15 @@ func (s *Server) renderBoard(w http.ResponseWriter, r *http.Request, home *works
 			entries[i].Overdue = overdue[entries[i].ID]
 		}
 	}
-
-	backlog, err := workshop.Backlog(r.Context(), s.pool, session.Scope)
-	if err != nil {
-		s.log.Error("backlog", "error", err)
+	if desk.BacklogErr != nil {
+		s.log.Error("backlog", "error", desk.BacklogErr)
 	}
 
 	s.render(w, r, http.StatusOK, "board", pageData{
 		Title:   "In the shop",
 		Session: session,
 		Board:   entries,
-		Backlog: backlog,
+		Backlog: desk.Backlog,
 		Home:    home,
 	})
 }

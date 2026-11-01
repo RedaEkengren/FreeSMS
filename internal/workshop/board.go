@@ -142,6 +142,56 @@ func (b BoardEntry) WaitingDays() int {
 	return int(time.Since(*b.ReadyAt).Hours() / 24)
 }
 
+// Desk is the counter's board as it is read once for a page: the board,
+// what is owed on it and the work nobody is on. The home page reads it in
+// its one transaction and hands it to both the queue and the board below,
+// so the cards, the queue and the board are one moment and the board is
+// not read twice.
+type Desk struct {
+	Board []BoardEntry
+	// What is owed, and the backlog; each with its own error, which the
+	// board page logs and shows the rest without, and the queue reports.
+	Owed       []Balance
+	OwedErr    error
+	Backlog    []BacklogItem
+	BacklogErr error
+}
+
+// ReadDesk reads the counter's board, what is owed and the backlog, for a
+// role that may see the board.
+func ReadDesk(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (Desk, error) {
+	if !scope.Role.SeesCustomerPersonalData() {
+		return Desk{}, access.ErrForbidden
+	}
+	if err := scope.Require(access.Workshop); err != nil {
+		return Desk{}, err
+	}
+	var d Desk
+	var err error
+	if d.Board, err = Board(ctx, pool, scope); err != nil {
+		return Desk{}, err
+	}
+	d.Owed, d.OwedErr = Receivables(ctx, pool, scope)
+	d.Backlog, d.BacklogErr = Backlog(ctx, pool, scope)
+	return d, nil
+}
+
+type deskKey struct{}
+
+// WithDesk hands a desk already read to what reads the counter's board
+// later with ctx: the queue's counter items.
+func WithDesk(ctx context.Context, d *Desk) context.Context {
+	return context.WithValue(ctx, deskKey{}, d)
+}
+
+// deskFor is the desk handed with ctx, or one read now.
+func deskFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (Desk, error) {
+	if d, ok := ctx.Value(deskKey{}).(*Desk); ok && d != nil {
+		return *d, nil
+	}
+	return ReadDesk(ctx, pool, scope)
+}
+
 // Board lists everything in the shop that is not finished.
 //
 // Requires a role that may see customer personal data. The check is here, at

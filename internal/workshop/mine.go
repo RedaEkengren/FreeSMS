@@ -440,16 +440,19 @@ func partsWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (
 // deskWaiting reads the counter's board and says what on it is waiting for
 // the counter. The owner also sees what is past its promise.
 func deskWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, late bool) ([]ActionItem, error) {
-	board, err := Board(ctx, pool, scope)
+	desk, err := deskFor(ctx, pool, scope)
 	if err != nil {
 		return nil, err
 	}
-	owed, err := Receivables(ctx, pool, scope)
-	if err != nil {
-		return nil, err
+	if desk.OwedErr != nil {
+		return nil, desk.OwedErr
 	}
+	if desk.BacklogErr != nil {
+		return nil, desk.BacklogErr
+	}
+	board, backlog := desk.Board, desk.Backlog
 	overdue := map[string]bool{}
-	for _, r := range owed {
+	for _, r := range desk.Owed {
 		if r.Overdue() {
 			overdue[r.WorkOrderID] = true
 		}
@@ -461,10 +464,6 @@ func deskWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, la
 	}
 	for _, b := range untold {
 		out = append(out, ActionItem{Kind: "booking_not_told", SubjectKind: "booking", SubjectID: b.BookingID, Text: b.What})
-	}
-	backlog, err := Backlog(ctx, pool, scope)
-	if err != nil {
-		return nil, err
 	}
 	for _, b := range backlog {
 		kind := map[string]string{"unstaffed": "unstaffed", "away": "tech_away", "overdue": "plan_overdue"}[b.Kind]
