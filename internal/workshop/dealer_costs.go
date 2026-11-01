@@ -104,6 +104,7 @@ var (
 	errCostCurrency = fmt.Errorf("%w: in another currency, say which, how much in it, the rate and where the rate came from", ErrInvalid)
 	errCostReversed = fmt.Errorf("%w: that cost has already been reversed", ErrInvalid)
 	errCostReversal = fmt.Errorf("%w: a reversal is not reversed; enter the cost again instead", ErrInvalid)
+	errJobOpen      = fmt.Errorf("%w: that job is still open; its cost is posted once it is done", ErrInvalid)
 	errJobNotStock  = fmt.Errorf("%w: that job was not opened on a car in stock", ErrInvalid)
 	errLabourRate   = fmt.Errorf("%w: an hour's cost is from nothing up to a hundred thousand kronor", ErrInvalid)
 	// ErrCostNoReason is a cost reversed without saying why.
@@ -371,7 +372,8 @@ func internalRateTx(ctx context.Context, tx pgx.Tx, rate *int64) error {
 // PostJobCost posts what a workshop job on a stock car cost the business,
 // once: the parts fitted at what they cost when they left the shelf, and
 // the job's labour hours at the internal rate -- not what a customer would
-// be charged. The job must have been opened while the car was in stock.
+// be charged. The job must have been opened while the car was in stock,
+// and be done: ready, invoiced, closed or declined.
 // Asked again, it returns the posting there is. For whoever buys cars, in a
 // shop that sells cars; the job's own invoice is the workshop's matter.
 func PostJobCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) (StockCost, error) {
@@ -418,6 +420,19 @@ func PostJobCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		}
 		if err != nil {
 			return fmt.Errorf("read the job's car: %w", err)
+		}
+		// Done: ready, invoiced, closed, or declined after work. An open job
+		// may yet take parts and hours, and a posting is what the job cost,
+		// not what it has cost so far; one that kept moving would change
+		// under the margin it is read into.
+		var state State
+		if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1`, jobID).Scan(&state); err != nil {
+			return fmt.Errorf("read the job: %w", err)
+		}
+		switch state {
+		case StateReady, StateInvoiced, StateClosed, StateDeclined:
+		default:
+			return errJobOpen
 		}
 		var rate int64
 		if err := internalRateTx(ctx, tx, &rate); err != nil {

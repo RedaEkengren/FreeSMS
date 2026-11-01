@@ -121,6 +121,16 @@ func TestAJobOnAStockCarPostsItsCostOnce(t *testing.T) {
 		SELECT $1, part.id, 'consumed', -2, 150000, $2 FROM part`, shopID, job); err != nil {
 		t.Fatal(err)
 	}
+	// Open, the job may yet take more parts and hours: its cost is not
+	// posted until it is done.
+	if _, err := workshop.PostJobCost(ctx, pool, buyerScope(), job); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("an open job's cost was posted: %v", err)
+	}
+	move(t, pool, job, workshop.StateEstimated, workshop.StateAwaitingApproval, workshop.StateApproved, workshop.StateInProgress)
+	if err := workshop.MarkPerformed(ctx, pool, advisor(), job, 1, true); err != nil {
+		t.Fatal(err)
+	}
+	move(t, pool, job, workshop.StateReady)
 	posted, err := workshop.PostJobCost(ctx, pool, buyerScope(), job)
 	// 2,5 h at 400 kr and two kits at 1 500 kr: 4 000 kr.
 	if err != nil || posted.NetMinor != 400_000 || posted.Source != workshop.CostFromWorkOrder || posted.Kind != workshop.CostWorkshop ||
