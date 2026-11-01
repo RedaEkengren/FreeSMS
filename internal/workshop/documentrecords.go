@@ -87,29 +87,41 @@ var ErrSignerUnavailable = errors.New("workshop: the signing service could not b
 // module switched off keeps its contracts readable; producing and signing
 // are new work, and the module must run.
 func mayDocument(roles access.Roles, scope access.Scope, kind string, writing bool) error {
-	var may bool
-	var module access.Module
-	switch kind {
-	case DocPurchaseAgreement, DocConsignmentAgreement:
-		may, module = roles.BuysVehicles(), access.Dealer
-	case DocSalesContract, DocTestDriveAgreement:
-		may, module = roles.SellsVehicles(), access.Dealer
-	case DocRentalAgreement:
-		may, module = roles.HandsOverRentals(), access.Rental
-	default:
-		return errDocKind
-	}
-	if !may {
-		return access.ErrForbidden
+	if err := mayReadDocument(roles, kind); err != nil {
+		return err
 	}
 	if !writing {
 		return nil
+	}
+	module := access.Dealer
+	if kind == DocRentalAgreement {
+		module = access.Rental
 	}
 	// Written out per module, so the permission contract sees the gate.
 	if module == access.Rental {
 		return scope.Require(access.Rental)
 	}
 	return scope.Require(access.Dealer)
+}
+
+// mayReadDocument is mayDocument for reading, which is Core's and asks no
+// module: whoever makes a kind of contract reads it.
+func mayReadDocument(roles access.Roles, kind string) error {
+	var may bool
+	switch kind {
+	case DocPurchaseAgreement, DocConsignmentAgreement:
+		may = roles.BuysVehicles()
+	case DocSalesContract, DocTestDriveAgreement:
+		may = roles.SellsVehicles()
+	case DocRentalAgreement:
+		may = roles.HandsOverRentals()
+	default:
+		return errDocKind
+	}
+	if !may {
+		return access.ErrForbidden
+	}
+	return nil
 }
 
 // docError turns the database's refusals into sentences.

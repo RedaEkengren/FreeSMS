@@ -133,31 +133,30 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 	if !looksLikeUUID(subjectID) {
 		return nil, ErrNotFound
 	}
-	roles := scope.Role
 	reasons := true
 	switch subjectKind {
 	case "shop":
-		if !roles.RunsTheShop() {
+		if !scope.Role.RunsTheShop() {
 			return nil, access.ErrForbidden
 		}
 		if !strings.EqualFold(subjectID, scope.ShopID) {
 			return nil, ErrNotFound
 		}
 	case "user":
-		if !roles.RunsTheShop() {
+		if !scope.Role.RunsTheShop() {
 			return nil, access.ErrForbidden
 		}
 	case "resource_block":
-		if !roles.KeepsResources() && !roles.SellsVehicles() && !roles.RunsTheShop() {
+		if !scope.Role.KeepsResources() && !scope.Role.SellsVehicles() && !scope.Role.RunsTheShop() {
 			return nil, access.ErrForbidden
 		}
-		reasons = roles.RunsTheShop()
+		reasons = scope.Role.RunsTheShop()
 	case "invoice", "payment", "customer", "vehicle", "party":
-		if !roles.SeesCustomerPersonalData() {
+		if !scope.Role.SeesCustomerPersonalData() {
 			return nil, access.ErrForbidden
 		}
 	case "work_order":
-		if !roles.SeesCustomerPersonalData() && !roles.WorksInTheWorkshop() && !roles.FollowsJobs() {
+		if !scope.Role.SeesCustomerPersonalData() && !scope.Role.WorksInTheWorkshop() && !scope.Role.FollowsJobs() {
 			return nil, access.ErrForbidden
 		}
 	case "document":
@@ -175,7 +174,7 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 			if err != nil {
 				return fmt.Errorf("read document: %w", err)
 			}
-			if err := mayDocument(roles, scope, kind, false); err != nil {
+			if err := mayReadDocument(scope.Role, kind); err != nil {
 				return err
 			}
 		}
@@ -199,7 +198,7 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 				e.Reason = ""
 			}
 			for k, may := range detailSeen {
-				if _, there := e.Detail[k]; there && !may(roles) {
+				if _, there := e.Detail[k]; there && !may(scope.Role) {
 					delete(e.Detail, k)
 				}
 			}
