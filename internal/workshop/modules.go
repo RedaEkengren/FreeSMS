@@ -360,16 +360,10 @@ func recordSetupModulesTx(ctx context.Context, tx pgx.Tx, shopID, ownerID string
 	return nil
 }
 
-// ShopRuns reports whether a shop runs a module, for a request with nobody
-// signed in: the customer's links. Everything with a session reads the
-// modules from its scope instead.
-func ShopRuns(ctx context.Context, pool *pgxpool.Pool, shopID string, m access.Module) (bool, error) {
-	modules, err := ShopModules(ctx, pool, shopID)
-	return slices.Contains(modules, m), err
-}
-
 // ShopModules is every module a shop runs, for a request with nobody signed
-// in, in one read.
+// in -- the customer's links -- in one read. The server keeps it for a
+// moment (moduleCache); everything with a session reads the modules from its
+// scope instead.
 func ShopModules(ctx context.Context, pool *pgxpool.Pool, shopID string) ([]access.Module, error) {
 	if shopID == "" {
 		return nil, nil
