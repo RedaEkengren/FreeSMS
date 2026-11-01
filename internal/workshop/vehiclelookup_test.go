@@ -146,6 +146,10 @@ func TestAListOfLookupsIsQueuedNotHammered(t *testing.T) {
 	if run, err := workshop.RunOutbox(ctx, pool, shopID, adapters, 10); err != nil || run.Retried != 2 || run.Sent != 0 {
 		t.Errorf("with the provider holding back: %+v, %v", run, err)
 	}
+	// Each attempt that failed is a lookup made, and a row.
+	if n := countRows(t, pool, `SELECT count(*) FROM vehicle_lookups WHERE purpose = 'purchase' AND outcome = 'failed' AND looked_up_by IS NOT NULL`); n != 2 {
+		t.Errorf("%d failed lookups recorded from the list, want 2", n)
+	}
 	if _, err := pool.Exec(ctx, `UPDATE outbox_events SET retry_at = now() - interval '1 second' WHERE event = 'retry_scheduled'`); err != nil {
 		t.Fatal(err)
 	}

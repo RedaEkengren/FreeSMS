@@ -321,16 +321,21 @@ func (a VehicleLookupAdapter) Send(ctx context.Context, it OutboxItem) error {
 	if errors.Is(err, vehicledata.ErrNotConfigured) {
 		return ErrManualTask
 	}
-	if out.Outcome == LookupFailed {
-		return fmt.Errorf("the vehicle lookup failed for %s", NormaliseRegistration(registration))
-	}
 	var facts map[string]any
 	if out.Outcome == LookupFound {
 		facts = lookupFacts(out.Vehicle)
 	}
-	return database.InShop(ctx, a.Pool, it.ShopID, func(ctx context.Context, tx pgx.Tx) error {
+	// Every lookup made is a row, the ones that failed as well: each
+	// attempt asked the provider, for a reason, on somebody's behalf.
+	if err := database.InShop(ctx, a.Pool, it.ShopID, func(ctx context.Context, tx pgx.Tx) error {
 		return recordLookupTx(ctx, tx, it.ShopID, by, registration, NormaliseRegistration(registration), a.Provider, purpose, out.Outcome, facts)
-	})
+	}); err != nil {
+		return err
+	}
+	if out.Outcome == LookupFailed {
+		return fmt.Errorf("the vehicle lookup failed for %s", NormaliseRegistration(registration))
+	}
+	return nil
 }
 
 // VehicleLookupEntry is one lookup as its log shows it.
