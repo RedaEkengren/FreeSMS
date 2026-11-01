@@ -8272,6 +8272,7 @@
     "No driver is named for the rental.": {"other": "Ingen förare är angiven för hyran."},
     "No licence was shown.": {"other": "Inget körkort visades."},
     "The licence does not hold a category this unit needs.": {"other": "Körkortet har ingen behörighet som enheten kräver."},
-    "The licence is not valid for the whole rental.": {"other": "Körkortet gäller inte under hela hyrestiden."}
+    "The licence is not valid for the whole rental.": {"other": "Körkortet gäller inte under hela hyrestiden."},
+    "a rental is at most five years": {"other": "en hyra är högst fem år"}
   }
 }

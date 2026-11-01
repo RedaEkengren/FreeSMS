@@ -164,3 +164,16 @@ func TestSplittingAddsNoUnits(t *testing.T) {
 		t.Errorf("a minimum across the boundary: %+v, %v", lines, err)
 	}
 }
+
+// A rental is priced up to five years; longer is refused rather than
+// searched for (review).
+func TestARentalLongerThanFiveYearsIsRefused(t *testing.T) {
+	terms := RateTerms{Prices: RatePrices{Day: price(1), Week: price(5), Month: price(20)}}
+	from := sthlm("2026-01-01 00:00")
+	if _, err := PriceRental(from, from.AddDate(5, 0, 1), stockholm, terms); !errors.Is(err, ErrTooLong) {
+		t.Errorf("five years and a day: %v", err)
+	}
+	if _, err := PriceRental(from, from.AddDate(5, 0, 0), stockholm, terms); err != nil {
+		t.Errorf("five years: %v", err)
+	}
+}

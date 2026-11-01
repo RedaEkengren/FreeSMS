@@ -67,6 +67,10 @@ type RentalLine struct {
 // Net is the line's amount.
 func (l RentalLine) Net() int64 { return LineNet(l.Count*1000, l.UnitPrice) }
 
+// ErrTooLong is a rental longer than five years, which is not priced: a
+// lease, not a rental, and past what the search over units is for.
+var ErrTooLong = errors.New("money: a rental longer than five years is not priced")
+
 // ErrNoPriceFor is a plan that prices nothing that covers the rental.
 var ErrNoPriceFor = errors.New("money: the plan has no price for a rental this long")
 
@@ -208,6 +212,9 @@ func advance(t time.Time, unit string) time.Time {
 func priceWall(from, to time.Time, t RateTerms, weekend bool) ([]RentalLine, error) {
 	if !to.After(from) {
 		return nil, errors.New("money: a rental ends after it starts")
+	}
+	if to.After(from.AddDate(5, 0, 0)) {
+		return nil, ErrTooLong
 	}
 	if min := from.Add(t.Minimum); to.Before(min) {
 		to = min

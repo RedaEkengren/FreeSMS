@@ -91,6 +91,7 @@ var (
 	errNoPlan         = fmt.Errorf("%w: no rate plan prices that unit; add one first", ErrInvalid)
 	errNoSeason       = fmt.Errorf("%w: the plan has no season for the day the rental starts", ErrInvalid)
 	errNoPriceForLong = fmt.Errorf("%w: the plan has no price for a rental this long", ErrInvalid)
+	errRentalTooLong  = fmt.Errorf("%w: a rental is at most five years", ErrInvalid)
 	errQuoteTimes     = fmt.Errorf("%w: a rental ends after it starts", ErrInvalid)
 	errExtraGone      = fmt.Errorf("%w: that extra is not offered any more", ErrInvalid)
 	errExtraCount     = fmt.Errorf("%w: take an extra between once and 99 times", ErrInvalid)
@@ -512,6 +513,9 @@ func quoteTx(ctx context.Context, tx pgx.Tx, q QuoteRequest) (RentalQuote, error
 		return out, errNoSeason
 	}
 	lines, err := money.PriceRentalSeasons(q.From, q.To, loc, seasons, plan.SeasonRule == "split")
+	if errors.Is(err, money.ErrTooLong) {
+		return out, errRentalTooLong
+	}
 	if errors.Is(err, money.ErrNoPriceFor) {
 		return out, errNoPriceForLong
 	}
