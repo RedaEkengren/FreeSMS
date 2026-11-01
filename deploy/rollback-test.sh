@@ -19,13 +19,16 @@
 # is this tree. Runs in CI on every push, and by hand with the same command.
 #
 # Then the real ones (#142): every migration from M6 on that says
-# "rollback: safe" is put to the same test with the releases that bracket it
-# -- the last commit that changed it (or this tree, if it has uncommitted
-# changes), and the commit before it was added. The workshop's own data
-# is written by the newer release, after its migration, and the older one
-# must start over it, show it, and pass -verify. This needs the history, so
-# CI checks out with fetch-depth 0. A migration not committed yet is tested
-# as this tree against HEAD.
+# "rollback: safe" is put to the same test, the commit before it was added
+# against two newer releases: the last commit that changed it, and this
+# tree. The first is the release the claim was written for; the second is
+# what ships, with every commit since -- code added later that writes rows
+# the older release cannot read breaks the claim too, and only a build of
+# this tree would see it. The workshop's own data is written by the newer
+# release, after its migration, and the older one must start over it, show
+# it, and pass -verify. This needs the history, so CI checks out with
+# fetch-depth 0. A migration not committed yet is tested as this tree
+# against HEAD.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -186,6 +189,9 @@ sign_in() {
         "http://localhost:$PORT/login" || fail "could not sign in as the seeded owner"
 }
 
+# This tree is the newer release of every pair below, so it is built once.
+build_release m6-tree ""
+
 m6=0
 for file in migrations/*.sql; do
     version=$((10#$(basename "$file" | cut -c1-4)))
@@ -194,52 +200,62 @@ for file in migrations/*.sql; do
     m6=$((m6 + 1))
     name="$(basename "$file")"
     # The release before is the one before the migration was added. The
-    # migration itself is tested as it is now: as last committed, or as it
-    # stands in this tree when it has changes not committed yet -- a fix to
-    # a migration after it was added is what has to be safe, not the first
-    # draft of it.
+    # newer ones: the last commit that changed it -- a fix to a migration
+    # after it was added is what has to be safe, not the first draft of it
+    # -- and this tree, unless that commit is what this tree already is.
     added="$(git -C "$ROOT" log --diff-filter=A --format=%H -1 -- "$file" 2>/dev/null || true)"
     if [ -n "$added" ]; then
         previous_commit="$added^"
     else
         previous_commit="HEAD"
     fi
-    if [ -z "$added" ] || [ -n "$(git -C "$ROOT" status --porcelain -- "$file")" ]; then
-        next_commit=""
-    else
-        next_commit="$(git -C "$ROOT" log --format=%H -1 -- "$file")"
+    nexts=(tree)
+    if [ -n "$added" ] && [ -z "$(git -C "$ROOT" status --porcelain -- "$file")" ]; then
+        changed="$(git -C "$ROOT" log --format=%H -1 -- "$file")"
+        if [ "$changed" != "$(git -C "$ROOT" rev-parse HEAD)" ] || [ -n "$(git -C "$ROOT" status --porcelain)" ]; then
+            nexts=("$changed" tree)
+        fi
     fi
 
-    say "$name: building the release that has it as it is now, and the one before it was added"
+    say "$name: building the release before it was added"
     build_release m6-previous "$(git -C "$ROOT" rev-parse "$previous_commit")"
-    build_release m6-next "$next_commit"
 
-    say "$name: the release before, with the seeded workshop in it"
-    fresh_database
-    run m6-previous
-    healthy || fail "the release before $name did not start"
-    docker exec -i "$DB_CONTAINER" psql -U freesms -d freesms -q -v ON_ERROR_STOP=1 \
-        < "$WORK/release-m6-previous/scripts/seed.sql" >/dev/null || fail "the seed did not load"
+    for next in "${nexts[@]}"; do
+        if [ "$next" = tree ]; then
+            tag=m6-tree label="this tree"
+        else
+            say "$name: building the release that last changed it, ${next:0:12}"
+            build_release m6-next "$next"
+            tag=m6-next label="${next:0:12}"
+        fi
 
-    say "$name: the release that added it, and a car taken in after the migration"
-    run m6-next
-    healthy || fail "the release that added $name did not start"
-    [ "$(sql "SELECT count(*) FROM schema_migrations WHERE version = $version")" = 1 ] || fail "$name was not applied"
-    sign_in
-    status=$(curl -sS -o /dev/null -w '%{http_code}' -b "$WORK/jar" -H "Origin: http://localhost:$PORT" \
-        --data-urlencode "registration=RBK 142" --data-urlencode "complaint=Taken in after $name" \
-        "http://localhost:$PORT/jobs/new")
-    [ "$status" = 303 ] || fail "taking a car in on the release that added $name answered $status"
+        say "$name: the release before, with the seeded workshop in it"
+        fresh_database
+        run m6-previous
+        healthy || fail "the release before $name did not start"
+        docker exec -i "$DB_CONTAINER" psql -U freesms -d freesms -q -v ON_ERROR_STOP=1 \
+            < "$WORK/release-m6-previous/scripts/seed.sql" >/dev/null || fail "the seed did not load"
 
-    say "$name: back to the release before"
-    run m6-previous
-    healthy || fail "the release before refused $name, which says it is safe for it"
-    docker logs "$APP" 2>&1 | grep 'newer release' >/dev/null || fail "the rollback over $name was not logged"
-    sign_in
-    curl -fsS -b "$WORK/jar" "http://localhost:$PORT/board" > "$WORK/board.html" || fail "the board did not load after rolling back over $name"
-    grep 'RBK 142' "$WORK/board.html" >/dev/null || fail "the car taken in after $name is not on the board of the release before"
-    docker exec "$APP" /freesms -verify >/dev/null || fail "the release before does not verify the data after $name"
-    echo "the release before runs over $name and shows the workshop written after it"
+        say "$name: $label, and a car taken in after the migration"
+        run "$tag"
+        healthy || fail "$label did not start over $name"
+        [ "$(sql "SELECT count(*) FROM schema_migrations WHERE version = $version")" = 1 ] || fail "$name was not applied by $label"
+        sign_in
+        status=$(curl -sS -o /dev/null -w '%{http_code}' -b "$WORK/jar" -H "Origin: http://localhost:$PORT" \
+            --data-urlencode "registration=RBK 142" --data-urlencode "complaint=Taken in after $name" \
+            "http://localhost:$PORT/jobs/new")
+        [ "$status" = 303 ] || fail "taking a car in on $label after $name answered $status"
+
+        say "$name: from $label back to the release before"
+        run m6-previous
+        healthy || fail "the release before refused $name as $label left it, which says it is safe for it"
+        docker logs "$APP" 2>&1 | grep 'newer release' >/dev/null || fail "the rollback over $name was not logged"
+        sign_in
+        curl -fsS -b "$WORK/jar" "http://localhost:$PORT/board" > "$WORK/board.html" || fail "the board did not load after rolling back over $name"
+        grep 'RBK 142' "$WORK/board.html" >/dev/null || fail "the car taken in on $label is not on the board of the release before $name"
+        docker exec "$APP" /freesms -verify >/dev/null || fail "the release before does not verify the data $label wrote after $name"
+        echo "the release before $name runs over what $label wrote, and shows it"
+    done
 done
 [ "$m6" -gt 0 ] || echo "no migration after $(printf '%04d' "$LAST_BEFORE_M6") is marked safe yet"
 
