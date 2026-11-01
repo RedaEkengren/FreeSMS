@@ -272,7 +272,10 @@ func RecordPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		// The same request again is answered with what it recorded, before
 		// anything is asked of a balance it has itself changed.
 		if strings.TrimSpace(p.Key) != "" {
-			out = Payment{InvoiceID: b.InvoiceID}
+			out = Payment{InvoiceID: b.InvoiceID, Method: p.Method}
+			if p.AmountMinor != nil {
+				out.AmountMinor = *p.AmountMinor
+			}
 			if found, err := replayedPaymentTx(ctx, tx, strings.TrimSpace(p.Key), &out); found || err != nil {
 				return err
 			}
@@ -453,36 +456,64 @@ func insertPaymentOnce(ctx context.Context, tx pgx.Tx, scope access.Scope, p *Pa
 	if found, err := replayedPaymentTx(ctx, tx, key, p); found || err != nil {
 		return found, err
 	}
+	if err := insertKeyedTx(ctx, tx, scope, p); err != nil {
+		if errors.Is(err, errKeyTaken) {
+			return replayedPaymentTx(ctx, tx, key, p)
+		}
+		return false, err
+	}
+	return false, nil
+}
+
+// errKeyTaken is a request key another request has used since it was
+// looked for.
+var errKeyTaken = errors.New("workshop: the request key was taken meanwhile")
+
+// insertKeyedTx inserts p, whose key may have been taken by another request
+// since it was looked for -- one not serialised by the same lock, which
+// waits on the key's unique index for the other to finish -- and says so
+// with errKeyTaken, leaving the transaction usable.
+func insertKeyedTx(ctx context.Context, tx pgx.Tx, scope access.Scope, p *Payment) error {
 	sp, err := tx.Begin(ctx)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if err := insertPayment(ctx, sp, scope, p); err != nil {
 		if !isUniqueViolation(err, "invoice_payments_request_idx") {
-			return false, err
+			return err
 		}
 		if rerr := sp.Rollback(ctx); rerr != nil {
-			return false, rerr
+			return rerr
 		}
-		return replayedPaymentTx(ctx, tx, key, p)
+		return errKeyTaken
 	}
-	return false, sp.Commit(ctx)
+	return sp.Commit(ctx)
 }
 
+// replayedPaymentTx finds the payment a key recorded and reads it into p,
+// when it is the same request: against the same thing, the same kind of
+// movement -- a payment, a refund of the same one -- by the same way of
+// paying and, where p says, for the same amount. A key used for anything
+// else is refused.
 func replayedPaymentTx(ctx context.Context, tx pgx.Tx, key string, p *Payment) (bool, error) {
-	var target string
+	var target, refunds, reverses, method string
 	var got Payment
 	err := tx.QueryRow(ctx, `
-		SELECT id, series, number, amount_minor, rounding_minor, recorded_at, coalesce(invoice_id, deposit_id, payout_id)::text
+		SELECT id, series, number, amount_minor, rounding_minor, recorded_at, coalesce(invoice_id, deposit_id, payout_id)::text,
+		       coalesce(refunds_id::text, ''), coalesce(reverses_id::text, ''), method
 		FROM invoice_payments WHERE request_key = $1`, key).Scan(&got.ID, &got.Series, &got.Number, &got.AmountMinor,
-		&got.RoundingMinor, &got.RecordedAt, &target)
+		&got.RoundingMinor, &got.RecordedAt, &target, &refunds, &reverses, &method)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {
 		return false, fmt.Errorf("read the request: %w", err)
 	}
-	if !strings.EqualFold(target, p.InvoiceID+p.DepositID+p.PayoutID) {
+	switch {
+	case !strings.EqualFold(target, p.InvoiceID+p.DepositID+p.PayoutID),
+		!strings.EqualFold(refunds, p.RefundsID), reverses != "",
+		p.Method != "" && method != p.Method,
+		p.AmountMinor != 0 && got.AmountMinor != p.AmountMinor:
 		return false, errKeyOtherPayment
 	}
 	p.ID, p.Series, p.Number, p.AmountMinor, p.RoundingMinor, p.RecordedAt = got.ID, got.Series, got.Number, got.AmountMinor, got.RoundingMinor, got.RecordedAt

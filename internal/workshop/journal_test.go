@@ -504,3 +504,69 @@ func TestADepositApplicationIsReversedWhole(t *testing.T) {
 		}
 	}
 }
+
+// A request's key is checked under the locks of what it moves money on,
+// and names one request: the same key again -- a double click, at once or
+// after -- records nothing more and succeeds, and the same key for
+// anything else is refused rather than answered with a payment it did not
+// make.
+func TestARequestKeyNamesOneRequest(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	desk := everything(advisor())
+	dep, _ := depositWith(t, pool, 500000)
+	inv, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
+	if err != nil {
+		t.Fatal(err)
+	}
+	applications := func() int {
+		return countRows(t, pool, `SELECT count(*) FROM invoice_payments WHERE method = 'deposit' AND deposit_id = $1`, dep)
+	}
+
+	// A double click: both at once, one application.
+	errs := make(chan error, 2)
+	for range 2 {
+		go func() { errs <- workshop.ApplyDeposit(ctx, pool, desk, dep, inv.ID, 100000, "apply-twice") }()
+	}
+	for range 2 {
+		if err := <-errs; err != nil {
+			t.Errorf("a double click on the application: %v", err)
+		}
+	}
+	if n := applications(); n != 1 {
+		t.Errorf("%d applications from one request, want 1", n)
+	}
+	// The same key for another invoice, another amount, or another kind of
+	// request: refused, and nothing moves.
+	for name, apply := range map[string]func() error{
+		"another invoice": func() error { return workshop.ApplyDeposit(ctx, pool, desk, dep, other.ID, 100000, "apply-twice") },
+		"another amount":  func() error { return workshop.ApplyDeposit(ctx, pool, desk, dep, inv.ID, 50000, "apply-twice") },
+	} {
+		if err := apply(); !errors.Is(err, workshop.ErrInvalid) {
+			t.Errorf("the key again for %s: %v, want refused", name, err)
+		}
+	}
+	paid, err := workshop.RecordPayment(ctx, pool, advisor(), other.ID, workshop.NewPayment{AmountMinor: minor(1000), Method: "bank", PaidOn: time.Now(), Key: "pay-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ApplyDeposit(ctx, pool, desk, dep, other.ID, 1000, "pay-1"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("an application under a payment's key: %v, want refused", err)
+	}
+	if n := applications(); n != 1 {
+		t.Errorf("%d applications after the refusals, want 1", n)
+	}
+	if r, err := workshop.RefundPayment(ctx, pool, advisor(), paid.ID, workshop.NewPayment{AmountMinor: minor(1000), Method: "bank", PaidOn: time.Now(), Key: "pay-1"}, "Tillbaka"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a refund under the payment's own key: %+v, %v; want refused", r, err)
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), other.ID, workshop.NewPayment{AmountMinor: minor(2000), Method: "bank", PaidOn: time.Now(), Key: "pay-1"}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("the payment's key again for another amount: %v, want refused", err)
+	}
+	if again, err := workshop.RecordPayment(ctx, pool, advisor(), other.ID, workshop.NewPayment{AmountMinor: minor(1000), Method: "bank", PaidOn: time.Now(), Key: "pay-1"}); err != nil || again.ID != paid.ID {
+		t.Errorf("the payment repeated: %s, %v; want %s", again.ID, err, paid.ID)
+	}
+}

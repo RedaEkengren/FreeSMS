@@ -454,15 +454,6 @@ func ApplyDeposit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d
 	}
 	key = strings.TrimSpace(key)
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		if key != "" {
-			var done bool
-			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM invoice_payments WHERE request_key = $1)`, key).Scan(&done); err != nil {
-				return fmt.Errorf("read the request: %w", err)
-			}
-			if done {
-				return nil
-			}
-		}
 		d, err := depositTx(ctx, tx, depositID, true)
 		if err != nil {
 			return err
@@ -470,6 +461,13 @@ func ApplyDeposit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d
 		b, err := balanceTx(ctx, tx, invoiceID, true)
 		if err != nil {
 			return err
+		}
+		// The same request again, checked under the locks: a double click
+		// waits for the first, then finds what it applied.
+		if key != "" {
+			if found, err := replayedApplicationTx(ctx, tx, key, depositID, b.InvoiceID, amountMinor); found || err != nil {
+				return err
+			}
 		}
 		switch {
 		case amountMinor > d.Held():
@@ -479,7 +477,18 @@ func ApplyDeposit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d
 		}
 		now := time.Now()
 		out := Payment{DepositID: depositID, AmountMinor: -amountMinor, Method: "deposit", PaidOn: now, Reference: b.Reference, Key: key}
-		if err := insertPayment(ctx, tx, scope, &out); err != nil {
+		if key == "" {
+			if err := insertPayment(ctx, tx, scope, &out); err != nil {
+				return err
+			}
+		} else if err := insertKeyedTx(ctx, tx, scope, &out); err != nil {
+			// The key taken by another request since: this one's, or not.
+			if errors.Is(err, errKeyTaken) {
+				_, err = replayedApplicationTx(ctx, tx, key, depositID, b.InvoiceID, amountMinor)
+				if err == nil {
+					err = errKeyOtherPayment
+				}
+			}
 			return err
 		}
 		in := Payment{InvoiceID: b.InvoiceID, AmountMinor: amountMinor, Method: "deposit", PaidOn: now, Reference: out.Series + "-" + fmt.Sprint(out.Number)}
@@ -494,6 +503,30 @@ func ApplyDeposit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d
 		}
 		return closeIfFinishedTx(ctx, tx, b.WorkOrderID)
 	})
+}
+
+// replayedApplicationTx reports whether key already applied amountMinor of
+// depositID to invoiceID -- the same request again -- and refuses a key
+// used for anything else.
+func replayedApplicationTx(ctx context.Context, tx pgx.Tx, key, depositID, invoiceID string, amountMinor int64) (bool, error) {
+	var deposit, invoice, method string
+	var amount int64
+	err := tx.QueryRow(ctx, `
+		SELECT coalesce(p.deposit_id::text, ''), p.method, p.amount_minor, coalesce(i.invoice_id::text, '')
+		FROM invoice_payments p
+		LEFT JOIN deposit_applications a ON a.deposit_payment_id = p.id
+		LEFT JOIN invoice_payments i ON i.id = a.invoice_payment_id
+		WHERE p.request_key = $1`, key).Scan(&deposit, &method, &amount, &invoice)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read the request: %w", err)
+	}
+	if method != "deposit" || !strings.EqualFold(deposit, depositID) || !strings.EqualFold(invoice, invoiceID) || amount != -amountMinor {
+		return false, errKeyOtherPayment
+	}
+	return true, nil
 }
 
 // RefundPayment gives back part or all of one payment received -- into an
