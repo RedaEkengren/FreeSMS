@@ -7044,6 +7044,45 @@
     },
     "the final check is done on a job, so its checklist must be one for jobs": {
       "other": "slutkontrollen görs på ett jobb, så dess checklista måste vara en för jobb"
+    },
+    "a customer is made with the customer's own record": {
+      "other": "en kund läggs upp med kundens eget kort"
+    },
+    "a customer's party is the one kept; merge the other into it": {
+      "other": "kundens part är den som behålls; slå ihop den andra med den"
+    },
+    "a party cannot be merged into itself": {
+      "other": "en part kan inte slås ihop med sig själv"
+    },
+    "a party is either a person or a company": {
+      "other": "en part är antingen en person eller ett företag"
+    },
+    "a party needs a name, in 200 characters or fewer": {
+      "other": "en part behöver ett namn, högst 200 tecken"
+    },
+    "a person and a company are not the same party": {
+      "other": "en person och ett företag är inte samma part"
+    },
+    "both are customers; merge them as customers": {
+      "other": "båda är kunder; slå ihop dem som kunder"
+    },
+    "somebody here already has that email address": {
+      "other": "någon här har redan den e-postadressen"
+    },
+    "that is not a role a party can have": {
+      "other": "det är inte en roll en part kan ha"
+    },
+    "that party has been merged into another": {
+      "other": "den parten har slagits ihop med en annan"
+    },
+    "that role has already ended": {
+      "other": "den rollen har redan upphört"
+    },
+    "the party already has that role": {
+      "other": "parten har redan den rollen"
+    },
+    "this party is a customer; change the details on the customer": {
+      "other": "den här parten är en kund; ändra uppgifterna på kunden"
     }
   }
 }

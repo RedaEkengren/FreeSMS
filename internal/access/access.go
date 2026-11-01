@@ -101,9 +101,10 @@ func (r Role) runsIt() bool { return r == RoleOwner || r == RoleAdmin }
 // home address to change a clutch, so they are not given it -- not hidden from
 // it in the template, not given it. A field nobody fetches cannot leak.
 //
-// Not yet the dealer's or the rental desk's: what they are shown of a party
-// is decided with the parties (#148), and this capability also lets the
-// front desk invoice and move any job, which theirs must not.
+// Not the dealer's or the rental desk's: this capability also lets the
+// front desk invoice and move any job, which theirs must not. What they are
+// shown of a party -- the parties they deal with, in the roles they deal in
+// -- is decided with the parties (workshop.PartyByID, #148).
 func (r Role) SeesCustomerPersonalData() bool {
 	return r.runsIt() || r == RoleServiceAdvisor
 }

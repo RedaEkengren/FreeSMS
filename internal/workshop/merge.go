@@ -354,6 +354,13 @@ func doCustomerMergeTx(ctx context.Context, tx pgx.Tx, scope access.Scope, keepI
 	if _, err := tx.Exec(ctx, `UPDATE customers SET merged_into = $2, merged_at = clock_timestamp(), revision = revision + 1, updated_at = now() WHERE id = $1`, dropID, keepID); err != nil {
 		return fmt.Errorf("mark merged: %w", err)
 	}
+	// Their parties are one too (#148). The other's roles stay on its party,
+	// with their periods, and are read through the merge (party_now).
+	if _, err := tx.Exec(ctx, `
+		UPDATE parties d SET merged_into = k.id, merged_at = clock_timestamp(), revision = d.revision + 1
+		FROM parties k WHERE d.customer_id = $2 AND k.customer_id = $1`, keepID, dropID); err != nil {
+		return fmt.Errorf("merge parties: %w", err)
+	}
 	summary := fmt.Sprintf("%d jobs, %d ownerships, %d contacts moved; %d issued invoices left as issued", p.Jobs, p.Ownerships, p.People, p.Invoices)
 	if err := logChangeTx(ctx, tx, scope, "merge", keepID, dropPerson, "merged in", p.Drop.Name, summary, reason); err != nil {
 		return err

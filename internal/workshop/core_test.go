@@ -17,7 +17,10 @@ var core = map[string]string{
 	"IssueCredit": "correcting an issued document", "PreviewCredit": "correcting an issued document",
 	"EligibleLines": "correcting an issued document", "CorrectionsFor": "correcting an issued document",
 	"RebillTo": "correcting an issued document", "EInvoice": "an issued document, electronically",
-	"IssueManual":        "a sale entered by hand, which no module records (#146)",
+	"IssueManual": "a sale entered by hand, which no module records (#146)",
+	// Parties (#148): one record of each person or company across modules.
+	"PartyByID": "parties, which every module deals with", "PartyOfCustomer": "parties: a customer's own",
+	"EditParty": "parties", "MergeParties": "parties, the same one entered twice",
 	"ChecklistTemplates": "checklists, for every module's inspections (#147)", "ChecklistTemplateByID": "checklists",
 	"SaveChecklistTemplate": "checklists", "SetChecklistActive": "checklists", "SubjectsOffered": "what a checklist may be made for",
 	"ImportKindsFor":      "bringing records in: which kinds, by the modules",

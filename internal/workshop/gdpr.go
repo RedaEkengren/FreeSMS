@@ -50,9 +50,18 @@ type PersonExport struct {
 	Employment *ExportedEmployment `json:"employment,omitempty"`
 	// What was corrected on their records, and when.
 	Corrections []ExportedCorrection `json:"corrections,omitempty"`
+	// What they have been to the business -- customer, seller, buyer,
+	// renter -- and for how long (#148).
+	Roles []ExportedPartyRole `json:"roles,omitempty"`
 
 	// Written out rather than left for somebody to infer.
 	Notes []string `json:"notes"`
+}
+
+type ExportedPartyRole struct {
+	Role string     `json:"role"`
+	From time.Time  `json:"from"`
+	To   *time.Time `json:"to,omitempty"`
 }
 
 type ExportedCorrection struct {
@@ -144,7 +153,11 @@ func ExportPerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 			SELECT coalesce(address_line1,''), coalesce(address_line2,''),
 			       coalesce(postal_code,''), coalesce(city,''), coalesce(country,''),
 			       coalesce(endpoint_id,''), coalesce(buyer_reference,'')
-			FROM customers WHERE person_id = $1`, personID)
+			FROM customers WHERE person_id = $1
+			UNION ALL
+			SELECT coalesce(address_line1,''), coalesce(address_line2,''),
+			       coalesce(postal_code,''), coalesce(city,''), coalesce(country,''), '', ''
+			FROM parties WHERE person_id = $1`, personID)
 		if err != nil {
 			return fmt.Errorf("read addresses: %w", err)
 		}
@@ -237,6 +250,28 @@ func ExportPerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 			})
 		}
 		invoices.Close()
+
+		// Their parties: as a customer, or on their own -- and any merged
+		// into one of those, whose roles are theirs as well.
+		roles, err := tx.Query(ctx, `
+			WITH theirs AS (
+			  SELECT pa.id FROM parties pa LEFT JOIN customers c ON c.id = pa.customer_id
+			  WHERE pa.person_id = $1 OR c.person_id = $1)
+			SELECT r.role, r.valid_from, r.valid_to FROM party_roles r
+			WHERE r.party_id IN (SELECT id FROM theirs) OR party_now(r.party_id) IN (SELECT id FROM theirs)
+			ORDER BY r.valid_from, r.id`, personID)
+		if err != nil {
+			return fmt.Errorf("read roles: %w", err)
+		}
+		for roles.Next() {
+			var r ExportedPartyRole
+			if err := roles.Scan(&r.Role, &r.From, &r.To); err != nil {
+				roles.Close()
+				return err
+			}
+			e.Roles = append(e.Roles, r)
+		}
+		roles.Close()
 
 		fixes, err := tx.Query(ctx, `
 			SELECT field, coalesce(old_value, ''), coalesce(new_value, ''), at
@@ -346,6 +381,15 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 			                     endpoint_id = NULL, buyer_reference = NULL, updated_at = now()
 			WHERE person_id = $1`, personID); err != nil {
 			return fmt.Errorf("clear addresses: %w", err)
+		}
+		// A party that is no customer -- a private seller, a renter -- keeps
+		// its address on itself (#148). Its roles stay: that somebody sold
+		// the dealer a car on a date is part of the purchase's record.
+		if _, err := tx.Exec(ctx, `
+			UPDATE parties SET address_line1 = NULL, address_line2 = NULL,
+			                   postal_code = NULL, city = NULL, country = NULL, revision = revision + 1
+			WHERE person_id = $1`, personID); err != nil {
+			return fmt.Errorf("clear party addresses: %w", err)
 		}
 
 		// What they were before a correction is theirs too. The row stays and
