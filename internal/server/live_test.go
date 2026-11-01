@@ -212,3 +212,24 @@ func TestTheHeaderCountListensForEveryTopicTheQueueDoes(t *testing.T) {
 		}
 	}
 }
+
+// One provider of the queue failing leaves the rest of the count, and the
+// person's chime with it: the count says it is not all, and the sound they
+// asked for still plays for what did load.
+func TestACountWithAProviderFailingKeepsItsChime(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := signIn(t, ts, ownerEmail)
+	if status := postStatus(t, owner, ts.URL+"/account/alert", url.Values{"on": {"yes"}}); status != http.StatusSeeOther {
+		t.Fatalf("turning the sound on answered %d", status)
+	}
+	if _, err := pool.Exec(context.Background(), `ALTER TABLE payment_flow_checks RENAME TO payment_flow_checks_gone`); err != nil {
+		t.Fatal(err)
+	}
+	count := get(t, owner, ts.URL+"/mine/count", http.StatusOK)
+	if !strings.Contains(count, "data-sound") {
+		t.Errorf("a failing provider turned the chime off:\n%s", count)
+	}
+	if !strings.Contains(count, "data-incomplete") {
+		t.Errorf("the count does not say it is not all:\n%s", count)
+	}
+}

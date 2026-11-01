@@ -25,6 +25,6 @@
 {{/* The header's count. It asks for itself again when the stream says
      something changed (live.js sends freesms:change), as a refresh: it does
      not count as the person doing anything. */}}
-{{define "count"}}<span id="mine-count" class="count" data-n="{{.WaitingCount}}"{{if .AlertSound}} data-sound{{end}}
+{{define "count"}}<span id="mine-count" class="count" data-n="{{.WaitingCount}}"{{if .AlertSound}} data-sound{{end}}{{if .WaitingIncomplete}} data-incomplete title="{{.T "Some items could not be loaded."}}"{{end}}
   hx-get="/mine/count" hx-trigger="freesms:change from:body" hx-swap="outerHTML"
-  hx-headers='{"X-FreeSMS-Live": "1"}'>{{if .WaitingCount}}{{.WaitingCount}}{{end}}</span>{{end}}
+  hx-headers='{"X-FreeSMS-Live": "1"}'>{{if .WaitingCount}}{{.WaitingCount}}{{end}}{{if .WaitingIncomplete}}+{{end}}</span>{{end}}

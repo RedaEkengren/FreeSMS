@@ -45,17 +45,21 @@ func (s *Server) handleMineCount(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	var n int
 	var sound bool
-	var err error
+	var err, soundErr error
 	database.Reading(r.Context(), s.pool, session.Scope, func(ctx context.Context) {
-		if n, err = workshop.CountWaiting(ctx, s.pool, session.Scope); err != nil {
-			return
-		}
-		sound, err = workshop.AlertSound(ctx, s.pool, session.Scope)
+		n, err = workshop.CountWaiting(ctx, s.pool, session.Scope)
+		// A provider failing leaves the rest of the count, and the chime
+		// the person asked for plays for what did load.
+		sound, soundErr = workshop.AlertSound(ctx, s.pool, session.Scope)
 	})
-	if err != nil {
+	incomplete := s.waitingIncomplete(err)
+	if err != nil && !incomplete {
 		s.log.Error("count waiting", "error", err)
 	}
-	s.renderPartial(w, r, "mine", "count", pageData{Session: session, WaitingCount: n, AlertSound: sound})
+	if soundErr != nil {
+		s.log.Error("read alert sound", "error", soundErr)
+	}
+	s.renderPartial(w, r, "mine", "count", pageData{Session: session, WaitingCount: n, AlertSound: sound, WaitingIncomplete: incomplete})
 }
 
 // handleAlertSound is the person's own choice to hear when something new is
