@@ -17,6 +17,14 @@
 #
 # "next" is this tree with one migration added, built in a copy; "previous"
 # is this tree. Runs in CI on every push, and by hand with the same command.
+#
+# Then the real ones (#142): every migration from M6 on that says
+# "rollback: safe" is put to the same test with the releases that bracket it
+# -- the commit that added it, and the commit before. The workshop's own data
+# is written by the newer release, after its migration, and the older one
+# must start over it, show it, and pass -verify. This needs the history, so
+# CI checks out with fetch-depth 0. A migration not committed yet is tested
+# as this tree against HEAD.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -145,5 +153,81 @@ for kind in safe restore; do
     [ "$(sql "SELECT count(*) FROM shops")" = 1 ] || fail "the restore did not go back to before the deploy"
     echo "previous release healthy after the restore; the shop written after the deploy is gone, as documented"
 done
+
+# --- The M6 migrations marked safe, between the releases that bracket them ---
+
+# The newest migration of the release before M6 (lastBeforeM6 in
+# internal/server/golden_test.go). Everything above it is Core work that a
+# workshop-only installation must be able to roll back from.
+LAST_BEFORE_M6=62
+SEED_EMAIL=anna@example.test SEED_PASSWORD=workshop
+
+# A release's tree, as the image would be built from it: a commit, or this
+# working tree when the commit is empty.
+build_release() {
+    local tag="$1" commit="$2" dir="$WORK/release-$1"
+    rm -rf "$dir" && mkdir -p "$dir"
+    if [ -n "$commit" ]; then
+        git -C "$ROOT" archive "$commit" | tar -C "$dir" -xf -
+    else
+        tar -C "$ROOT" --exclude=.git -cf - . | tar -C "$dir" -xf -
+    fi
+    docker build -q -t "freesms-rollback:$tag" "$dir" >/dev/null 2>&1 || fail "could not build $tag (${commit:-this tree})"
+}
+
+# Signs in as the seeded owner and keeps the session in a jar.
+sign_in() {
+    rm -f "$WORK/jar"
+    curl -fsS -o /dev/null -c "$WORK/jar" -H "Origin: http://localhost:$PORT" \
+        --data-urlencode "email=$SEED_EMAIL" --data-urlencode "password=$SEED_PASSWORD" \
+        "http://localhost:$PORT/login" || fail "could not sign in as the seeded owner"
+}
+
+m6=0
+for file in migrations/*.sql; do
+    version=$((10#$(basename "$file" | cut -c1-4)))
+    [ "$version" -gt "$LAST_BEFORE_M6" ] || continue
+    grep -Eq '^--[[:space:]]*rollback:[[:space:]]*safe[[:space:]]*$' "$file" || continue
+    m6=$((m6 + 1))
+    name="$(basename "$file")"
+    added="$(git -C "$ROOT" log --diff-filter=A --format=%H -1 -- "$file" 2>/dev/null || true)"
+    if [ -n "$added" ]; then
+        next_commit="$added" previous_commit="$added^"
+    else
+        next_commit="" previous_commit="HEAD"
+    fi
+
+    say "$name: building the release that added it and the one before"
+    build_release m6-previous "$(git -C "$ROOT" rev-parse "$previous_commit")"
+    build_release m6-next "$next_commit"
+
+    say "$name: the release before, with the seeded workshop in it"
+    fresh_database
+    run m6-previous
+    healthy || fail "the release before $name did not start"
+    docker exec -i "$DB_CONTAINER" psql -U freesms -d freesms -q -v ON_ERROR_STOP=1 \
+        < "$WORK/release-m6-previous/scripts/seed.sql" >/dev/null || fail "the seed did not load"
+
+    say "$name: the release that added it, and a car taken in after the migration"
+    run m6-next
+    healthy || fail "the release that added $name did not start"
+    [ "$(sql "SELECT count(*) FROM schema_migrations WHERE version = $version")" = 1 ] || fail "$name was not applied"
+    sign_in
+    status=$(curl -sS -o /dev/null -w '%{http_code}' -b "$WORK/jar" -H "Origin: http://localhost:$PORT" \
+        --data-urlencode "registration=RBK 142" --data-urlencode "complaint=Taken in after $name" \
+        "http://localhost:$PORT/jobs/new")
+    [ "$status" = 303 ] || fail "taking a car in on the release that added $name answered $status"
+
+    say "$name: back to the release before"
+    run m6-previous
+    healthy || fail "the release before refused $name, which says it is safe for it"
+    docker logs "$APP" 2>&1 | grep 'newer release' >/dev/null || fail "the rollback over $name was not logged"
+    sign_in
+    curl -fsS -b "$WORK/jar" "http://localhost:$PORT/board" > "$WORK/board.html" || fail "the board did not load after rolling back over $name"
+    grep 'RBK 142' "$WORK/board.html" >/dev/null || fail "the car taken in after $name is not on the board of the release before"
+    docker exec "$APP" /freesms -verify >/dev/null || fail "the release before does not verify the data after $name"
+    echo "the release before runs over $name and shows the workshop written after it"
+done
+[ "$m6" -gt 0 ] || echo "no migration after $(printf '%04d' "$LAST_BEFORE_M6") is marked safe yet"
 
 say "rollback verified: safe migrations roll back by image, the rest by the pre-deploy dump"

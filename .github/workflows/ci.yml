@@ -51,11 +51,16 @@ jobs:
     # of them, and the thing it guards against is losing a workshop's seven
     # years of invoices.
     runs-on: ubuntu-latest
-    # Three image builds for the rollback test on top of the restore.
-    timeout-minutes: 30
+    # Three image builds for the rollback test on top of the restore, and two
+    # more for each M6 migration marked safe.
+    timeout-minutes: 45
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The rollback test builds the release before each M6 migration
+          # from history, so it needs the history.
+          fetch-depth: 0
 
       - name: Back up, destroy, restore, verify
         run: ./deploy/restore-test.sh
