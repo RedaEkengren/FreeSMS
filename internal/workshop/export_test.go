@@ -124,7 +124,7 @@ func TestTheWholeShopLeavesReadableWithoutFreeSMS(t *testing.T) {
 		return err
 	})
 	// And somebody who asked to be erased.
-	if err := workshop.ErasePerson(ctx, pool, owner(), "22222222-2222-2222-2222-222222222223", "Begärde radering"); err != nil {
+	if err := workshop.ErasePerson(ctx, pool, owner(), &recordingRemover{}, "22222222-2222-2222-2222-222222222223", "Begärde radering"); err != nil {
 		t.Fatalf("ErasePerson: %v", err)
 	}
 

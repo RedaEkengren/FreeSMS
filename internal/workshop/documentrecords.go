@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -857,54 +858,141 @@ func SetDocumentRetention(ctx context.Context, pool *pgxpool.Pool, scope access.
 	})
 }
 
-// eraseDocumentsTx blanks, for a person being erased, what the documents
-// naming them said -- those past their kind's retention, and only those:
-// the rest the law has the shop keep, and the erasure says so. What is kept
-// of a blanked one is that it existed: its kind, its dates, its hash, the
-// signatures and who recorded them. Returns how many were blanked and kept.
-func eraseDocumentsTx(ctx context.Context, tx pgx.Tx, personID string) (blanked, kept int, err error) {
+// eraseDocumentsTx takes a person being erased off the documents naming
+// them -- those past their kind's retention, and only those: the rest the
+// law has the shop keep, whole, scan included, until their retention ends,
+// and the erasure says so. Within retention the bookkeeping law wins;
+// after it, the erasure does.
+//
+// Past retention, what goes:
+//   - what the document said, its text and data, whole: it names everyone
+//     on it, and a contract's text cannot be blanked one person at a time
+//     with any certainty that nothing about them is left;
+//   - the erased person's own naming as a party -- only theirs: the other
+//     party asked for nothing and stays named;
+//   - their name in the title, a heading somebody typed;
+//   - the scan of the signed paper copy, from every signature on it. A scan
+//     is a picture of the whole contract, them and their signature
+//     included, and a picture cannot be blanked in part, so it goes as the
+//     text does. The other party has lost nothing they are owed: the shop
+//     need no longer keep it, their own copy is theirs, and the hash stays
+//     to match it to what was signed.
+//
+// What stays of a blanked document is that it existed: its kind, its
+// dates, its hash, and each signature -- who, how, when, recorded by
+// whom. A document already blanked for somebody else still loses this
+// person's naming and their name in its title. Returns how many were
+// blanked and kept, and the scans whose files the caller removes once the
+// transaction has committed.
+func eraseDocumentsTx(ctx context.Context, tx pgx.Tx, personID string) (blanked, kept int, scans []string, err error) {
 	years, err := retentionTx(ctx, tx)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, nil, err
 	}
 	rows, err := tx.Query(ctx, `
-		SELECT DISTINCT r.id::text, r.kind, r.created_at
+		SELECT r.id::text, r.kind, r.created_at, r.erased_at IS NOT NULL, r.title,
+		       array_agg(dp.id::text) FILTER (WHERE pa.kind = 'private'),
+		       array_agg(dp.name) FILTER (WHERE pa.kind = 'private')
 		FROM document_records r JOIN document_record_parties dp ON dp.document_id = r.id
 		JOIN parties pa ON pa.id = dp.party_id LEFT JOIN customers c ON c.id = pa.customer_id
-		WHERE r.erased_at IS NULL AND (pa.person_id = $1 OR c.person_id = $1)`, personID)
+		WHERE pa.person_id = $1 OR c.person_id = $1
+		GROUP BY r.id`, personID)
 	if err != nil {
-		return 0, 0, fmt.Errorf("read documents: %w", err)
+		return 0, 0, nil, fmt.Errorf("read documents: %w", err)
 	}
 	type doc struct {
-		id, kind string
-		at       time.Time
+		id, kind, title string
+		at              time.Time
+		erased          bool
+		parties, names  []string
 	}
 	var docs []doc
 	for rows.Next() {
 		var d doc
-		if err := rows.Scan(&d.id, &d.kind, &d.at); err != nil {
+		if err := rows.Scan(&d.id, &d.kind, &d.at, &d.erased, &d.title, &d.parties, &d.names); err != nil {
 			rows.Close()
-			return 0, 0, err
+			return 0, 0, nil, err
 		}
 		docs = append(docs, d)
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
-		return 0, 0, err
+		return 0, 0, nil, err
 	}
 	for _, d := range docs {
-		if time.Now().Before(d.at.AddDate(years[d.kind], 0, 0)) {
+		if !d.erased && time.Now().Before(d.at.AddDate(years[d.kind], 0, 0)) {
 			kept++
 			continue
 		}
-		if _, err := tx.Exec(ctx, `UPDATE document_records SET body = NULL, data = NULL, erased_at = now() WHERE id = $1`, d.id); err != nil {
-			return 0, 0, fmt.Errorf("blank document: %w", err)
+		title := withoutNames(d.title, d.names)
+		if !d.erased {
+			if _, err := tx.Exec(ctx, `UPDATE document_records SET body = NULL, data = NULL, title = $2, erased_at = now() WHERE id = $1`,
+				d.id, title); err != nil {
+				return 0, 0, nil, fmt.Errorf("blank document: %w", err)
+			}
+			srows, err := tx.Query(ctx, `
+				UPDATE document_signatures s SET evidence_key = NULL
+				FROM (SELECT id, evidence_key FROM document_signatures WHERE document_id = $1 AND evidence_key IS NOT NULL FOR UPDATE) old
+				WHERE s.id = old.id RETURNING old.evidence_key`, d.id)
+			if err != nil {
+				return 0, 0, nil, fmt.Errorf("remove the scans: %w", err)
+			}
+			for srows.Next() {
+				var k string
+				if err := srows.Scan(&k); err != nil {
+					srows.Close()
+					return 0, 0, nil, err
+				}
+				scans = append(scans, k)
+			}
+			srows.Close()
+			if err := srows.Err(); err != nil {
+				return 0, 0, nil, fmt.Errorf("remove the scans: %w", err)
+			}
+			blanked++
+		} else if title != d.title {
+			if _, err := tx.Exec(ctx, `UPDATE document_records SET title = $2 WHERE id = $1`, d.id, title); err != nil {
+				return 0, 0, nil, fmt.Errorf("blank the title: %w", err)
+			}
 		}
-		if _, err := tx.Exec(ctx, `UPDATE document_record_parties SET name = $2, org_number = NULL, address = NULL WHERE document_id = $1`,
-			d.id, ErasedName); err != nil {
-			return 0, 0, fmt.Errorf("blank document parties: %w", err)
+		if _, err := tx.Exec(ctx, `UPDATE document_record_parties SET name = $2, org_number = NULL, address = NULL WHERE id = ANY($1)`,
+			d.parties, ErasedName); err != nil {
+			return 0, 0, nil, fmt.Errorf("blank the person on the document: %w", err)
 		}
-		blanked++
 	}
-	return blanked, kept, nil
+	return blanked, kept, slices.Compact(slices.Sorted(slices.Values(scans))), nil
+}
+
+// withoutNames is a title with each of names taken out of it, and each part
+// of them two letters or longer -- "Köpeavtal – Svensson" names Anna
+// Svensson as surely as her whole name does -- in any case. Taking out a
+// word that only looked like a name is the safer mistake. Too long, or
+// nothing left, it is ErasedName.
+func withoutNames(title string, names []string) string {
+	var words []string
+	for _, n := range names {
+		if n == ErasedName {
+			continue
+		}
+		words = append(words, strings.TrimSpace(n))
+		for _, w := range strings.Fields(n) {
+			if utf8.RuneCountInString(w) >= 2 {
+				words = append(words, w)
+			}
+		}
+	}
+	if len(words) == 0 {
+		return title
+	}
+	// Longest first, so a whole name goes as one rather than word by word.
+	slices.SortFunc(words, func(a, b string) int { return utf8.RuneCountInString(b) - utf8.RuneCountInString(a) })
+	quoted := make([]string, len(words))
+	for i, w := range words {
+		quoted[i] = regexp.QuoteMeta(w)
+	}
+	out := regexp.MustCompile(`(?i)(`+strings.Join(quoted, "|")+`)`).ReplaceAllString(title, ErasedName)
+	if out = strings.TrimSpace(out); out == "" || utf8.RuneCountInString(out) > 200 {
+		return ErasedName
+	}
+	return out
 }

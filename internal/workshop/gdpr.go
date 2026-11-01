@@ -375,7 +375,10 @@ func MarshalExport(e PersonExport) ([]byte, error) {
 // cleared and what was kept is written down, because anonymising is not
 // deleting and a shop asked "did you action my request" needs an answer better
 // than a row that now says nothing.
-func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, personID, reason string) error {
+//
+// files removes what is stored for them: the scans of contracts past their
+// retention, after the transaction has committed, as DeleteAttachment does.
+func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, files PhotoRemover, personID, reason string) error {
 	if !scope.Role.SeesCustomerPersonalData() {
 		return access.ErrForbidden
 	}
@@ -383,7 +386,8 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 		return ErrNotFound
 	}
 
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	var scans []string
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var alreadyErased *time.Time
 		if err := tx.QueryRow(ctx, `SELECT erased_at FROM people WHERE id = $1`, personID).
 			Scan(&alreadyErased); err != nil {
@@ -471,13 +475,14 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 
 		// Contracts naming them (#150): blanked past their kind's retention,
 		// kept within it, and the record says which.
-		blanked, keptDocs, err := eraseDocumentsTx(ctx, tx, personID)
+		blanked, keptDocs, docScans, err := eraseDocumentsTx(ctx, tx, personID)
 		if err != nil {
 			return err
 		}
+		scans = docScans
 		clearedNow, keptNow := cleared, kept
 		if blanked > 0 {
-			clearedNow += fmt.Sprintf(" What %d contracts past their retention said; that they existed, their hash and their signatures stay.", blanked)
+			clearedNow += fmt.Sprintf(" What %d contracts past their retention said, their naming of them and the scans of signed copies; that they existed, their hash and their signatures stay.", blanked)
 		}
 		if keptDocs > 0 {
 			keptNow += fmt.Sprintf(" %d contracts still within the retention set for their kind, which they support.", keptDocs)
@@ -491,6 +496,17 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	// After the commit, as DeleteAttachment: the worst case is a file
+	// nobody references, never a row pointing at a file that is gone.
+	for _, k := range scans {
+		if err := files.Remove(k); err != nil {
+			return fmt.Errorf("remove the scan: %w", err)
+		}
+	}
+	return nil
 }
 
 // Erasure is a record that somebody was erased.

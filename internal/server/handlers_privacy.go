@@ -44,7 +44,7 @@ func (s *Server) handleErasePerson(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusBadRequest, "Not erased", "Tick the box to say you understand it cannot be undone.")
 		return
 	}
-	if err := workshop.ErasePerson(r.Context(), s.pool, session.Scope, id, r.FormValue("reason")); s.handoverError(w, r, err) {
+	if err := workshop.ErasePerson(r.Context(), s.pool, session.Scope, s.photos, id, r.FormValue("reason")); s.handoverError(w, r, err) {
 		return
 	}
 	http.Redirect(w, r, "/privacy", http.StatusSeeOther)

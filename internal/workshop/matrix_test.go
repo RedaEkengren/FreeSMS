@@ -184,7 +184,7 @@ func TestOnlyTheFrontDeskErasesAPerson(t *testing.T) {
 	addTechnician(t, pool)
 	ctx := context.Background()
 	for _, s := range []access.Scope{technician(), partsDeskScope()} {
-		if err := workshop.ErasePerson(ctx, pool, s, customerPerson, "asked"); !errors.Is(err, access.ErrForbidden) {
+		if err := workshop.ErasePerson(ctx, pool, s, &recordingRemover{}, customerPerson, "asked"); !errors.Is(err, access.ErrForbidden) {
 			t.Errorf("ErasePerson as %s: %v, want forbidden", s.Role, err)
 		}
 	}

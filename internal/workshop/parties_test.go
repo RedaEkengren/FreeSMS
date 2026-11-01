@@ -331,7 +331,7 @@ func TestAPartyIsInThePersonsExportAndErasure(t *testing.T) {
 	if len(e.Roles) != 1 || e.Roles[0].Role != workshop.PartySeller || len(e.Addresses) != 1 || e.Addresses[0].City != "Kvarnby" {
 		t.Errorf("the export: roles %+v, addresses %+v", e.Roles, e.Addresses)
 	}
-	if err := workshop.ErasePerson(ctx, pool, advisor(), person, "Begäran"); err != nil {
+	if err := workshop.ErasePerson(ctx, pool, advisor(), &recordingRemover{}, person, "Begäran"); err != nil {
 		t.Fatal(err)
 	}
 	p, err := workshop.PartyByID(ctx, pool, owner(), seller)

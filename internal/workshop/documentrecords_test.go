@@ -3,6 +3,7 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
@@ -321,7 +322,7 @@ func TestErasureBlanksOnlyContractsPastTheirRetention(t *testing.T) {
 	if err != nil || len(e.Contracts) != 2 || !e.Contracts[0].Signed || e.Contracts[0].Text == "" {
 		t.Errorf("the person's export lists the contracts naming them as %+v, %v", e.Contracts, err)
 	}
-	if err := workshop.ErasePerson(ctx, pool, advisor(), customerPersonID, "Begäran"); err != nil {
+	if err := workshop.ErasePerson(ctx, pool, advisor(), &recordingRemover{}, customerPersonID, "Begäran"); err != nil {
 		t.Fatal(err)
 	}
 	gone, _ := workshop.DocumentRecordByID(ctx, pool, buyerScope(), old)
@@ -372,5 +373,78 @@ func TestADocumentNamesOnlyPartiesTheCallerMaySee(t *testing.T) {
 	want, _ := workshop.PartyByID(ctx, pool, sales, customer)
 	if err != nil || len(d.Parties) != 1 || d.Parties[0].Name != want.Name || d.Parties[0].Address != want.Address || want.Name == "" {
 		t.Errorf("the contract names %+v, %v; want the party as it is read, %+v", d.Parties, err, want)
+	}
+}
+
+// Erasing one person from a contract past its retention takes them off it,
+// and only them: the other party stays named. Their name goes from the
+// title as well, and the scan of the signed paper copy -- which shows the
+// whole contract, them included, and cannot be blanked in part -- goes with
+// the text, file and all. Erasing the other party later takes them off the
+// same contract.
+func TestErasingOnePersonTakesOnlyThemOffAContract(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	tpl := purchaseTemplate(t, pool)
+	seller := theSeller(t, pool)
+	id, err := workshop.ProduceDocument(ctx, pool, buyerScope(), workshop.NewDocumentRecord{
+		Kind: workshop.DocPurchaseAgreement, SubjectKind: "purchase", SubjectID: purchaseA,
+		TemplateVersionID: tpl.VersionID, Title: "Köpeavtal ABC 12D – Sven Säljare",
+		Parties: []workshop.DocumentPartyRole{
+			{PartyID: seller, Role: "seller"},
+			{PartyID: theCustomerAsSeller(t, pool), Role: "guarantor"},
+		},
+		Data: map[string]string{"seller": "Sven Säljare", "registration": "ABC 12D", "price": "85 000 kr"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, _ := workshop.DocumentRecordByID(ctx, pool, buyerScope(), id)
+	guarantor := d.Parties[1].Name
+	if err := workshop.RecordSignature(ctx, pool, buyerScope(), id, d.Parties[0].ID, workshop.SignatureEvidence{
+		Method: workshop.SignedOnPaper, Hash: d.Hash, EvidenceKey: "scan-sven.jpg"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `ALTER TABLE document_records DISABLE TRIGGER document_records_are_frozen`); err != nil {
+		t.Fatal(err)
+	}
+	_, err = pool.Exec(ctx, `UPDATE document_records SET created_at = now() - interval '8 years' WHERE id = $1`, id)
+	if _, e := pool.Exec(ctx, `ALTER TABLE document_records ENABLE TRIGGER document_records_are_frozen`); e != nil || err != nil {
+		t.Fatal(err, e)
+	}
+	var sellerPerson string
+	if err := pool.QueryRow(ctx, `SELECT person_id::text FROM parties WHERE id = $1`, seller).Scan(&sellerPerson); err != nil {
+		t.Fatal(err)
+	}
+
+	files := &recordingRemover{}
+	if err := workshop.ErasePerson(ctx, pool, advisor(), files, sellerPerson, "Begäran"); err != nil {
+		t.Fatal(err)
+	}
+	gone, err := workshop.DocumentRecordByID(ctx, pool, buyerScope(), id)
+	if err != nil || gone.ErasedAt == nil || gone.Body != "" {
+		t.Fatalf("past its retention: %+v, %v", gone, err)
+	}
+	if gone.Parties[0].Name != workshop.ErasedName || gone.Parties[0].Address != "" {
+		t.Errorf("the erased seller is still named: %+v", gone.Parties[0])
+	}
+	if gone.Parties[1].Name != guarantor || guarantor == "" {
+		t.Errorf("the guarantor, who asked for nothing, is named %q, want %q", gone.Parties[1].Name, guarantor)
+	}
+	if strings.Contains(gone.Title, "Sven") || strings.Contains(gone.Title, "Säljare") || !strings.Contains(gone.Title, "ABC 12D") {
+		t.Errorf("the title after erasure: %q", gone.Title)
+	}
+	if s := gone.Parties[0].Signature; s == nil || s.EvidenceKey != "" || s.Method != workshop.SignedOnPaper {
+		t.Errorf("the signature after erasure: %+v; want it kept, without its scan", s)
+	}
+	if len(files.removed) != 1 || files.removed[0] != "scan-sven.jpg" {
+		t.Errorf("files removed: %v; want the scan", files.removed)
+	}
+
+	if err := workshop.ErasePerson(ctx, pool, advisor(), files, customerPersonID, "Begäran"); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := workshop.DocumentRecordByID(ctx, pool, buyerScope(), id); again.Parties[1].Name != workshop.ErasedName {
+		t.Errorf("the guarantor erased later is still named on the erased contract: %+v", again.Parties[1])
 	}
 }
