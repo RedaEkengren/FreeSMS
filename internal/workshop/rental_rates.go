@@ -399,6 +399,8 @@ type QuotedLine struct {
 	PlanID         string
 	SeasonID       string
 	ExtraID        string
+	// How many of the extra were taken, for an extra.
+	ExtraCount int
 }
 
 // Net is the line's amount before VAT.
@@ -556,7 +558,8 @@ func quoteTx(ctx context.Context, tx pgx.Tx, q QuoteRequest) (RentalQuote, error
 			qty *= out.Days
 		}
 		out.Lines = append(out.Lines, QuotedLine{Kind: "extra", Unit: e.Kind, Description: e.Name, QuantityMilli: qty * 1000,
-			UnitPriceMinor: e.PriceMinor, VATRateBp: e.VATRateBp, VATCategory: e.VATCategory, Unconfirmed: e.Unconfirmed, ExtraID: e.ID})
+			UnitPriceMinor: e.PriceMinor, VATRateBp: e.VATRateBp, VATCategory: e.VATCategory, Unconfirmed: e.Unconfirmed, ExtraID: e.ID,
+			ExtraCount: c.Count})
 	}
 	out.Totals = quoteTotals(out.Lines)
 	return out, nil

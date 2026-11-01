@@ -449,11 +449,12 @@ func insertRentalLinesTx(ctx context.Context, tx pgx.Tx, scope access.Scope, boo
 		}
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO rental_booking_lines (shop_id, booking_id, position, event_id, kind, unit, description, quantity_milli,
-				unit_price_minor, vat_rate_bp, vat_category, unconfirmed, plan_id, season_id, extra_id, priced_minor, override_reason, override_by)
+				unit_price_minor, vat_rate_bp, vat_category, unconfirmed, plan_id, season_id, extra_id, priced_minor, override_reason, override_by,
+				extra_count)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NULLIF($13, '')::uuid, NULLIF($14, '')::uuid, NULLIF($15, '')::uuid,
-			        $16, nullif($17, ''), $18::uuid)`,
+			        $16, nullif($17, ''), $18::uuid, nullif($19, 0))`,
 			scope.ShopID, bookingID, first+i, eventID, l.Kind, l.Unit, l.Description, l.QuantityMilli, l.UnitPriceMinor,
-			l.VATRateBp, l.VATCategory, l.Unconfirmed, l.PlanID, l.SeasonID, l.ExtraID, l.pricedMinor, l.reason, by); err != nil {
+			l.VATRateBp, l.VATCategory, l.Unconfirmed, l.PlanID, l.SeasonID, l.ExtraID, l.pricedMinor, l.reason, by, l.ExtraCount); err != nil {
 			return fmt.Errorf("freeze the price: %w", err)
 		}
 		if l.reason != "" {
@@ -791,7 +792,8 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 // at.
 func perDayExtrasTx(ctx context.Context, tx pgx.Tx, bookingID string, days, added int64) ([]frozenLine, error) {
 	rows, err := tx.Query(ctx, `
-		SELECT l.extra_id::text, l.unit, l.description, sum(l.quantity_milli), l.unit_price_minor, l.vat_rate_bp, l.vat_category, l.unconfirmed
+		SELECT l.extra_id::text, l.unit, l.description, sum(l.quantity_milli), l.unit_price_minor, l.vat_rate_bp, l.vat_category, l.unconfirmed,
+		       coalesce(max(l.extra_count), 0)
 		FROM rental_booking_lines l JOIN rental_extras e ON e.id = l.extra_id
 		WHERE l.booking_id = $1 AND e.per = 'day'
 		GROUP BY l.extra_id, l.unit, l.description, l.unit_price_minor, l.vat_rate_bp, l.vat_category, l.unconfirmed
@@ -803,11 +805,16 @@ func perDayExtrasTx(ctx context.Context, tx pgx.Tx, bookingID string, days, adde
 	var out []frozenLine
 	for rows.Next() {
 		var l QuotedLine
-		var qty int64
-		if err := rows.Scan(&l.ExtraID, &l.Unit, &l.Description, &qty, &l.UnitPriceMinor, &l.VATRateBp, &l.VATCategory, &l.Unconfirmed); err != nil {
+		var qty, count int64
+		if err := rows.Scan(&l.ExtraID, &l.Unit, &l.Description, &qty, &l.UnitPriceMinor, &l.VATRateBp, &l.VATCategory, &l.Unconfirmed, &count); err != nil {
 			return nil, err
 		}
-		count := qty / (days * 1000)
+		// As many as were taken, as the line says; a line from before
+		// 0307 says it through its quantity and the days.
+		if count == 0 {
+			count = qty / (days * 1000)
+		}
+		l.ExtraCount = int(count)
 		if count < 1 {
 			continue
 		}

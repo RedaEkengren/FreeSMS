@@ -634,7 +634,10 @@ func TestCancellingARunOutHoldBesideABookingDoesNotDeadlock(t *testing.T) {
 		var wg sync.WaitGroup
 		var cancelled, booked error
 		wg.Add(2)
-		go func() { defer wg.Done(); cancelled = workshop.CancelRentalBooking(ctx, pool, rentalDesk(), held, "Inget svar", false) }()
+		go func() {
+			defer wg.Done()
+			cancelled = workshop.CancelRentalBooking(ctx, pool, rentalDesk(), held, "Inget svar", false)
+		}()
 		go func() { defer wg.Done(); _, booked = v.book(pool, from.Add(time.Hour), from.Add(5*time.Hour)) }()
 		wg.Wait()
 		for _, err := range []error{cancelled, booked} {
@@ -691,5 +694,40 @@ func TestAnUnlimitedBookingStaysUnlimitedWhenExtended(t *testing.T) {
 	}
 	if b, _ := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id); b.IncludedKm != nil {
 		t.Errorf("an unlimited booking became one of %d km", *b.IncludedKm)
+	}
+}
+
+// A daily extra is charged on an extension for as many as were taken,
+// whatever the wall clock did to the days in between: a booking moved
+// across the night the clocks go forward still has its one seat (review 2
+// #6).
+func TestADailyExtraKeepsItsCountAcrossTheChangeOfHour(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	seat, _ := workshop.AddRentalExtra(ctx, pool, rentalOwner(), workshop.NewRentalExtra{Kind: "child_seat", Name: "Barnstol", Per: "day",
+		PriceMinor: 5000, VATRateBp: 2500, VATCategory: "S"})
+	id, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: v.unit, RenterID: v.renter,
+		From: wallAt("2031-03-20 12:00"), To: wallAt("2031-03-22 12:00"), Extras: []workshop.ExtraChoice{{ExtraID: seat, Count: 1}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Forty-eight hours from noon on 29 March end at one on the 31st: three
+	// days begun on the wall clock.
+	if err := workshop.MoveRentalBooking(ctx, pool, rentalDesk(), id, wallAt("2031-03-29 12:00"), wallAt("2031-03-31 13:00"), ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, wallAt("2031-04-02 13:00"), ""); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id)
+	var seats int64
+	for _, l := range b.Lines {
+		if l.ExtraID == seat {
+			seats += l.QuantityMilli
+		}
+	}
+	if seats != 4000 {
+		t.Errorf("one seat for two days and two more: %d seat-days", seats/1000)
 	}
 }
