@@ -131,13 +131,15 @@ DECLARE
     unit uuid;
     happened timestamptz;
 BEGIN
-    IF NEW.kind <> 'invoice' OR NEW.amount_minor IS NULL THEN
+    IF NEW.kind <> 'invoice' THEN
         RETURN NEW;
     END IF;
     -- An invoice noted again for the same work replaces the one before,
     -- as the workshop reads it (the latest stands): the cost posted from
     -- the earlier one is reversed, with the new invoice's reference as
-    -- why, rather than counted twice.
+    -- why, rather than counted twice. So is one noted without an amount
+    -- yet: the earlier invoice no longer stands, and its cost goes with
+    -- it until the new one's amount is noted.
     INSERT INTO stock_cost_entries (shop_id, stock_unit_id, kind, net_minor, input_vat_minor, vat_rate_basis,
                                     supplier_party_id, external_ref, incurred_on, source, work_order_id, happened_at,
                                     note, reverses_id, recorded_by)
@@ -148,6 +150,9 @@ BEGIN
       JOIN outsourced_events oe ON oe.id = e.outsourced_event_id
      WHERE oe.outsourced_id = NEW.outsourced_id
        AND NOT EXISTS (SELECT 1 FROM stock_cost_entries r WHERE r.reverses_id = e.id);
+    IF NEW.amount_minor IS NULL THEN
+        RETURN NEW;
+    END IF;
     SELECT u.id, w.opened_at INTO unit, happened
       FROM outsourced_work o
       JOIN work_orders w ON w.id = o.work_order_id

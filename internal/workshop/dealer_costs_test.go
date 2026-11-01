@@ -195,6 +195,15 @@ func TestOutsourcedWorkOnAStockCarPostsTheSuppliersCost(t *testing.T) {
 		t.Errorf("after the corrected invoice: %d entries, %d net, %d VAT; want the first reversed and the second standing",
 			len(costs.Entries), costs.BeforeSale, costs.InputVATMinor)
 	}
+
+	// Re-issued again with no amount yet: the latest stands, so the cost
+	// before it is reversed now, not once the amount is known.
+	record(t, pool, stock, workshop.OutsourcedEventInput{Kind: "invoice", InvoiceRef: "TV-2291c"})
+	costs, _ = workshop.CostsOfUnit(ctx, pool, buyerScope(), p.StockUnitID)
+	if len(costs.Entries) != 4 || costs.TotalMinor() != 0 || costs.InputVATMinor != 0 {
+		t.Errorf("after an invoice with no amount: %d entries, %d net, %d VAT; want the standing cost reversed",
+			len(costs.Entries), costs.TotalMinor(), costs.InputVATMinor)
+	}
 }
 
 // Costs are for whoever may see what a car cost: a salesperson asking
