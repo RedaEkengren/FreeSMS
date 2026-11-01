@@ -10,6 +10,7 @@ import (
 	"github.com/RedaEkengren/FreeSMS/internal/testsupport"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -342,5 +343,39 @@ func TestAPartyIsInThePersonsExportAndErasure(t *testing.T) {
 	}
 	if open, _ := rolesOf(p, workshop.PartySeller); open != 1 {
 		t.Error("erasure took the party's role away")
+	}
+}
+
+// What is kept is kept by the database, not only by the code in front of
+// it: the application may not delete a party or move it to another
+// customer, rewrite a role's period, rewrite the record of a removed
+// photograph, or delete a resource or a block rather than release it.
+func TestTheApplicationCannotRewriteWhatIsKept(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	for _, stmt := range []string{
+		`DELETE FROM parties`,
+		`UPDATE parties SET customer_id = NULL`,
+		`UPDATE parties SET person_id = NULL`,
+		`UPDATE party_roles SET role = 'buyer'`,
+		`UPDATE party_roles SET valid_from = now()`,
+		`DELETE FROM party_roles`,
+		`UPDATE protocol_photo_removals SET reason = 'x'`,
+		`DELETE FROM protocol_photo_removals`,
+		`DELETE FROM resources`,
+		`UPDATE resources SET vehicle_id = NULL`,
+		`DELETE FROM resource_blocks`,
+		`UPDATE resource_blocks SET kind = 'rental'`,
+		`UPDATE resource_block_changes SET reason = 'x'`,
+		`DELETE FROM resource_block_changes`,
+	} {
+		err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+			_, err := tx.Exec(ctx, stmt)
+			return err
+		})
+		var pg *pgconn.PgError
+		if !errors.As(err, &pg) || pg.Code != "42501" {
+			t.Errorf("%q as the application: %v, want refused for want of the privilege", stmt, err)
+		}
 	}
 }

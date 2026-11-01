@@ -148,10 +148,8 @@ func TestAHoldThatHasRunOutBlocksNothing(t *testing.T) {
 		t.Errorf("a booking over a live hold: %v", err)
 	}
 	// An hour later.
-	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `UPDATE resource_blocks SET expires_at = now() - interval '1 minute' WHERE id = $1`, hold)
-		return err
-	}); err != nil {
+	// As the database's owner: the application may not move an expiry.
+	if _, err := pool.Exec(ctx, `UPDATE resource_blocks SET expires_at = now() - interval '1 minute' WHERE id = $1`, hold); err != nil {
 		t.Fatal(err)
 	}
 	blocks, _ := workshop.ResourceBlocks(ctx, pool, rentalDesk(), res, in2031(4, 0), in2031(5, 0))
