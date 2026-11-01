@@ -121,4 +121,5 @@ var core = map[string]string{
 	"PurchaseOfUnit": "a car's history in stock", "VATEligibilityOfUnit": "a car's history in stock",
 	"StockChecks": "a car's history in stock", "ChecksOutstanding": "a car's history in stock",
 	"StockCheckSettings": "a car's history in stock", "PurchaseSplitOf": "a car's history in stock",
+	"CalculationByID": "a car's history in stock", "CalculationsForVehicle": "a car's history in stock",
 }

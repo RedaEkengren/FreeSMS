@@ -325,6 +325,7 @@ func (s *Server) routes() (http.Handler, error) {
 	// run it -- not a refusal, which would say there is something to refuse.
 	mux := routeMux{ServeMux: http.NewServeMux(), s: s, table: &s.routeTable}
 	workshopMux := mux.in(access.Workshop)
+	dealerMux := mux.in(access.Dealer)
 
 	// Health is outside the session middleware on purpose: a health check must
 	// not depend on authentication working.
@@ -580,6 +581,12 @@ func (s *Server) routes() (http.Handler, error) {
 	workshopMux.HandleFunc("POST /jobs/{id}/tasks/{task}/decision", s.requireSession(s.handleTaskDecision))
 	workshopMux.HandleFunc("POST /jobs/{id}/clock-in", s.requireSession(s.handleClock(true)))
 	workshopMux.HandleFunc("POST /jobs/{id}/clock-out", s.requireSession(s.handleClock(false)))
+
+	// Dealer
+	dealerMux.HandleFunc("GET /cars/calculations/new", s.requireSession(s.handleCalculationForm))
+	dealerMux.HandleFunc("POST /cars/calculations", s.requireSession(s.handleSaveCalculation))
+	dealerMux.HandleFunc("GET /cars/calculations/{id}", s.requireSession(s.handleCalculation))
+	dealerMux.HandleFunc("POST /cars/calculations/{id}/accept", s.requireSession(s.handleAcceptCalculation))
 
 	return s.securityHeaders(s.checkOrigin(s.requireSetup(s.withSession(s.refuseNUL(s.idempotent(mux)))))), nil
 }

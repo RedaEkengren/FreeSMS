@@ -44,6 +44,8 @@ var ExportTables = []string{
 	// Dealer: a car's cycles through stock, what was paid for it and the
 	// checks before the money left (#160-#162).
 	"stock_units", "vehicle_purchases", "stock_checks", "purchase_loans", "stock_check_overrides",
+	// What a buyer worked out before bidding (#163).
+	"purchase_calculations", "purchase_calculation_costs", "purchase_calculation_acceptances",
 }
 
 // exportQueries are tables exported with chosen columns, because one of
