@@ -245,6 +245,9 @@ func SwitchModule(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, m
 			if len(open.Items) > 0 && !confirmed {
 				return open
 			}
+			if err := cancelModuleOutboxTx(ctx, tx, scope, m); err != nil {
+				return err
+			}
 			// A clock left running would be refused its clock-out with the
 			// workshop off, and close weeks later with the hours in between
 			// counted as work. It stops at the moment the workshop does --

@@ -59,7 +59,7 @@ var swept = map[string]string{
 	"GET /board": "", "GET /jobs/new": "", "POST /jobs/new": "",
 	"GET /jobs/new/lookup": "", "GET /jobs/new/customers": "", "GET /figures": "", "GET /accounting": "",
 	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/modules": "", "POST /shop/charges": "", "POST /shop/final-check": "",
-	"GET /privacy": "", "GET /day": "", "POST /day/settlement": "", "POST /day/review": "", "POST /privacy/export": "", "GET /events": "", "GET /mine": "", "GET /rota": "", "POST /hooks/46elks/{secret}": "", "POST /rota": "", "GET /schedule": "", "GET /mine/count": "", "POST /account/alert": "", "POST /account/theme": "", "GET /calendar": "", "POST /calendar": "", "GET /enquiries": "", "POST /enquiries": "", "POST /calendar/capacity": "", "GET /labour": "", "POST /labour": "",
+	"GET /privacy": "", "GET /outbox": "", "GET /day": "", "POST /day/settlement": "", "POST /day/review": "", "POST /privacy/export": "", "GET /events": "", "GET /mine": "", "GET /rota": "", "POST /hooks/46elks/{secret}": "", "POST /rota": "", "GET /schedule": "", "GET /mine/count": "", "POST /account/alert": "", "POST /account/theme": "", "GET /calendar": "", "POST /calendar": "", "GET /enquiries": "", "POST /enquiries": "", "POST /calendar/capacity": "", "GET /labour": "", "POST /labour": "",
 	"POST /labour/rate": "", "GET /time": "", "POST /time/correct": "",
 	"POST /drafts": "", "GET /drafts": "", "DELETE /drafts": "",
 	"GET /search": "", "GET /scan": "", "GET /labels": "", "GET /stock": "",
@@ -185,6 +185,9 @@ var swept = map[string]string{
 	"POST /bookings/{id}/contact":                 "sweep",
 	"POST /invoices/{id}/payments":                "sweep",
 	"POST /payments/{id}/reverse":                 "sweep",
+	"POST /outbox/{id}/retry":                     "sweep",
+	"POST /outbox/{id}/done":                      "sweep",
+	"POST /outbox/{id}/cancel":                    "sweep",
 	"GET /inspections/{id}":                       "sweep",
 	"POST /inspections/{id}/items/{itemID}":       "sweep",
 	"POST /inspections/{id}/items/{itemID}/photo": "sweep",
@@ -237,10 +240,12 @@ func fill(pattern string) (method, path string) {
 		"/supply/orders/{id}": "/supply/orders/" + orderB,
 		"/import/{id}":        "/import/" + batchB,
 		"/contracts/{id}":     "/contracts/" + contractB,
-		"{row}":               "bbbbbbbb-0000-0000-0000-0000000000ff",
-		"{version}":           "1",
-		"{quoteID}":           "cccccccc-0000-0000-0000-0000000000cc",
-		"{key}":               photoB,
+		// No other shop's call is seeded: an id that is nobody's.
+		"/outbox/{id}": "/outbox/bbbbbbbb-0000-0000-0000-0000000000ee",
+		"{row}":        "bbbbbbbb-0000-0000-0000-0000000000ff",
+		"{version}":    "1",
+		"{quoteID}":    "cccccccc-0000-0000-0000-0000000000cc",
+		"{key}":        photoB,
 	} {
 		path = strings.ReplaceAll(path, from, to)
 	}

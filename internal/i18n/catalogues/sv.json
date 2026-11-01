@@ -2503,6 +2503,49 @@
     "between a day and ten years": {
       "other": "mellan en dag och tio år"
     },
+    "that call is not waiting for anybody": {
+      "other": "det anropet väntar inte på någon"
+    },
+    "that call is already done or cancelled": {
+      "other": "det anropet är redan gjort eller avbrutet"
+    },
+    "say why the call is cancelled, in 300 characters or fewer": {
+      "other": "säg varför anropet avbryts, med högst 300 tecken"
+    },
+    "Calls to other services": {
+      "other": "Anrop till andra tjänster"
+    },
+    "What FreeSMS was to ask of another service -- a signing service, a payment provider -- and could not, or what a person has to do by hand because no service is connected. Nothing else waits on these.": {
+      "other": "Det som FreeSMS skulle be en annan tjänst om – en signeringstjänst, en betaltjänst – och inte kunde, eller det som en person måste göra för hand eftersom ingen tjänst är ansluten. Inget annat väntar på dessa."
+    },
+    "Try again": {
+      "other": "Försök igen"
+    },
+    "Done by hand": {
+      "other": "Gjort för hand"
+    },
+    "Why it is cancelled": {
+      "other": "Varför det avbryts"
+    },
+    "Nothing is waiting.": {
+      "other": "Inget väntar."
+    },
+    "A signature asked for": {
+      "other": "En begärd underskrift"
+    },
+    "A call to another service": {
+      "other": "Ett anrop till en annan tjänst"
+    },
+    "To do by hand": {
+      "other": "Att göra för hand"
+    },
+    "Given up": {
+      "other": "Uppgivet"
+    },
+    "%d attempt": {
+      "one": "%d försök",
+      "other": "%d försök"
+    },
     "They carry the same plate at the same time.": {
       "other": "De har samma skylt samtidigt."
     },

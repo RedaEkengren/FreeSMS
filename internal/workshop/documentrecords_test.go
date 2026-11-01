@@ -199,7 +199,7 @@ func TestSigningIsEvidenceOfTheDocumentAsItIs(t *testing.T) {
 
 type downSigner struct{}
 
-func (downSigner) Request(context.Context, workshop.DocumentRecord, workshop.DocumentParty) (string, error) {
+func (downSigner) Request(context.Context, workshop.DocumentRecord, workshop.DocumentParty, string) (string, error) {
 	return "", errors.New("connection refused")
 }
 

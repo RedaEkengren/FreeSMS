@@ -6,6 +6,10 @@
       "one": "%d day net",
       "other": "%d days net"
     },
+    "%d attempt": {
+      "one": "%d attempt",
+      "other": "%d attempts"
+    },
     "%d finding": {
       "one": "%d finding",
       "other": "%d findings"

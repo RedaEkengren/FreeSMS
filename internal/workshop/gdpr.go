@@ -481,6 +481,11 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fi
 			return err
 		}
 
+		// Calls about them not yet made: not made (#154).
+		if err := cancelPersonOutboxTx(ctx, tx, scope, personID); err != nil {
+			return err
+		}
+
 		// Why things were done about them, which can say who they are; that
 		// they were done stays (#151).
 		if err := eraseAuditReasonsTx(ctx, tx, personID); err != nil {

@@ -49,7 +49,10 @@ type Server struct {
 	// The keys identity values are sealed with; nil or empty, none can be
 	// recorded or read (#153).
 	identityKeys *identity.Keyring
-	catalogues   *i18n.Catalogues
+	// The services calls to the outside world go through, by kind; none
+	// ships, so each becomes a task for a person (#154, #235).
+	outboxAdapters map[string]workshop.OutboxAdapter
+	catalogues     *i18n.Catalogues
 
 	// Open screens, told when something they show has changed.
 	live          *live.Hub
@@ -438,6 +441,10 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /shop/modules", s.requireSession(s.handleSwitchModule))
 	workshopMux.HandleFunc("POST /shop/charges", s.requireSession(s.handleSaveSurcharges))
 	mux.HandleFunc("GET /privacy", s.requireSession(s.handlePrivacy))
+	mux.HandleFunc("GET /outbox", s.requireSession(s.handleOutbox))
+	mux.HandleFunc("POST /outbox/{id}/retry", s.requireSession(s.handleOutboxAction("retry")))
+	mux.HandleFunc("POST /outbox/{id}/done", s.requireSession(s.handleOutboxAction("done")))
+	mux.HandleFunc("POST /outbox/{id}/cancel", s.requireSession(s.handleOutboxAction("cancel")))
 	mux.HandleFunc("GET /people/{id}/export", s.requireSession(s.handleExportPerson))
 	mux.HandleFunc("POST /privacy/export", s.requireSession(s.handleShopExport))
 	mux.HandleFunc("GET /exports/{id}", s.requireSession(s.handleShopExportFile))

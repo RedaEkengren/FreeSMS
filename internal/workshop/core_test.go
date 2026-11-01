@@ -18,6 +18,9 @@ var core = map[string]string{
 	"IdentityRecordsFor": "that a party's identity was checked", "ReadIdentityValue": "an identity value, read under its purpose",
 	"EndIdentityPurpose": "an identity value's purpose ended, which removes it", "SetIdentityRetention": "how long identity values are kept",
 	"RotateIdentityKeys": "the keys identity values are sealed with",
+	// The outbox (#154): the calls of every module, in front of the owner.
+	"OutboxNeedingAttention": "calls to the outside world that need a person", "RetryOutbox": "a call sent again",
+	"FinishOutboxByHand": "a call done by hand", "CancelOutbox": "a call cancelled",
 	// Audit events (#151): the trail of every module's transitions.
 	"AuditTrail":   "who did what and why, whichever module it was in",
 	"DocumentByID": "an issued document", "CreditNote": "correcting an issued document",

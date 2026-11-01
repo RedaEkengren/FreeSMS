@@ -681,7 +681,11 @@ type Signer interface {
 	// Request asks the party to sign the document as it is, and returns the
 	// provider's reference to follow it by; "" when there is nothing to
 	// follow.
-	Request(ctx context.Context, doc DocumentRecord, party DocumentParty) (ref string, err error)
+	//
+	// key is the request's own, the same on every retry of it: a provider
+	// that took the first and timed out before answering sees the same
+	// request again, not a second one.
+	Request(ctx context.Context, doc DocumentRecord, party DocumentParty, key string) (ref string, err error)
 }
 
 // ManualSigner is signing on paper: print the document, have it signed,
@@ -690,7 +694,7 @@ type Signer interface {
 type ManualSigner struct{}
 
 // Request has nothing to send.
-func (ManualSigner) Request(context.Context, DocumentRecord, DocumentParty) (string, error) {
+func (ManualSigner) Request(context.Context, DocumentRecord, DocumentParty, string) (string, error) {
 	return "", nil
 }
 
@@ -731,7 +735,7 @@ func RequestSignature(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 		return "", errDocSigned
 	}
 	// Outside the transaction: a provider that hangs holds no lock.
-	ref, err := signer.Request(ctx, d, d.Parties[i])
+	ref, err := signer.Request(ctx, d, d.Parties[i], "sign:"+strings.ToLower(documentPartyID))
 	if err != nil {
 		return "", fmt.Errorf("%w: %v", ErrSignerUnavailable, err)
 	}
