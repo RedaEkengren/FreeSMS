@@ -522,3 +522,28 @@ func TestABuffersTimeIsInTheFleet(t *testing.T) {
 		t.Errorf("an hour's cleaning after the van was sold: %v", err)
 	}
 }
+
+// A booking for somebody new, sent twice with its key -- one after the
+// other, or both at once -- is one booking and one new renter (review #4).
+func TestARepeatedBookingForSomebodyNewMakesThemOnce(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	n := workshop.NewRentalBooking{UnitID: v.unit, From: in2031(10, 9), To: in2031(11, 9), Key: "phone-2",
+		NewRenter: &workshop.NewParty{Kind: "private", Name: "Nina Ny", Phone: "070-1"}}
+	var wg sync.WaitGroup
+	ids, errs := make([]string, 2), make([]error, 2)
+	for i := range ids {
+		wg.Add(1)
+		go func() { defer wg.Done(); ids[i], errs[i] = workshop.BookRental(ctx, pool, rentalDesk(), n) }()
+	}
+	wg.Wait()
+	again, err := workshop.BookRental(ctx, pool, rentalDesk(), n)
+	if errs[0] != nil || errs[1] != nil || err != nil || ids[0] != ids[1] || again != ids[0] {
+		t.Fatalf("three sends: %v %v %v, %v %v %v", ids, again, "", errs[0], errs[1], err)
+	}
+	var made int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM people WHERE display_name = 'Nina Ny'`).Scan(&made); err != nil || made != 1 {
+		t.Errorf("Nina was made %d times, %v", made, err)
+	}
+}

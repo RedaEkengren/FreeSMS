@@ -566,13 +566,10 @@ func (s *Server) handleRentalBook(w http.ResponseWriter, r *http.Request) {
 		n.Overrides = []workshop.PriceOverride{{Position: 1, UnitGrossMinor: &gross, Reason: r.FormValue("rent_reason")}}
 	}
 	if n.RenterID == "" {
-		renter, err := workshop.CreateParty(r.Context(), s.pool, session.Scope, workshop.NewParty{Kind: "private",
-			Name: r.FormValue("renter_name"), Phone: r.FormValue("renter_phone"), Email: r.FormValue("renter_email"),
-			Role: workshop.PartyRenter})
-		if s.handoverError(w, r, err) {
-			return
-		}
-		n.RenterID = renter
+		// Made with the booking, under its key: the form sent twice makes
+		// them once.
+		n.NewRenter = &workshop.NewParty{Kind: "private", Name: r.FormValue("renter_name"),
+			Phone: r.FormValue("renter_phone"), Email: r.FormValue("renter_email")}
 	}
 	id, err := workshop.BookRental(r.Context(), s.pool, session.Scope, n)
 	if s.handoverError(w, r, err) {

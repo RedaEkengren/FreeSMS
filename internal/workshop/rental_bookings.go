@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -134,8 +135,11 @@ type PriceOverride struct {
 // unless confirmed. Key is the request's own: sent again, from a phone that
 // lost its answer, it finds the booking it made.
 type NewRentalBooking struct {
-	UnitID    string
-	RenterID  string
+	UnitID   string
+	RenterID string
+	// Or somebody new to make a renter, in the booking's own transaction:
+	// sent again with the same key, they are made once.
+	NewRenter *NewParty
 	From, To  time.Time
 	PlanID    string
 	Extras    []ExtraChoice
@@ -179,7 +183,26 @@ func BookRental(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n N
 	if !scope.Role.HandsOverRentals() {
 		return "", access.ErrForbidden
 	}
-	if !looksLikeUUID(n.UnitID) || !looksLikeUUID(n.RenterID) || (n.PlanID != "" && !looksLikeUUID(n.PlanID)) {
+	var renterNote string
+	if n.NewRenter != nil {
+		r := *n.NewRenter
+		r.Role, r.Name = PartyRenter, strings.TrimSpace(r.Name)
+		if err := mayRecordPartyRole(scope.Role, scope, r.Role); err != nil {
+			return "", err
+		}
+		switch {
+		case r.Kind != "private" && r.Kind != "company":
+			return "", fmt.Errorf("%w: a party is either a person or a company", ErrInvalid)
+		case r.Name == "" || utf8.RuneCountInString(r.Name) > 200:
+			return "", fmt.Errorf("%w: a party needs a name, in 200 characters or fewer", ErrInvalid)
+		}
+		var err error
+		if renterNote, err = checkNote(r.Note); err != nil {
+			return "", err
+		}
+		n.NewRenter, n.RenterID = &r, ""
+	}
+	if !looksLikeUUID(n.UnitID) || (n.NewRenter == nil && !looksLikeUUID(n.RenterID)) || (n.PlanID != "" && !looksLikeUUID(n.PlanID)) {
 		return "", ErrNotFound
 	}
 	switch {
@@ -216,6 +239,12 @@ func BookRental(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n N
 		sp, err := tx.Begin(ctx)
 		if err != nil {
 			return err
+		}
+		if n.NewRenter != nil {
+			if n.RenterID, err = createPartyTx(ctx, sp, scope, *n.NewRenter, renterNote); err != nil {
+				_ = sp.Rollback(ctx)
+				return err
+			}
 		}
 		id, err = bookRentalTx(ctx, sp, scope, n, key)
 		if err == nil {

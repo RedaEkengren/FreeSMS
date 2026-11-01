@@ -192,6 +192,18 @@ func CreateParty(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n 
 	}
 	var id string
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		id, err = createPartyTx(ctx, tx, scope, n, note)
+		return err
+	})
+	return id, err
+}
+
+// createPartyTx makes a party CreateParty has checked, in the caller's
+// transaction.
+func createPartyTx(ctx context.Context, tx pgx.Tx, scope access.Scope, n NewParty, note string) (string, error) {
+	var id string
+	err := func() error {
 		// A private party is a person, as a private customer is: the name,
 		// telephone and email live on people, where erasure and the
 		// person's export already reach. A company's are the company's.
@@ -219,7 +231,7 @@ func CreateParty(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n 
 			return fmt.Errorf("create party: %w", err)
 		}
 		return startPartyRoleTx(ctx, tx, scope, id, n.Role, note)
-	})
+	}()
 	return id, err
 }
 
