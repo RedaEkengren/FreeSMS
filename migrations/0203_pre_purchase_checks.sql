@@ -114,3 +114,13 @@ CREATE POLICY shop_isolation ON stock_check_overrides
     WITH CHECK (shop_id = nullif(current_setting('app.current_shop', true), '')::uuid);
 REVOKE ALL ON stock_check_overrides FROM freesms_app;
 GRANT SELECT, INSERT ON stock_check_overrides TO freesms_app;
+
+-- A payout names what it pays only for the purpose it is for: a purchase's
+-- names a purchase, a consignment's a consignment, and one for anything
+-- else names nothing. A payout for something else naming a car would let
+-- money leave for that car without its checks, an override or a reason.
+-- Refused here as well as in the application, whatever writes it. The
+-- previous release has no page that names a payout's subject at all, so
+-- it never writes one this refuses.
+ALTER TABLE payouts ADD CONSTRAINT payouts_subject_is_its_purpose
+    CHECK (subject_kind IS NULL OR subject_kind = purpose);

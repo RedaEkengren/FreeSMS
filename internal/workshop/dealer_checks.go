@@ -475,7 +475,8 @@ var (
 // pays, or pays somebody it does not owe: a purchase's payout names the
 // purchase, and is to the seller or a lender on it, so that the checks it
 // is let through on are that car's. A consignment's waits for its
-// agreement (#166). Called when a payout is opened and when it is paid.
+// agreement (#166). A payout for anything else names no car. Called when a
+// payout is opened and when it is paid.
 func payoutSubjectTx(ctx context.Context, tx pgx.Tx, purpose, subjectKind, subjectID, partyID string) error {
 	switch purpose {
 	case "purchase":
@@ -495,6 +496,12 @@ func payoutSubjectTx(ctx context.Context, tx pgx.Tx, purpose, subjectKind, subje
 		}
 	case "consignment":
 		return errConsignmentPayout
+	default:
+		// Not for a car, so it names none: naming one would let money leave
+		// for the car without its checks, an override or a reason.
+		if subjectKind != "" || subjectID != "" {
+			return errPayoutSubject
+		}
 	}
 	return nil
 }

@@ -316,7 +316,8 @@ func TestChecksByRoleAndModule(t *testing.T) {
 // A purchase payout pays the purchase it names, to its seller or to a
 // lender on it: naming another car's purchase -- one whose checks passed --
 // does not step round this car's. A consignment payout waits for its
-// agreement (#166), and none can be opened before there is one.
+// agreement (#166), and none can be opened before there is one. A payout
+// for something else names no car.
 func TestAPayoutPaysThePurchaseItNamesToThoseItOwes(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
@@ -334,9 +335,21 @@ func TestAPayoutPaysThePurchaseItNamesToThoseItOwes(t *testing.T) {
 		"a purchase there is not": {PartyID: sellerA, Purpose: "purchase", SubjectKind: "purchase", SubjectID: "99999999-9999-9999-9999-999999999999"},
 		"no purchase at all":      {PartyID: sellerA, Purpose: "purchase"},
 		"a consignment":           {PartyID: sellerA, Purpose: "consignment", SubjectKind: "consignment", SubjectID: a.StockUnitID},
+		// Not for a car, and yet naming one: it would pay the car round its
+		// checks, with no override and no reason recorded.
+		"something else, naming a purchase":    {PartyID: sellerA, Purpose: "other", SubjectKind: "purchase", SubjectID: a.ID},
+		"something else, naming a consignment": {PartyID: sellerA, Purpose: "other", SubjectKind: "consignment", SubjectID: a.StockUnitID},
 	} {
-		if _, err := workshop.CreatePayout(ctx, pool, buyerScope(), n); !errors.Is(err, workshop.ErrInvalid) && !errors.Is(err, workshop.ErrNotFound) {
+		// As the owner, who may open a payout for anything.
+		if _, err := workshop.CreatePayout(ctx, pool, everything(owner()), n); !errors.Is(err, workshop.ErrInvalid) && !errors.Is(err, workshop.ErrNotFound) {
 			t.Errorf("a payout for %s: %v", name, err)
+		}
+	}
+	// And the database refuses it, whatever writes it.
+	for _, kind := range []string{"purchase", "consignment"} {
+		if _, err := pool.Exec(ctx, `INSERT INTO payouts (shop_id, party_id, purpose, subject_kind, subject_id, created_by)
+			VALUES ($1, $2, 'other', $3, $4, $5)`, shopID, sellerA, kind, a.ID, userID); err == nil {
+			t.Errorf("the database took a payout for something else naming a %s", kind)
 		}
 	}
 	lender, err := workshop.CreateParty(ctx, pool, buyerScope(), workshop.NewParty{Kind: "company", Name: "Bilfinans AB",
