@@ -1,0 +1,34 @@
+{{define "content"}}
+<h1>{{.T "Rental"}}</h1>
+<p><a href="/rental/settings">{{.T "Rental settings"}}</a></p>
+
+<h2>{{.T "Units"}}</h2>
+{{if .Rental.Units}}
+<ul class="lines">
+  {{range .Rental.Units}}
+  <li>
+    <div class="row"><a href="/rental/units/{{.ID}}">{{.Label}}</a>
+      <span class="tag{{if eq .Status "out_of_fleet" "at_workshop" "blocked"}} late{{end}}">{{$.T ($.Rental.FleetLabel .Status)}}</span></div>
+    <div class="waiting">{{.Category}} &middot; {{if .Shipped}}{{$.T .ProfileName}}{{else}}{{.ProfileName}}{{end}}{{if .Make}} &middot; {{.Make}} {{.Model}}{{end}}</div>
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p>{{.T "Nothing to rent out yet."}}</p>
+{{end}}
+
+<details><summary>{{.T "Add a unit"}}</summary>
+<form method="post" action="/rental/units">
+  <div class="pair">
+    <label><span>{{.T "Registration, for a vehicle"}}</span><input name="registration" maxlength="20" autocapitalize="characters"></label>
+    <label><span>{{.T "Or a name, for something unregistered"}}</span><input name="name" maxlength="120"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "Fleet number"}}</span><input name="fleet_number" maxlength="40" required></label>
+    <label><span>{{.T "Category"}}</span><input name="category" maxlength="60" required placeholder="{{.T "Small van"}}"></label>
+  </div>
+  <label><span>{{.T "Rented under"}}</span><select name="profile">{{range .Rental.Profiles}}<option value="{{.ID}}">{{if .Shipped}}{{$.T .Name}}{{else}}{{.Name}}{{end}}</option>{{end}}</select></label>
+  <button type="submit">{{.T "Add the unit"}}</button>
+</form>
+</details>
+{{end}}

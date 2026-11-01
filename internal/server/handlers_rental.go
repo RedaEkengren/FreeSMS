@@ -2,6 +2,8 @@ package server
 
 import (
 	"net/http"
+
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"strconv"
 	"strings"
 	"time"
@@ -14,13 +16,34 @@ import (
 // does not exist; the operations check the role and the module again.
 
 // rentalPages are the templates Rental adds.
-var rentalPages = []string{"rentalsettings"}
+var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit"}
 
 // rentalData is what Rental's pages are given.
 type rentalData struct {
 	Permits    []workshop.RentalPermit
 	Profiles   []workshop.RentalProfile
 	Checklists []workshop.ChecklistTemplate
+	Units      []workshop.RentalUnit
+	Unit       workshop.RentalUnit
+	// Rentals booked after the end asked for, refused.
+	InTheWay []workshop.Block
+}
+
+// JoinedHow and LeftHow are the ways a unit joins and leaves the fleet,
+// for a form.
+func (rentalData) JoinedHow() []string { return workshop.FleetJoinedHow }
+func (rentalData) LeftHow() []string   { return workshop.FleetLeftHow }
+
+// FleetLabel is a way of joining or leaving, or a unit's state, as a
+// catalogue key.
+func (rentalData) FleetLabel(key string) string {
+	return map[string]string{
+		"bought": "Bought for the fleet", "from_stock": "Moved from sales stock", "leased_in": "Leased in",
+		"already_owned": "Already the business's", "other": "Other",
+		"sold": "Sold off", "to_stock": "Moved to sales stock", "lease_returned": "Lease returned", "scrapped": "Scrapped",
+		workshop.UnitOutOfFleet: "Out of the fleet", workshop.UnitAvailable: "Available", workshop.UnitRented: "Rented out",
+		workshop.UnitWorkshop: "At the workshop", workshop.UnitBlocked: "Taken by other use",
+	}[key]
 }
 
 // ProfileBases are the shipped profiles, for a form.
@@ -57,6 +80,11 @@ func (rentalData) HasCategory(p workshop.RentalProfile, c string) bool {
 }
 
 func (s *Server) rentalRoutes(m routeMux) {
+	m.HandleFunc("GET /rental", s.requireSession(s.handleRentalUnits))
+	m.HandleFunc("POST /rental/units", s.requireSession(s.handleRentalUnitAdd))
+	m.HandleFunc("GET /rental/units/{id}", s.requireSession(s.handleRentalUnit))
+	m.HandleFunc("POST /rental/units/{id}/fleet", s.requireSession(s.handleFleetJoin))
+	m.HandleFunc("POST /rental/memberships/{id}/end", s.requireSession(s.handleFleetLeave))
 	m.HandleFunc("GET /rental/settings", s.requireSession(s.handleRentalSettings))
 	m.HandleFunc("POST /rental/permits", s.requireSession(s.handleRentalPermit))
 	m.HandleFunc("POST /rental/permits/{id}/revoke", s.requireSession(s.handleRentalPermitRevoke))
@@ -174,4 +202,82 @@ func (s *Server) handleRentalProfileSave(w http.ResponseWriter, r *http.Request)
 	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/rental/settings", http.StatusSeeOther)
+}
+
+// handleRentalUnits lists what the shop rents out and what each is doing.
+func (s *Server) handleRentalUnits(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	var d rentalData
+	var err error
+	if d.Units, err = workshop.RentalUnits(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
+	}
+	if d.Profiles, err = workshop.RentalProfiles(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "rentalunits", pageData{Title: "Rental", Session: session, Rental: d})
+}
+
+func (s *Server) handleRentalUnitAdd(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id, err := workshop.AddRentalUnit(r.Context(), s.pool, session.Scope, workshop.NewRentalUnit{
+		Registration: r.FormValue("registration"), Name: r.FormValue("name"), ProfileID: r.FormValue("profile"),
+		FleetNumber: r.FormValue("fleet_number"), Category: r.FormValue("category")})
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/rental/units/"+id, http.StatusSeeOther)
+}
+
+func (s *Server) renderRentalUnit(w http.ResponseWriter, r *http.Request, id string, status int, inTheWay []workshop.Block) {
+	session := sessionFrom(r.Context())
+	u, err := workshop.RentalUnitByID(r.Context(), s.pool, session.Scope, id)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, status, "rentalunit", pageData{Title: "Rental unit", Session: session,
+		Rental: rentalData{Unit: u, InTheWay: inTheWay}, Today: time.Now().In(s.shopLocation(r)).Format(wallClockLayout)})
+}
+
+func (s *Server) handleRentalUnit(w http.ResponseWriter, r *http.Request) {
+	s.renderRentalUnit(w, r, r.PathValue("id"), http.StatusOK, nil)
+}
+
+func (s *Server) handleFleetJoin(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	at, err := parseWallClock(r.FormValue("at"), s.shopLocation(r), r.FormValue("at_was"))
+	if err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "That date did not parse", "Use the picker.")
+		return
+	}
+	_, err = workshop.StartFleetMembership(r.Context(), s.pool, session.Scope, r.PathValue("id"), at, r.FormValue("how"), r.FormValue("note"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/rental/units/"+r.PathValue("id"), http.StatusSeeOther)
+}
+
+func (s *Server) handleFleetLeave(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	unit := r.FormValue("unit")
+	at, err := parseWallClock(r.FormValue("at"), s.shopLocation(r), r.FormValue("at_was"))
+	if err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "That date did not parse", "Use the picker.")
+		return
+	}
+	err = workshop.EndFleetMembership(r.Context(), s.pool, session.Scope, r.PathValue("id"), at, r.FormValue("how"), r.FormValue("note"))
+	if f, ok := workshop.AsFutureBookings(err); ok && access.IsUUID(unit) {
+		s.renderRentalUnit(w, r, unit, http.StatusConflict, f.Blocks)
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	if !access.IsUUID(unit) {
+		unit = ""
+	}
+	http.Redirect(w, r, "/rental/units/"+unit, http.StatusSeeOther)
 }

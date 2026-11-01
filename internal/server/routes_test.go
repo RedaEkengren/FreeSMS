@@ -75,6 +75,8 @@ var swept = map[string]string{
 	// Rental
 	"GET /rental/settings": "", "POST /rental/permits": "", "POST /rental/profiles": "",
 	"POST /rental/permits/{id}/revoke": "sweep", "POST /rental/profiles/{id}": "sweep",
+	"GET /rental": "", "POST /rental/units": "", "GET /rental/units/{id}": "sweep", "POST /rental/units/{id}/fleet": "sweep",
+	"POST /rental/memberships/{id}/end": "sweep",
 
 	// The customer's link. Not a shop identifier: it is an unguessable token,
 	// and asking for it with a uuid is a different test -- the share tests
@@ -260,8 +262,10 @@ func fill(pattern string) (method, path string) {
 		"{quoteID}":           "cccccccc-0000-0000-0000-0000000000cc",
 		"{key}":               photoB,
 		// Rental: ids that are nobody's.
-		"/rental/permits/{id}":  "/rental/permits/bbbbbbbb-0000-0000-0000-0000000000e1",
-		"/rental/profiles/{id}": "/rental/profiles/bbbbbbbb-0000-0000-0000-0000000000e2",
+		"/rental/permits/{id}":     "/rental/permits/bbbbbbbb-0000-0000-0000-0000000000e1",
+		"/rental/profiles/{id}":    "/rental/profiles/bbbbbbbb-0000-0000-0000-0000000000e2",
+		"/rental/units/{id}":       "/rental/units/bbbbbbbb-0000-0000-0000-0000000000e3",
+		"/rental/memberships/{id}": "/rental/memberships/bbbbbbbb-0000-0000-0000-0000000000e4",
 	} {
 		path = strings.ReplaceAll(path, from, to)
 	}

@@ -1,0 +1,51 @@
+{{define "content"}}
+{{with .Rental.Unit}}
+<h1>{{.Label}}</h1>
+<p><span class="tag{{if eq .Status "out_of_fleet" "at_workshop" "blocked"}} late{{end}}">{{$.T ($.Rental.FleetLabel .Status)}}</span>
+  {{.Category}} &middot; {{if .Shipped}}{{$.T .ProfileName}}{{else}}{{.ProfileName}}{{end}}
+  {{if .VehicleID}} &middot; <a href="/vehicles/{{.VehicleID}}">{{.Registration}}{{if .Make}} {{.Make}} {{.Model}}{{end}}</a>{{end}}</p>
+
+{{if $.Rental.InTheWay}}
+<div class="error"><p>{{$.T "Rentals are booked on it after that. Move or cancel them first:"}}</p>
+<ul>{{range $.Rental.InTheWay}}<li>{{$.Date ($.Local .From) "Mon 2 Jan 15:04"}}{{if .To}} &ndash; {{$.Date ($.Local .To) "Mon 2 Jan 15:04"}}{{end}}</li>{{end}}</ul></div>
+{{end}}
+
+<h2>{{$.T "In the fleet"}}</h2>
+{{if .Memberships}}
+<ul class="lines">
+  {{range .Memberships}}
+  <li>
+    <div class="row"><span>{{$.Date ($.Local .JoinedAt) "2 Jan 2006 15:04"}} &ndash; {{if .LeftAt}}{{$.Date ($.Local .LeftAt) "2 Jan 2006 15:04"}}{{else}}{{$.T "now"}}{{end}}</span></div>
+    <div class="waiting">{{$.T ($.Rental.FleetLabel .JoinedHow)}}{{with .JoinedBy}} &middot; {{.}}{{end}}{{with .JoinedNote}} &middot; {{.}}{{end}}</div>
+    {{if .LeftAt}}<div class="waiting">{{$.T ($.Rental.FleetLabel .LeftHow)}}{{with .LeftBy}} &middot; {{.}}{{end}}{{with .LeftNote}} &middot; {{.}}{{end}}</div>
+    {{else}}
+    <details><summary>{{$.T "It leaves the fleet"}}</summary>
+    <form method="post" action="/rental/memberships/{{.ID}}/end">
+      <input type="hidden" name="unit" value="{{$.Rental.Unit.ID}}">
+      <div class="pair">
+        <label><span>{{$.T "When"}}</span><input type="datetime-local" name="at" value="{{$.Today}}" required></label>
+        <label><span>{{$.T "How"}}</span><select name="how">{{range $.Rental.LeftHow}}<option value="{{.}}">{{$.T ($.Rental.FleetLabel .)}}</option>{{end}}</select></label>
+      </div>
+      <label><span>{{$.T "Note"}}</span><input name="note" maxlength="300"></label>
+      <button type="submit" class="secondary">{{$.T "Take it out of the fleet"}}</button>
+    </form>
+    </details>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p>{{$.T "Never in the fleet yet."}}</p>
+{{end}}
+{{if not .InFleet}}
+<form method="post" action="/rental/units/{{.ID}}/fleet">
+  <div class="pair">
+    <label><span>{{$.T "From"}}</span><input type="datetime-local" name="at" value="{{$.Today}}" required></label>
+    <label><span>{{$.T "How"}}</span><select name="how">{{range $.Rental.JoinedHow}}<option value="{{.}}">{{$.T ($.Rental.FleetLabel .)}}</option>{{end}}</select></label>
+  </div>
+  <label><span>{{$.T "Note"}}</span><input name="note" maxlength="300"></label>
+  <button type="submit">{{$.T "Put it in the fleet"}}</button>
+</form>
+{{end}}
+{{end}}
+{{end}}
