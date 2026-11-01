@@ -336,6 +336,10 @@ func RecordPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 // refused until they are reversed, and a deposit's receipt only while the
 // deposit still holds it: what was given back or applied did move. The
 // database holds both (0081).
+//
+// A deposit applied to an invoice is two rows and one fact: reversed from
+// either, both are, so the money is neither held and paid at once nor
+// gone (0082).
 func ReversePayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, paymentID, reason string) error {
 	if !scope.Role.SeesCustomerPersonalData() && !scope.Role.SellsVehicles() && !scope.Role.HandsOverRentals() && !scope.Role.SeesPurchasePrice() {
 		return access.ErrForbidden
@@ -348,6 +352,24 @@ func ReversePayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		return err
 	}
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// Which it is decides what is locked, and in which order: an
+		// application is the deposit's and the invoice's, as ApplyDeposit
+		// locks them.
+		var method, depositHalf, invoiceHalf string
+		err := tx.QueryRow(ctx, `
+			SELECT p.method, coalesce(a.deposit_payment_id::text, ''), coalesce(a.invoice_payment_id::text, '')
+			FROM invoice_payments p
+			LEFT JOIN deposit_applications a ON p.id IN (a.deposit_payment_id, a.invoice_payment_id)
+			WHERE p.id = $1`, paymentID).Scan(&method, &depositHalf, &invoiceHalf)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("read payment: %w", err)
+		}
+		if method == "deposit" {
+			return reverseApplicationTx(ctx, tx, scope, depositHalf, invoiceHalf, reason)
+		}
 		orig, err := paymentTargetTx(ctx, tx, scope, paymentID)
 		if err != nil {
 			return err
@@ -377,6 +399,45 @@ func ReversePayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		return fmt.Errorf("%w: that payment has already been reversed", ErrInvalid)
 	}
 	return err
+}
+
+// reverseApplicationTx reverses both rows of a deposit's application to an
+// invoice: the front desk's, who applies one. The deposit is locked first,
+// then the invoice, as ApplyDeposit does.
+func reverseApplicationTx(ctx context.Context, tx pgx.Tx, scope access.Scope, depositHalf, invoiceHalf, reason string) error {
+	if !scope.Role.SeesCustomerPersonalData() {
+		return access.ErrForbidden
+	}
+	if depositHalf == "" {
+		return fmt.Errorf("%w: that is a reversal of a deposit's application, or its other half cannot be found", ErrInvalid)
+	}
+	var halves [2]Payment
+	for i, id := range []string{depositHalf, invoiceHalf} {
+		p := &halves[i]
+		if err := tx.QueryRow(ctx, `
+			SELECT id, coalesce(invoice_id::text, ''), coalesce(deposit_id::text, ''), amount_minor, rounding_minor,
+			       EXISTS (SELECT 1 FROM invoice_payments r WHERE r.reverses_id = p.id)
+			FROM invoice_payments p WHERE id = $1`, id).Scan(&p.ID, &p.InvoiceID, &p.DepositID, &p.AmountMinor, &p.RoundingMinor, &p.Reversed); err != nil {
+			return fmt.Errorf("read the application: %w", err)
+		}
+	}
+	if _, err := depositTx(ctx, tx, halves[0].DepositID, true); err != nil {
+		return err
+	}
+	if _, err := balanceTx(ctx, tx, halves[1].InvoiceID, true); err != nil {
+		return err
+	}
+	if halves[0].Reversed || halves[1].Reversed {
+		return fmt.Errorf("%w: that payment has already been reversed", ErrInvalid)
+	}
+	for _, p := range halves {
+		undo := Payment{InvoiceID: p.InvoiceID, DepositID: p.DepositID, AmountMinor: -p.AmountMinor, RoundingMinor: -p.RoundingMinor,
+			Method: "deposit", PaidOn: time.Now(), Reverses: p.ID, Reason: reason}
+		if err := insertPayment(ctx, tx, scope, &undo); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // insertPaymentOnce is insertPayment for a request that may be repeated:

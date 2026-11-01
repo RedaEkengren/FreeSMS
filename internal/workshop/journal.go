@@ -486,6 +486,12 @@ func ApplyDeposit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d
 		if err := insertPayment(ctx, tx, scope, &in); err != nil {
 			return err
 		}
+		// The two rows are one application: reversed, they go together
+		// (0082).
+		if _, err := tx.Exec(ctx, `INSERT INTO deposit_applications (shop_id, deposit_payment_id, invoice_payment_id) VALUES ($1, $2, $3)`,
+			scope.ShopID, out.ID, in.ID); err != nil {
+			return fmt.Errorf("record the application: %w", err)
+		}
 		return closeIfFinishedTx(ctx, tx, b.WorkOrderID)
 	})
 }

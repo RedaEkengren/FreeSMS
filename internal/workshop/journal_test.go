@@ -282,9 +282,16 @@ func TestTheManualProviderOnlyRecords(t *testing.T) {
 // check in Go: what the database alone lets through.
 func rawPayment(t *testing.T, pool *pgxpool.Pool, cols string, args ...any) error {
 	t.Helper()
+	return rawPaymentBy(t, pool, "bank", cols, args...)
+}
+
+// rawPaymentBy is rawPayment by a way of paying: number first in args,
+// then cols' values.
+func rawPaymentBy(t *testing.T, pool *pgxpool.Pool, method, cols string, args ...any) error {
+	t.Helper()
 	return database.InShop(context.Background(), pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `INSERT INTO invoice_payments (shop_id, series, number, method, paid_on, recorded_by, `+cols+`)
-			VALUES ($1, 'B', $2, 'bank', now(), $3`+placeholders(4, len(args)-1)+`)`, append([]any{shopID, args[0], userID}, args[1:]...)...)
+			VALUES ($1, 'B', $2, $3, now(), $4`+placeholders(5, len(args)-1)+`)`, append([]any{shopID, args[0], method, userID}, args[1:]...)...)
 		return err
 	})
 }
@@ -420,6 +427,80 @@ func TestMoneyHandedBackNeverExceedsWhatCameIn(t *testing.T) {
 		d, _ := workshop.DepositBalanceFor(ctx, pool, desk, dep)
 		if ok != 1 || d.Held() != 0 {
 			t.Errorf("round %d: %d of the two went through and the deposit holds %d; want one, and nothing", round, ok, d.Held())
+		}
+	}
+}
+
+// applicationHalves is the two rows of the one application on a deposit
+// and an invoice: out of the deposit, and into the invoice.
+func applicationHalves(t *testing.T, pool *pgxpool.Pool, dep, inv string) (out, in string) {
+	t.Helper()
+	ctx := context.Background()
+	d, err := workshop.DepositBalanceFor(ctx, pool, everything(advisor()), dep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range d.Payments {
+		if p.Method == "deposit" && p.Reverses == "" {
+			out = p.ID
+		}
+	}
+	b, err := workshop.BalanceFor(ctx, pool, advisor(), inv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range b.Payments {
+		if p.Method == "deposit" && p.Reverses == "" {
+			in = p.ID
+		}
+	}
+	if out == "" || in == "" {
+		t.Fatalf("the application's halves: %q, %q", out, in)
+	}
+	return out, in
+}
+
+// A deposit applied to an invoice is one fact in two rows. Reversed from
+// either half, both go: the deposit holds the money again and the invoice
+// owes it again, so it neither exists twice nor vanishes. The database
+// refuses a reversal of one half alone.
+func TestADepositApplicationIsReversedWhole(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	desk := everything(advisor())
+	for _, side := range []string{"deposit", "invoice"} {
+		dep, _ := depositWith(t, pool, 500000)
+		inv, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := workshop.ApplyDeposit(ctx, pool, desk, dep, inv.ID, 200000, ""); err != nil {
+			t.Fatal(err)
+		}
+		out, in := applicationHalves(t, pool, dep, inv.ID)
+		// One half alone, past Go: refused when the transaction commits.
+		if err := rawPaymentBy(t, pool, "deposit", "deposit_id, amount_minor, reverses_id, reason", 980, dep, 200000, out, "x"); err == nil {
+			t.Errorf("%s side: the database let the deposit's half be reversed alone", side)
+		}
+		if err := rawPaymentBy(t, pool, "deposit", "invoice_id, amount_minor, reverses_id, reason", 981, inv.ID, -200000, in, "x"); err == nil {
+			t.Errorf("%s side: the database let the invoice's half be reversed alone", side)
+		}
+		which := out
+		if side == "invoice" {
+			which = in
+		}
+		if err := workshop.ReversePayment(ctx, pool, desk, which, "Fel deposition"); err != nil {
+			t.Fatalf("%s side: %v", side, err)
+		}
+		d, _ := workshop.DepositBalanceFor(ctx, pool, desk, dep)
+		b, _ := workshop.BalanceFor(ctx, pool, advisor(), inv.ID)
+		if d.Held() != 500000 || b.OutstandingMinor() != inv.GrossMinor {
+			t.Errorf("%s side: the deposit holds %d and the invoice owes %d; want 500000 and %d", side, d.Held(), b.OutstandingMinor(), inv.GrossMinor)
+		}
+		for _, again := range []string{out, in} {
+			if err := workshop.ReversePayment(ctx, pool, desk, again, "Igen"); !errors.Is(err, workshop.ErrInvalid) {
+				t.Errorf("%s side: an application reversed twice: %v", side, err)
+			}
 		}
 	}
 }
