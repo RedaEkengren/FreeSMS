@@ -7032,6 +7032,12 @@
     },
     "those records belong to a part of FreeSMS this shop does not run": {
       "other": "de uppgifterna hör till en del av FreeSMS som verkstaden inte använder"
+    },
+    "say why the photograph is removed; the protocol keeps that it was": {
+      "other": "skriv varför fotot tas bort; protokollet behåller att det fanns"
+    },
+    "the reason is longer than 300 characters": {
+      "other": "anledningen är längre än 300 tecken"
     }
   }
 }
