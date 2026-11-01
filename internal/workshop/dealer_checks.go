@@ -412,19 +412,20 @@ func standingChecksTx(ctx context.Context, tx pgx.Tx, unitID string) ([]StockChe
 
 // checksOutstandingTx is why a unit's checks do not let money leave yet: the kinds
 // the shop requires that stand failed, unknown, too old, or not made at all.
-// Nil when nothing is outstanding.
-func checksOutstandingTx(ctx context.Context, tx pgx.Tx, unitID string) ([]string, error) {
+// Nil when nothing is outstanding. With it, the settings it was read
+// against, so an override is judged by the same ones.
+func checksOutstandingTx(ctx context.Context, tx pgx.Tx, unitID string) ([]string, map[string]StockCheckSetting, error) {
 	settings, err := checkSettingsTx(ctx, tx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var now time.Time
 	if err := tx.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&now); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	standing, err := standingChecksTx(ctx, tx, unitID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	byKind := map[string]StockCheck{}
 	for _, c := range standing {
@@ -441,7 +442,7 @@ func checksOutstandingTx(ctx context.Context, tx pgx.Tx, unitID string) ([]strin
 			out = append(out, k)
 		}
 	}
-	return out, nil
+	return out, settings, nil
 }
 
 // overriddenTx reports whether an owner's override lets the unit's money
@@ -449,21 +450,23 @@ func checksOutstandingTx(ctx context.Context, tx pgx.Tx, unitID string) ([]strin
 // override was made over, no check of it made since, and the override no
 // older than a check of that kind may be.
 func overriddenTx(ctx context.Context, tx pgx.Tx, unitID string, outstanding []string, settings map[string]StockCheckSetting) (bool, error) {
-	for _, k := range outstanding {
-		var ok bool
-		if err := tx.QueryRow(ctx, `
-			SELECT EXISTS (SELECT 1 FROM stock_check_overrides o
-			               WHERE o.stock_unit_id = $1 AND $2 = ANY (o.kinds)
-			                 AND o.upto_seq >= coalesce((SELECT max(seq) FROM stock_checks WHERE stock_unit_id = $1 AND kind = $2), 0)
-			                 AND o.at > clock_timestamp() - make_interval(secs => $3))`,
-			unitID, k, settings[k].MaxAge.Seconds()).Scan(&ok); err != nil {
-			return false, fmt.Errorf("read overrides: %w", err)
-		}
-		if !ok {
-			return false, nil
-		}
+	ages := make([]float64, len(outstanding))
+	for i, k := range outstanding {
+		ages[i] = settings[k].MaxAge.Seconds()
 	}
-	return true, nil
+	// One question for every kind: is there one it is not covered for?
+	var uncovered bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM unnest($2::text[], $3::float8[]) AS k(kind, max_age)
+		               WHERE NOT EXISTS (SELECT 1 FROM stock_check_overrides o
+		                                 WHERE o.stock_unit_id = $1 AND k.kind = ANY (o.kinds)
+		                                   AND o.upto_seq >= coalesce((SELECT max(seq) FROM stock_checks
+		                                                               WHERE stock_unit_id = $1 AND kind = k.kind), 0)
+		                                   AND o.at > clock_timestamp() - make_interval(secs => k.max_age)))`,
+		unitID, outstanding, ages).Scan(&uncovered); err != nil {
+		return false, fmt.Errorf("read overrides: %w", err)
+	}
+	return !uncovered, nil
 }
 
 var (
@@ -523,12 +526,8 @@ func purchaseChecksClearTx(ctx context.Context, tx pgx.Tx, purchaseID string) er
 	if err != nil {
 		return fmt.Errorf("read purchase: %w", err)
 	}
-	outstanding, err := checksOutstandingTx(ctx, tx, unitID)
+	outstanding, settings, err := checksOutstandingTx(ctx, tx, unitID)
 	if err != nil || len(outstanding) == 0 {
-		return err
-	}
-	settings, err := checkSettingsTx(ctx, tx)
-	if err != nil {
 		return err
 	}
 	ok, err := overriddenTx(ctx, tx, unitID, outstanding, settings)
@@ -559,15 +558,12 @@ func ChecksOutstanding(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		if !exists {
 			return ErrNotFound
 		}
-		if kinds, err = checksOutstandingTx(ctx, tx, unitID); err != nil {
+		var settings map[string]StockCheckSetting
+		if kinds, settings, err = checksOutstandingTx(ctx, tx, unitID); err != nil {
 			return err
 		}
 		if len(kinds) == 0 {
 			return nil
-		}
-		settings, err := checkSettingsTx(ctx, tx)
-		if err != nil {
-			return err
 		}
 		overridden, err = overriddenTx(ctx, tx, unitID, kinds, settings)
 		return err
@@ -599,7 +595,7 @@ func OverrideStockChecks(ctx context.Context, pool *pgxpool.Pool, scope access.S
 		if _, err := unitOpenTx(ctx, tx, unitID); err != nil {
 			return err
 		}
-		outstanding, err := checksOutstandingTx(ctx, tx, unitID)
+		outstanding, _, err := checksOutstandingTx(ctx, tx, unitID)
 		if err != nil {
 			return err
 		}
