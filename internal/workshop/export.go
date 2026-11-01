@@ -38,7 +38,7 @@ var ExportTables = []string{
 	"stock_movements", "price_bands", "labour_times", "erasures", "shop_exports",
 	"bookings", "booking_events", "staff_absences", "shop_closures", "rotas", "rota_hours", "shift_changes", "outbound_messages", "message_events",
 	"work_order_state_changes", "quotes", "quote_lines", "quote_decisions", "enquiries", "enquiry_lines", "job_assignments", "job_plans", "work_order_line_revisions", "job_tasks", "job_task_events", "record_changes", "customer_people", "job_notes",
-	"supplier_orders", "supplier_order_lines", "supplier_line_etas", "supplier_receipts", "supplier_returns", "job_recommendations", "delivery_summaries", "invoice_deliveries", "invoice_corrections", "receivable_cases", "receivable_events", "day_settlements", "day_reviews", "comebacks", "comeback_claims", "comeback_events", "outsourced_work", "outsourced_events", "import_batches", "import_refs", "setup_steps", "shop_module_changes", "user_roles", "protocol_photo_removals", "parties", "party_roles", "resources",
+	"supplier_orders", "supplier_order_lines", "supplier_line_etas", "supplier_receipts", "supplier_returns", "job_recommendations", "delivery_summaries", "invoice_deliveries", "invoice_corrections", "receivable_cases", "receivable_events", "day_settlements", "day_reviews", "comebacks", "comeback_claims", "comeback_events", "outsourced_work", "outsourced_events", "import_batches", "import_refs", "setup_steps", "shop_module_changes", "user_roles", "protocol_photo_removals", "parties", "party_roles", "resources", "document_templates", "document_template_versions", "document_record_parties", "document_retention_settings",
 }
 
 // exportQueries are tables exported with chosen columns, because one of
@@ -53,6 +53,14 @@ var exportQueries = map[string]string{
 	"resource_blocks": `SELECT id, shop_id, resource_id, kind, status, lower(period) AS starts_at, upper(period) AS ends_at,
 		extract(epoch FROM buffer_before)::bigint AS buffer_before_seconds, extract(epoch FROM buffer_after)::bigint AS buffer_after_seconds,
 		expires_at, source_kind, source_id, request_key, reason, created_at, created_by, ended_at, ended_by FROM resource_blocks`,
+	// Hashes as hex, which a reader can compare with the one printed on a
+	// paper copy; a link's token never leaves, as an invoice link's (#150).
+	"document_records": `SELECT id, shop_id, kind, subject_kind, subject_id, template_version_id, title, body, data,
+		encode(content_sha256, 'hex') AS content_sha256, supersedes_id, created_at, created_by, erased_at FROM document_records`,
+	"document_signatures": `SELECT id, shop_id, document_id, document_party_id, method, signed_at, recorded_by, provider_ref,
+		evidence_key, witnessed_by, encode(document_sha256, 'hex') AS document_sha256 FROM document_signatures`,
+	"document_record_links": `SELECT id, shop_id, document_id, created_by, created_at, expires_at, revoked_at, revoked_by,
+		first_opened_at, last_opened_at, opens FROM document_record_links`,
 	"resource_block_changes": `SELECT id, shop_id, block_id, change, lower(old_period) AS old_starts_at, upper(old_period) AS old_ends_at,
 		lower(new_period) AS new_starts_at, upper(new_period) AS new_ends_at, by_user, at, reason FROM resource_block_changes`,
 }

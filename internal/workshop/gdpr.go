@@ -53,9 +53,21 @@ type PersonExport struct {
 	// What they have been to the business -- customer, seller, buyer,
 	// renter -- and for how long (#148).
 	Roles []ExportedPartyRole `json:"roles,omitempty"`
+	// Contracts naming them (#150), as they were produced.
+	Contracts []ExportedContract `json:"contracts,omitempty"`
 
 	// Written out rather than left for somebody to infer.
 	Notes []string `json:"notes"`
+}
+
+type ExportedContract struct {
+	Kind      string     `json:"kind"`
+	Title     string     `json:"title"`
+	Text      string     `json:"text,omitempty"`
+	Made      time.Time  `json:"made"`
+	ErasedAt  *time.Time `json:"erased_at,omitempty"`
+	Signed    bool       `json:"signed_by_you"`
+	KeptUntil time.Time  `json:"kept_until"`
 }
 
 type ExportedPartyRole struct {
@@ -273,6 +285,31 @@ func ExportPerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 		}
 		roles.Close()
 
+		years, err := retentionTx(ctx, tx)
+		if err != nil {
+			return err
+		}
+		docs, err := tx.Query(ctx, `
+			SELECT r.kind, r.title, coalesce(r.body, ''), r.created_at, r.erased_at,
+			       bool_or(EXISTS (SELECT 1 FROM document_signatures s WHERE s.document_party_id = dp.id))
+			FROM document_records r JOIN document_record_parties dp ON dp.document_id = r.id
+			JOIN parties pa ON pa.id = dp.party_id LEFT JOIN customers c ON c.id = pa.customer_id
+			WHERE pa.person_id = $1 OR c.person_id = $1
+			GROUP BY r.id ORDER BY r.created_at, r.id`, personID)
+		if err != nil {
+			return fmt.Errorf("read contracts: %w", err)
+		}
+		for docs.Next() {
+			var c ExportedContract
+			if err := docs.Scan(&c.Kind, &c.Title, &c.Text, &c.Made, &c.ErasedAt, &c.Signed); err != nil {
+				docs.Close()
+				return err
+			}
+			c.KeptUntil = c.Made.AddDate(years[c.Kind], 0, 0)
+			e.Contracts = append(e.Contracts, c)
+		}
+		docs.Close()
+
 		fixes, err := tx.Query(ctx, `
 			SELECT field, coalesce(old_value, ''), coalesce(new_value, ''), at
 			FROM record_changes WHERE person_id = $1 ORDER BY at`, personID)
@@ -432,10 +469,24 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 			"The technical history of vehicles, which belongs to the vehicle rather than to a person. " +
 			"Clocked hours, where the person was an employee, because they support payroll records."
 
+		// Contracts naming them (#150): blanked past their kind's retention,
+		// kept within it, and the record says which.
+		blanked, keptDocs, err := eraseDocumentsTx(ctx, tx, personID)
+		if err != nil {
+			return err
+		}
+		clearedNow, keptNow := cleared, kept
+		if blanked > 0 {
+			clearedNow += fmt.Sprintf(" What %d contracts past their retention said; that they existed, their hash and their signatures stay.", blanked)
+		}
+		if keptDocs > 0 {
+			keptNow += fmt.Sprintf(" %d contracts still within the retention set for their kind, which they support.", keptDocs)
+		}
+
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO erasures (shop_id, person_id, erased_by, cleared, kept, reason)
 			VALUES ($1, $2, $3, $4, $5, nullif($6, ''))`,
-			scope.ShopID, personID, scope.UserID, cleared, kept, strings.TrimSpace(reason)); err != nil {
+			scope.ShopID, personID, scope.UserID, clearedNow, keptNow, strings.TrimSpace(reason)); err != nil {
 			return fmt.Errorf("record the erasure: %w", err)
 		}
 		return nil

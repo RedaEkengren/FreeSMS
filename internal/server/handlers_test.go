@@ -50,6 +50,7 @@ const (
 	receiptB    = "bbbbbbbb-0000-0000-0000-000000000012"
 	returnB     = "bbbbbbbb-0000-0000-0000-000000000013"
 	batchB      = "bbbbbbbb-0000-0000-0000-000000000015"
+	contractB   = "bbbbbbbb-0000-0000-0000-000000000016"
 
 	// A string that appears nowhere in shop A. If it reaches a response body,
 	// something leaked, whatever the status code said.
@@ -207,6 +208,20 @@ func testServerOn(t *testing.T, pool *pgxpool.Pool) (*httptest.Server, *pgxpool.
 		 ('` + batchB + `','` + shopB + `','customers','` + secretB + `.csv','\x00','UTF-8',1,'bbbbbbbb-0000-0000-0000-0000000000bb')`,
 		`INSERT INTO job_notes (id, shop_id, work_order_id, kind, body, occurred_at, author) VALUES
 		 ('` + noteB + `','` + shopB + `','` + jobB + `','note','` + secretB + `', now(), 'bbbbbbbb-0000-0000-0000-0000000000bb')`,
+	})
+	// A contract of shop B's (#150): a template, its version, and the
+	// document naming shop B's customer's party.
+	seedShop(t, pool, shopB, []string{
+		`INSERT INTO document_templates (id, shop_id, kind, name) VALUES
+		 ('bbbbbbbb-0000-0000-0000-000000000017','` + shopB + `','sales_contract','` + secretB + `')`,
+		`INSERT INTO document_template_versions (id, shop_id, template_id, version, body) VALUES
+		 ('bbbbbbbb-0000-0000-0000-000000000018','` + shopB + `','bbbbbbbb-0000-0000-0000-000000000017',1,'` + secretB + `')`,
+		`INSERT INTO document_records (id, shop_id, kind, subject_kind, subject_id, template_version_id, title, body, data, content_sha256, created_by) VALUES
+		 ('` + contractB + `','` + shopB + `','sales_contract','sale','bbbbbbbb-0000-0000-0000-000000000019',
+		  'bbbbbbbb-0000-0000-0000-000000000018','` + secretB + `','` + secretB + `','{}',decode(repeat('00', 32), 'hex'),
+		  'bbbbbbbb-0000-0000-0000-0000000000bb')`,
+		`INSERT INTO document_record_parties (shop_id, document_id, party_id, position, role, name) VALUES
+		 ('` + shopB + `','` + contractB + `',(SELECT id FROM parties WHERE customer_id = '` + customerB + `'),1,'buyer','` + secretB + `')`,
 	})
 
 	cfg := &config.Config{

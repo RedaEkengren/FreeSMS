@@ -504,6 +504,11 @@ func (s *Server) routes() (http.Handler, error) {
 	workshopMux.HandleFunc("POST /jobs/{id}/recommendations/{rec}/enquiry", s.requireSession(s.handleRecommendationEnquiry))
 	links.HandleFunc("GET /k/{token}/summary", s.handleCustomerSummary)
 	mux.HandleFunc("GET /d/{token}", s.handleCustomerDocument)
+	// Contracts (#150): Core's, whichever module made them, so a module
+	// switched off keeps them readable; who may read which is the kind's.
+	mux.HandleFunc("GET /contracts/{id}", s.requireSession(s.handleContract))
+	mux.HandleFunc("POST /contracts/{id}/link", s.requireSession(s.handleContractLink))
+	mux.HandleFunc("GET /c/{token}", s.handleCustomerContract)
 	mux.HandleFunc("GET /day", s.requireSession(s.handleDay))
 	mux.HandleFunc("POST /day/settlement", s.requireSession(s.handleDaySettlement))
 	mux.HandleFunc("POST /day/review", s.requireSession(s.handleDayReview))

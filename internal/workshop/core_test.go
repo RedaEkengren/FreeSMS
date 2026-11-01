@@ -25,7 +25,11 @@ var core = map[string]string{
 	// module books it. Booking checks the module of the use.
 	"CreateResource": "resources, the business's own things", "RetireResource": "resources",
 	"ResourceBlocks": "when a resource is taken, by any module", "OverrideBlock": "replanning across modules",
-	"ChecklistTemplates": "checklists, for every module's inspections (#147)", "ChecklistTemplateByID": "checklists",
+	// Contracts (#150): the shop's own wording and how long it keeps them.
+	// Producing, reading and signing check the module of the kind.
+	"SaveDocumentTemplate": "the shop's contract templates, for every module", "DocumentRetention": "how long contracts are kept",
+	"SetDocumentRetention": "how long contracts are kept",
+	"ChecklistTemplates":   "checklists, for every module's inspections (#147)", "ChecklistTemplateByID": "checklists",
 	"SaveChecklistTemplate": "checklists", "SetChecklistActive": "checklists", "SubjectsOffered": "what a checklist may be made for",
 	"ImportKindsFor":      "bringing records in: which kinds, by the modules",
 	"SetTemplateSubjects": "what a checklist is for, across modules; each subject named needs its module, checked per subject (#147)",

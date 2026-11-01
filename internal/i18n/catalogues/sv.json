@@ -7137,6 +7137,150 @@
     },
     "what it is for needs both its kind and which one": {
       "other": "vad det gäller behöver både sitt slag och vilket"
+    },
+    "a correction supersedes a document of the same kind about the same thing": {
+      "other": "en rättelse ersätter ett dokument av samma slag om samma sak"
+    },
+    "a document is between parties; name at least one": {
+      "other": "ett dokument är mellan parter; ange minst en"
+    },
+    "a document is frozen once produced; a correction is a new one that supersedes it": {
+      "other": "ett dokument är låst när det har skapats; en rättelse är ett nytt som ersätter det"
+    },
+    "a document needs a title, in 200 characters or fewer": {
+      "other": "ett dokument behöver en rubrik, högst 200 tecken"
+    },
+    "a paper signature needs the scan or who saw it signed": {
+      "other": "en underskrift på papper behöver den inskannade kopian eller vem som såg den skrivas"
+    },
+    "a party is named once in each part": {
+      "other": "en part anges en gång i varje roll"
+    },
+    "a provider's signature needs its reference": {
+      "other": "en underskrift via en tjänst behöver tjänstens referens"
+    },
+    "a template needs a name, in 120 characters or fewer": {
+      "other": "en mall behöver ett namn, högst 120 tecken"
+    },
+    "a template needs its text, in 20 000 characters or fewer": {
+      "other": "en mall behöver sin text, högst 20 000 tecken"
+    },
+    "a template stays the kind it was made for": {
+      "other": "en mall förblir det slag den gjordes för"
+    },
+    "between 1 and 30 years": {
+      "other": "mellan 1 och 30 år"
+    },
+    "signed on paper, in person or through a provider": {
+      "other": "undertecknad på papper, på plats eller via en tjänst"
+    },
+    "that document has already been superseded": {
+      "other": "det dokumentet har redan ersatts"
+    },
+    "that document has been superseded; sign the one that replaced it": {
+      "other": "det dokumentet har ersatts; skriv under det som ersatte det"
+    },
+    "that is not a kind of document": {
+      "other": "det är inte ett slags dokument"
+    },
+    "that is not a part a party can have in a document": {
+      "other": "det är inte en roll en part kan ha i ett dokument"
+    },
+    "that is not something a document can be about": {
+      "other": "det är inte något ett dokument kan gälla"
+    },
+    "that party has already signed": {
+      "other": "den parten har redan skrivit under"
+    },
+    "that template is not one for this kind of document": {
+      "other": "den mallen är inte en för det här slaget av dokument"
+    },
+    "the evidence is longer than it can be": {
+      "other": "underlaget är längre än det får vara"
+    },
+    "what was signed is not this document as it is; show it again and sign that": {
+      "other": "det som skrevs under är inte det här dokumentet som det ser ut nu; visa det igen och skriv under det"
+    },
+    "A contract is for those who made it with the customer.": {
+      "other": "Ett avtal är för dem som gjorde det med kunden."
+    },
+    "No such document.": {
+      "other": "Det finns inget sådant dokument."
+    },
+    "Document": {
+      "other": "Dokument"
+    },
+    "Not signed": {
+      "other": "Inte underskriven"
+    },
+    "Parties": {
+      "other": "Parter"
+    },
+    "Signed": {
+      "other": "Underskriven"
+    },
+    "The customer's link, shown this once:": {
+      "other": "Kundens länk, som visas bara den här gången:"
+    },
+    "This document has been replaced by a correction, and is not signed any more.": {
+      "other": "Det här dokumentet har ersatts av en rättelse och skrivs inte längre under."
+    },
+    "What this document said has been erased at a person's request. That it existed, and who signed it, is kept.": {
+      "other": "Det som stod i dokumentet har raderats på en persons begäran. Att det fanns, och vem som skrev under, finns kvar."
+    },
+    "witnessed by": {
+      "other": "bevittnad av"
+    },
+    "Not signed by anybody yet": {
+      "other": "Inte underskriven av någon ännu"
+    },
+    "Signed by some of the parties": {
+      "other": "Underskriven av några av parterna"
+    },
+    "Signed by every party": {
+      "other": "Underskriven av alla parter"
+    },
+    "Purchase agreement": {
+      "other": "Inköpsavtal"
+    },
+    "Sales contract": {
+      "other": "Köpeavtal"
+    },
+    "Test-drive agreement": {
+      "other": "Provkörningsavtal"
+    },
+    "Consignment agreement": {
+      "other": "Förmedlingsavtal"
+    },
+    "Rental agreement": {
+      "other": "Hyresavtal"
+    },
+    "The seller": {
+      "other": "Säljaren"
+    },
+    "The renter": {
+      "other": "Hyrestagaren"
+    },
+    "The consignor": {
+      "other": "Uppdragsgivaren"
+    },
+    "The driver": {
+      "other": "Föraren"
+    },
+    "The guarantor": {
+      "other": "Borgensmannen"
+    },
+    "on paper": {
+      "other": "på papper"
+    },
+    "in person, on the screen": {
+      "other": "på plats, på skärmen"
+    },
+    "through a signing service": {
+      "other": "via en signeringstjänst"
+    },
+    "The buyer": {
+      "other": "Köparen"
     }
   }
 }
