@@ -459,7 +459,7 @@ func setStateTx(ctx context.Context, tx pgx.Tx, jobID string, to State) error {
 		`UPDATE work_orders SET state = $1, updated_at = now(),
 		        closed_at = CASE WHEN $1 IN ('closed', 'cancelled') THEN now() ELSE NULL END
 		 WHERE id = $2`, to, jobID); err != nil {
-		return fmt.Errorf("set state: %w", err)
+		return jobBlockError(err, "set state")
 	}
 
 	switch to {

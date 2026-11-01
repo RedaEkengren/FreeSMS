@@ -21,6 +21,10 @@ var core = map[string]string{
 	// Parties (#148): one record of each person or company across modules.
 	"PartyByID": "parties, which every module deals with", "PartyOfCustomer": "parties: a customer's own",
 	"EditParty": "parties", "MergeParties": "parties, the same one entered twice",
+	// The availability ledger (#149): what the business owns, whichever
+	// module books it. Booking checks the module of the use.
+	"CreateResource": "resources, the business's own things", "RetireResource": "resources",
+	"ResourceBlocks": "when a resource is taken, by any module", "OverrideBlock": "replanning across modules",
 	"ChecklistTemplates": "checklists, for every module's inspections (#147)", "ChecklistTemplateByID": "checklists",
 	"SaveChecklistTemplate": "checklists", "SetChecklistActive": "checklists", "SubjectsOffered": "what a checklist may be made for",
 	"ImportKindsFor":      "bringing records in: which kinds, by the modules",

@@ -427,7 +427,7 @@ func takeInTx(ctx context.Context, tx pgx.Tx, scope access.Scope, registration, 
 		RETURNING id`,
 		scope.ShopID, number, vehicleID, customerID, strings.TrimSpace(complaint), scope.UserID,
 	).Scan(&jobID); err != nil {
-		return "", fmt.Errorf("open job: %w", err)
+		return "", jobBlockError(err, "open job")
 	}
 
 	// Taking a car in is the car being left with us: the first row of

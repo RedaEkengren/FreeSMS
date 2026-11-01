@@ -20,18 +20,19 @@ func TestEachRoleHasTheCapabilitiesItsWorkNeedsAndNoMore(t *testing.T) {
 		"SeesMargin":               Role.SeesMargin,
 		"HandsOverRentals":         Role.HandsOverRentals,
 		"SeesIdentityRecords":      Role.SeesIdentityRecords,
+		"KeepsResources":           Role.KeepsResources,
 	}
 	has := map[Role][]string{
 		RoleOwner: {"SeesCustomerPersonalData", "RunsTheShop", "SeesParts", "HandlesParts", "FollowsJobs", "WorksInTheWorkshop",
-			"SellsVehicles", "BuysVehicles", "SeesPurchasePrice", "SeesMargin", "HandsOverRentals", "SeesIdentityRecords"},
+			"SellsVehicles", "BuysVehicles", "SeesPurchasePrice", "SeesMargin", "HandsOverRentals", "SeesIdentityRecords", "KeepsResources"},
 		RoleAdmin: {"SeesCustomerPersonalData", "RunsTheShop", "SeesParts", "HandlesParts", "FollowsJobs", "WorksInTheWorkshop",
-			"SellsVehicles", "BuysVehicles", "SeesPurchasePrice", "SeesMargin", "HandsOverRentals", "SeesIdentityRecords"},
+			"SellsVehicles", "BuysVehicles", "SeesPurchasePrice", "SeesMargin", "HandsOverRentals", "SeesIdentityRecords", "KeepsResources"},
 		RoleServiceAdvisor: {"SeesCustomerPersonalData", "SeesParts", "HandlesParts", "FollowsJobs", "WorksInTheWorkshop"},
 		RoleTechnician:     {"HandlesParts", "FollowsJobs", "WorksInTheWorkshop"},
 		RoleParts:          {"SeesParts", "HandlesParts", "WorksInTheWorkshop"},
 		RoleSales:          {"SellsVehicles", "SeesIdentityRecords"},
-		RoleBuyer:          {"BuysVehicles", "SeesPurchasePrice", "SeesMargin", "SeesIdentityRecords"},
-		RoleRentalAgent:    {"HandsOverRentals", "SeesIdentityRecords"},
+		RoleBuyer:          {"BuysVehicles", "SeesPurchasePrice", "SeesMargin", "SeesIdentityRecords", "KeepsResources"},
+		RoleRentalAgent:    {"HandsOverRentals", "SeesIdentityRecords", "KeepsResources"},
 	}
 	if len(has) != len(AllRoles) {
 		t.Fatalf("the table covers %d roles of %d", len(has), len(AllRoles))

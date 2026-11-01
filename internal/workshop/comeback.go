@@ -211,7 +211,7 @@ func OpenComeback(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 			INSERT INTO work_orders (shop_id, number, vehicle_id, customer_id, complaint, state, created_by)
 			VALUES ($1, $2, $3, $4, $5, 'draft', $6) RETURNING id`,
 			scope.ShopID, next, vehicleID, customer, complaint, scope.UserID).Scan(&jobID); err != nil {
-			return fmt.Errorf("open the follow-up: %w", err)
+			return jobBlockError(err, "open the follow-up")
 		}
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO vehicle_presence (shop_id, work_order_id, event, recorded_by) VALUES ($1, $2, 'left', $3)`,

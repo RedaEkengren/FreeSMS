@@ -168,6 +168,12 @@ func (r Role) SeesMargin() bool { return r.SeesPurchasePrice() }
 // vehicle or the equipment over and takes it back.
 func (r Role) HandsOverRentals() bool { return r.runsIt() || r == RoleRentalAgent }
 
+// KeepsResources reports whether this role looks after what the business
+// itself owns and books (#149): the stock the buyer brings in, the rental
+// desk's fleet, and whoever runs the business. It makes something bookable,
+// takes it out of use, and reads when it is taken.
+func (r Role) KeepsResources() bool { return r.runsIt() || r == RoleBuyer || r == RoleRentalAgent }
+
 // SeesIdentityRecords reports whether this role may read a person's identity
 // number or driving licence, held apart from the party with a purpose and an
 // expiry (#153). Whoever signs a person up to a contract checks who they are:
@@ -244,6 +250,7 @@ func (rs Roles) SeesPurchasePrice() bool        { return rs.any(Role.SeesPurchas
 func (rs Roles) SeesMargin() bool               { return rs.any(Role.SeesMargin) }
 func (rs Roles) HandsOverRentals() bool         { return rs.any(Role.HandsOverRentals) }
 func (rs Roles) SeesIdentityRecords() bool      { return rs.any(Role.SeesIdentityRecords) }
+func (rs Roles) KeepsResources() bool           { return rs.any(Role.KeepsResources) }
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 

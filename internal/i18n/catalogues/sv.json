@@ -7083,6 +7083,60 @@
     },
     "this party is a customer; change the details on the customer": {
       "other": "den här parten är en kund; ändra uppgifterna på kunden"
+    },
+    "a buffer is time added, not taken away": {
+      "other": "en buffert är tid som läggs till, inte dras ifrån"
+    },
+    "a hold has to run out later than now": {
+      "other": "en preliminär bokning måste löpa ut senare än nu"
+    },
+    "a job in the workshop blocks its car through the job": {
+      "other": "ett jobb i verkstaden blockerar sin bil genom jobbet"
+    },
+    "a resource that is not a vehicle needs a name, in 120 characters or fewer": {
+      "other": "en resurs som inte är ett fordon behöver ett namn, högst 120 tecken"
+    },
+    "it is taken then": {
+      "other": "den är upptagen då"
+    },
+    "it is taken then by a delivery": {
+      "other": "den är upptagen då av en leverans"
+    },
+    "it is taken then by a job in the workshop": {
+      "other": "den är upptagen då av ett jobb i verkstaden"
+    },
+    "it is taken then by a rental": {
+      "other": "den är upptagen då av en uthyrning"
+    },
+    "it is taken then by a service block": {
+      "other": "den är upptagen då av en service"
+    },
+    "it is taken then by a test drive": {
+      "other": "den är upptagen då av en provkörning"
+    },
+    "say when it starts": {
+      "other": "ange när det börjar"
+    },
+    "say why it is replanned, in 300 characters or fewer": {
+      "other": "ange varför det planeras om, högst 300 tecken"
+    },
+    "something is still booked on it; release or replan that first": {
+      "other": "något är fortfarande bokat på den; släpp eller planera om det först"
+    },
+    "that has been taken out of use": {
+      "other": "den har tagits ur bruk"
+    },
+    "that is no longer booked": {
+      "other": "det är inte längre bokat"
+    },
+    "that is not a use a resource can be booked for": {
+      "other": "det är inte något en resurs kan bokas för"
+    },
+    "the hold has run out or been let go; book it again": {
+      "other": "den preliminära bokningen har löpt ut eller släppts; boka igen"
+    },
+    "what it is for needs both its kind and which one": {
+      "other": "vad det gäller behöver både sitt slag och vilket"
     }
   }
 }
