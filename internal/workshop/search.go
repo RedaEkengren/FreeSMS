@@ -37,6 +37,9 @@ type Found struct {
 	// The modules a vehicle is active in, of those the caller may see.
 	ActiveIn []access.Module
 	rank     int
+	// The whole of what was typed is this record's plate, chassis number
+	// or job number, not a part of it.
+	exact bool
 }
 
 // Link is the result's page.
@@ -51,7 +54,8 @@ func (f Found) Link() string {
 }
 
 // The ranks, best first: an exact registration or chassis number, then a
-// reference -- a job's number -- then a name or a description.
+// reference -- a job's number, a part of a chassis number -- then a name
+// or a description.
 const (
 	rankExact = iota
 	rankReference
@@ -113,6 +117,26 @@ func SearchAll(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, quer
 	return out, nil
 }
 
+// Straight is the one result a search goes to without a list: the only
+// result, or the only one that is exactly what was typed -- a plate, a
+// chassis number, a job's number -- among weaker matches. The digits of a
+// plate turn up in somebody's telephone number, and the front desk that
+// typed the plate wants the car, not a choice. Two exact matches are a
+// choice.
+func Straight(results []Found) (Found, bool) {
+	if len(results) == 1 {
+		return results[0], true
+	}
+	var only Found
+	n := 0
+	for _, f := range results {
+		if f.exact {
+			only, n = f, n+1
+		}
+	}
+	return only, n == 1
+}
+
 // findVehicles is Search's: every plate a vehicle has carried, its chassis
 // number, and its owner's name for a role that may see names.
 func findVehicles(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query string) ([]Found, error) {
@@ -143,6 +167,7 @@ func findVehicles(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, q
 			return nil, fmt.Errorf("read where the vehicles are active: %w", err)
 		}
 	}
+	vin := vinLike(NormaliseRegistration(query))
 	out := make([]Found, 0, len(results))
 	for _, r := range results {
 		f := Found{Kind: "vehicle", ID: r.VehicleID, Heading: r.Describe(), MatchedOn: r.MatchedOn, rank: rankName,
@@ -154,8 +179,13 @@ func findVehicles(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, q
 			f.Detail += " · " + r.OwnerName
 		}
 		switch r.MatchedOn {
-		case "registration", "a plate it used to carry", "chassis number":
-			f.rank = rankExact
+		case "registration", "a plate it used to carry":
+			f.rank, f.exact = rankExact, true
+		case "chassis number":
+			f.rank = rankReference
+			if vinLike(NormaliseRegistration(r.VIN)) == vin {
+				f.rank, f.exact = rankExact, true
+			}
 		}
 		if active[r.VehicleID] {
 			f.ActiveIn = []access.Module{access.Workshop}
@@ -197,7 +227,7 @@ func findJobs(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query
 	}
 	var out []Found
 	err = inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		f := Found{Kind: "job", Module: access.Workshop, MatchedOn: "job number", rank: rankReference}
+		f := Found{Kind: "job", Module: access.Workshop, MatchedOn: "job number", rank: rankReference, exact: true}
 		var plate, make_, model string
 		err := tx.QueryRow(ctx, `
 			SELECT w.id::text, w.number, coalesce(r.registration, ''), coalesce(v.make, ''), coalesce(v.model, '')

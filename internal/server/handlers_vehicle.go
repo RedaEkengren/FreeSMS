@@ -27,11 +27,12 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// One hit goes straight there. Making somebody choose from a list of one
-	// is a tap for nothing, and at a counter with a telephone in the other
-	// hand that tap is the difference.
-	if len(results) == 1 {
-		http.Redirect(w, r, results[0].Link(), http.StatusSeeOther)
+	// One hit goes straight there, and so does the one exact plate, chassis
+	// number or job number among weaker hits. Making somebody choose from a
+	// list is a tap for nothing, and at a counter with a telephone in the
+	// other hand that tap is the difference.
+	if only, ok := workshop.Straight(results); ok {
+		http.Redirect(w, r, only.Link(), http.StatusSeeOther)
 		return
 	}
 

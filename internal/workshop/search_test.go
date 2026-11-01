@@ -83,3 +83,57 @@ func TestTheOneSearchFindsWhatTheRoleMaySee(t *testing.T) {
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+// An exact plate, chassis number or job number goes straight to its record
+// even when weaker matches come with it -- the digits of a plate in a
+// customer's telephone number, a job's number inside a chassis number --
+// while a part of a chassis number is not exact and leaves the list to
+// choose from.
+func TestAnExactMatchGoesStraightThereAmongWeakerOnes(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	currentPool = pool
+	job := newJob(t, pool)
+	var number int64
+	if err := pool.QueryRow(ctx, `SELECT number FROM work_orders WHERE id = $1`, job).Scan(&number); err != nil {
+		t.Fatal(err)
+	}
+	vin := "YV2SW58D0234567" + itoa(number%10) + itoa(number%10)
+	if _, err := pool.Exec(ctx, `UPDATE vehicles SET vin = $2 WHERE id = $1`, vehicleA, vin); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE people SET phone = $2 WHERE id = $1`, customerPersonID,
+		"070-"+strings.Map(digitsOnly, vin)+"-12"+itoa(number)); err != nil {
+		t.Fatal(err)
+	}
+	straight := func(q string) (workshop.Found, bool, int) {
+		t.Helper()
+		found := must(workshop.SearchAll(ctx, pool, advisor(), q))
+		f, ok := workshop.Straight(found)
+		return f, ok, len(found)
+	}
+	for q, want := range map[string]string{
+		"abc 12d":            "/vehicles/" + vehicleA,
+		vin:                  "/vehicles/" + vehicleA,
+		strings.ToLower(vin): "/vehicles/" + vehicleA,
+		"#" + itoa(number):   "/jobs/" + job,
+	} {
+		f, ok, n := straight(q)
+		if n < 2 {
+			t.Errorf("%q found %d, want the exact match among weaker ones", q, n)
+		}
+		if !ok || f.Link() != want {
+			t.Errorf("%q goes to %q (%v), want %q", q, f.Link(), ok, want)
+		}
+	}
+	if f, ok, n := straight("34567"); ok {
+		t.Errorf("a part of a chassis number goes straight to %q, of %d", f.Link(), n)
+	}
+}
+
+func digitsOnly(r rune) rune {
+	if r >= '0' && r <= '9' {
+		return r
+	}
+	return -1
+}
