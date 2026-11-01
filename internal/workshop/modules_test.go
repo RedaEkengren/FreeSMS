@@ -201,6 +201,42 @@ func TestSwitchingTheWorkshopOffStopsTheRunningClocks(t *testing.T) {
 	}
 }
 
+// A clock can start after the switch's transaction did: the switch waits on
+// the shop's row and on the open-business query, and a technician clocking
+// on meanwhile commits a started_at later than the switch's now(). Stopping
+// it at now() would end it before it began, the CHECK would refuse, and the
+// whole switch-off would fail. A clock stops at the moment the switch
+// reaches it, and never before it started.
+func TestAClockStartedDuringTheSwitchOffStopsAfterItStarted(t *testing.T) {
+	pool := setup(t)
+	addTechnician(t, pool)
+	ctx := context.Background()
+	job := newJob(t, pool)
+	if err := workshop.ClockIn(ctx, pool, technician(), job); err != nil {
+		t.Fatalf("ClockIn: %v", err)
+	}
+	// As it is when the clock-on committed after the switch began: a
+	// started_at later than any now() the switch can have.
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE time_entries SET started_at = now() + interval '2 seconds' WHERE ended_at IS NULL`)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, false, "Closing", true); err != nil {
+		t.Fatalf("switching off with a clock started after the switch began: %v", err)
+	}
+	var running, backwards int
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE ended_at IS NULL), count(*) FILTER (WHERE ended_at <= started_at) FROM time_entries`).Scan(&running, &backwards)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if running != 0 || backwards != 0 {
+		t.Errorf("%d clocks still running, %d ending before they began", running, backwards)
+	}
+}
+
 // Switching a module to what it already is changes nothing, records
 // nothing, and says so, so the caller does not report a switch that did not
 // happen.

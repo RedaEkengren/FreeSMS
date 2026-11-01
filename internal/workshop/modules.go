@@ -247,10 +247,16 @@ func SwitchModule(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, m
 			}
 			// A clock left running would be refused its clock-out with the
 			// workshop off, and close weeks later with the hours in between
-			// counted as work. It stops at the moment the workshop does.
+			// counted as work. It stops at the moment the workshop does --
+			// the moment this statement runs, not now(), which is when the
+			// transaction began. A clock started while the switch waited on
+			// the shop's row began after that, and ending it at now() would
+			// end it before it started, which the CHECK refuses. Never
+			// before it started, either, by however little.
 			if m == access.Workshop {
-				if _, err := tx.Exec(ctx,
-					`UPDATE time_entries SET ended_at = now() WHERE ended_at IS NULL`); err != nil {
+				if _, err := tx.Exec(ctx, `
+					UPDATE time_entries SET ended_at = greatest(clock_timestamp(), started_at + interval '1 millisecond')
+					 WHERE ended_at IS NULL`); err != nil {
 					return fmt.Errorf("stop the running clocks: %w", err)
 				}
 			}
