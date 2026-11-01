@@ -161,3 +161,42 @@ func TestSwitchingAModuleIsTheOwnersAndIsKept(t *testing.T) {
 		t.Errorf("modules = %+v, %v; want the workshop, off", states, err)
 	}
 }
+
+// A clock left running when the workshop is switched off could not be
+// stopped -- clocking out is the workshop's, and refused -- and would close
+// weeks later with every hour in between counted as work. It is listed with
+// what is open, and stops at the moment the workshop does.
+func TestSwitchingTheWorkshopOffStopsTheRunningClocks(t *testing.T) {
+	pool := setup(t)
+	addTechnician(t, pool)
+	ctx := context.Background()
+	job := newJob(t, pool)
+	if err := workshop.ClockIn(ctx, pool, technician(), job); err != nil {
+		t.Fatalf("ClockIn: %v", err)
+	}
+
+	err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, false, "Closing", false)
+	ob, ok := workshop.AsOpenBusiness(err)
+	if !ok {
+		t.Fatalf("switching off with a clock running: %v, want the open business listed", err)
+	}
+	var listed bool
+	for _, it := range ob.Items {
+		listed = listed || (it.Kind == "clock" && it.Link == "/jobs/"+job)
+	}
+	if !listed {
+		t.Errorf("the running clock is not listed: %+v", ob.Items)
+	}
+	if err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, false, "Closing", true); err != nil {
+		t.Fatal(err)
+	}
+	var running int
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT count(*) FROM time_entries WHERE ended_at IS NULL`).Scan(&running)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if running != 0 {
+		t.Errorf("%d clocks still running after the workshop was switched off", running)
+	}
+}

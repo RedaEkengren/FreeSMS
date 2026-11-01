@@ -57,7 +57,8 @@ type OpenBusiness struct {
 
 // OpenItem is one thing still open.
 type OpenItem struct {
-	// "job" or "booking".
+	// "job", "booking" or "clock": somebody clocked on to a job. What is
+	// the person's name for a clock.
 	Kind string
 	// What a person recognises it by: a job number and plate, a booking's
 	// time and what it is for.
@@ -237,6 +238,15 @@ func SwitchModule(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, m
 			if len(open.Items) > 0 && !confirmed {
 				return open
 			}
+			// A clock left running would be refused its clock-out with the
+			// workshop off, and close weeks later with the hours in between
+			// counted as work. It stops at the moment the workshop does.
+			if m == access.Workshop {
+				if _, err := tx.Exec(ctx,
+					`UPDATE time_entries SET ended_at = now() WHERE ended_at IS NULL`); err != nil {
+					return fmt.Errorf("stop the running clocks: %w", err)
+				}
+			}
 		}
 		// A shop that never recorded a choice runs the workshop by the view's
 		// rule, not by a row. Its first change writes that row first, so the
@@ -258,7 +268,8 @@ func SwitchModule(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, m
 
 // openBusinessTx lists what is open in a module. The workshop's: every job
 // not yet invoiced, closed, declined or cancelled, and every booking still to
-// come. Car sales and rental have none until they exist.
+// come, and every clock still running, which switching off stops. Car sales
+// and rental have none until they exist.
 func openBusinessTx(ctx context.Context, tx pgx.Tx, m access.Module) (*OpenBusiness, error) {
 	open := &OpenBusiness{Module: m}
 	if m != access.Workshop {
@@ -273,6 +284,14 @@ func openBusinessTx(ctx context.Context, tx pgx.Tx, m access.Module) (*OpenBusin
 		SELECT 'booking', 0, coalesce(b.registration, ''), b.what, b.starts_at, b.id::text
 		  FROM bookings b
 		 WHERE b.status = 'booked' AND b.ends_at > now()
+		UNION ALL
+		SELECT 'clock', w.number, coalesce(r.registration, ''), p.display_name, t.started_at, w.id::text
+		  FROM time_entries t
+		  JOIN work_orders w ON w.id = t.work_order_id
+		  JOIN users u ON u.id = t.user_id
+		  JOIN people p ON p.id = u.person_id
+		  LEFT JOIN vehicle_registrations r ON r.vehicle_id = w.vehicle_id AND r.valid_to IS NULL
+		 WHERE t.ended_at IS NULL
 		 ORDER BY 1 DESC, 2, 5`)
 	if err != nil {
 		return nil, fmt.Errorf("read open business: %w", err)
@@ -284,7 +303,7 @@ func openBusinessTx(ctx context.Context, tx pgx.Tx, m access.Module) (*OpenBusin
 		if err := rows.Scan(&it.Kind, &it.Number, &it.Registration, &it.What, &it.At, &id); err != nil {
 			return nil, err
 		}
-		if it.Kind == "job" {
+		if it.Kind == "job" || it.Kind == "clock" {
 			it.Link = "/jobs/" + id
 		} else {
 			it.Link = "/bookings/" + id

@@ -104,7 +104,7 @@
 <div class="error" role="alert">
   <p>{{$.T "Still open in %s:" ($.T .Module.Label)}}</p>
   <ul>
-    {{range .Items}}<li><a href="{{.Link}}">{{if eq .Kind "job"}}{{$.T "Job #%d" .Number}}{{else}}{{$.T "Booking %s" ($.Date ($.Local .At) "Mon 2 Jan 15:04")}}{{end}}</a> {{$.Dot .Registration .What}}</li>{{end}}
+    {{range .Items}}<li><a href="{{.Link}}">{{if eq .Kind "job"}}{{$.T "Job #%d" .Number}}{{else if eq .Kind "clock"}}{{$.T "Clocked on to job #%d" .Number}}{{else}}{{$.T "Booking %s" ($.Date ($.Local .At) "Mon 2 Jan 15:04")}}{{end}}</a> {{$.Dot .Registration .What}}</li>{{end}}
   </ul>
   <p>{{$.T "Switched off, these stay as they are, and nobody can carry on with them until it is switched on again."}}</p>
 </div>

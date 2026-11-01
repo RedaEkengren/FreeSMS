@@ -6880,6 +6880,9 @@
     "Job #%d": {
       "other": "Jobb #%d"
     },
+    "Clocked on to job #%d": {
+      "other": "Instämplad på jobb #%d"
+    },
     "Booking %s": {
       "other": "Bokning %s"
     },
