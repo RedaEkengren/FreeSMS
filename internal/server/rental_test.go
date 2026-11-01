@@ -108,3 +108,41 @@ func TestTheRentalDeskAddsAUnitAndPutsItInTheFleet(t *testing.T) {
 		t.Errorf("a technician's rental page: %d", resp.StatusCode)
 	}
 }
+
+// The owner sets a plan's prices including VAT; the rental desk reads them
+// as entered and may not add one.
+func TestTheRentalPricesPage(t *testing.T) {
+	ts, pool := testServer(t)
+	seedRentalDesk(t, func(t *testing.T, stmts []string) { seedShop(t, pool, shopA, stmts) })
+	owner := signIn(t, ts, ownerEmail)
+	desk := signIn(t, ts, rentalEmail)
+	resp := postModuleForm(t, owner, ts.URL, "/rental/plans", url.Values{"name": {"Sommar"}, "category": {"Släpvagn"},
+		"vat_percent": {"25"}, "season_rule": {"split"}})
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("adding a plan: %d %s", resp.StatusCode, readBody(t, resp))
+	}
+	var plan string
+	if err := pool.QueryRow(t.Context(), `SELECT id FROM rate_plans`).Scan(&plan); err != nil {
+		t.Fatal(err)
+	}
+	resp = postModuleForm(t, owner, ts.URL, "/rental/plans/"+plan+"/seasons", url.Values{"vat_bp": {"2500"},
+		"valid_from": {"2026-05-01"}, "day": {"499"}, "grace_minutes": {"30"}})
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("adding prices: %d %s", resp.StatusCode, readBody(t, resp))
+	}
+	var net int64
+	if err := pool.QueryRow(t.Context(), `SELECT day_minor FROM rate_plan_seasons`).Scan(&net); err != nil || net != 39920 {
+		t.Errorf("499 kr including VAT stored as %d net, %v; want 39920", net, err)
+	}
+	resp, _ = desk.Get(ts.URL + "/rental/prices")
+	body := readBody(t, resp)
+	for _, want := range []string{"Sommar", "Släpvagn", "499.00"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the prices page lacks %q", want)
+		}
+	}
+	resp = postModuleForm(t, desk, ts.URL, "/rental/plans", url.Values{"name": {"x"}, "category": {"x"}, "vat_percent": {"25"}, "season_rule": {"split"}})
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("the rental desk adding a plan: %d", resp.StatusCode)
+	}
+}

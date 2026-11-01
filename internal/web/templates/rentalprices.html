@@ -1,0 +1,116 @@
+{{define "content"}}
+<h1>{{.T "Rental prices"}}</h1>
+<p><a href="/rental">{{.T "Rental"}}</a></p>
+{{$runs := .Session.Scope.Role.RunsTheShop}}
+<p class="waiting">{{.T "Prices are shown including VAT. A booking keeps the prices it was confirmed at; a new season or an archived plan changes no booking already made."}}</p>
+
+<h2>{{.T "Plans"}}</h2>
+{{range .Rental.Plans}}
+{{$plan := .}}
+<section class="card">
+  <h3>{{.Name}} <span class="waiting">{{if .Category}}{{.Category}}{{else}}{{$.T "one unit"}}{{end}} &middot; {{$.T "VAT %d%%" ($.Rental.Percent .VATRateBp)}}</span>{{if .Archived}} <span class="tag">{{$.T "archived"}}</span>{{end}}</h3>
+  <p class="waiting">{{$.T ($.Rental.RentalWord .SeasonRule)}}</p>
+  {{if .Seasons}}
+  <ul class="lines">
+    {{range .Seasons}}
+    <li>
+      <div class="row"><span>{{$.T "From %s" ($.Date .ValidFrom "2 Jan 2006")}}{{if .ValidUntil}} &ndash; {{$.Date .ValidUntil "2 Jan 2006"}}{{end}}</span></div>
+      <div class="waiting">
+        {{if .Hour}}{{$.T "hour"}} {{$.Money ($.Rental.Gross .Hour $plan.VATRateBp)}} {{end}}
+        {{if .Day}}&middot; {{$.T "day"}} {{$.Money ($.Rental.Gross .Day $plan.VATRateBp)}} {{end}}
+        {{if .Weekend}}&middot; {{$.T "weekend"}} {{$.Money ($.Rental.Gross .Weekend $plan.VATRateBp)}} {{end}}
+        {{if .Week}}&middot; {{$.T "week"}} {{$.Money ($.Rental.Gross .Week $plan.VATRateBp)}} {{end}}
+        {{if .Month}}&middot; {{$.T "month"}} {{$.Money ($.Rental.Gross .Month $plan.VATRateBp)}} {{end}}
+      </div>
+      <div class="waiting">{{with .IncludedKmPerDay}}{{$.T "%d km a day included" .}}{{end}}{{if .ExtraKmMinor}} &middot; {{$.T "%s per extra km" ($.Money ($.Rental.Gross .ExtraKmMinor $plan.VATRateBp))}}{{end}}{{if .Grace}} &middot; {{$.T "%d minutes' grace" ($.Rental.Minutes .Grace)}}{{end}}{{if .Minimum}} &middot; {{$.T "at least %d minutes" ($.Rental.Minutes .Minimum)}}{{end}}</div>
+    </li>
+    {{end}}
+  </ul>
+  {{else}}<p>{{$.T "No prices yet."}}</p>{{end}}
+  {{if and $runs (not .Archived)}}
+  <details><summary>{{$.T "Prices from a day"}}</summary>
+  <form method="post" action="/rental/plans/{{.ID}}/seasons">
+    <input type="hidden" name="vat_bp" value="{{.VATRateBp}}">
+    <div class="pair">
+      <label><span>{{$.T "From"}}</span><input type="date" name="valid_from" value="{{$.Today}}" required></label>
+      <label><span>{{$.T "Until, if it ends"}}</span><input type="date" name="valid_until"></label>
+    </div>
+    <div class="pair">
+      <label><span>{{$.T "Per hour, kr"}}</span><input name="hour" inputmode="decimal"></label>
+      <label><span>{{$.T "Per day, kr"}}</span><input name="day" inputmode="decimal"></label>
+    </div>
+    <div class="pair">
+      <label><span>{{$.T "Per weekend, kr"}}</span><input name="weekend" inputmode="decimal"></label>
+      <label><span>{{$.T "Per week, kr"}}</span><input name="week" inputmode="decimal"></label>
+    </div>
+    <div class="pair">
+      <label><span>{{$.T "Per month, kr"}}</span><input name="month" inputmode="decimal"></label>
+      <label><span>{{$.T "Km included a day"}}</span><input name="included_km" inputmode="numeric"></label>
+    </div>
+    <div class="pair">
+      <label><span>{{$.T "Per extra km, kr"}}</span><input name="extra_km" inputmode="decimal"></label>
+      <label><span>{{$.T "Grace, minutes"}}</span><input name="grace_minutes" inputmode="numeric"></label>
+    </div>
+    <label><span>{{$.T "Shortest rental, minutes"}}</span><input name="minimum_minutes" inputmode="numeric"></label>
+    <button type="submit" class="secondary">{{$.T "Add the prices"}}</button>
+  </form>
+  </details>
+  <form method="post" action="/rental/plans/{{.ID}}/archive" class="inline"><button type="submit" class="link">{{$.T "Archive the plan"}}</button></form>
+  {{end}}
+</section>
+{{else}}
+<p>{{.T "No plans yet."}}</p>
+{{end}}
+{{if $runs}}
+<details><summary>{{.T "Add a plan"}}</summary>
+<form method="post" action="/rental/plans">
+  <div class="pair">
+    <label><span>{{.T "Name"}}</span><input name="name" maxlength="80" required></label>
+    <label><span>{{.T "VAT, per cent"}}</span><input name="vat_percent" inputmode="numeric" value="25" required></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "For a category"}}</span><input name="category" maxlength="60" placeholder="{{.T "Small van"}}"></label>
+    <label><span>{{.T "Or for one unit"}}</span><select name="unit"><option value="">&ndash;</option>{{range .Rental.Units}}<option value="{{.ID}}">{{.Label}}</option>{{end}}</select></label>
+  </div>
+  <label><span>{{.T "Across two seasons"}}</span><select name="season_rule"><option value="at_start">{{.T "Priced by the season it starts in"}}</option><option value="split">{{.T "Split where the new season starts"}}</option></select></label>
+  <button type="submit">{{.T "Add the plan"}}</button>
+</form>
+</details>
+{{end}}
+
+<h2>{{.T "Extras"}}</h2>
+{{if .Rental.Extras}}
+<ul class="lines">
+  {{range .Rental.Extras}}
+  <li>
+    <div class="row"><span>{{.Name}} &middot; {{$.T ($.Rental.RentalWord .Kind)}}</span>
+      <span>{{$.Money ($.Rental.GrossOf .PriceMinor .VATRateBp)}} / {{$.T ($.Rental.RentalWord .Per)}}</span></div>
+    <div class="waiting">{{if eq .VATCategory "O"}}{{$.T "outside the scope of VAT"}}{{else}}{{$.T "VAT %d%%" ($.Rental.Percent .VATRateBp)}}{{end}}{{if .Unconfirmed}} <span class="tag late">{{$.T "VAT treatment not confirmed"}}</span>{{end}}{{if .Archived}} <span class="tag">{{$.T "archived"}}</span>{{end}}</div>
+    {{if and $runs (not .Archived)}}<form method="post" action="/rental/extras/{{.ID}}/archive" class="inline"><button type="submit" class="link">{{$.T "Stop offering it"}}</button></form>{{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p>{{.T "No extras yet."}}</p>
+{{end}}
+{{if $runs}}
+<details><summary>{{.T "Add an extra"}}</summary>
+<form method="post" action="/rental/extras">
+  <div class="pair">
+    <label><span>{{.T "Name"}}</span><input name="name" maxlength="80" required></label>
+    <label><span>{{.T "Kind"}}</span><select name="kind">{{range .Rental.ExtraKinds}}<option value="{{.}}">{{$.T ($.Rental.RentalWord .)}}</option>{{end}}</select></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "Price including VAT, kr"}}</span><input name="price" inputmode="decimal" required></label>
+    <label><span>{{.T "Charged"}}</span><select name="per"><option value="rental">{{.T "per rental"}}</option><option value="day">{{.T "per day"}}</option></select></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "VAT, per cent"}}</span><input name="vat_percent" inputmode="numeric" value="25"></label>
+    <label class="check"><input type="checkbox" name="outside_vat" value="1"> {{.T "Outside the scope of VAT"}}</label>
+  </div>
+  <p class="waiting">{{.T "An excess reduction may be insurance rather than part of the rental, and what is outside the scope of VAT is your adviser's decision: both are marked as not confirmed."}}</p>
+  <button type="submit">{{.T "Add the extra"}}</button>
+</form>
+</details>
+{{end}}
+{{end}}

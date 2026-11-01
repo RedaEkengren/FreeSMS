@@ -679,13 +679,9 @@ func rentalHandoverGapsTx(ctx context.Context, tx pgx.Tx, profile RentalProfile,
 		if err != nil {
 			return nil, err
 		}
-		var zone string
-		if err := tx.QueryRow(ctx, `SELECT timezone FROM shops`).Scan(&zone); err != nil {
-			return nil, fmt.Errorf("read the shop's zone: %w", err)
-		}
-		loc, err := time.LoadLocation(zone)
+		loc, err := shopLocationTx(ctx, tx)
 		if err != nil {
-			loc = time.UTC
+			return nil, err
 		}
 		last := to
 		if last.IsZero() {

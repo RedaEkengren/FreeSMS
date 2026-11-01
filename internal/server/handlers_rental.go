@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/money"
 	"strconv"
 	"strings"
 	"time"
@@ -16,7 +17,7 @@ import (
 // does not exist; the operations check the role and the module again.
 
 // rentalPages are the templates Rental adds.
-var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit"}
+var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "rentalprices"}
 
 // rentalData is what Rental's pages are given.
 type rentalData struct {
@@ -27,6 +28,37 @@ type rentalData struct {
 	Unit       workshop.RentalUnit
 	// Rentals booked after the end asked for, refused.
 	InTheWay []workshop.Block
+	Plans    []workshop.RatePlan
+	Extras   []workshop.RentalExtra
+}
+
+// ExtraKinds are the kinds of extra, for a form.
+func (rentalData) ExtraKinds() []string { return workshop.RentalExtraKinds }
+
+// RentalWord is a rental key -- a kind of extra, a billed unit, what an
+// extra is charged per -- as a catalogue key.
+func (rentalData) RentalWord(key string) string {
+	return map[string]string{
+		"extra_driver": "Extra driver", "child_seat": "Child seat", "excess_reduction": "Excess reduction",
+		"delivery": "Delivery", "cancellation_fee": "Cancellation fee", "no_show_fee": "No-show fee",
+		"young_driver": "Young driver", "other": "Other",
+		"hour": "hour", "day": "day", "weekend": "weekend", "week": "week", "month": "month", "rental": "rental",
+		"at_start": "Priced by the season it starts in", "split": "Split where the new season starts",
+	}[key]
+}
+
+// GrossOf is a net amount with VAT at rate.
+func (rentalData) GrossOf(net int64, rateBp int) int64 { return net + money.VAT(net, rateBp) }
+
+// Percent is basis points as whole per cent.
+func (rentalData) Percent(bp int) int { return bp / 100 }
+
+// Gross is a net unit price with VAT at rate, as a consumer is shown it.
+func (rentalData) Gross(net *int64, rateBp int) int64 {
+	if net == nil {
+		return 0
+	}
+	return *net + money.VAT(*net, rateBp)
 }
 
 // JoinedHow and LeftHow are the ways a unit joins and leaves the fleet,
@@ -81,6 +113,12 @@ func (rentalData) HasCategory(p workshop.RentalProfile, c string) bool {
 
 func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("GET /rental", s.requireSession(s.handleRentalUnits))
+	m.HandleFunc("GET /rental/prices", s.requireSession(s.handleRentalPrices))
+	m.HandleFunc("POST /rental/plans", s.requireSession(s.handleRatePlanAdd))
+	m.HandleFunc("POST /rental/plans/{id}/seasons", s.requireSession(s.handleRateSeasonAdd))
+	m.HandleFunc("POST /rental/plans/{id}/archive", s.requireSession(s.handleRatePlanArchive))
+	m.HandleFunc("POST /rental/extras", s.requireSession(s.handleRentalExtraAdd))
+	m.HandleFunc("POST /rental/extras/{id}/archive", s.requireSession(s.handleRentalExtraArchive))
 	m.HandleFunc("POST /rental/units", s.requireSession(s.handleRentalUnitAdd))
 	m.HandleFunc("GET /rental/units/{id}", s.requireSession(s.handleRentalUnit))
 	m.HandleFunc("POST /rental/units/{id}/fleet", s.requireSession(s.handleFleetJoin))
@@ -280,4 +318,128 @@ func (s *Server) handleFleetLeave(w http.ResponseWriter, r *http.Request) {
 		unit = ""
 	}
 	http.Redirect(w, r, "/rental/units/"+unit, http.StatusSeeOther)
+}
+
+// handleRentalPrices shows the plans and extras: whoever runs the shop sets
+// them, the rental desk reads them.
+func (s *Server) handleRentalPrices(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	var d rentalData
+	var err error
+	if d.Plans, err = workshop.RatePlans(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
+	}
+	if d.Extras, err = workshop.RentalExtras(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
+	}
+	if d.Units, err = workshop.RentalUnits(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "rentalprices", pageData{Title: "Rental prices", Session: session, Rental: d,
+		Today: time.Now().In(s.shopLocation(r)).Format("2006-01-02")})
+}
+
+func (s *Server) rentalPricesDone(w http.ResponseWriter, r *http.Request, err error) {
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/rental/prices", http.StatusSeeOther)
+}
+
+func (s *Server) handleRatePlanAdd(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	vat, err := strconv.Atoi(strings.TrimSpace(r.FormValue("vat_percent")))
+	if err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "Not accepted", "Write the VAT rate as a whole per cent.")
+		return
+	}
+	_, err = workshop.CreateRatePlan(r.Context(), s.pool, session.Scope, workshop.NewRatePlan{Name: r.FormValue("name"),
+		Category: r.FormValue("category"), UnitID: r.FormValue("unit"), VATRateBp: vat * 100, SeasonRule: r.FormValue("season_rule")})
+	s.rentalPricesDone(w, r, err)
+}
+
+// grossToNet reads a price including VAT at rate as the net it is stored
+// as; blank is no price.
+func grossToNet(v string, rateBp int) (*int64, error) {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return nil, nil
+	}
+	gross, err := parseMinorUnits(v)
+	if err != nil {
+		return nil, err
+	}
+	net := money.Scale(gross, 10000, int64(10000+rateBp))
+	return &net, nil
+}
+
+func (s *Server) handleRateSeasonAdd(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	rate, _ := strconv.Atoi(r.FormValue("vat_bp"))
+	from, ok1 := s.formDate(r, "valid_from")
+	until, ok2 := s.formDate(r, "valid_until")
+	if !ok1 || !ok2 || from == nil {
+		s.renderError(w, r, http.StatusBadRequest, "That date did not parse", "Use the picker.")
+		return
+	}
+	season := workshop.RateSeason{ValidFrom: *from, ValidUntil: until}
+	var bad error
+	for name, into := range map[string]**int64{"hour": &season.Hour, "day": &season.Day, "weekend": &season.Weekend,
+		"week": &season.Week, "month": &season.Month} {
+		if *into, bad = grossToNet(r.FormValue(name), rate); bad != nil {
+			break
+		}
+	}
+	if bad == nil {
+		season.ExtraKmMinor, bad = grossToNet(r.FormValue("extra_km"), rate)
+	}
+	ints := map[string]int{}
+	for _, name := range []string{"included_km", "minimum_minutes", "grace_minutes"} {
+		if v := strings.TrimSpace(r.FormValue(name)); v != "" && bad == nil {
+			ints[name], bad = strconv.Atoi(v)
+		}
+	}
+	if bad != nil {
+		s.renderError(w, r, http.StatusBadRequest, "Not accepted", "Write prices as amounts and kilometres and minutes as whole numbers.")
+		return
+	}
+	if v, ok := ints["included_km"]; ok {
+		season.IncludedKmPerDay = &v
+	}
+	season.Minimum = time.Duration(ints["minimum_minutes"]) * time.Minute
+	season.Grace = time.Duration(ints["grace_minutes"]) * time.Minute
+	_, err := workshop.AddRateSeason(r.Context(), s.pool, session.Scope, r.PathValue("id"), season)
+	s.rentalPricesDone(w, r, err)
+}
+
+func (s *Server) handleRatePlanArchive(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	s.rentalPricesDone(w, r, workshop.ArchiveRatePlan(r.Context(), s.pool, session.Scope, r.PathValue("id")))
+}
+
+func (s *Server) handleRentalExtraAdd(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	vat, err := strconv.Atoi(strings.TrimSpace(r.FormValue("vat_percent")))
+	category := "S"
+	if r.FormValue("outside_vat") != "" {
+		vat, category, err = 0, "O", nil
+	}
+	if err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "Not accepted", "Write the VAT rate as a whole per cent.")
+		return
+	}
+	price, err := grossToNet(r.FormValue("price"), vat*100)
+	if err != nil || price == nil {
+		s.renderError(w, r, http.StatusBadRequest, "Not accepted", "Write prices as amounts and kilometres and minutes as whole numbers.")
+		return
+	}
+	_, err = workshop.AddRentalExtra(r.Context(), s.pool, session.Scope, workshop.NewRentalExtra{Kind: r.FormValue("kind"),
+		Name: r.FormValue("name"), Per: r.FormValue("per"), PriceMinor: *price, VATRateBp: vat * 100, VATCategory: category})
+	s.rentalPricesDone(w, r, err)
+}
+
+func (s *Server) handleRentalExtraArchive(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	s.rentalPricesDone(w, r, workshop.ArchiveRentalExtra(r.Context(), s.pool, session.Scope, r.PathValue("id")))
 }
