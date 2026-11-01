@@ -7463,8 +7463,53 @@
     "that is a reversal of a deposit's application, or its other half cannot be found": {
       "other": "det är en återföring av en avräknad deposition, eller så går dess andra halva inte att hitta"
     },
+    "Nothing is registered under that number. Type what you can.": {
+      "other": "Inget fordon är registrerat på det numret. Skriv in det du kan."
+    },
+    "The lookup service did not answer. Type what you can; this does not stop you.": {
+      "other": "Uppslagstjänsten svarade inte. Skriv in det du kan; det hindrar dig inte."
+    },
+    "Filled in from the registration. Change anything that is wrong.": {
+      "other": "Ifyllt från registreringsnumret. Ändra det som är fel."
+    },
+    "From %s, as it stood at %s. What you typed is kept.": {
+      "other": "Från %s, som det såg ut %s. Det du skrev in behålls."
+    },
+    "Look it up again": {
+      "other": "Slå upp igen"
+    },
+    "Roadworthiness test": {
+      "other": "Kontrollbesiktning"
+    },
+    "Vehicle tax": {
+      "other": "Fordonsskatt"
+    },
+    "Driving ban": {
+      "other": "Körförbud"
+    },
+    "Last recorded odometer": {
+      "other": "Senast registrerade mätarställning"
+    },
+    "not provided by the service": {
+      "other": "lämnas inte av tjänsten"
+    },
+    "none": {
+      "other": "ingen"
+    },
+    "The service gives the chassis number %s, not the one typed. Check it on the car; the one typed is kept.": {
+      "other": "Tjänsten anger chassinumret %s, inte det som skrevs in. Kontrollera det på bilen; det som skrevs in behålls."
+    },
+    "A registration looked up": {
+      "other": "Ett registreringsnummer som slås upp"
+    },
     "that is more than is owed back to the customer; to give back a payment, refund it": {
       "other": "det är mer än det kunden har tillgodo; för att betala tillbaka en betalning, återbetala den"
+    },
+    "a car taken in is looked up at the counter, not in a list": {
+      "other": "en bil som tas in slås upp vid disken, inte i en lista"
+    },
+    "that is not a reason to look a registration up": {
+      "other": "det är inget skäl att slå upp ett registreringsnummer"
     }
   }
 }

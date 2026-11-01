@@ -46,6 +46,7 @@ type Server struct {
 	photos         *storage.Store
 	baseURL        string
 	vehicleLookup  vehicledata.Lookup
+	lookupProvider string
 	// The keys identity values are sealed with; nil or empty, none can be
 	// recorded or read (#153).
 	identityKeys *identity.Keyring
@@ -101,15 +102,18 @@ type Server struct {
 //
 // Nothing is the default and is not a degraded mode: a shop without an
 // arrangement types the make and model, which is what it does today on paper.
+//
+// A provider is asked no faster than the shop's agreement allows, and backs
+// off when it says it is rate limiting (#155).
 func newLookup(cfg *config.Config) vehicledata.Lookup {
 	if cfg.VehicleLookupURL == "" {
 		return vehicledata.None{}
 	}
-	return vehicledata.HTTPLookup{
+	return vehicledata.NewLimited(vehicledata.HTTPLookup{
 		URL:    cfg.VehicleLookupURL,
 		Token:  cfg.VehicleLookupToken,
 		Fields: vehicledata.DefaultFields(),
-	}
+	}, cfg.VehicleLookupPerMinute)
 }
 
 // localeFor resolves the language for a request: the person's, then the
@@ -251,6 +255,7 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 		photos:           photos,
 		exportDir:        cfg.ExportDir,
 		vehicleLookup:    newLookup(cfg),
+		lookupProvider:   cfg.VehicleLookupProvider,
 		identityKeys:     cfg.IdentityKeys,
 		catalogues:       catalogues,
 		baseURL:          strings.TrimRight(cfg.BaseURL, "/"),
@@ -295,6 +300,11 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 			srv.smsSecret = cfg.SMSCallbackSecret
 		}
 		srv.sms = elks
+	}
+	if srv.canLookUp() {
+		srv.outboxAdapters = map[string]workshop.OutboxAdapter{
+			"vehicle_lookup": workshop.VehicleLookupAdapter{Pool: pool, Lookup: srv.vehicleLookup, Provider: srv.lookupProvider},
+		}
 	}
 	return srv, nil
 }

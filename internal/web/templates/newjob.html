@@ -11,7 +11,7 @@
 
   {{if .CanLookUp}}
   <button type="button" class="secondary"
-          hx-get="/jobs/new/lookup" hx-include="[name='registration']"
+          hx-get="/jobs/new/lookup" hx-include="[name='registration'],#lookup input"
           hx-target="#lookup" hx-swap="innerHTML">
     {{.T "Look the registration up"}}
   </button>
@@ -36,7 +36,19 @@
 {{end}}
 
 {{define "lookup"}}
-{{if .LookupNote}}<p class="waiting">{{.LookupNote}}</p>{{end}}
+{{if .LookupNote}}<p class="waiting">{{.T .LookupNote}}</p>{{end}}
+{{with .Looked}}
+<p class="waiting">{{$.T "From %s, as it stood at %s. What you typed is kept." .Provider ($.Date ($.Local .At) "2 Jan 15:04")}}
+  <button type="button" class="link" hx-get="/jobs/new/lookup?refresh=1" hx-include="[name='registration'],#lookup input"
+          hx-target="#lookup" hx-swap="innerHTML">{{$.T "Look it up again"}}</button></p>
+<ul class="plain">
+  <li>{{$.T "Roadworthiness test"}}: {{if .Vehicle.Inspection.Provided}}{{or .Vehicle.Inspection.Value ($.T "none")}}{{else}}{{$.T "not provided by the service"}}{{end}}</li>
+  <li>{{$.T "Vehicle tax"}}: {{if .Vehicle.Tax.Provided}}{{or .Vehicle.Tax.Value ($.T "none")}}{{else}}{{$.T "not provided by the service"}}{{end}}</li>
+  <li>{{$.T "Driving ban"}}: {{if .Vehicle.DrivingBan.Provided}}{{if .Vehicle.DrivingBan.Value}}{{$.T "yes"}}{{else}}{{$.T "no"}}{{end}}{{else}}{{$.T "not provided by the service"}}{{end}}</li>
+  <li>{{$.T "Last recorded odometer"}}: {{if .Vehicle.OdometerKm.Provided}}{{.Vehicle.OdometerKm.Value}} km{{else}}{{$.T "not provided by the service"}}{{end}}</li>
+</ul>
+{{end}}
+{{with .LookupConflict}}<p class="error">{{$.T "The service gives the chassis number %s, not the one typed. Check it on the car; the one typed is kept." .}}</p>{{end}}
 <div class="pair">
   <label><span>{{.T "Make"}}</span><input name="make" value="{{.Lookup.Make}}"></label>
   <label><span>{{.T "Model"}}</span><input name="model" value="{{.Lookup.Model}}"></label>
@@ -46,7 +58,7 @@
          value="{{if .Lookup.ModelYear}}{{.Lookup.ModelYear}}{{end}}"></label>
   <label><span>{{.T "Engine"}}</span><input name="engine" value="{{.Lookup.Engine}}"></label>
 </div>
-<label><span>{{.T "Chassis number"}}</span><input name="vin" value="{{.Lookup.VIN}}"></label>
+<label><span>{{.T "Chassis number"}}</span><input name="vin" value="{{.Lookup.VIN.Value}}"></label>
 {{end}}
 
 {{/* What is known about who pays and who does the work, for the desk to

@@ -21,6 +21,9 @@ var core = map[string]string{
 	// The outbox (#154): the calls of every module, in front of the owner.
 	"OutboxNeedingAttention": "calls to the outside world that need a person", "RetryOutbox": "a call sent again",
 	"FinishOutboxByHand": "a call done by hand", "CancelOutbox": "a call cancelled",
+	// Vehicle lookup (#155): the log of every module's lookups. Looking up
+	// checks the module of its purpose.
+	"VehicleLookupLog": "who looked a registration up, in any module",
 	// Audit events (#151): the trail of every module's transitions.
 	"AuditTrail":   "who did what and why, whichever module it was in",
 	"DocumentByID": "an issued document", "CreditNote": "correcting an issued document",

@@ -222,6 +222,11 @@ type pageData struct {
 	PeriodTo    time.Time
 	Lookup      vehicledata.Vehicle
 	LookupNote  string
+	// The answer a lookup gave, with its source and age, for the intake
+	// form to say; the VIN it gave when it differs from the one typed.
+	Looked             *workshop.VehicleLookup
+	LookupConflict     string
+	LookupRegistration string
 
 	// Whether a vehicle lookup provider is configured at all. Empty is the
 	// default and is not a degraded mode -- a shop without an arrangement

@@ -63,6 +63,7 @@ func (ManualAdapter) Send(context.Context, OutboxItem) error { return ErrManualT
 // outboxKinds are the kinds of call there are.
 var outboxKinds = map[string]bool{
 	"signature_request": true,
+	"vehicle_lookup":    true,
 }
 
 // NewOutboxItem is a call to make. Key is what makes it once: the same
@@ -613,6 +614,8 @@ func (e OutboxEntry) KindLabel() string {
 	switch e.Kind {
 	case "signature_request":
 		return "A signature asked for"
+	case "vehicle_lookup":
+		return "A registration looked up"
 	}
 	return "A call to another service"
 }

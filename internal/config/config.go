@@ -44,6 +44,11 @@ type Config struct {
 	// that is the shop's to hold.
 	VehicleLookupURL   string
 	VehicleLookupToken string
+	// The provider's name, as each lookup records it; the URL's host when
+	// not given. How often it may be asked, per minute, as the shop's
+	// agreement says (#155).
+	VehicleLookupProvider  string
+	VehicleLookupPerMinute int
 
 	// Telling customers from the system. Empty providers are the default:
 	// the front desk sends from its own phone and records that it did.
@@ -83,18 +88,19 @@ func Load() (*Config, error) {
 	var problems []string
 
 	cfg := &Config{
-		DatabaseURL:        os.Getenv("DATABASE_URL"),
-		HTTPAddr:           envOr("HTTP_ADDR", ":8080"),
-		BaseURL:            os.Getenv("BASE_URL"),
-		AttachmentsDir:     envOr("ATTACHMENTS_DIR", "/var/lib/freesms/attachments"),
-		ExportDir:          envOr("EXPORT_DIR", "/var/lib/freesms/exports"),
-		DefaultLocale:      envOr("DEFAULT_LOCALE", "en"),
-		LogLevel:           envOr("LOG_LEVEL", "info"),
-		Release:            envOr("RELEASE", "dev"),
-		OpsToken:           os.Getenv("OPS_TOKEN"),
-		ShopID:             os.Getenv("SHOP_ID"),
-		VehicleLookupURL:   os.Getenv("VEHICLE_LOOKUP_URL"),
-		VehicleLookupToken: os.Getenv("VEHICLE_LOOKUP_TOKEN"),
+		DatabaseURL:           os.Getenv("DATABASE_URL"),
+		HTTPAddr:              envOr("HTTP_ADDR", ":8080"),
+		BaseURL:               os.Getenv("BASE_URL"),
+		AttachmentsDir:        envOr("ATTACHMENTS_DIR", "/var/lib/freesms/attachments"),
+		ExportDir:             envOr("EXPORT_DIR", "/var/lib/freesms/exports"),
+		DefaultLocale:         envOr("DEFAULT_LOCALE", "en"),
+		LogLevel:              envOr("LOG_LEVEL", "info"),
+		Release:               envOr("RELEASE", "dev"),
+		OpsToken:              os.Getenv("OPS_TOKEN"),
+		ShopID:                os.Getenv("SHOP_ID"),
+		VehicleLookupURL:      os.Getenv("VEHICLE_LOOKUP_URL"),
+		VehicleLookupToken:    os.Getenv("VEHICLE_LOOKUP_TOKEN"),
+		VehicleLookupProvider: os.Getenv("VEHICLE_LOOKUP_PROVIDER"),
 
 		EmailProvider:     os.Getenv("EMAIL_PROVIDER"),
 		EmailFrom:         os.Getenv("EMAIL_FROM"),
@@ -183,6 +189,19 @@ func Load() (*Config, error) {
 		}
 	default:
 		problems = append(problems, fmt.Sprintf("SMS_PROVIDER is %q, must be empty or 46elks", cfg.SMSProvider))
+	}
+
+	if _, err := fmt.Sscanf(envOr("VEHICLE_LOOKUP_PER_MINUTE", "30"), "%d", &cfg.VehicleLookupPerMinute); err != nil ||
+		cfg.VehicleLookupPerMinute < 1 || cfg.VehicleLookupPerMinute > 6000 {
+		problems = append(problems, "VEHICLE_LOOKUP_PER_MINUTE must be a whole number of lookups a minute, 1 to 6000")
+	}
+	if cfg.VehicleLookupProvider == "" && cfg.VehicleLookupURL != "" {
+		if u, err := url.Parse(strings.ReplaceAll(cfg.VehicleLookupURL, "{registration}", "x")); err == nil {
+			cfg.VehicleLookupProvider = u.Hostname()
+		}
+	}
+	if len(cfg.VehicleLookupProvider) > 100 {
+		problems = append(problems, "VEHICLE_LOOKUP_PROVIDER is a name, in 100 characters or fewer")
 	}
 
 	if _, err := fmt.Sscanf(envOr("SEND_HOURS", "08-20"), "%d-%d", &cfg.SendFrom, &cfg.SendUntil); err != nil ||

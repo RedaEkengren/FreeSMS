@@ -672,11 +672,13 @@ type SweepResult struct {
 	ImportPreviews int64
 	// Identity values past their expiry, removed; the records stay (#153).
 	IdentityValues int64
+	// Vehicle lookups past their year, deleted (#155).
+	VehicleLookups int64
 }
 
 // Empty reports whether there was nothing to do.
 func (s SweepResult) Empty() bool {
-	return s.LoginAttempts == 0 && s.Shares == 0 && s.JobLinks == 0 && s.ImportPreviews == 0 && s.IdentityValues == 0
+	return s.LoginAttempts == 0 && s.Shares == 0 && s.JobLinks == 0 && s.ImportPreviews == 0 && s.IdentityValues == 0 && s.VehicleLookups == 0
 }
 
 // Sweep applies the retention policy.
@@ -719,6 +721,14 @@ func Sweep(ctx context.Context, pool *pgxpool.Pool, shopID string) (SweepResult,
 		step("identity values", func(ctx context.Context, tx pgx.Tx) error {
 			n, err := sweepIdentityTx(ctx, tx)
 			r.IdentityValues = n
+			return err
+		}),
+
+		// Who looked which registration up, and why, is kept a year.
+		step("vehicle lookups", func(ctx context.Context, tx pgx.Tx) error {
+			tag, err := tx.Exec(ctx, `DELETE FROM vehicle_lookups WHERE looked_up_at < now() - $1::interval`,
+				seconds(vehicleLookupRetention))
+			r.VehicleLookups = tag.RowsAffected()
 			return err
 		}),
 

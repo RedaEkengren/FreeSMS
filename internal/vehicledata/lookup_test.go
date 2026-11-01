@@ -118,3 +118,85 @@ func TestAnUnconfiguredHTTPLookupSaysSo(t *testing.T) {
 		t.Errorf("Lookup with no URL = %v, want ErrNotConfigured", err)
 	}
 }
+
+// The state a register holds -- inspection, tax, a driving ban, the last
+// odometer reading, the VIN -- is read when the provider offers it, and a
+// fact it does not offer stays "not provided", which is not the same as
+// provided and empty.
+func TestAStatusFieldIsProvidedOrNot(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"make":"Volvo","vin":"YV1SW58D","inspection":"approved until 2027-05-31","driving_ban":false,"odometer_km":184500,"tax":null}`))
+	}))
+	defer srv.Close()
+	got, err := HTTPLookup{URL: srv.URL + "/{registration}", Fields: DefaultFields()}.Lookup(context.Background(), "ABC12D")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Vehicle{Make: "Volvo", VIN: Of("YV1SW58D"), Inspection: Of("approved until 2027-05-31"),
+		DrivingBan: Of(false), OdometerKm: Of(int64(184500)), Tax: Of("")}
+	if got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+	only := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"make":"Volvo"}`))
+	}))
+	defer only.Close()
+	got, err = HTTPLookup{URL: only.URL + "/{registration}"}.Lookup(context.Background(), "ABC12D")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.DrivingBan.Provided || got.Tax.Provided || got.Inspection.Provided || got.OdometerKm.Provided || got.VIN.Provided {
+		t.Errorf("facts the provider never offered read as provided: %+v", got)
+	}
+}
+
+type countingLookup struct {
+	calls int
+	err   error
+}
+
+func (c *countingLookup) Lookup(context.Context, string) (Vehicle, error) {
+	c.calls++
+	return Vehicle{Make: "Volvo"}, c.err
+}
+
+// The provider is asked no faster than the limit, and not at all for a
+// while after it says it is rate limiting; a call held back fails at once
+// as rate limited, never waits, and never reaches the provider.
+func TestALimitedLookupHoldsBackAndBacksOff(t *testing.T) {
+	inner := &countingLookup{}
+	l := NewLimited(inner, 12) // two at once, then one each five seconds
+	now := time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)
+	l.now = func() time.Time { return now }
+	for i := range 2 {
+		if _, err := l.Lookup(context.Background(), "ABC12D"); err != nil {
+			t.Fatalf("call %d: %v", i, err)
+		}
+	}
+	if _, err := l.Lookup(context.Background(), "ABC12D"); !errors.Is(err, ErrRateLimited) || inner.calls != 2 {
+		t.Errorf("the third at once: %v, provider asked %d times", err, inner.calls)
+	}
+	now = now.Add(5 * time.Second)
+	if _, err := l.Lookup(context.Background(), "ABC12D"); err != nil {
+		t.Errorf("after the bucket refilled: %v", err)
+	}
+	inner.err = ErrRateLimited
+	now = now.Add(time.Minute)
+	if _, err := l.Lookup(context.Background(), "ABC12D"); !errors.Is(err, ErrRateLimited) {
+		t.Fatal(err)
+	}
+	asked := inner.calls
+	now = now.Add(29 * time.Second)
+	if _, err := l.Lookup(context.Background(), "ABC12D"); !errors.Is(err, ErrRateLimited) || inner.calls != asked {
+		t.Errorf("asked during the back-off: %v, %d calls", err, inner.calls)
+	}
+	now = now.Add(2 * time.Second)
+	if _, err := l.Lookup(context.Background(), "ABC12D"); !errors.Is(err, ErrRateLimited) || inner.calls != asked+1 {
+		t.Errorf("after the back-off: %v, %d calls", err, inner.calls)
+	}
+	// Said again: the back-off doubles.
+	now = now.Add(31 * time.Second)
+	if _, err := l.Lookup(context.Background(), "ABC12D"); inner.calls != asked+1 {
+		t.Errorf("the back-off did not double: %v, %d calls", err, inner.calls)
+	}
+}
