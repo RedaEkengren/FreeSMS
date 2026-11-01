@@ -60,6 +60,7 @@ var everyRole = map[string]string{
 	// everybody in the shop, and no person's data.
 	"RolesOffered": "the roles the shop's modules have, no person's data",
 
+	"ImportKindsFor":  "the kinds of record the shop's modules have, no person's data",
 	"SubjectsOffered": "the subjects the shop's modules have, no person's data",
 
 	// Protocols other than a job's: delegate to endProtocol, which reads the

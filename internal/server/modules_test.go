@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"net/http"
 	"net/url"
@@ -110,6 +112,15 @@ func TestASwitchedOffModulesRoutesAreNotThere(t *testing.T) {
 		}
 		for who, client := range map[string]*http.Client{"owner": owner, "technician": tech, "nobody": anonymous} {
 			status, body := missing(client, method, path)
+			if r.CustomerLink {
+				// A link the customer was sent: a neutral page, nothing to
+				// press (owner decision on #143).
+				if status != http.StatusGone || !strings.Contains(body, "This service is no longer available") ||
+					strings.Contains(body, "<form") {
+					t.Errorf("%s %s as %s, workshop off: %d; want the neutral page with no actions", method, path, who, status)
+				}
+				continue
+			}
 			if status != http.StatusNotFound || body != nothing {
 				t.Errorf("%s %s as %s, workshop off: %d %q; want the answer a path that does not exist gets",
 					method, path, who, status, body)
@@ -131,6 +142,19 @@ func TestASwitchedOffModulesRoutesAreNotThere(t *testing.T) {
 					probe.method, probe.path, who, status, body)
 			}
 		}
+	}
+
+	// The invoice's link is Core: the customer reads their invoice for as
+	// long as it is kept, whatever the shop runs.
+	token := "an-invoice-link-token-for-the-test"
+	sum := sha256.Sum256([]byte(token))
+	seedShop(t, pool, shopA, []string{
+		`INSERT INTO invoice_links (shop_id, invoice_id, token_sha256, created_by, expires_at) VALUES
+		 ('` + shopA + `','` + invoice + `', decode('` + hex.EncodeToString(sum[:]) + `', 'hex'),
+		  'aaaaaaaa-0000-0000-0000-000000000011', now() + interval '30 days')`,
+	})
+	if status, body := missing(anonymous, http.MethodGet, "/d/"+token); status != http.StatusOK || !strings.Contains(body, customerName) {
+		t.Errorf("the customer's invoice link with the workshop off: %d", status)
 	}
 
 	// Core, and the workshop's history through it.

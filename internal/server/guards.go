@@ -51,12 +51,18 @@ type routeMux struct {
 	// Where every registration is written down, shared by every value made
 	// from the same mux.
 	table *[]registeredRoute
+	// What a switched-off module's route answers, when not "a path that
+	// does not exist": the customer's links (customerLinks).
+	off http.Handler
 }
 
 // registeredRoute is one pattern and the module it belongs to.
 type registeredRoute struct {
 	Pattern string
 	Module  access.Module
+	// A customer's link, which answers a switched-off module with the
+	// neutral page rather than as a path that does not exist.
+	CustomerLink bool
 }
 
 // in is the same router, registering routes as m's.
@@ -81,8 +87,19 @@ func (m routeMux) HandleFunc(pattern string, h http.HandlerFunc) {
 
 func (m routeMux) record(pattern string) {
 	if m.table != nil {
-		*m.table = append(*m.table, registeredRoute{Pattern: pattern, Module: m.module})
+		*m.table = append(*m.table, registeredRoute{Pattern: pattern, Module: m.module, CustomerLink: m.off != nil})
 	}
+}
+
+// customerLinks is the same router, for the links a customer is sent. A
+// customer holding a link to a quote or an inspection of a module the shop
+// has since switched off is not told the page does not exist -- they were
+// sent it -- but that the service is no longer available and to contact the
+// shop: no actions, nothing to answer (owner decision on #143). The
+// invoice's link (/d/) is Core and is not one of these.
+func (m routeMux) customerLinks(off http.HandlerFunc) routeMux {
+	m.off = off
+	return m
 }
 
 // gate answers as an unregistered path would -- the same status, the same
@@ -95,6 +112,10 @@ func (m routeMux) gate(h http.Handler) http.Handler {
 	module := m.module
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !m.s.runs(r, module) {
+			if m.off != nil {
+				m.off.ServeHTTP(w, r)
+				return
+			}
 			http.NotFound(w, r)
 			return
 		}

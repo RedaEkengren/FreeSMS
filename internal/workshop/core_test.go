@@ -20,6 +20,7 @@ var core = map[string]string{
 	"IssueManual":        "a sale entered by hand, which no module records (#146)",
 	"ChecklistTemplates": "checklists, for every module's inspections (#147)", "ChecklistTemplateByID": "checklists",
 	"SaveChecklistTemplate": "checklists", "SetChecklistActive": "checklists", "SubjectsOffered": "what a checklist may be made for",
+	"ImportKindsFor":      "bringing records in: which kinds, by the modules",
 	"SetTemplateSubjects": "what a checklist is for, across modules; each subject named needs its module, checked per subject (#147)",
 	"DeliveriesFor":       "how a document reached the customer", "SendDocument": "sending an issued document",
 	"HandDocumentOver": "handing an issued document over", "RevokeDocumentLinks": "an issued document's links",

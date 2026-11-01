@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"io"
 	"net/mail"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 )
 
 // Reading a file somebody exported from their old system.
@@ -33,6 +36,34 @@ const (
 // ImportKinds are the things that can be imported, in the order they make
 // sense: a vehicle names its owner, a stock row names its part.
 var ImportKinds = []string{"customers", "vehicles", "parts", "stock"}
+
+// ImportKindsFor is the kinds this shop may import (owner decision on #143):
+// customers and vehicles always, being Core's; parts and opening stock only
+// while the workshop runs, whose they are.
+func ImportKindsFor(scope access.Scope) []string {
+	var out []string
+	for _, k := range ImportKinds {
+		if importable(scope, k) {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+// importable reports whether this shop may import kind. Read from the
+// scope's modules, not through scope.Uses, which the permission contract
+// takes for a gate: the import is Core's and works whatever the shop runs;
+// what it may bring in depends on the modules.
+func importable(scope access.Scope, kind string) bool {
+	switch kind {
+	case "parts", "stock":
+		return slices.Contains(scope.Modules, access.Workshop)
+	}
+	return true
+}
+
+// errNotImportable is a kind of record whose module the shop does not run.
+var errNotImportable = fmt.Errorf("%w: those records belong to a part of FreeSMS this shop does not run", ErrInvalid)
 
 // importColumns are the columns of each kind, in the template's order, and
 // which of them a row cannot be without.

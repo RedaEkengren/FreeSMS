@@ -7023,6 +7023,15 @@
     },
     "Save what it is for": {
       "other": "Spara vad den används till"
+    },
+    "This service is no longer available": {
+      "other": "Den här tjänsten finns inte längre"
+    },
+    "Please contact the shop.": {
+      "other": "Kontakta verkstaden."
+    },
+    "those records belong to a part of FreeSMS this shop does not run": {
+      "other": "de uppgifterna hör till en del av FreeSMS som verkstaden inte använder"
     }
   }
 }

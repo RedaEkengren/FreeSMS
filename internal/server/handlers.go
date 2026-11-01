@@ -134,6 +134,18 @@ func (s *Server) handleCustomerStatus(w http.ResponseWriter, r *http.Request) {
 // handleCustomerQuote is the customer's own yes or no to a quote. Bound to the
 // version they were shown: an answer to one that has since been replaced is
 // not taken for the newer, and they are sent to look at it.
+// handleServiceGone is what a customer's link answers when the module it
+// belongs to has been switched off: the same for every link and every
+// token, so it says nothing about whether this one was ever valid, and
+// offers nothing to press.
+func (s *Server) handleServiceGone(w http.ResponseWriter, r *http.Request) {
+	s.render(w, r, http.StatusGone, "status", pageData{
+		Locale: s.shopLocale(r),
+		Title:  "This service is no longer available",
+		Error:  "Please contact the shop.",
+	})
+}
+
 func (s *Server) handleCustomerQuote(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 	err := workshop.QuoteAnswerFromLink(r.Context(), s.pool, s.shop(), token,

@@ -377,8 +377,9 @@ func (s *Server) routes() (http.Handler, error) {
 	workshopMux.HandleFunc("POST /enquiries/{id}/link", s.requireSession(s.handleEnquiryLink))
 	workshopMux.HandleFunc("POST /enquiries/{id}/book", s.requireSession(s.handleEnquiryBook))
 	workshopMux.HandleFunc("GET /enquiries/{id}/quote/{version}/print", s.requireSession(s.handleProposalPrint))
-	workshopMux.HandleFunc("GET /o/{token}", s.handleOffer)
-	workshopMux.HandleFunc("POST /o/{token}/quote/{quoteID}", s.handleOfferAnswer)
+	links := workshopMux.customerLinks(s.handleServiceGone)
+	links.HandleFunc("GET /o/{token}", s.handleOffer)
+	links.HandleFunc("POST /o/{token}/quote/{quoteID}", s.handleOfferAnswer)
 	workshopMux.HandleFunc("GET /bookings/{id}", s.requireSession(s.handleBooking))
 	workshopMux.HandleFunc("POST /bookings/{id}", s.requireSession(s.handleBookingAction))
 	workshopMux.HandleFunc("POST /bookings/{id}/message", s.requireSession(s.handleBookingMessage))
@@ -418,11 +419,11 @@ func (s *Server) routes() (http.Handler, error) {
 
 	// The customer's link. No session; the token is the whole of the
 	// authorisation, and it authorises exactly one inspection.
-	workshopMux.HandleFunc("GET /i/{token}", s.handleSharedInspection)
-	workshopMux.HandleFunc("GET /k/{token}", s.handleCustomerStatus)
-	workshopMux.HandleFunc("POST /k/{token}/quote/{quoteID}", s.handleCustomerQuote)
-	workshopMux.HandleFunc("POST /i/{token}/items/{itemID}", s.handleSharedDecision)
-	workshopMux.HandleFunc("GET /i/{token}/photos/{key}", s.handleSharedPhoto)
+	links.HandleFunc("GET /i/{token}", s.handleSharedInspection)
+	links.HandleFunc("GET /k/{token}", s.handleCustomerStatus)
+	links.HandleFunc("POST /k/{token}/quote/{quoteID}", s.handleCustomerQuote)
+	links.HandleFunc("POST /i/{token}/items/{itemID}", s.handleSharedDecision)
+	links.HandleFunc("GET /i/{token}/photos/{key}", s.handleSharedPhoto)
 
 	mux.HandleFunc("GET /figures", s.requireSession(s.handleDashboard))
 	mux.HandleFunc("GET /accounting", s.requireSession(s.handleAccounting))
@@ -501,7 +502,7 @@ func (s *Server) routes() (http.Handler, error) {
 	workshopMux.HandleFunc("POST /jobs/{id}/recommendations", s.requireSession(s.handleAddRecommendation))
 	workshopMux.HandleFunc("POST /jobs/{id}/recommendations/{rec}/withdraw", s.requireSession(s.handleWithdrawRecommendation))
 	workshopMux.HandleFunc("POST /jobs/{id}/recommendations/{rec}/enquiry", s.requireSession(s.handleRecommendationEnquiry))
-	workshopMux.HandleFunc("GET /k/{token}/summary", s.handleCustomerSummary)
+	links.HandleFunc("GET /k/{token}/summary", s.handleCustomerSummary)
 	mux.HandleFunc("GET /d/{token}", s.handleCustomerDocument)
 	mux.HandleFunc("GET /day", s.requireSession(s.handleDay))
 	mux.HandleFunc("POST /day/settlement", s.requireSession(s.handleDaySettlement))
