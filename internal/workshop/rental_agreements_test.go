@@ -283,6 +283,11 @@ func TestAPlansVATRateIsUsedEverywhere(t *testing.T) {
 	if b.Lines[0].UnitPriceMinor != 10000 || b.Lines[0].VATRateBp != 600 {
 		t.Errorf("106 kr including 6 %% VAT stored as %+v", b.Lines[0])
 	}
+	// The rate the booking froze is the rate, whatever the plan says later
+	// (review 2 #8): no operation changes it; the database owner can.
+	if _, err := pool.Exec(ctx, `UPDATE rate_plans SET vat_rate_bp = 2500`); err != nil {
+		t.Fatal(err)
+	}
 	templates, _ := workshop.RentalAgreementTemplates(ctx, pool, rentalDesk())
 	doc, err := workshop.ProduceRentalAgreement(ctx, pool, rentalDesk(), id, templates[0].VersionID)
 	if err != nil {

@@ -689,7 +689,9 @@ func ProduceRentalAgreement(ctx context.Context, pool *pgxpool.Pool, scope acces
 		if err := tx.QueryRow(ctx, `
 			SELECT b.number, b.renter_party_id, u.fleet_number || coalesce(', ' || reg.registration, ', ' || r.name, ''),
 			       s.name, coalesce(s.org_number, ''), b.included_km, b.extra_km_minor, v.default_deposit_minor,
-			       coalesce((SELECT vat_rate_bp FROM rate_plans WHERE id = b.plan_id), 0)
+			       -- The rent's rate, as the booking froze it.
+			       coalesce((SELECT l.vat_rate_bp FROM rental_booking_lines l WHERE l.booking_id = b.id AND l.kind = 'rent'
+			                  ORDER BY l.position LIMIT 1), 0)
 			FROM rental_bookings b JOIN rental_units u ON u.id = b.unit_id JOIN resources r ON r.id = u.resource_id
 			LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = r.vehicle_id AND reg.valid_to IS NULL
 			JOIN rental_profile_versions v ON v.id = b.profile_version_id
