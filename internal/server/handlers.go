@@ -377,12 +377,15 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 	var invoices []workshop.Invoice
 	var contact workshop.Contact
 	var surcharges []workshop.SurchargeLine
-	if session.Scope.Role.SeesCustomerPersonalData() {
-		// What the invoice would add, shown with the total so the figure
-		// read out on the telephone is the one the invoice prints.
+	// What the invoice would add, shown with the total so the figure read
+	// out on the telephone is the one the invoice prints -- to whoever is
+	// shown the total, a technician the prices are opened for included.
+	if session.Scope.SeesOnJob(access.FieldLinePrices) {
 		if surcharges, err = workshop.PreviewSurcharges(r.Context(), s.pool, session.Scope, id); err != nil {
 			s.log.Error("preview surcharges", "error", err)
 		}
+	}
+	if session.Scope.Role.SeesCustomerPersonalData() {
 		invoices, err = workshop.InvoicesFor(r.Context(), s.pool, session.Scope, id)
 		if err != nil {
 			s.log.Error("read invoices", "error", err)

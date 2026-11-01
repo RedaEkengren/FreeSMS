@@ -227,3 +227,54 @@ func asApp(ctx context.Context, pool *pgxpool.Pool, stmt string) error {
 		return err
 	})
 }
+
+// A technician shown the job's prices is shown the total the invoice will
+// print, surcharges included, and the amounts on the timeline's lines --
+// the same field, read the same way. Not shown the prices, neither.
+func TestATechnicianShownThePricesSeesTheTotalTheInvoicePrints(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	addTechnician(t, pool)
+	if err := workshop.SaveSurcharges(ctx, pool, owner(), workshop.Surcharges{InvoiceFeeMinor: 4900}); err != nil {
+		t.Fatal(err)
+	}
+	job := inProgress(t, pool, "Replace brake discs")
+	desk, err := workshop.PreviewSurcharges(ctx, pool, advisor(), job)
+	if err != nil || len(desk) != 1 {
+		t.Fatalf("the counter's preview: %+v, %v", desk, err)
+	}
+	amounts := func(scope access.Scope) (n int) {
+		t.Helper()
+		events, err := workshop.TimelineFor(ctx, pool, scope, job)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range events {
+			if e.Kind == "scope" && e.AmountMinor != nil {
+				n++
+			}
+		}
+		return n
+	}
+
+	closed := techAs(t, pool, techUserID)
+	if _, err := workshop.PreviewSurcharges(ctx, pool, closed, job); !errors.Is(err, access.ErrForbidden) {
+		t.Errorf("a technician not shown the prices was handed the surcharges: %v", err)
+	}
+	if n := amounts(closed); n != 0 {
+		t.Errorf("a technician not shown the prices sees %d amounts on the timeline", n)
+	}
+
+	if err := workshop.SetTechnicianField(ctx, pool, owner(), access.FieldLinePrices, true, "Ackord"); err != nil {
+		t.Fatal(err)
+	}
+	open := techAs(t, pool, techUserID)
+	got, err := workshop.PreviewSurcharges(ctx, pool, open, job)
+	if err != nil || !slices.Equal(got, desk) {
+		t.Errorf("the technician's surcharges %+v (%v), the counter's %+v", got, err, desk)
+	}
+	if n := amounts(open); n == 0 {
+		t.Error("a technician shown the prices sees no amount on the timeline's lines")
+	}
+}
+

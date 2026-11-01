@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -44,6 +45,16 @@ func TestATechniciansJobPageShowsOnlyWhatTheShopOpened(t *testing.T) {
 	}
 	if page := visibleText(get(t, tech, job, http.StatusOK)); !strings.Contains(page, price) || strings.Contains(page, customerName) {
 		t.Errorf("the prices opened: the price and not the customer, got:\n%s", page)
+	}
+	// The total is the one the invoice prints, the invoicing fee included,
+	// on the technician's page as on the counter's.
+	if _, err := pool.Exec(context.Background(), `UPDATE shops SET invoice_fee_minor = 4900`); err != nil {
+		t.Fatal(err)
+	}
+	total := regexp.MustCompile(`<dd class="grand">([^<]+)</dd>`)
+	techTotal, deskTotal := total.FindStringSubmatch(get(t, tech, job, http.StatusOK)), total.FindStringSubmatch(get(t, desk, job, http.StatusOK))
+	if techTotal == nil || deskTotal == nil || techTotal[1] != deskTotal[1] {
+		t.Errorf("the technician's total %q, the counter's %q", techTotal, deskTotal)
 	}
 
 	if _, err := pool.Exec(context.Background(), `UPDATE work_orders SET assigned_to = 'aaaaaaaa-0000-0000-0000-000000000002' WHERE id = $1`, jobA); err != nil {

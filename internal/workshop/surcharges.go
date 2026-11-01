@@ -161,8 +161,11 @@ func chargeLine(kind, text string, net int64, rate int) invoiceLine {
 }
 
 // PreviewSurcharges is what the surcharges would add to a job invoiced now.
+// The counter's, and whoever else is shown the job's prices and its total
+// (access.FieldLinePrices): the total they see is the one the invoice
+// prints, surcharges included.
 func PreviewSurcharges(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) ([]SurchargeLine, error) {
-	if !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesCustomerPersonalData() && !scope.SeesOnJob(access.FieldLinePrices) {
 		return nil, access.ErrForbidden
 	}
 	if !looksLikeUUID(jobID) {

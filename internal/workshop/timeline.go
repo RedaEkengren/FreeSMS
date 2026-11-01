@@ -371,8 +371,8 @@ func timelineTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID string
 		return nil, err
 	}
 
-	// Scope and price: the lines as they were written, with prices for the
-	// counter only.
+	// Scope and price: the lines as they were written, with prices for
+	// whoever is shown the job's prices (access.FieldLinePrices).
 	if err := add(collect(ctx, tx, `
 		SELECT r.id::text, r.at, r.change, r.description, coalesce(r.reason, ''), r.approval_cleared,
 		       coalesce(p.display_name, ''),
@@ -380,7 +380,7 @@ func timelineTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID string
 		FROM work_order_line_revisions r
 		JOIN work_order_lines l ON l.id = r.line_id
 		LEFT JOIN users u ON u.id = r.by_user LEFT JOIN people p ON p.id = u.person_id
-		WHERE l.work_order_id = $1 AND r.revision > 0`, append(job, desk), func(r pgx.Rows) (Event, error) {
+		WHERE l.work_order_id = $1 AND r.revision > 0`, append(job, scope.SeesOnJob(access.FieldLinePrices)), func(r pgx.Rows) (Event, error) {
 		var e Event
 		var change string
 		var cleared bool
