@@ -227,3 +227,29 @@ func TestCostsByRoleAndModule(t *testing.T) {
 }
 
 func refTo(n int64) *int64 { return &n }
+
+// After the sale is one rule, whoever posts the cost: a supplier's invoice
+// for work on a car sold and not yet delivered is after the sale, as a cost
+// entered by hand that day is.
+func TestAfterTheSaleIsOneRuleForEveryCost(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	job, line := turboJob(t, pool)
+	out := sendOut(t, pool, job, line, time.Now().AddDate(0, 0, 3))
+	moveStock(t, pool, p.StockUnitID, workshop.StockForSale, workshop.StockReserved, workshop.StockSold)
+	record(t, pool, out, workshop.OutsourcedEventInput{Kind: "invoice", AmountMinor: pointerTo(int64(100_000)), InvoiceRef: "S-1"})
+	byHand, err := workshop.RecordStockCost(ctx, pool, buyerScope(), p.StockUnitID, cost(workshop.CostTransport, 50_000))
+	if err != nil {
+		t.Fatal(err)
+	}
+	costs, _ := workshop.CostsOfUnit(ctx, pool, buyerScope(), p.StockUnitID)
+	for _, c := range costs.Entries {
+		if !c.PostSale {
+			t.Errorf("a %s cost on a car sold, not delivered, is not after the sale: %+v", c.Source, c)
+		}
+	}
+	if !byHand.PostSale {
+		t.Error("the cost by hand is not after the sale")
+	}
+}

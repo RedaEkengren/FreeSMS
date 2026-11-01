@@ -80,17 +80,24 @@ CREATE POLICY shop_isolation ON stock_cost_settings
 REVOKE ALL ON stock_cost_settings FROM freesms_app;
 GRANT SELECT, INSERT ON stock_cost_settings TO freesms_app;
 
+-- Whether a cost spent now on a stock unit is after the sale: the car is
+-- sold, delivered or not. A cycle closed without a sale -- a consigned car
+-- handed back, a purchase undone -- or written off had no sale to be after.
+-- One rule, read by the trigger below and by the application alike.
+CREATE FUNCTION stock_cost_post_sale(unit uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT status IN ('sold', 'delivered') FROM stock_units WHERE id = unit
+$$;
+
 -- A supplier's invoice for work sent out from a job on a car in stock is
 -- the car's cost, posted in the same transaction as the invoice is
 -- recorded, whichever release records it: kind workshop, as it is work
 -- done on the car, with the VAT a Swedish supplier charges on it. A job
 -- opened while the car was not in stock -- every customer's car, the car
--- after it was sold -- posts nothing. A job opened in stock and invoiced
--- by the supplier after the cycle ended posts after the sale.
+-- after it was sold -- posts nothing. Whether it is after the sale is
+-- stock_cost_post_sale's to say.
 CREATE FUNCTION outsourced_invoice_costs_stock() RETURNS trigger AS $$
 DECLARE
     unit uuid;
-    ended boolean;
 BEGIN
     IF NEW.kind <> 'invoice' OR NEW.amount_minor IS NULL THEN
         RETURN NEW;
@@ -109,7 +116,7 @@ BEGIN
       JOIN outsourced_events oe ON oe.id = e.outsourced_event_id
      WHERE oe.outsourced_id = NEW.outsourced_id
        AND NOT EXISTS (SELECT 1 FROM stock_cost_entries r WHERE r.reverses_id = e.id);
-    SELECT u.id, u.closed_at IS NOT NULL INTO unit, ended
+    SELECT u.id INTO unit
       FROM outsourced_work o
       JOIN work_orders w ON w.id = o.work_order_id
       JOIN stock_units u ON u.vehicle_id = w.vehicle_id AND u.opened_at <= w.opened_at
@@ -122,7 +129,7 @@ BEGIN
                                     work_order_id, outsourced_event_id, external_ref, post_sale, recorded_by)
     SELECT NEW.shop_id, unit, 'workshop', NEW.amount_minor, round(NEW.amount_minor * 0.25)::bigint,
            (NEW.at AT TIME ZONE (SELECT timezone FROM shops WHERE id = NEW.shop_id))::date, 'outsourced',
-           o.work_order_id, NEW.id, NEW.invoice_ref, ended, NEW.by_user
+           o.work_order_id, NEW.id, NEW.invoice_ref, stock_cost_post_sale(unit), NEW.by_user
       FROM outsourced_work o WHERE o.id = NEW.outsourced_id;
     RETURN NEW;
 END;

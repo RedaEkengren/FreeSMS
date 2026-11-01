@@ -169,20 +169,20 @@ func RecordStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 	}
 	var out StockCost
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		var status StockStatus
-		err := tx.QueryRow(ctx, `SELECT status FROM stock_units WHERE id = $1`, unitID).Scan(&status)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNotFound
-		}
-		if err != nil {
+		// After the sale is stock_cost_post_sale's to say (0205), for every
+		// way a cost is posted.
+		var postSale *bool
+		if err := tx.QueryRow(ctx, `SELECT stock_cost_post_sale($1)`, unitID).Scan(&postSale); err != nil {
 			return fmt.Errorf("read stock unit: %w", err)
+		}
+		if postSale == nil {
+			return ErrNotFound
 		}
 		if n.SupplierPartyID != "" {
 			if err := partySeenTx(ctx, tx, scope, n.SupplierPartyID); err != nil {
 				return err
 			}
 		}
-		postSale := status == StockSold || status == StockDelivered
 		var id string
 		if err := tx.QueryRow(ctx, `
 			INSERT INTO stock_cost_entries (shop_id, stock_unit_id, kind, net_minor, input_vat_minor, vat_rate_basis,
@@ -193,10 +193,11 @@ func RecordStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 			        nullif(btrim($15), ''), nullif($16, ''), NULLIF($17, '')::uuid)
 			RETURNING id`,
 			scope.ShopID, unitID, n.Kind, n.NetMinor, vat, n.VATRateBasis, n.SupplierPartyID, n.ExternalRef,
-			n.IncurredOn.Format(time.DateOnly), source, postSale, n.Currency, n.OriginalMinor, n.RateMicro, n.RateSource,
+			n.IncurredOn.Format(time.DateOnly), source, *postSale, n.Currency, n.OriginalMinor, n.RateMicro, n.RateSource,
 			n.Note, scope.UserID).Scan(&id); err != nil {
 			return fmt.Errorf("record the cost: %w", err)
 		}
+		var err error
 		out, err = stockCostTx(ctx, tx, id)
 		return err
 	})
@@ -400,12 +401,11 @@ func PostJobCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 			return fmt.Errorf("read the job's posting: %w", err)
 		}
 		var unit string
-		var status StockStatus
 		err = tx.QueryRow(ctx, `
-			SELECT u.id, u.status FROM work_orders w
+			SELECT u.id FROM work_orders w
 			JOIN stock_units u ON u.vehicle_id = w.vehicle_id AND u.opened_at <= w.opened_at
 			                  AND (u.closed_at IS NULL OR u.closed_at > w.opened_at)
-			WHERE w.id = $1`, jobID).Scan(&unit, &status)
+			WHERE w.id = $1`, jobID).Scan(&unit)
 		if errors.Is(err, pgx.ErrNoRows) {
 			var job bool
 			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM work_orders WHERE id = $1)`, jobID).Scan(&job); err != nil {
@@ -440,8 +440,8 @@ func PostJobCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 			INSERT INTO stock_cost_entries (shop_id, stock_unit_id, kind, net_minor, input_vat_minor, vat_rate_basis,
 			       incurred_on, source, work_order_id, post_sale, note, recorded_by)
 			VALUES ($1, $2, 'workshop', $3, 0, 0, (clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops WHERE id = $1))::date,
-			        'work_order', $4, $5, $6, NULLIF($7, '')::uuid)
-			RETURNING id`, scope.ShopID, unit, net, jobID, status == StockSold || status == StockDelivered,
+			        'work_order', $4, stock_cost_post_sale($2), $5, NULLIF($6, '')::uuid)
+			RETURNING id`, scope.ShopID, unit, net, jobID,
 			fmt.Sprintf("#%d", number), scope.UserID).Scan(&id); err != nil {
 			return fmt.Errorf("post the job's cost: %w", err)
 		}
