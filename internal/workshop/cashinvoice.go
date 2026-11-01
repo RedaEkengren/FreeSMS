@@ -43,7 +43,11 @@ type CashPayment struct {
 }
 
 // CashSale is how an invoice issued at payment is paid, and through which
-// of the shop's payment flows, if it names one.
+// of the shop's payment flows. Named, a flow's way of paying fills in a
+// payment that names none. Not named, the sale is put through the shop's
+// one flow for the way it was paid, when there is exactly one: the
+// register says that is how the shop takes money that way. With none, or
+// several and none chosen, it is through no flow.
 type CashSale struct {
 	Payments []CashPayment
 	FlowID   string
@@ -80,7 +84,7 @@ func checkCashSale(s CashSale) error {
 		return ErrNotFound
 	}
 	for i, p := range s.Payments {
-		known := false
+		known := p.Method == "" && s.FlowID != ""
 		for _, m := range CashMethods {
 			known = known || p.Method == m
 		}
@@ -156,19 +160,49 @@ func IssueManualAndPay(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 // payOnIssueTx records the payments of an invoice just issued, which settle
 // it exactly, and that it was paid on issue.
 func payOnIssueTx(ctx context.Context, tx pgx.Tx, scope access.Scope, inv Invoice, sale CashSale) error {
+	payments := append([]CashPayment(nil), sale.Payments...)
 	if sale.FlowID != "" {
-		var found bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM payment_flows WHERE id = $1)`, sale.FlowID).Scan(&found); err != nil {
+		var method string
+		err := tx.QueryRow(ctx, `SELECT method FROM payment_flows WHERE id = $1`, sale.FlowID).Scan(&method)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
 			return fmt.Errorf("read the payment flow: %w", err)
 		}
-		if !found {
-			return ErrNotFound
+		for i := range payments {
+			if payments[i].Method != "" {
+				continue
+			}
+			if method == "other" {
+				return errCashMethod
+			}
+			payments[i].Method = method
+		}
+	} else if one := payments[0].Method; func() bool {
+		for _, p := range payments {
+			if p.Method != one {
+				return false
+			}
+		}
+		return true
+	}() {
+		var ids []string
+		rows, err := tx.Query(ctx, `SELECT id::text FROM payment_flows WHERE method = $1 LIMIT 2`, one)
+		if err == nil {
+			ids, err = pgx.CollectRows(rows, pgx.RowTo[string])
+		}
+		if err != nil {
+			return fmt.Errorf("read the payment flows: %w", err)
+		}
+		if len(ids) == 1 {
+			sale.FlowID = ids[0]
 		}
 	}
 	left := inv.GrossMinor
 	now := time.Now()
 	var with []PaidWith
-	for i, c := range sale.Payments {
+	for i, c := range payments {
 		p := Payment{InvoiceID: inv.ID, Method: c.Method, PaidOn: now, Reference: strings.TrimSpace(c.Reference), AmountMinor: c.AmountMinor}
 		if c.AmountMinor == 0 {
 			p.AmountMinor = left
@@ -177,7 +211,7 @@ func payOnIssueTx(ctx context.Context, tx pgx.Tx, scope access.Scope, inv Invoic
 				p.RoundingMinor = left - p.AmountMinor
 			}
 		}
-		if p.AmountMinor <= 0 || p.Settles() > left || (i == len(sale.Payments)-1 && p.Settles() != left) {
+		if p.AmountMinor <= 0 || p.Settles() > left || (i == len(payments)-1 && p.Settles() != left) {
 			return errCashSplit
 		}
 		if err := insertPayment(ctx, tx, scope, &p); err != nil {
@@ -267,6 +301,33 @@ func paymentFlowsTx(ctx context.Context, tx pgx.Tx) ([]PaymentFlow, error) {
 		out = append(out, f)
 	}
 	return out, rows.Err()
+}
+
+// CounterFlow is a payment flow as the counter chooses it for a cash
+// invoice: its name and its way of paying, and nothing of its check.
+type CounterFlow struct {
+	ID     string
+	Name   string
+	Method string
+}
+
+// CounterPaymentFlows lists the flows a cash invoice can be paid through
+// -- cash, card or Swish -- for the front desk, who issues one: so the
+// invoice says which, and the owner sees the flows in use.
+func CounterPaymentFlows(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]CounterFlow, error) {
+	if !scope.Role.SeesCustomerPersonalData() {
+		return nil, access.ErrForbidden
+	}
+	var out []CounterFlow
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `SELECT id::text, name, method FROM payment_flows WHERE method IN ('cash', 'card', 'swish') ORDER BY lower(name)`)
+		if err != nil {
+			return fmt.Errorf("read payment flows: %w", err)
+		}
+		out, err = pgx.CollectRows(rows, pgx.RowToStructByPos[CounterFlow])
+		return err
+	})
+	return out, err
 }
 
 // AddPaymentFlow records a way the shop takes money in person, not yet

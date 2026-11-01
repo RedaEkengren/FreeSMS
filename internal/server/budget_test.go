@@ -46,7 +46,8 @@ var queryBudgets = map[string]int{
 	// (two statements), which the counter reads on every live refresh.
 	// 39: the work list, as for the technician. 40: whether the job is a
 	// return visit or has been come back to (#119), as for the technician.
-	"desk GET /jobs/{id}": 40,
+	// 41: the shop's payment flows, for a job paid as it is invoiced (#156).
+	"desk GET /jobs/{id}": 41,
 	// 17: the documents the customer is not known to have, one read in its own
 	// scope, and the worklist reads the shop's zone to date what is late.
 	"desk GET /receivables": 17,

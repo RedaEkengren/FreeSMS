@@ -227,6 +227,7 @@ type pageData struct {
 	Looked *workshop.VehicleLookup
 	// The ways money is taken in person, and the year's figure (#156).
 	PaymentFlows       []workshop.PaymentFlow
+	CounterFlows       []workshop.CounterFlow
 	Turnover           workshop.InPersonTurnover
 	LookupConflict     string
 	LookupRegistration string

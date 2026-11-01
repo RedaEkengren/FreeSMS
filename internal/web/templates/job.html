@@ -795,7 +795,7 @@
     <details>
       <summary>{{.T "Paid now, at the counter"}}</summary>
       <div class="pair">
-        <label><span>{{.T "How"}}</span><select name="paid_now"><option value="">{{.T "Not paid now"}}</option>{{range .CashMethods}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+        <label><span>{{.T "How"}}</span><select name="paid_now"><option value="">{{.T "Not paid now"}}</option>{{range .CounterFlows}}<option value="flow:{{.ID}}">{{.Name}} ({{$.T .Method}})</option>{{end}}{{range .CashMethods}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
         <label><span>{{.T "Reference"}}</span><input name="paid_reference" maxlength="100"></label>
       </div>
       <p class="waiting">{{.T "Issued and paid in one step: the invoice says it was paid. A recorded payment is not a cash-register receipt, and FreeSMS is not a cash register."}}</p>

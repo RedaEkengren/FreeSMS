@@ -69,3 +69,38 @@ func TestAJobIsInvoicedAndPaidAtTheCounter(t *testing.T) {
 		}
 	}
 }
+
+// The counter chooses which of the shop's flows a job paid at the counter
+// went through; the owner then sees the flow in use, and on the list of
+// what waits for them until its check is recorded.
+func TestTheCounterSaysWhichFlowAJobWasPaidThrough(t *testing.T) {
+	ts, pool := testServer(t)
+	desk, owner := signIn(t, ts, advisorEmail), signIn(t, ts, ownerEmail)
+	if status := postStatus(t, owner, ts.URL+"/payment-flows", url.Values{"name": {"Kort i disken"}, "method": {"card"}}); status != http.StatusSeeOther {
+		t.Fatalf("noting a flow answered %d", status)
+	}
+	post(t, desk, ts.URL+"/jobs/"+jobA+"/lines", url.Values{
+		"kind": {"labour"}, "description": {"Replace front pads"},
+		"quantity": {"2.5"}, "unit_price": {"895.00"}, "vat_rate": {"25"},
+	})
+	for _, state := range []string{"estimated", "awaiting_approval", "approved", "in_progress", "ready"} {
+		if state == "approved" {
+			agreeAtTheCounter(t, ts.URL, jobA, desk, pool)
+		}
+		post(t, desk, ts.URL+"/jobs/"+jobA+"/state", url.Values{"state": {state}})
+	}
+	job := get(t, desk, ts.URL+"/jobs/"+jobA, http.StatusOK)
+	m := regexp.MustCompile(`<option value="flow:([0-9a-f-]{36})">Kort i disken`).FindStringSubmatch(job)
+	if m == nil {
+		t.Fatal("the job page does not offer the shop's flow")
+	}
+	if status := postStatus(t, desk, ts.URL+"/jobs/"+jobA+"/invoice", url.Values{"paid_now": {"flow:" + m[1]}}); status != http.StatusSeeOther {
+		t.Fatalf("invoiced and paid through the flow answered %d", status)
+	}
+	if _, flows := page(t, owner, ts.URL+"/payment-flows"); !strings.Contains(flows, "1 cash invoice issued through it") {
+		t.Error("the flows page does not count the cash invoice through the flow")
+	}
+	if _, mine := page(t, owner, ts.URL+"/mine"); !strings.Contains(mine, "not checked against the cash register rules: Kort i disken") {
+		t.Error("the owner's list does not have the flow in use and not checked")
+	}
+}

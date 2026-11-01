@@ -29,7 +29,7 @@ var core = map[string]string{
 	// against the cash register threshold are the business's money.
 	"IssueManualAndPay": "a sale entered by hand, paid at the counter", "PaymentFlows": "the ways money is taken in person",
 	"AddPaymentFlow": "the ways money is taken in person", "CheckPaymentFlow": "a payment flow checked by the shop's adviser",
-	"InPersonTurnoverFor": "money taken in person this financial year", "SetCashRegisterThreshold": "the cash register threshold",
+	"InPersonTurnoverFor": "money taken in person this financial year", "CounterPaymentFlows": "the ways money is taken in person", "SetCashRegisterThreshold": "the cash register threshold",
 	// Audit events (#151): the trail of every module's transitions.
 	"AuditTrail":   "who did what and why, whichever module it was in",
 	"DocumentByID": "an issued document", "CreditNote": "correcting an issued document",

@@ -319,6 +319,15 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 		}
 	}
 
+	// The shop's ways of taking money in person, for a job paid as it is
+	// invoiced (#156): the counter says which.
+	var counterFlows []workshop.CounterFlow
+	if session.Scope.Role.SeesCustomerPersonalData() {
+		if counterFlows, err = workshop.CounterPaymentFlows(r.Context(), s.pool, session.Scope); err != nil {
+			s.log.Error("read payment flows", "error", err)
+		}
+	}
+
 	// Telling the customer from here: what there is to tell, how, and what
 	// was sent. The counter's.
 	var messages []workshop.OutboundMessage
@@ -398,39 +407,40 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 	})
 
 	return pageData{
-		Title:       "Job",
-		Session:     session,
-		Step:        step,
-		Job:         job,
-		Progress:    progress,
-		Lines:       lines,
-		Next:        next,
-		FinalCheck:  finalCheck,
-		Totals:      workshop.TotalsWith(lines, surcharges),
-		Surcharges:  surcharges,
-		Invoices:    invoices,
-		Contact:     contact,
-		Requests:    requests,
-		Findings:    findings,
-		Tasks:       tasks,
-		TaskCounts:  taskCounts,
-		Answers:     answers,
-		Quote:       quote,
-		Presence:    presence,
-		JobPlan:     jobPlan,
-		PlanTechs:   planTechs,
-		JobParts:    jobParts,
-		Contacts:    contacts,
-		ShareURL:    linkURL,
-		Inspections: inspections,
-		Templates:   templates,
-		Suggestions: suggestions,
-		Parts:       stocked,
-		LabourRate:  labourRate,
-		Messages:    messages,
-		Tell:        tell,
-		CanText:     s.sms != nil,
-		CanEmail:    s.email != nil,
+		Title:        "Job",
+		CounterFlows: counterFlows,
+		Session:      session,
+		Step:         step,
+		Job:          job,
+		Progress:     progress,
+		Lines:        lines,
+		Next:         next,
+		FinalCheck:   finalCheck,
+		Totals:       workshop.TotalsWith(lines, surcharges),
+		Surcharges:   surcharges,
+		Invoices:     invoices,
+		Contact:      contact,
+		Requests:     requests,
+		Findings:     findings,
+		Tasks:        tasks,
+		TaskCounts:   taskCounts,
+		Answers:      answers,
+		Quote:        quote,
+		Presence:     presence,
+		JobPlan:      jobPlan,
+		PlanTechs:    planTechs,
+		JobParts:     jobParts,
+		Contacts:     contacts,
+		ShareURL:     linkURL,
+		Inspections:  inspections,
+		Templates:    templates,
+		Suggestions:  suggestions,
+		Parts:        stocked,
+		LabourRate:   labourRate,
+		Messages:     messages,
+		Tell:         tell,
+		CanText:      s.sms != nil,
+		CanEmail:     s.email != nil,
 	}, nil
 }
 

@@ -304,3 +304,70 @@ func TestTheYearInPersonIsSalesTakenInPerson(t *testing.T) {
 		t.Errorf("after 25000 of the card sale refunded: %d, want 275000", got)
 	}
 }
+
+// A cash invoice is issued through a flow of the shop's register: the one
+// the counter chooses, its way of paying filling in the payment's; or,
+// with none chosen, the shop's one flow for the way it was paid. A flow so
+// used and not checked is on the owner's list. With two flows for the same
+// way of paying and none chosen, it is through neither.
+func TestACashInvoiceSaysWhichFlowItWasPaidThrough(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	currentPool = pool
+	desk := advisor()
+	if _, err := workshop.CounterPaymentFlows(ctx, pool, technician()); !errors.Is(err, access.ErrForbidden) {
+		t.Errorf("a technician read the counter's flows: %v", err)
+	}
+	counter, err := workshop.AddPaymentFlow(ctx, pool, owner(), "Kort i disken", "card")
+	if err != nil {
+		t.Fatal(err)
+	}
+	used := func() map[string]int {
+		t.Helper()
+		flows, err := workshop.PaymentFlows(ctx, pool, owner())
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]int{}
+		for _, f := range flows {
+			out[f.ID] = f.Used
+		}
+		return out
+	}
+	if _, err := workshop.IssueAndPay(ctx, pool, desk, readyToInvoice(t, pool), workshop.CashSale{Payments: []workshop.CashPayment{{Method: "card"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if u := used(); u[counter] != 1 {
+		t.Errorf("paid by card with one card flow: %v, want it through that flow", u)
+	}
+	if items := waiting(t, owner(), "flow_unchecked"); len(items) != 1 || items[0].Text != "Kort i disken" {
+		t.Errorf("the flow in use and not checked: %+v", items)
+	}
+	rental, err := workshop.AddPaymentFlow(ctx, pool, owner(), "Kort vid återlämning", "card")
+	if err != nil {
+		t.Fatal(err)
+	}
+	flows, err := workshop.CounterPaymentFlows(ctx, pool, desk)
+	if err != nil || len(flows) != 2 || flows[0].Name != "Kort i disken" || flows[0].Method != "card" {
+		t.Errorf("the counter's flows: %+v, %v", flows, err)
+	}
+	if _, err := workshop.IssueAndPay(ctx, pool, desk, readyToInvoice(t, pool), workshop.CashSale{Payments: []workshop.CashPayment{{Method: "card"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if u := used(); u[counter] != 1 || u[rental] != 0 {
+		t.Errorf("two card flows and none chosen: %v, want it through neither", u)
+	}
+	inv, err := workshop.IssueAndPay(ctx, pool, desk, readyToInvoice(t, pool), workshop.CashSale{FlowID: rental, Payments: []workshop.CashPayment{{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u := used(); u[rental] != 1 {
+		t.Errorf("the flow chosen: %v, want it through that flow", u)
+	}
+	if d, _ := workshop.DocumentByID(ctx, pool, desk, inv.ID); d.PaidOnIssue == nil || d.PaidOnIssue.Flow != "Kort vid återlämning" || d.PaidOnIssue.With[0].Method != "card" {
+		t.Errorf("the document paid through the chosen flow: %+v", d.PaidOnIssue)
+	}
+	if _, err := workshop.IssueAndPay(ctx, pool, desk, readyToInvoice(t, pool), workshop.CashSale{Payments: []workshop.CashPayment{{}}}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("no way of paying and no flow: %v, want refused", err)
+	}
+}
