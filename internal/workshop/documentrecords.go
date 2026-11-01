@@ -464,7 +464,7 @@ func ProduceDocument(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 		for i, p := range n.Parties {
 			var visible bool
 			if err := tx.QueryRow(ctx, `
-				SELECT EXISTS (SELECT 1 FROM party_roles r WHERE party_now(r.party_id) = party_now($1) AND r.role = ANY($2))`,
+				SELECT EXISTS (SELECT 1 FROM party_roles r WHERE r.party_id = ANY((SELECT party_ids_read_as(party_now($1)))::uuid[]) AND r.role = ANY($2))`,
 				p.PartyID, seen).Scan(&visible); err != nil {
 				return fmt.Errorf("read party: %w", err)
 			}

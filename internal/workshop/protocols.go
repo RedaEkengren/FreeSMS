@@ -386,7 +386,7 @@ func ProtocolsForVehicle(ctx context.Context, pool *pgxpool.Pool, scope access.S
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		// A finished protocol keeps the vehicle it was made of, which a
 		// merge does not rewrite; it is read through the merge instead.
-		all, err := readProtocols(ctx, tx, `vehicle_now(i.vehicle_id) = $1 AND i.subject <> 'work_order'`, vehicleID)
+		all, err := readProtocols(ctx, tx, `i.vehicle_id = ANY((SELECT vehicle_ids_read_as($1))::uuid[]) AND i.subject <> 'work_order'`, vehicleID)
 		if err != nil {
 			return err
 		}
@@ -411,7 +411,8 @@ func readProtocols(ctx context.Context, tx pgx.Tx, where string, arg any) ([]Pro
 		       coalesce(p.display_name, ''), i.started_at, i.completed_at, i.abandoned_at,
 		       coalesce(i.supersedes_id::text, '')
 		FROM inspections i
-		LEFT JOIN vehicle_registrations r ON r.vehicle_id = vehicle_now(i.vehicle_id) AND r.valid_to IS NULL
+		CROSS JOIN LATERAL (SELECT vehicle_now(i.vehicle_id) AS now) vn
+		LEFT JOIN vehicle_registrations r ON r.vehicle_id = vn.now AND r.valid_to IS NULL
 		LEFT JOIN users u ON u.id = i.performed_by
 		LEFT JOIN people p ON p.id = u.person_id
 		WHERE `+where+` ORDER BY i.started_at, i.id`, arg)

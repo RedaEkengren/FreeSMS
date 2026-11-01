@@ -632,13 +632,20 @@ func Worklist(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, today
 			return err
 		}
 		rows, err := tx.Query(ctx, `
-			WITH open AS (
+			-- What each customer is now, through its merges, found once for
+			-- all of them rather than followed again for every invoice.
+			WITH RECURSIVE now_of(id, now, depth) AS (
+			  SELECT id, id, 0 FROM customers WHERE merged_into IS NULL
+			  UNION ALL
+			  SELECT c.id, n.now, n.depth + 1 FROM customers c JOIN now_of n ON c.merged_into = n.id WHERE n.depth < 64),
+			open AS (
 			  SELECT i.id, i.series || '-' || i.number AS ref, i.customer_name, i.issued_at, coalesce(i.seller_payment_terms_days, 0) AS terms,
 			         -- Whom it is to: the job's customer for the workshop's, its
 			         -- own for any other source (#146).
 			         -- Through any merge: a manual invoice keeps the customer it
 			         -- was issued to, which may since be merged into another.
-			         customer_now(coalesce(i.customer_id, (SELECT w.customer_id FROM work_orders w WHERE w.id = i.work_order_id))) AS customer_id,
+			         (SELECT n.now FROM now_of n
+			           WHERE n.id = coalesce(i.customer_id, (SELECT w.customer_id FROM work_orders w WHERE w.id = i.work_order_id))) AS customer_id,
 			         i.gross_minor
 			           + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = i.id), 0)
 			           - coalesce((SELECT sum(p.amount_minor + p.rounding_minor) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) AS owed

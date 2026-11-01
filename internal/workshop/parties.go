@@ -342,7 +342,7 @@ func PartyByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id s
 		rows, err := tx.Query(ctx, `
 			SELECT r.id::text, r.role, r.valid_from, r.valid_to, r.party_id::text, coalesce(r.note, '')
 			FROM party_roles r
-			WHERE party_now(r.party_id) = party_now($1) AND r.role = ANY($2)
+			WHERE r.party_id = ANY((SELECT party_ids_read_as(party_now($1)))::uuid[]) AND r.role = ANY($2)
 			ORDER BY r.valid_from, r.id`, id, seen)
 		if err != nil {
 			return fmt.Errorf("read roles: %w", err)
@@ -441,7 +441,7 @@ func EditParty(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id s
 		var visible bool
 		err := tx.QueryRow(ctx, `
 			SELECT pa.kind, coalesce(pa.person_id::text, ''), pa.customer_id::text, pa.merged_into::text, pa.revision,
-			       EXISTS (SELECT 1 FROM party_roles r WHERE party_now(r.party_id) = pa.id AND r.role = ANY($2))
+			       EXISTS (SELECT 1 FROM party_roles r WHERE r.party_id = ANY(party_ids_read_as(pa.id)) AND r.role = ANY($2))
 			FROM parties pa WHERE pa.id = $1 FOR UPDATE`, id, seen).Scan(&kind, &personID, &customer, &merged, &rev, &visible)
 		if errors.Is(err, pgx.ErrNoRows) || (err == nil && !visible) {
 			return ErrNotFound

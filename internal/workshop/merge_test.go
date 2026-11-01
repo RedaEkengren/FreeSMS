@@ -3,12 +3,15 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
+	"github.com/jackc/pgx/v5"
 )
 
 // Two records that are one, and two that only look alike. People are never
@@ -332,5 +335,53 @@ func TestAVehicleMergeMindsTheResourcesBookings(t *testing.T) {
 	}
 	if _, err := workshop.MergeVehicles(ctx, pool, advisor(), dup, vehicleA, pv.KeepRevision, pv.DropRevision, ""); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("the resource merged away: %v, want refused", err)
+	}
+}
+
+// What is read as a record through its merges is found once, as a set, so
+// a read asks for the rows naming any of it by index rather than following
+// every row's merges: the record itself and everything merged into it,
+// through a chain; nothing for a record merged away, as no row is read as
+// that one either.
+func TestTheRecordsReadAsOneAreFoundOnce(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	customer := func(name string) string {
+		id, err := workshop.CreateCustomer(ctx, pool, advisor(), workshop.NewCustomer{Kind: "private", Name: name})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	a, b := customer("Kedja A"), customer("Kedja B")
+	// fixtureCustomer <- a <- b: b merged into a, then a into the fixture.
+	for _, m := range [][2]string{{a, b}, {fixtureCustomer, a}} {
+		pv, err := workshop.PreviewCustomerMerge(ctx, pool, advisor(), m[0], m[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := workshop.MergeCustomers(ctx, pool, advisor(), m[0], m[1], pv.KeepRevision, pv.DropRevision, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	read := func(id string) []string {
+		var ids []string
+		if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+			return tx.QueryRow(ctx, `SELECT coalesce(array_agg(x::text ORDER BY x), '{}') FROM unnest(customer_ids_read_as($1)) x`, id).Scan(&ids)
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return ids
+	}
+	want := []string{fixtureCustomer, a, b}
+	slices.Sort(want)
+	if got := read(fixtureCustomer); !slices.Equal(got, want) {
+		t.Errorf("read as the kept customer: %v, want %v", got, want)
+	}
+	if got := read(a); len(got) != 0 {
+		t.Errorf("read as a customer merged away: %v, want none", got)
+	}
+	if got := read("99999999-0000-0000-0000-000000000000"); len(got) != 0 {
+		t.Errorf("read as no customer: %v, want none", got)
 	}
 }
