@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -186,7 +185,7 @@ func Parts(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Part,
 		return nil, access.ErrForbidden
 	}
 	var out []Part
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT`+partColumns+`
 			FROM parts p WHERE p.active ORDER BY p.number`)
 		if err != nil {
@@ -219,7 +218,7 @@ func PartByCode(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, cod
 		return Part{}, ErrNotFound
 	}
 	var p Part
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		p, err = scanPart(tx.QueryRow(ctx, `SELECT`+partColumns+`
 			FROM parts p
@@ -262,7 +261,7 @@ func Move(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, m Movemen
 		}
 	}
 
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		return moveTx(ctx, tx, scope, m, partID, workOrderID, lineID)
 	})
 }
@@ -315,7 +314,7 @@ func MovementsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 		return nil, access.ErrForbidden
 	}
 	var out []Movement
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT m.id, m.kind, m.quantity, coalesce(m.reason, ''), m.moved_at,
 			       coalesce(p.display_name, ''), coalesce(m.note, ''),
@@ -365,7 +364,7 @@ func WriteOffs(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, from
 		return nil, access.ErrForbidden
 	}
 	var out []WriteOffCost
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT reason, sum(-quantity),
 			       coalesce(sum(-quantity * coalesce(unit_cost_minor, 0))::bigint, 0)
@@ -421,7 +420,7 @@ func ConsumeForJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if quantity <= 0 {
 		return fmt.Errorf("%w: consume a positive quantity", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := releaseReservations(ctx, tx, scope, jobID, partID); err != nil {
 			return err
 		}
@@ -490,7 +489,7 @@ func PriceFromCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		return 0, access.ErrForbidden
 	}
 	var bands []PriceBand
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		bands, err = bandsTx(ctx, tx)
 		return err
@@ -579,7 +578,7 @@ func PriceBands(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]
 		return nil, access.ErrForbidden
 	}
 	var out []PriceBand
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		out, err = bandsTx(ctx, tx)
 		return err
@@ -595,7 +594,7 @@ func SavePriceBand(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if markupBasis < 0 || markupBasis > 100000 {
 		return fmt.Errorf("%w: a markup between 0 and 1000%% please", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
 			INSERT INTO price_bands (shop_id, up_to_minor, markup_basis)
 			VALUES ($1, $2, $3)
@@ -639,7 +638,7 @@ func PartsForJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 
 	query = strings.TrimSpace(query)
 	var out []Part
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		// The job has to exist in this shop before its shelf is listed.
 		//
 		// Without this the identifier is only used in an EXISTS that orders
@@ -747,7 +746,7 @@ func Stocktake(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, part
 	if countedMilli < 0 {
 		return 0, fmt.Errorf("%w: a shelf cannot hold fewer than none", ErrInvalid)
 	}
-	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err = inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `SELECT 1 FROM parts WHERE id = $1 FOR UPDATE`, partID); err != nil {
 			return fmt.Errorf("lock part: %w", err)
 		}

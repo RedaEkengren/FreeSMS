@@ -1,34 +1,50 @@
 package server
 
 import (
+	"io"
+	"log/slog"
 	"net/http"
-	"os"
-	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/RedaEkengren/FreeSMS/internal/config"
 )
 
-// registeredRoutes reads the patterns out of server.go.
+// registeredRoutes is every pattern the server registers.
 //
-// http.ServeMux does not report what has been registered with it, so the
-// source is the only list there is. Reading it is the point: a route added to
-// the mux and not to the table below becomes a failure here, which is the
-// difference between a sweep and a handful of examples.
+// http.ServeMux does not report what has been registered with it; the
+// server's own router writes each registration down, with its module (#143).
+// A route added to the mux and not to the table below becomes a failure here,
+// which is the difference between a sweep and a handful of examples. It used
+// to read server.go with a pattern, which stopped seeing a route the moment
+// it was registered through anything but a variable named mux.
 func registeredRoutes(t *testing.T) []string {
 	t.Helper()
-	src, err := os.ReadFile("server.go")
-	if err != nil {
-		t.Fatalf("read server.go: %v", err)
-	}
-	re := regexp.MustCompile(`mux\.Handle(?:Func)?\("([A-Z]+ [^"]+)"`)
 	var out []string
-	for _, m := range re.FindAllStringSubmatch(string(src), -1) {
-		out = append(out, m[1])
+	for _, r := range routeTable(t) {
+		out = append(out, r.Pattern)
 	}
 	if len(out) < 40 {
-		t.Fatalf("found only %d routes; the pattern has stopped matching", len(out))
+		t.Fatalf("found only %d routes; the router has stopped writing them down", len(out))
 	}
 	return out
+}
+
+// routeTable is every route with the module it belongs to, from a server
+// that has not been given a database: registering touches none.
+func routeTable(t *testing.T) []registeredRoute {
+	t.Helper()
+	srv, err := New(nil, slog.New(slog.NewTextHandler(io.Discard, nil)), &config.Config{
+		BaseURL: "http://localhost", DefaultLocale: "en", Release: "test",
+		AttachmentsDir: t.TempDir(), ExportDir: t.TempDir(),
+	}, "")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if _, err := srv.routes(); err != nil {
+		t.Fatalf("routes: %v", err)
+	}
+	return srv.routeTable
 }
 
 // swept says what the sweep does with each route.
@@ -42,7 +58,7 @@ var swept = map[string]string{
 	"GET /login": "", "POST /login": "", "POST /logout": "", "GET /{$}": "",
 	"GET /board": "", "GET /jobs/new": "", "POST /jobs/new": "",
 	"GET /jobs/new/lookup": "", "GET /jobs/new/customers": "", "GET /figures": "", "GET /accounting": "",
-	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/charges": "", "POST /shop/final-check": "",
+	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/modules": "", "POST /shop/charges": "", "POST /shop/final-check": "",
 	"GET /privacy": "", "GET /day": "", "POST /day/settlement": "", "POST /day/review": "", "POST /privacy/export": "", "GET /events": "", "GET /mine": "", "GET /rota": "", "POST /hooks/46elks/{secret}": "", "POST /rota": "", "GET /schedule": "", "GET /mine/count": "", "POST /account/alert": "", "POST /account/theme": "", "GET /calendar": "", "POST /calendar": "", "GET /enquiries": "", "POST /enquiries": "", "POST /calendar/capacity": "", "GET /labour": "", "POST /labour": "",
 	"POST /labour/rate": "", "GET /time": "", "POST /time/correct": "",
 	"POST /drafts": "", "GET /drafts": "", "DELETE /drafts": "",

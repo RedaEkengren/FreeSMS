@@ -205,7 +205,7 @@ func AssignCustomer(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 	if !scope.Role.SeesCustomerPersonalData() {
 		return access.ErrForbidden
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var state State
 		var vehicleID string
 		switch err := tx.QueryRow(ctx,

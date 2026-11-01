@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -56,7 +55,7 @@ func AddLine(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 	if err := checkLine(&line); err != nil {
 		return err
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		return addLineTx(ctx, tx, scope, jobID, line, lineSource{})
 	})
 }

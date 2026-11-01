@@ -347,8 +347,10 @@ func loadBeforeM6(t *testing.T, pool *pgxpool.Pool) {
 func goldenScenario(t *testing.T, pool *pgxpool.Pool) goldenWorld {
 	t.Helper()
 	ctx := context.Background()
-	owner := access.Scope{ShopID: seedShopID, UserID: seedOwner, Role: access.RoleOwner}
-	tech := access.Scope{ShopID: seedShopID, UserID: seedTechnician, Role: access.RoleTechnician}
+	// A workshop-only shop, as every shop is unless it says otherwise.
+	workshopOnly := []access.Module{access.Workshop}
+	owner := access.Scope{ShopID: seedShopID, UserID: seedOwner, Role: access.RoleOwner, Modules: workshopOnly}
+	tech := access.Scope{ShopID: seedShopID, UserID: seedTechnician, Role: access.RoleTechnician, Modules: workshopOnly}
 
 	if err := workshop.SaveDetails(ctx, pool, owner, workshop.ShopDetails{
 		Name: "Verkstaden", AddressLine1: "Verkstadsgatan 1", PostalCode: "123 45", City: "Stockholm",

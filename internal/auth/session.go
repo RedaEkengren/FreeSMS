@@ -102,13 +102,15 @@ func Login(ctx context.Context, pool *pgxpool.Pool, shopID, email, password, use
 		}
 
 		const lookup = `
-			SELECT u.id, u.role, u.password_hash, u.active
+			SELECT u.id, u.role, u.password_hash, u.active,
+			       ARRAY(SELECT m.module FROM shop_modules m WHERE m.shop_id = u.shop_id ORDER BY m.module)
 			FROM users u
 			JOIN people p ON p.id = u.person_id
 			WHERE p.email = $1`
 		var userID, role, hash string
 		var active bool
-		scanErr := tx.QueryRow(ctx, lookup, email).Scan(&userID, &role, &hash, &active)
+		var modules []string
+		scanErr := tx.QueryRow(ctx, lookup, email).Scan(&userID, &role, &hash, &active, &modules)
 
 		if errors.Is(scanErr, pgx.ErrNoRows) {
 			// Spend the same effort as a real verification would, so that a
@@ -141,7 +143,7 @@ func Login(ctx context.Context, pool *pgxpool.Pool, shopID, email, password, use
 		ok = true
 		token = tok
 		s = Session{
-			Scope:     access.Scope{ShopID: shopID, UserID: userID, Role: access.Role(role)},
+			Scope:     access.Scope{ShopID: shopID, UserID: userID, Role: access.Role(role), Modules: asModules(modules)},
 			ExpiresAt: expires,
 		}
 		return nil
@@ -164,6 +166,15 @@ func Login(ctx context.Context, pool *pgxpool.Pool, shopID, email, password, use
 		return "", Session{}, ErrInvalidCredentials
 	}
 	return token, s, nil
+}
+
+// asModules is the shop's modules as read, in the type a scope carries.
+func asModules(names []string) []access.Module {
+	out := make([]access.Module, 0, len(names))
+	for _, n := range names {
+		out = append(out, access.Module(n))
+	}
+	return out
 }
 
 // dummyHash is a real argon2id hash of a value nobody knows, used to spend
@@ -215,9 +226,13 @@ func authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string,
 
 	var s Session
 	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		// The shop's modules come with the session, every request, so that
+		// switching one off takes effect on the next click rather than at the
+		// next sign-in -- and an operation can check without asking again.
 		const lookup = `
 			SELECT s.id, s.user_id, u.role, s.expires_at, s.last_seen_at, u.active,
-			       coalesce(u.locale, sh.locale, 'en'), u.plans_staff, coalesce(u.theme, '')
+			       coalesce(u.locale, sh.locale, 'en'), u.plans_staff, coalesce(u.theme, ''),
+			       ARRAY(SELECT m.module FROM shop_modules m WHERE m.shop_id = s.shop_id ORDER BY m.module)
 			FROM sessions s
 			JOIN users u  ON u.id = s.user_id
 			JOIN shops sh ON sh.id = s.shop_id
@@ -225,8 +240,9 @@ func authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string,
 		var sessionID, userID, role, locale, theme string
 		var expires, lastSeen time.Time
 		var active, planner bool
+		var modules []string
 
-		err := tx.QueryRow(ctx, lookup, sum[:]).Scan(&sessionID, &userID, &role, &expires, &lastSeen, &active, &locale, &planner, &theme)
+		err := tx.QueryRow(ctx, lookup, sum[:]).Scan(&sessionID, &userID, &role, &expires, &lastSeen, &active, &locale, &planner, &theme, &modules)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNoSession
 		}
@@ -250,7 +266,8 @@ func authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string,
 		}
 
 		s = Session{
-			Scope:     access.Scope{ShopID: shopID, UserID: userID, Role: access.Role(role), Planner: planner},
+			Scope: access.Scope{ShopID: shopID, UserID: userID, Role: access.Role(role), Planner: planner,
+				Modules: asModules(modules)},
 			ExpiresAt: expires,
 			Locale:    locale,
 			Theme:     theme,

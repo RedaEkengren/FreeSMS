@@ -49,7 +49,8 @@ func NeedsSetup(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
 //
 // locale is the language the workshop is created in: DEFAULT_LOCALE, because
 // whoever installed it has already said which language the workshop speaks.
-func Setup(ctx context.Context, pool *pgxpool.Pool, shopName, ownerName, email, password, locale string) (shopID string, err error) {
+// modules are what the shop runs (#143); none is Workshop alone.
+func Setup(ctx context.Context, pool *pgxpool.Pool, shopName, ownerName, email, password, locale string, modules []access.Module) (shopID string, err error) {
 	shopName = strings.TrimSpace(shopName)
 	ownerName = strings.TrimSpace(ownerName)
 	email = strings.TrimSpace(email)
@@ -131,10 +132,14 @@ func Setup(ctx context.Context, pool *pgxpool.Pool, shopName, ownerName, email, 
 		shopID, ownerName, email).Scan(&personID); err != nil {
 		return "", fmt.Errorf("create person: %w", err)
 	}
-	if _, err := tx.Exec(ctx,
-		`INSERT INTO users (shop_id, person_id, role, password_hash) VALUES ($1, $2, 'owner', $3)`,
-		shopID, personID, hash); err != nil {
+	var ownerID string
+	if err := tx.QueryRow(ctx,
+		`INSERT INTO users (shop_id, person_id, role, password_hash) VALUES ($1, $2, 'owner', $3) RETURNING id`,
+		shopID, personID, hash).Scan(&ownerID); err != nil {
 		return "", fmt.Errorf("create owner: %w", err)
+	}
+	if err := recordSetupModulesTx(ctx, tx, shopID, ownerID, modules); err != nil {
+		return "", err
 	}
 
 	if err := tx.Commit(ctx); err != nil {

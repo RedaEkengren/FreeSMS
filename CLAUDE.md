@@ -76,6 +76,20 @@ the handler that calls it today. Every exported function that takes an
 test reads the code and fails on anything else. `TestTheRoleMatrix` calls
 the privileged operations directly as each role.
 
+Modules are checked the same way
+([#143](https://github.com/RedaEkengren/FreeSMS/issues/143)). A shop runs
+any of Workshop, Dealer and Rental, recorded as rows in
+`shop_module_changes` and carried on `access.Scope.Modules` with the
+session. Every route is registered as Core's or a module's, and a module the
+shop does not run answers exactly as a path that does not exist. Every
+workshop operation reads through `inWorkshop` (or checks `scope.Require`)
+and refuses with `access.ErrModuleOff`; the ones that must keep working
+whatever is switched on -- documents, payments, customers, vehicles, people,
+privacy -- are listed in `core` in
+`internal/workshop/modules_contract_test.go` with the reason, and the test
+fails on anything else. Switched off, a module's history stays readable
+through Core; only new work is refused.
+
 So: a technician's default payload is the vehicle and the job. Customer
 personal data is opt-in per field, with a purpose. A field with no purpose does
 not exist.

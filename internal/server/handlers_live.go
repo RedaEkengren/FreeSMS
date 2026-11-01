@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/auth"
 )
 
@@ -53,6 +55,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cookie, _ := r.Cookie(sessionCookie)
+	scope := session.Scope
 	tick := time.NewTicker(s.liveHeartbeat)
 	defer tick.Stop()
 	for {
@@ -63,6 +66,11 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 			if !open {
 				return
 			}
+			// A module the shop does not run sends nothing (#143): its screens
+			// are not found, and the stream says nothing about them either.
+			if !scope.Uses(topicModule(topic)...) {
+				continue
+			}
 			if !send("event: change\ndata: %s\n\n", topic) {
 				return
 			}
@@ -70,9 +78,14 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 			// A stream does not outlive its session: signed out elsewhere,
 			// switched off by the owner, or simply expired. Checked without
 			// counting as activity, so the stream cannot keep it alive.
-			if _, err := auth.Check(r.Context(), s.pool, s.shop(), cookie.Value); errors.Is(err, auth.ErrNoSession) {
+			checked, err := auth.Check(r.Context(), s.pool, s.shop(), cookie.Value)
+			if errors.Is(err, auth.ErrNoSession) {
 				send("event: signedout\ndata: \n\n")
 				return
+			}
+			if err == nil {
+				// The modules as they are now, if the owner switched one.
+				scope = checked.Scope
 			}
 			// A comment line: keeps proxies from closing a quiet connection.
 			if !send(": ping\n\n") {
@@ -80,4 +93,15 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+}
+
+// topicModule is the module whose screens a live topic is about. Everything
+// a workshop screen listens for is the workshop's; the rota is Core's, which
+// Uses answers yes to with no module named.
+func topicModule(topic string) []access.Module {
+	switch {
+	case topic == "board", topic == "calendar", topic == "parts", strings.HasPrefix(topic, "job:"):
+		return []access.Module{access.Workshop}
+	}
+	return nil
 }

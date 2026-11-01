@@ -6858,6 +6858,81 @@
     },
     "light, dark, or the device's": {
       "other": "ljust, mörkt eller enhetens"
+    },
+    "Workshop": {
+      "other": "Verkstad"
+    },
+    "Car sales": {
+      "other": "Bilhandel"
+    },
+    "Rental": {
+      "other": "Uthyrning"
+    },
+    "What the shop runs": {
+      "other": "Vad företaget använder"
+    },
+    "Customers, vehicles, invoices and payments are always there. A module that is switched off keeps what it recorded -- its invoices and its history stay readable -- and nothing new can be added to it.": {
+      "other": "Kunder, fordon, fakturor och betalningar finns alltid. En modul som stängs av behåller det den har registrerat – dess fakturor och historik går fortfarande att läsa – men inget nytt kan läggas till i den."
+    },
+    "Still open in %s:": {
+      "other": "Fortfarande öppet i %s:"
+    },
+    "Job #%d": {
+      "other": "Jobb #%d"
+    },
+    "Booking %s": {
+      "other": "Bokning %s"
+    },
+    "Switched off, these stay as they are, and nobody can carry on with them until it is switched on again.": {
+      "other": "Avstängda ligger de kvar som de är, och ingen kan fortsätta med dem förrän modulen slås på igen."
+    },
+    "on since %s": {
+      "other": "på sedan %s"
+    },
+    "I have seen what is open and want to switch it off": {
+      "other": "Jag har sett vad som är öppet och vill stänga av den"
+    },
+    "Switch on": {
+      "other": "Slå på"
+    },
+    "Changes": {
+      "other": "Ändringar"
+    },
+    "%s switched on": {
+      "other": "%s slogs på"
+    },
+    "%s switched off": {
+      "other": "%s stängdes av"
+    },
+    "%s switched on by %s": {
+      "other": "%s slogs på av %s"
+    },
+    "%s switched off by %s": {
+      "other": "%s stängdes av, av %s"
+    },
+    "Switched off": {
+      "other": "Avstängt"
+    },
+    "That is part of something this shop has switched off. What it recorded before is still here; nothing new can be added to it.": {
+      "other": "Det hör till något som är avstängt här. Det som registrerades tidigare finns kvar, men inget nytt kan läggas till."
+    },
+    "there is no such module": {
+      "other": "den modulen finns inte"
+    },
+    "that module is not part of this release yet": {
+      "other": "den modulen finns inte i den här versionen ännu"
+    },
+    "the reason is longer than 500 characters": {
+      "other": "anledningen är längre än 500 tecken"
+    },
+    "Every shop before modules was a workshop": {
+      "other": "Varje företag var en verkstad innan det fanns moduler"
+    },
+    "Chosen at setup": {
+      "other": "Valt när FreeSMS sattes upp"
+    },
+    "Run since before modules were recorded": {
+      "other": "Använd sedan innan moduler registrerades"
     }
   }
 }

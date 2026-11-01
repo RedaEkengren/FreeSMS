@@ -114,7 +114,7 @@ func DeliveryDraft(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		return SummaryContent{}, ErrNotFound
 	}
 	var c SummaryContent
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		c, err = draftTx(ctx, tx, jobID)
 		return err
@@ -385,7 +385,7 @@ func IssueSummary(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, j
 		return DeliverySummary{}, fmt.Errorf("%w: that is not an odometer reading", ErrInvalid)
 	}
 	var out DeliverySummary
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var state State
 		var vehicleID string
 		if err := tx.QueryRow(ctx, `SELECT state, vehicle_id::text FROM work_orders WHERE id = $1 FOR UPDATE`, jobID).Scan(&state, &vehicleID); err != nil {
@@ -498,7 +498,7 @@ func SummariesFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, j
 		return nil, ErrNotFound
 	}
 	var out []DeliverySummary
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, summarySelect+` WHERE d.work_order_id = $1 ORDER BY d.version DESC`, jobID)
 		if err != nil {
 			return fmt.Errorf("list summaries: %w", err)
@@ -525,7 +525,7 @@ func SummaryVersion(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		return DeliverySummary{}, ErrNotFound
 	}
 	var out DeliverySummary
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		s, err := summaryTx(ctx, tx, jobID, version)
 		if err != nil {
 			return err
@@ -595,7 +595,7 @@ func AddRecommendation(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 	if body == "" || len([]rune(body)) > 300 || len([]rune(when)) > 80 {
 		return fmt.Errorf("%w: say what, in 300 characters or fewer, and when in 80", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `
 			INSERT INTO job_recommendations (shop_id, work_order_id, body, when_hint, by_user)
 			SELECT $1, w.id, $2, nullif($3, ''), $4 FROM work_orders w WHERE w.id = $5`,
@@ -616,7 +616,7 @@ func RecommendationsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		return nil, ErrNotFound
 	}
 	var out []Recommendation
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT r.id::text, r.body, coalesce(r.when_hint, ''), coalesce(p.display_name, ''), r.at, r.withdrawn_at, coalesce(r.enquiry_id::text, '')
 			FROM job_recommendations r LEFT JOIN users u ON u.id = r.by_user LEFT JOIN people p ON p.id = u.person_id
@@ -646,7 +646,7 @@ func WithdrawRecommendation(ctx context.Context, pool *pgxpool.Pool, scope acces
 	if !looksLikeUUID(recID) {
 		return ErrNotFound
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var author string
 		var gone *time.Time
 		if err := tx.QueryRow(ctx, `SELECT by_user::text, withdrawn_at FROM job_recommendations WHERE id = $1 FOR UPDATE`, recID).Scan(&author, &gone); err != nil {
@@ -678,7 +678,7 @@ func RecommendationToEnquiry(ctx context.Context, pool *pgxpool.Pool, scope acce
 		return "", ErrNotFound
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var body, jobID string
 		var existing, gone *string
 		if err := tx.QueryRow(ctx, `

@@ -17,6 +17,17 @@ import (
 // address for "where I start" means nobody has to remember a second one, and a
 // bookmark keeps working when somebody's role changes.
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
+	// A shop that does not run the workshop has no board to start at. Until
+	// the home page knows every module (#157), it starts at what is Core:
+	// the customers for the counter, the inbox for everybody else.
+	if scope := sessionFrom(r.Context()).Scope; !scope.Uses(access.Workshop) {
+		if scope.Role.SeesCustomerPersonalData() {
+			http.Redirect(w, r, "/customers", http.StatusSeeOther)
+		} else {
+			http.Redirect(w, r, "/mine", http.StatusSeeOther)
+		}
+		return
+	}
 	if sessionFrom(r.Context()).Scope.Role.SeesCustomerPersonalData() {
 		s.handleBoard(w, r)
 		return

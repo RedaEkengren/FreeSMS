@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -62,7 +61,7 @@ func TakeInWith(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, reg
 	}
 
 	var jobID string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		jobID, err = takeInTx(ctx, tx, scope, registration, complaint, odometerKm, d)
 		return err
@@ -143,7 +142,7 @@ func TakeInBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if in.TechnicianID != "" && !looksLikeUUID(in.TechnicianID) {
 		return "", false, fmt.Errorf("%w: choose who does the work", ErrInvalid)
 	}
-	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err = inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var status, name, phone, bookedTech, bookedTechName string
 		var existing *string
 		err := tx.QueryRow(ctx, `
@@ -329,7 +328,7 @@ func TakeInWalkIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 		return "", fmt.Errorf("%w: choose who does the work", ErrInvalid)
 	}
 	var jobID string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if _, err := technicianNameTx(ctx, tx, in.TechnicianID); err != nil {
 			return err
 		}

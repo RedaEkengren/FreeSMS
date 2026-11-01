@@ -9,7 +9,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // Where the car is, as a ledger of what happened to it: left with us,
@@ -50,7 +49,7 @@ type Presence struct {
 // to look for it, and nothing in it is about the customer.
 func PresenceFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) (Presence, error) {
 	var p Presence
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		p, err = presenceTx(ctx, tx, jobID)
 		return err
@@ -118,7 +117,7 @@ func CarRebooked(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 }
 
 func presenceEvent(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID, event string, expectedBack *time.Time) error {
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		// The order row serialises two people at the counter recording the
 		// same car at once, so the second reads what the first wrote.
 		var state State

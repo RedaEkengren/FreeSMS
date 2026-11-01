@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // A customer's yes on their link used to stop at the inspection: stored, and
@@ -61,7 +60,7 @@ func CustomerAnswers(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 		return nil, access.ErrForbidden
 	}
 	var out []CustomerAnswer
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT it.id, it.inspection_id, it.label, coalesce(it.note, ''),
 			       d.decision, d.id, d.decided_at, d.share_id IS NOT NULL,
@@ -108,7 +107,7 @@ func PriceAnswer(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 	if err := checkLine(&line); err != nil {
 		return err
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		// The order first, as every line does: it serialises two people
 		// pricing the same item, so the second sees the first one's line.
 		var state State

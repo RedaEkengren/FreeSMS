@@ -39,7 +39,7 @@ func CapacityBetween(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 		return Capacity{}, access.ErrForbidden
 	}
 	c := Capacity{Absent: map[string]map[string]string{}, Closed: map[string]string{}, Shifts: map[string]map[string]ScheduledDay{}}
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		loc, err := shopLocationTx(ctx, tx)
 		if err != nil {
 			return err
@@ -151,7 +151,7 @@ func CloseDay(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, day t
 	if reason == "" {
 		return fmt.Errorf("%w: say why the shop is shut", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `INSERT INTO shop_closures (shop_id, day, reason, created_by) VALUES ($1, $2::date, $3, $4)`,
 			scope.ShopID, day.Format("2006-01-02"), reason, scope.UserID)
 		var pgErr *pgconn.PgError
@@ -167,7 +167,7 @@ func OpenDay(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, day ti
 	if !scope.Role.RunsTheShop() {
 		return access.ErrForbidden
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `DELETE FROM shop_closures WHERE day = $1::date`, day.Format("2006-01-02"))
 		return err
 	})
@@ -181,7 +181,7 @@ func SetLifts(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, lifts
 	if lifts < 0 {
 		return fmt.Errorf("%w: lifts are not negative", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `UPDATE shops SET lifts = nullif($2, 0) WHERE id = $1`, scope.ShopID, lifts)
 		return err
 	})

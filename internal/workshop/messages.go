@@ -97,7 +97,7 @@ func SentBefore(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, job
 		return false, access.ErrForbidden
 	}
 	var sent bool
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `
 			SELECT EXISTS (
 			  SELECT 1 FROM outbound_messages m
@@ -117,7 +117,7 @@ func AlreadySent(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		return nil, access.ErrForbidden
 	}
 	var at *time.Time
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `
 			SELECT max(m.created_at) FROM outbound_messages m JOIN work_orders w ON w.id = m.work_order_id
 			WHERE m.work_order_id = $1 AND m.about = $2
@@ -147,7 +147,7 @@ func QueueMessage(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, m
 		return "", ErrNotFound
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		id, err = queueMessageTx(ctx, tx, scope, m)
 		return err
@@ -182,7 +182,7 @@ func MessagesFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		return nil, access.ErrForbidden
 	}
 	var out []OutboundMessage
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT m.id, m.about, m.channel, m.recipient, m.not_before, m.created_at, coalesce(p.display_name, ''),
 			       e.event, e.at, coalesce(e.detail, '')

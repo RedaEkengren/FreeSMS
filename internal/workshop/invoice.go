@@ -88,7 +88,7 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 	}
 
 	var inv Invoice
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		// The lock first, then the question.
 		//
 		// This used to ask whether an invoice existed and only afterwards take
@@ -263,7 +263,7 @@ func InvoicesFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, wo
 		return nil, access.ErrForbidden
 	}
 	var out []Invoice
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT id, series, number, work_order_id, credit_of_id, issued_at,
 			       customer_name, net_minor, vat_minor, gross_minor

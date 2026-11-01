@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // A final check before a car is ready, as a checklist the shop may require.
@@ -31,7 +30,7 @@ func FinalCheckSettingsFor(ctx context.Context, pool *pgxpool.Pool, scope access
 		return FinalCheckSettings{}, access.ErrForbidden
 	}
 	var s FinalCheckSettings
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		s, err = finalCheckSettingsTx(ctx, tx, scope.ShopID)
 		return err
@@ -60,7 +59,7 @@ func SaveFinalCheck(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 	if s.TemplateID != "" && !looksLikeUUID(s.TemplateID) {
 		return fmt.Errorf("%w: no such checklist", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if s.TemplateID != "" {
 			var active bool
 			var items int
@@ -94,7 +93,7 @@ type FinalCheck struct {
 // FinalCheckFor reads where a job stands.
 func FinalCheckFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) (FinalCheck, error) {
 	var fc FinalCheck
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		fc, err = finalCheckTx(ctx, tx, scope.ShopID, jobID)
 		return err

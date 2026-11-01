@@ -16,7 +16,7 @@ import (
 const secondTechID = "33333333-3333-3333-3333-333333333335"
 
 func secondTechnician() access.Scope {
-	return access.Scope{ShopID: shopID, UserID: secondTechID, Role: access.RoleTechnician}
+	return access.Scope{ShopID: shopID, UserID: secondTechID, Role: access.RoleTechnician, Modules: workshopOnly}
 }
 
 // addSecondTechnician is a fixture, like addTechnician: a person to clock.

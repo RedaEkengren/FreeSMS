@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // A workshop books three weeks ahead and FreeSMS had no surface for it. A
@@ -144,7 +143,7 @@ func CreateBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		return "", err
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if !nb.ConfirmedPast {
 			loc, err := shopLocationTx(ctx, tx)
 			if err != nil {
@@ -192,7 +191,7 @@ func MoveBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 	if err := checkBooking(&nb); err != nil {
 		return err
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := closedTx(ctx, tx, starts); err != nil {
 			return err
 		}
@@ -229,7 +228,7 @@ func closeBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 	if !looksLikeUUID(id) {
 		return ErrNotFound
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `UPDATE bookings SET status = $2 WHERE id = $1 AND status = 'booked'`, id, status)
 		if err != nil {
 			return fmt.Errorf("close booking: %w", err)
@@ -302,7 +301,7 @@ func BookingByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 	}
 	var b Booking
 	var events []BookingEvent
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		b, err = scanBooking(tx.QueryRow(ctx, `SELECT`+bookingColumns+bookingFrom+` WHERE b.id = $1`, id))
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -335,7 +334,7 @@ func BookingByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 
 func queryBookings(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, where string, args ...any) ([]Booking, error) {
 	var out []Booking
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT`+bookingColumns+bookingFrom+where, args...)
 		if err != nil {
 			return fmt.Errorf("list bookings: %w", err)
@@ -365,7 +364,7 @@ func PlannerRows(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([
 		return nil, access.ErrForbidden
 	}
 	var out []PlannerRow
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT u.id, p.display_name FROM users u JOIN people p ON p.id = u.person_id
 			WHERE u.active AND u.role = 'technician' ORDER BY p.display_name`)

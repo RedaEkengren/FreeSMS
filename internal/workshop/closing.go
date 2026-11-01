@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // Closing a job used to be a button somebody had to remember, the last one in
@@ -72,7 +71,7 @@ func CloseJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID
 	if len(reason) > 500 {
 		return fmt.Errorf("%w: keep the reason under 500 characters", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var state State
 		if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1 FOR UPDATE`, jobID).Scan(&state); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {

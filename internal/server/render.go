@@ -78,7 +78,12 @@ type pageData struct {
 	BookingPreview  *BookingPreview
 	FinalCheck      workshop.FinalCheck
 	FinalSetting    workshop.FinalCheckSettings
-	MyLocale        string
+	// What the shop runs, how that changed, and what is open in a module
+	// somebody tried to switch off.
+	Modules       []workshop.ModuleState
+	ModuleChanges []workshop.ModuleChange
+	ModuleOpen    *workshop.OpenBusiness
+	MyLocale      string
 	// What is waiting for the person signed in, and the header's count of it.
 	Waiting      []workshop.WaitingItem
 	WaitingCount int
@@ -268,6 +273,22 @@ type intakeForm struct {
 	ShopName  string
 	OwnerName string
 	Email     string
+	// What the shop is to run; nil before the form has been sent.
+	Modules []access.Module
+}
+
+// Runs reports whether the setup form has m ticked: what was sent, or the
+// workshop alone before anything was.
+func (f intakeForm) Runs(m access.Module) bool {
+	if f.Modules == nil {
+		return m == access.Workshop
+	}
+	for _, chosen := range f.Modules {
+		if chosen == m {
+			return true
+		}
+	}
+	return false
 }
 
 // setupForm is intakeForm under a name that says which page it belongs to.
@@ -291,6 +312,14 @@ var templateFuncs = template.FuncMap{
 	"date":  func(t time.Time) string { return t.Format("2006-01-02") },
 	"asset": web.Asset,
 }
+
+// AvailableModules is what this release offers a shop to run.
+func (d pageData) AvailableModules() []access.Module { return workshop.Available }
+
+// Runs reports whether the reader's shop runs a module, for a menu or a card
+// that belongs to it. Only presentation: the routes and the operations behind
+// them check for themselves (#143).
+func (d pageData) Runs(m string) bool { return d.Session.Scope.Uses(access.Module(m)) }
 
 // MessageAbouts are what a message to a customer can be about, as the page
 // names them.

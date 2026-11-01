@@ -153,7 +153,7 @@ func Board(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Board
 	}
 
 	var out []BoardEntry
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		const q = `
 			SELECT w.id, w.number, w.state,
 			       coalesce(r.registration, ''), coalesce(v.make, ''), coalesce(v.model, ''),

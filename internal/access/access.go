@@ -124,6 +124,52 @@ var ErrNoScope = errors.New("access: no shop in scope")
 // useful, while telling an anonymous visitor the same thing is not.
 var ErrForbidden = errors.New("access: not permitted for this role")
 
+// Module is a part of FreeSMS a shop chooses to run (#143). Core -- customers,
+// vehicles, documents, payments, people -- is not a module: every shop has it.
+type Module string
+
+const (
+	Workshop Module = "workshop"
+	Dealer   Module = "dealer"
+	Rental   Module = "rental"
+)
+
+// Modules is every module there is, in the order they are offered. The same
+// list is a CHECK constraint on shop_module_changes.module.
+var Modules = []Module{Workshop, Dealer, Rental}
+
+// Valid reports whether m is a module the schema accepts.
+func (m Module) Valid() bool {
+	for _, known := range Modules {
+		if m == known {
+			return true
+		}
+	}
+	return false
+}
+
+var moduleLabels = map[Module]string{
+	Workshop: "Workshop",
+	Dealer:   "Car sales",
+	Rental:   "Rental",
+}
+
+// Label is the module in words, as a catalogue key.
+func (m Module) Label() string {
+	if label, ok := moduleLabels[m]; ok {
+		return label
+	}
+	return string(m)
+}
+
+// ErrModuleOff is returned by an operation of a module the shop does not run.
+//
+// Not ErrForbidden: nobody's role is wrong. The shop has switched the module
+// off, and what it wrote while it was on is still read through Core. Over
+// HTTP a switched-off module's routes are not found; this is what an
+// operation reached any other way answers.
+var ErrModuleOff = errors.New("access: the module is switched off for this shop")
+
 // Scope is who is asking, and is the only way to reach data belonging to a
 // shop. Functions that read or write tenant rows take one.
 type Scope struct {
@@ -133,6 +179,40 @@ type Scope struct {
 	// Given the planning of people by whoever runs the shop. Read with
 	// PlansStaff, which also answers yes for those who run it.
 	Planner bool
+	// The modules the shop runs, loaded with the session so that an
+	// operation can check without another query. Empty runs none: a scope
+	// somebody forgot to fill in refuses every module's operations rather
+	// than allowing them.
+	Modules []Module
+}
+
+// Uses reports whether the shop runs every one of these modules. A feature
+// across modules -- a rental's damage as a workshop job -- asks for both.
+func (s Scope) Uses(modules ...Module) bool {
+	for _, want := range modules {
+		found := false
+		for _, m := range s.Modules {
+			if m == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+// Require is Uses as the error an operation returns: nil, or ErrModuleOff
+// naming the module that is off.
+func (s Scope) Require(modules ...Module) error {
+	for _, m := range modules {
+		if !s.Uses(m) {
+			return fmt.Errorf("%w: %s", ErrModuleOff, m)
+		}
+	}
+	return nil
 }
 
 // PlansStaff reports whether this person may set rotas and absences, and

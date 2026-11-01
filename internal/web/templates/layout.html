@@ -23,7 +23,9 @@
          anything; empty when nothing is waiting. */}}
     <a href="/mine" class="nav" data-live-topics="board parts staff">{{.T "For me"}} <span id="mine-count" class="count"
       hx-get="/mine/count" hx-trigger="load" hx-swap="outerHTML" hx-headers='{"X-FreeSMS-Live": "1"}'></span></a>
-    {{if .Session.Scope.Role.SeesParts}}<a href="/parts" class="nav">{{.T "Parts"}}</a>
+    {{/* A module's links only when the shop runs it (#143). The routes
+         answer "not found" regardless; this keeps the menu honest. */ -}}
+    {{if and .Session.Scope.Role.SeesParts (.Runs "workshop")}}<a href="/parts" class="nav">{{.T "Parts"}}</a>
     <a href="/supply" class="nav">{{.T "Orders"}}</a>
     <a href="/stock" class="nav">{{.T "Stock"}}</a>
     <a href="/scan" class="nav">{{.T "Scan"}}</a>
@@ -33,8 +35,8 @@
     <a href="/import" class="nav">{{.T "Import"}}</a>
     <a href="/start" class="nav">{{.T "Getting started"}}</a>{{end}}
     {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/customers" class="nav">{{.T "Customers"}}</a>
-    <a href="/enquiries" class="nav">{{.T "Enquiries"}}</a>
-    <a href="/calendar" class="nav">{{.T "Bookings"}}</a>
+    {{if .Runs "workshop"}}<a href="/enquiries" class="nav">{{.T "Enquiries"}}</a>
+    <a href="/calendar" class="nav">{{.T "Bookings"}}</a>{{end}}
     <a href="/figures" class="nav">{{.T "Figures"}}</a>
     <a href="/receivables" class="nav">{{.T "Owed"}}</a>
     <a href="/day" class="nav">{{.T "The day"}}</a>
@@ -42,9 +44,9 @@
     <a href="/privacy" class="nav">{{.T "Privacy"}}</a>{{end}}
     {{/* "Hours" and "Times" were two words apart and meant opposite things:
          your own clock, and the shop's labour guide. Both say which now. */}}
-    <a href="/time" class="nav">{{.T "My hours"}}</a>
-    <a href="/rota" class="nav">{{.T "Rota"}}</a>
-    {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/labour" class="nav">{{.T "Labour times"}}</a>{{end}}
+    {{if .Runs "workshop"}}<a href="/time" class="nav">{{.T "My hours"}}</a>
+    {{end}}<a href="/rota" class="nav">{{.T "Rota"}}</a>
+    {{if and .Session.Scope.Role.SeesCustomerPersonalData (.Runs "workshop")}}<a href="/labour" class="nav">{{.T "Labour times"}}</a>{{end}}
     <a href="/help" class="nav">{{.T "Help"}}</a>
     <a href="/search" class="nav">{{.T "Search"}}</a>
   </nav>

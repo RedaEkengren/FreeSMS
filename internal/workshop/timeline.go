@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // One job, in the order it happened.
@@ -129,7 +128,7 @@ func AddNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 		n.DeskOnly = false
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var opened time.Time
 		if err := tx.QueryRow(ctx, `SELECT opened_at FROM work_orders WHERE id = $1`, jobID).Scan(&opened); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -176,7 +175,7 @@ func CorrectNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, no
 	if body == "" || len([]rune(body)) > 1000 {
 		return fmt.Errorf("%w: write something, in 1000 characters or fewer", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var jobID, kind, audience, author string
 		var channel *string
 		var occurred time.Time
@@ -216,7 +215,7 @@ func TimelineFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 	}
 	desk := scope.Role.SeesCustomerPersonalData()
 	var out []Event
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var exists bool
 		if err := tx.QueryRow(ctx, `SELECT exists(SELECT 1 FROM work_orders WHERE id = $1)`, jobID).Scan(&exists); err != nil {
 			return fmt.Errorf("read job: %w", err)
@@ -840,7 +839,7 @@ func HandoverFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 	}
 	var h Handover
 	desk := scope.Role.SeesCustomerPersonalData()
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var hasCustomer bool
 		if err := tx.QueryRow(ctx, `SELECT state, promised_at, customer_id IS NOT NULL FROM work_orders WHERE id = $1`,
 			jobID).Scan(&h.State, &h.Promised, &hasCustomer); err != nil {

@@ -2,8 +2,10 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/auth"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
@@ -53,7 +55,21 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 	password := r.FormValue("password")
 
-	shopID, err := workshop.Setup(r.Context(), s.pool, form.ShopName, form.OwnerName, form.Email, password, s.locale)
+	// What the shop runs (#143). A form that did not ask -- a script written
+	// before there was a choice -- gets the workshop, as every installation
+	// did; a form that asked and had everything unticked is sent back.
+	form.Modules = []access.Module{}
+	for _, m := range r.Form["module"] {
+		form.Modules = append(form.Modules, access.Module(m))
+	}
+	err := error(nil)
+	if r.FormValue("modules_asked") != "" && len(form.Modules) == 0 {
+		err = fmt.Errorf("%w: choose at least one thing the shop runs", workshop.ErrInvalid)
+	}
+	var shopID string
+	if err == nil {
+		shopID, err = workshop.Setup(r.Context(), s.pool, form.ShopName, form.OwnerName, form.Email, password, s.locale, form.Modules)
+	}
 	switch {
 	case errors.Is(err, workshop.ErrAlreadySetUp):
 		// Somebody else finished first, or the page was left open. Either way

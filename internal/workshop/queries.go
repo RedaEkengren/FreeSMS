@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -264,7 +263,7 @@ func scanJob(row pgx.Row) (Job, error) {
 // OpenJobs lists what is in the shop and not finished, newest first.
 func OpenJobs(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Job, error) {
 	var jobs []Job
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT`+jobColumns+jobFrom+`
 			WHERE w.state NOT IN ('closed', 'cancelled')
 			-- Mine first. "What am I doing today" is the question a
@@ -297,7 +296,7 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 	var job Job
 	var lines []Line
 
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		row := tx.QueryRow(ctx, `SELECT`+jobColumns+jobFrom+` WHERE w.id = $2`, scope.UserID, id)
 		j, err := scanJob(row)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -357,7 +356,7 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 // car has stopped working on the first one, and asking them to remember two
 // taps in a workshop is how hours go missing.
 func ClockIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) error {
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		// Refuse before anything else happens. The transaction would roll a
 		// late refusal back anyway, but the clock the technician already has
 		// running on another car is stopped in the next statement, and a
@@ -422,7 +421,7 @@ func ClockOut(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID
 	if !looksLikeUUID(jobID) {
 		return ErrNotFound
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var exists bool
 		if err := tx.QueryRow(ctx, `SELECT exists(SELECT 1 FROM work_orders WHERE id = $1)`, jobID).Scan(&exists); err != nil {
 			return fmt.Errorf("read job: %w", err)

@@ -136,7 +136,7 @@
 
 <div class="no-print">
   <button type="button" class="secondary" data-print>{{$.T "Print"}}</button>
-  <p class="mt-l"><a href="/jobs/{{.WorkOrderID}}">{{$.T "Back to the job"}}</a></p>
+  {{if $.Runs "workshop"}}<p class="mt-l"><a href="/jobs/{{.WorkOrderID}}">{{$.T "Back to the job"}}</a></p>{{end}}
 </div>
 {{end}}
 {{end}}

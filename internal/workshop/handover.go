@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -91,7 +90,7 @@ func RequestParts(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, j
 	if quantity <= 0 {
 		return fmt.Errorf("%w: ask for at least one", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		_, err := requestPartsTx(ctx, tx, scope, jobID, description, quantity)
 		return err
 	})
@@ -130,7 +129,7 @@ func OpenPartRequests(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 		return nil, access.ErrForbidden
 	}
 	var out []PartRequest
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT pr.id, pr.work_order_id, pr.description,
 			       coalesce(p.display_name, ''), pr.requested_at,
@@ -195,7 +194,7 @@ func ReceivePart(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, re
 	if quantity < 0 {
 		return fmt.Errorf("%w: a negative arrival is a return to the supplier", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		_, _, err := receiveRequestTx(ctx, tx, scope, requestID, quantity, source)
 		return err
 	})
@@ -254,7 +253,7 @@ func CancelPartRequest(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 	if reason == "" {
 		return fmt.Errorf("%w: say why it is not coming", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var jobID string
 		err := tx.QueryRow(ctx, `
 			UPDATE part_requests SET cancelled_at = now(), note = $2
@@ -300,7 +299,7 @@ func resumeIfNothingOwedTx(ctx context.Context, tx pgx.Tx, jobID string) error {
 // PartRequestsFor lists a job's requests, arrived and outstanding.
 func PartRequestsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) ([]PartRequest, error) {
 	var out []PartRequest
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT pr.id, pr.work_order_id, pr.description,
 			       coalesce(p.display_name, ''), pr.requested_at, pr.arrived_at, pr.cancelled_at,
@@ -339,7 +338,7 @@ func ReportFinding(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if strings.TrimSpace(note) == "" {
 		return fmt.Errorf("%w: say what you found", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `
 			INSERT INTO findings (shop_id, work_order_id, note, reported_by)
 			SELECT $1, w.id, $2, $3 FROM work_orders w WHERE w.id = $4`,
@@ -357,7 +356,7 @@ func ReportFinding(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 // FindingsFor lists what has been reported on a job.
 func FindingsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) ([]Finding, error) {
 	var out []Finding
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT f.id, f.note, coalesce(p.display_name, ''), f.reported_at, f.handled_at, f.work_order_id
 			FROM findings f
@@ -390,7 +389,7 @@ func HandleFinding(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if !scope.Role.SeesCustomerPersonalData() {
 		return access.ErrForbidden
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx,
 			`UPDATE findings SET handled_at = now(), handled_by = $1
 			 WHERE id = $2 AND handled_at IS NULL`, scope.UserID, findingID)

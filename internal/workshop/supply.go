@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // Parts bought outside FreeSMS, and what came of them.
@@ -81,7 +80,7 @@ func RecordOrder(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in
 		in.PlacedOn = time.Now()
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if in.Reference != "" {
 			var other string
 			err := tx.QueryRow(ctx, `SELECT id FROM supplier_orders WHERE lower(supplier) = lower($1) AND lower(reference) = lower($2)`,
@@ -192,7 +191,7 @@ func ChangeETA(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, line
 	if len([]rune(note)) > 300 {
 		return fmt.Errorf("%w: keep the note to 300 characters", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var last *string
 		if err := tx.QueryRow(ctx, `
 			SELECT (SELECT to_char(eta, 'YYYY-MM-DD') FROM supplier_line_etas WHERE line_id = l.id ORDER BY at DESC, id DESC LIMIT 1)
@@ -252,7 +251,7 @@ func ReceiveDelivery(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 	if len([]rune(in.DeliveryRef)) > 100 || len([]rune(in.Substitute)) > 200 {
 		return "", false, fmt.Errorf("%w: the reference or description is too long", ErrInvalid)
 	}
-	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err = inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var requestID, partID *string
 		var expected *int64
 		if err := tx.QueryRow(ctx, `
@@ -346,7 +345,7 @@ func AcceptSubstitute(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 	if !looksLikeUUID(receiptID) {
 		return ErrNotFound
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var status *string
 		var qty float64
 		var cost *int64
@@ -387,7 +386,7 @@ func RejectSubstitute(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 		return "", ErrNotFound
 	}
 	var returnID string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var status *string
 		var qty float64
 		if err := tx.QueryRow(ctx, `SELECT substitute_status, quantity::float8 FROM supplier_receipts WHERE id = $1 FOR UPDATE`, receiptID).Scan(&status, &qty); err != nil {
@@ -424,7 +423,7 @@ func CancelOrder(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, or
 	if note == "" || len([]rune(note)) > 300 {
 		return fmt.Errorf("%w: say why, in 300 characters or fewer", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var cancelled *time.Time
 		if err := tx.QueryRow(ctx, `SELECT cancelled_at FROM supplier_orders WHERE id = $1 FOR UPDATE`, orderID).Scan(&cancelled); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -452,7 +451,7 @@ func ConfirmSupplierCancellation(ctx context.Context, pool *pgxpool.Pool, scope 
 	if !looksLikeUUID(orderID) {
 		return ErrNotFound
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `
 			UPDATE supplier_orders SET supplier_cancel_confirmed_at = clock_timestamp(), supplier_cancel_confirmed_by = $2
 			WHERE id = $1 AND cancelled_at IS NOT NULL AND supplier_cancel_confirmed_at IS NULL`, orderID, scope.UserID)
@@ -507,7 +506,7 @@ func PlanReturn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in 
 		return "", fmt.Errorf("%w: send back at least one, with a note of 300 characters or fewer", ErrInvalid)
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var qty, planned float64
 		var status *string
 		var requestID *string
@@ -564,7 +563,7 @@ func MarkReturned(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, r
 	if !looksLikeUUID(returnID) {
 		return ErrNotFound
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var returned *time.Time
 		var qty float64
 		var route string
@@ -614,7 +613,7 @@ func ConfirmCredit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if creditedMinor < 0 || len([]rune(ref)) > 100 {
 		return fmt.Errorf("%w: an amount of zero or more, and a reference of 100 characters or fewer", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var at *time.Time
 		var minor *int64
 		if err := tx.QueryRow(ctx, `SELECT credited_at, credited_minor FROM supplier_returns WHERE id = $1 FOR UPDATE`, returnID).Scan(&at, &minor); err != nil {

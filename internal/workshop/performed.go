@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -23,7 +22,7 @@ func MarkPerformed(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if scope.Role != access.RoleTechnician && !scope.Role.SeesCustomerPersonalData() {
 		return access.ErrForbidden
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var state State
 		if err := tx.QueryRow(ctx,
 			`SELECT state FROM work_orders WHERE id = $1 FOR UPDATE`, jobID).Scan(&state); err != nil {
@@ -79,7 +78,7 @@ func MarkPerformed(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 // Positions that are not lines on the job are refused rather than ignored,
 // since a tick that quietly did nothing would leave work unbilled.
 func Decline(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string, performed []int) error {
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var from State
 		if err := tx.QueryRow(ctx,
 			`SELECT state FROM work_orders WHERE id = $1 FOR UPDATE`, jobID).Scan(&from); err != nil {

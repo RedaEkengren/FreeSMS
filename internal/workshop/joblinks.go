@@ -35,7 +35,7 @@ func CreateJobLink(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	token := base64.RawURLEncoding.EncodeToString(raw)
 	sum := sha256.Sum256([]byte(token))
 
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var exists bool
 		if err := tx.QueryRow(ctx, `SELECT true FROM work_orders WHERE id = $1 FOR UPDATE`, jobID).Scan(&exists); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {

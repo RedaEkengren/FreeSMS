@@ -30,8 +30,12 @@ const (
 	vehicleID = "55555555-5555-5555-5555-555555555555"
 )
 
+// workshopOnly is what an ordinary shop runs: the workshop and nothing else,
+// as every shop did before there were modules.
+var workshopOnly = []access.Module{access.Workshop}
+
 func advisor() access.Scope {
-	return access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleServiceAdvisor}
+	return access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleServiceAdvisor, Modules: workshopOnly}
 }
 
 // A workshop with two invoices, a credit, a payment and its reversal, and a

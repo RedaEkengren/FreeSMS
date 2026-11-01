@@ -256,7 +256,7 @@ func PresentQuote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, j
 		return Quote{}, access.ErrForbidden
 	}
 	var out Quote
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		state, err := lockedState(ctx, tx, jobID)
 		if err != nil {
 			return err
@@ -342,7 +342,7 @@ func QuoteFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID
 		return QuoteView{}, access.ErrForbidden
 	}
 	var v QuoteView
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var q Quote
 		var lines, answers []byte
 		err := tx.QueryRow(ctx, `
@@ -444,7 +444,7 @@ func RecordQuoteAnswer(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 	if a.Via != "phone" && a.Via != "counter" {
 		return fmt.Errorf("%w: say whether it was by telephone or at the counter", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		state, err := lockedState(ctx, tx, jobID)
 		if err != nil {
 			return err

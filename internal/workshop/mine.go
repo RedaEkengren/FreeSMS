@@ -101,6 +101,11 @@ func WaitingFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]
 	if err := add(scheduleChanged(ctx, pool, scope)); err != nil {
 		return nil, err
 	}
+	// One inbox for every module (#158); a module the shop has switched off
+	// puts nothing in it. Everything below is the workshop's.
+	if !scope.Uses(access.Workshop) {
+		return out, nil
+	}
 	switch scope.Role {
 	case access.RoleTechnician:
 		if err := add(technicianWaiting(ctx, pool, scope)); err != nil {

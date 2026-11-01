@@ -20,14 +20,18 @@ const (
 	vehicleA = "55555555-5555-5555-5555-555555555555"
 )
 
+// workshopOnly is what an ordinary shop runs: the workshop and nothing else,
+// as every shop did before there were modules.
+var workshopOnly = []access.Module{access.Workshop}
+
 func advisor() access.Scope {
-	return access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleServiceAdvisor}
+	return access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleServiceAdvisor, Modules: workshopOnly}
 }
 
 // owner is the same person as far as the fixtures are concerned, with the role
 // that may change the business's own particulars.
 func owner() access.Scope {
-	return access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleOwner}
+	return access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleOwner, Modules: workshopOnly}
 }
 
 func setup(t *testing.T) *pgxpool.Pool {

@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // That the customer was told their car is ready, as rows: who, how, when.
@@ -70,7 +69,7 @@ func RecordContact(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if len(note) > 500 {
 		return fmt.Errorf("%w: keep the note under 500 characters", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var state State
 		if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1`, jobID).Scan(&state); err != nil {
 			if err == pgx.ErrNoRows {
@@ -97,7 +96,7 @@ func ContactsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		return nil, access.ErrForbidden
 	}
 	var out []CustomerContact
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT cc.how, coalesce(cc.note, ''), cc.at, coalesce(p.display_name, '')
 			FROM customer_contacts cc

@@ -7,7 +7,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -81,7 +80,7 @@ func ChecklistTemplateByID(ctx context.Context, pool *pgxpool.Pool, scope access
 
 func readChecklists(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id string) ([]ChecklistTemplate, error) {
 	var out []ChecklistTemplate
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT t.id, t.name, t.active,
 			       coalesce((SELECT array_agg(i.label ORDER BY i.position)
@@ -144,7 +143,7 @@ func SaveChecklistTemplate(ctx context.Context, pool *pgxpool.Pool, scope access
 		return "", ErrNotFound
 	}
 
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if id == "" {
 			if err := tx.QueryRow(ctx,
 				`INSERT INTO inspection_templates (shop_id, name) VALUES ($1, $2) RETURNING id`,
@@ -191,7 +190,7 @@ func SetChecklistActive(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 	if !access.IsUUID(id) {
 		return ErrNotFound
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `UPDATE inspection_templates SET active = $1 WHERE id = $2`, active, id)
 		if err != nil {
 			return fmt.Errorf("set checklist active: %w", err)

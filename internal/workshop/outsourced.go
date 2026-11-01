@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // Work sent to somebody else.
@@ -262,7 +261,7 @@ func RequestOutsourced(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		return "", fmt.Errorf("%w: an estimate cannot be negative", ErrInvalid)
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := lockJobTx(ctx, tx, in.JobID); err != nil {
 			return err
 		}
@@ -369,7 +368,7 @@ func RecordOutsourced(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 		in.Assignee = ""
 	}
 
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var jobID, lineID, status string
 		var hasLine bool
 		if err := tx.QueryRow(ctx, `
@@ -481,7 +480,7 @@ func OutsourcedFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		return nil, ErrNotFound
 	}
 	var out []Outsourced
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		out, err = outsourcedTx(ctx, tx, scope, `o.work_order_id = $1`, jobID)
 		return err
@@ -496,7 +495,7 @@ func OutsourcedOpen(ctx context.Context, pool *pgxpool.Pool, scope access.Scope)
 		return nil, access.ErrForbidden
 	}
 	var out []Outsourced
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		out, err = outsourcedTx(ctx, tx, scope, `
 			(SELECT e.kind FROM outsourced_events e

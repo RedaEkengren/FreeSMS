@@ -90,8 +90,8 @@ func TestTheLastOwnerStays(t *testing.T) {
 	ctx := context.Background()
 	first, _ := workshop.AddStaff(ctx, pool, owner(), "Första Ägaren", "first@verkstaden.test", access.RoleOwner, firstPassword)
 	second, _ := workshop.AddStaff(ctx, pool, owner(), "Andra Ägaren", "second@verkstaden.test", access.RoleOwner, firstPassword)
-	asFirst := access.Scope{ShopID: shopID, UserID: first, Role: access.RoleOwner}
-	asSecond := access.Scope{ShopID: shopID, UserID: second, Role: access.RoleOwner}
+	asFirst := access.Scope{ShopID: shopID, UserID: first, Role: access.RoleOwner, Modules: workshopOnly}
+	asSecond := access.Scope{ShopID: shopID, UserID: second, Role: access.RoleOwner, Modules: workshopOnly}
 
 	if err := workshop.SetStaffActive(ctx, pool, asFirst, second, false); err != nil {
 		t.Fatalf("one owner switching the other off: %v", err)

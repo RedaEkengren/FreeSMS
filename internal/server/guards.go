@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -29,12 +31,69 @@ var uuidWildcards = []string{"id", "itemID", "line", "note", "quoteID", "rec", "
 // /jobs/abc reached the database, which refused the text with a type error,
 // and the person was shown "Something went wrong" for a link that is simply
 // not there.
+//
+// And a second: every route belongs to Core or to a module (#143), and a
+// module's route is gated on the shop running it. The gate is outermost, ahead
+// of the session check, so that a switched-off module's address answers a
+// visitor who is not signed in exactly as it answers one who is: as a path
+// that does not exist.
 type routeMux struct {
 	*http.ServeMux
 	s *Server
+	// The module the routes registered through this value belong to; empty
+	// for Core.
+	module access.Module
+	// Where every registration is written down, shared by every value made
+	// from the same mux.
+	table *[]registeredRoute
+}
+
+// registeredRoute is one pattern and the module it belongs to.
+type registeredRoute struct {
+	Pattern string
+	Module  access.Module
+}
+
+// in is the same router, registering routes as m's.
+func (m routeMux) in(module access.Module) routeMux {
+	m.module = module
+	return m
+}
+
+func (m routeMux) Handle(pattern string, h http.Handler) {
+	m.record(pattern)
+	m.ServeMux.Handle(pattern, m.gate(h))
 }
 
 func (m routeMux) HandleFunc(pattern string, h http.HandlerFunc) {
+	m.record(pattern)
+	m.handleFunc(pattern, m.gate(h).ServeHTTP)
+}
+
+func (m routeMux) record(pattern string) {
+	if m.table != nil {
+		*m.table = append(*m.table, registeredRoute{Pattern: pattern, Module: m.module})
+	}
+}
+
+// gate answers as an unregistered path would -- the same status, the same
+// body -- when the shop does not run the route's module. Nothing in the
+// answer says a module is there to be switched on.
+func (m routeMux) gate(h http.Handler) http.Handler {
+	if m.module == "" {
+		return h
+	}
+	module := m.module
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !m.s.runs(r, module) {
+			http.NotFound(w, r)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
+func (m routeMux) handleFunc(pattern string, h http.HandlerFunc) {
 	var names []string
 	for _, n := range uuidWildcards {
 		if strings.Contains(pattern, "{"+n+"}") {
@@ -109,6 +168,31 @@ func (s *Server) fault(w http.ResponseWriter, r *http.Request, what string, err 
 			return
 		}
 	}
+	// An operation of a module the shop has switched off, reached from a
+	// page that is not that module's own.
+	if errors.Is(err, access.ErrModuleOff) {
+		s.log.Warn(what, "error", err, "path", r.URL.Path)
+		s.renderError(w, r, http.StatusConflict, "Switched off",
+			"That is part of something this shop has switched off. What it recorded before is still here; nothing new can be added to it.")
+		return
+	}
 	s.log.Error(what, "error", err, "path", r.URL.Path)
 	s.renderError(w, r, http.StatusInternalServerError, "Something went wrong", "Try again.")
+}
+
+// runs reports whether the shop runs a module, for a request: from the
+// session when there is one, which carries the shop's modules as they were
+// read for this request, and from the shop otherwise -- the customer's links
+// have no session. A shop that cannot be read runs nothing: a module's page
+// answering "not found" for a moment is better than one served regardless.
+func (s *Server) runs(r *http.Request, m access.Module) bool {
+	if session := sessionFrom(r.Context()); session.Scope.ShopID != "" {
+		return session.Scope.Uses(m)
+	}
+	on, err := workshop.ShopRuns(r.Context(), s.pool, s.shop(), m)
+	if err != nil {
+		s.log.Warn("read the shop's modules", "error", err)
+		return false
+	}
+	return on
 }

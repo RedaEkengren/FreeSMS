@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // Who is on an open job and when the rest of it is going to be done.
@@ -218,7 +217,7 @@ func AssignTechnician(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 	if !looksLikeUUID(userID) {
 		return fmt.Errorf("%w: choose a technician", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := lockJobTx(ctx, tx, jobID); err != nil {
 			return err
 		}
@@ -234,7 +233,7 @@ func ReleaseTechnician(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 	if !looksLikeUUID(jobID) || !looksLikeUUID(userID) {
 		return ErrNotFound
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := lockJobTx(ctx, tx, jobID); err != nil {
 			return err
 		}
@@ -263,7 +262,7 @@ func ReassignJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		return fmt.Errorf("%w: choose who it moves from and to", ErrInvalid)
 	}
 	reason = strings.TrimSpace(reason)
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := lockJobTx(ctx, tx, jobID); err != nil {
 			return err
 		}
@@ -287,7 +286,7 @@ func PlanFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 	if !looksLikeUUID(jobID) {
 		return p, ErrNotFound
 	}
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		if p, err = planTx(ctx, tx, jobID); err != nil {
 			return err
@@ -380,7 +379,7 @@ func CheckPlan(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobI
 		return nil, ErrNotFound
 	}
 	var out []Clash
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		p, err := planTx(ctx, tx, jobID)
 		if err != nil {
 			return err
@@ -416,7 +415,7 @@ func PlanJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 		return nil, err
 	}
 	var clashes []Clash
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := lockJobTx(ctx, tx, jobID); err != nil {
 			return err
 		}
@@ -499,7 +498,7 @@ func CarryOver(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobI
 		return nil, ErrNotFound
 	}
 	var in PlanInput
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		p, err := planTx(ctx, tx, jobID)
 		if err != nil {
 			return err
@@ -754,7 +753,7 @@ type BacklogItem struct {
 // unstaffed job up.
 func Backlog(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]BacklogItem, error) {
 	var out []BacklogItem
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			WITH today AS (SELECT (now() AT TIME ZONE (SELECT timezone FROM shops LIMIT 1))::date AS d),
 			open AS (
@@ -818,7 +817,7 @@ func PlannedJobs(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fr
 		return nil, access.ErrForbidden
 	}
 	var out []PlannedJob
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT w.id, w.number, coalesce(r.registration, ''), coalesce(w.complaint, ''),
 			       p.starts_at, p.ends_at, p.on_lift,

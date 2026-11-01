@@ -198,7 +198,7 @@ func TestWhoTakesOutAndWhen(t *testing.T) {
 	if err := workshop.TakeOut(ctx, pool, partsDesk(), job, stockedPart, 1); err != nil {
 		t.Errorf("the parts desk could not take out: %v", err)
 	}
-	bookkeeper := access.Scope{ShopID: shopID, UserID: userID, Role: "bookkeeper"}
+	bookkeeper := access.Scope{ShopID: shopID, UserID: userID, Role: "bookkeeper", Modules: workshopOnly}
 	if err := workshop.TakeOut(ctx, pool, bookkeeper, job, stockedPart, 1); !errors.Is(err, access.ErrForbidden) {
 		t.Errorf("a role that neither fits nor stocks took out a part: %v", err)
 	}

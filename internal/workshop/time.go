@@ -113,7 +113,7 @@ func MyTime(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, since t
 
 func timeEntries(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, where string, args ...any) ([]TimeEntry, error) {
 	var out []TimeEntry
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		q := `
 			SELECT t.id, t.work_order_id, w.number, coalesce(r.registration, ''),
 			       coalesce(p.display_name, ''), t.started_at, t.ended_at,
@@ -171,7 +171,7 @@ func CorrectTime(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, en
 			ErrInvalid, ended.Sub(started).Hours())
 	}
 
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		// An entry already on an issued invoice must not move. The invoice is
 		// immutable, so changing the hours underneath it would make the two
 		// disagree with nothing to show which is right.

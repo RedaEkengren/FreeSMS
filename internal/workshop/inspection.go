@@ -85,7 +85,7 @@ func (i InspectionItem) Decided() bool { return i.Decision != "" }
 // Templates lists the checklists a shop has.
 func Templates(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Template, error) {
 	var out []Template
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
 			`SELECT id, name FROM inspection_templates WHERE active ORDER BY name`)
 		if err != nil {
@@ -117,7 +117,7 @@ type Template struct {
 // customer was shown last month.
 func StartInspection(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID, templateID string) (string, error) {
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var name string
 		err := tx.QueryRow(ctx,
 			`SELECT name FROM inspection_templates WHERE id = $1 AND active`, templateID).Scan(&name)
@@ -165,7 +165,7 @@ func SetItem(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, itemID
 	default:
 		return fmt.Errorf("%w: %q is not pass, attention or fail", ErrInvalid, status)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var s any
 		if status != "" {
 			s = status
@@ -185,7 +185,7 @@ func SetItem(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, itemID
 
 // AttachPhoto records a stored photograph against an item.
 func AttachPhoto(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, itemID, key, contentType string, size int64, originalName string) error {
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `
 			INSERT INTO attachments
 			  (shop_id, inspection_item_id, storage_key, content_type, byte_size, original_name, uploaded_by)
@@ -207,7 +207,7 @@ func CompleteInspection(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 	if !looksLikeUUID(inspectionID) {
 		return ErrNotFound
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := unansweredFinalCheckTx(ctx, tx, inspectionID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrNotFound
@@ -230,7 +230,7 @@ func CompleteInspection(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 // InspectionsFor lists a job's inspections, newest last.
 func InspectionsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) ([]Inspection, error) {
 	var out []Inspection
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT i.id, i.work_order_id, i.template_name,
 			       coalesce(p.display_name, ''), i.started_at, i.completed_at
@@ -257,7 +257,7 @@ func InspectionsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		return nil, err
 	}
 	// Every inspection's items at once, rather than a transaction each.
-	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err = inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		ids := make([]string, len(out))
 		for idx := range out {
 			ids[idx] = out[idx].ID
@@ -360,7 +360,7 @@ func CreateShare(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in
 	token := base64.RawURLEncoding.EncodeToString(raw)
 	sum := sha256.Sum256([]byte(token))
 
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `
 			INSERT INTO inspection_shares (shop_id, inspection_id, token_sha256, created_by, expires_at)
 			SELECT $1, i.id, $2, $3, now() + $4::interval
@@ -395,7 +395,7 @@ func RevokeShare(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sh
 	if !looksLikeUUID(shareID) {
 		return ErrNotFound
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx,
 			`UPDATE inspection_shares SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`, shareID)
 		if err != nil {
@@ -447,7 +447,7 @@ func SharesFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, insp
 		return nil, access.ErrForbidden
 	}
 	var out []Share
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
 			`SELECT id, created_at, expires_at, revoked_at FROM inspection_shares
 			 WHERE inspection_id = $1 ORDER BY created_at DESC`, inspectionID)
@@ -558,7 +558,7 @@ func RecordDecision(ctx context.Context, pool *pgxpool.Pool, shopID, token, item
 // InspectionsForID reads a single inspection with its items.
 func InspectionsForID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id string) (Inspection, error) {
 	var insp Inspection
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		const q = `
 			SELECT i.id, i.work_order_id, i.template_name,
 			       coalesce(p.display_name, ''), i.started_at, i.completed_at,
@@ -593,7 +593,7 @@ func InspectionsForID(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 // guessing a key.
 func PhotoInShop(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, key string) (bool, error) {
 	var ok bool
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		return tx.QueryRow(ctx,
 			`SELECT exists(SELECT 1 FROM attachments WHERE storage_key = $1)`, key).Scan(&ok)
 	})

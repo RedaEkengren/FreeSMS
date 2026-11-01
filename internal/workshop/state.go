@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -302,7 +301,7 @@ func SetState(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID
 	if !scope.Role.Valid() {
 		return access.ErrForbidden
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		return setStateInScopeTx(ctx, tx, scope, jobID, to)
 	})
 }
