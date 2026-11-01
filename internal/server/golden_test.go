@@ -418,6 +418,15 @@ func (w goldenWorld) withPeriod(t *testing.T, pool *pgxpool.Pool) goldenWorld {
 // compareGolden renders every golden page and compares it with its file.
 func compareGolden(t *testing.T, pool *pgxpool.Pool, world goldenWorld) {
 	t.Helper()
+	// The golden output is a workshop-only shop's, and is compared as one.
+	var runs []string
+	if err := pool.QueryRow(context.Background(),
+		`SELECT ARRAY(SELECT module FROM shop_modules WHERE shop_id = $1)`, seedShopID).Scan(&runs); err != nil {
+		t.Fatalf("what the seeded shop runs: %v", err)
+	}
+	if len(runs) != 1 || runs[0] != string(access.Workshop) {
+		t.Fatalf("the seeded shop runs %v; the golden output is a workshop-only shop's", runs)
+	}
 	ts := goldenServer(t, pool)
 	clients := map[string]*http.Client{}
 	for _, p := range world.pages() {

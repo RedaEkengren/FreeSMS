@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/i18n"
 )
 
@@ -124,6 +125,18 @@ func TestNoPageReadInSwedishShowsAnEnglishSentenceFromTheCatalogue(t *testing.T)
 	}
 	labels := labelSet(t)
 	leaks := map[string][]string{}
+	// A workshop-only shop shows no word of a module it does not run (#142),
+	// in either language: no "Bilhandel" card, no "Rental" menu.
+	cats, err := i18n.Load("en", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var otherModules []string
+	for _, m := range access.Modules {
+		if m != access.Workshop {
+			otherModules = append(otherModules, m.Label(), cats.For("sv").T(m.Label()))
+		}
+	}
 	walk := func(who string, c *http.Client, paths []string) {
 		for _, p := range paths {
 			status, body := page(t, c, base+p)
@@ -131,6 +144,11 @@ func TestNoPageReadInSwedishShowsAnEnglishSentenceFromTheCatalogue(t *testing.T)
 				continue
 			}
 			text := pageWords(body)
+			for _, word := range otherModules {
+				if strings.Contains(text, word) {
+					leaks["a module the shop does not run: "+word] = append(leaks["a module the shop does not run: "+word], who+" "+p)
+				}
+			}
 			for _, s := range sentences {
 				if strings.Contains(text, s) {
 					leaks[s] = append(leaks[s], who+" "+p)
