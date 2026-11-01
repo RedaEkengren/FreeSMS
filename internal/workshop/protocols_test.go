@@ -109,6 +109,34 @@ func TestACheckOutIsStartedOnceFromAChecklistForIt(t *testing.T) {
 	}
 }
 
+// A replay is the same request again. A phone replaying a check-out for a
+// vehicle that is not there is told so, not handed an unclassified error;
+// a key that started a different protocol is refused, not answered with
+// that protocol, which findings would then be recorded against.
+func TestAReplayedProtocolKeyFindsOnlyTheSameRequest(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	tpl := rentalChecklist(t, pool)
+	desk := otherRoles(access.Of(access.RoleRentalAgent))
+	start := func(ref, vehicle, key string) (string, error) {
+		return workshop.StartProtocol(ctx, pool, desk, workshop.ProtocolSubject{Kind: workshop.SubjectCheckOut,
+			RefID: ref, VehicleID: vehicle}, tpl, "", key)
+	}
+	if _, err := start(rentalA, "99999999-0000-0000-0000-000000000009", "phone-gone"); !errors.Is(err, workshop.ErrNotFound) {
+		t.Errorf("a replayed check-out of a vehicle that is not there: %v, want not found", err)
+	}
+	first := checkOut(t, pool, tpl, "phone-2")
+	if _, err := start("66666666-0000-0000-0000-000000000002", vehicleA, "phone-2"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("the key of one rental's check-out used for another: %v, want refused", err)
+	}
+	if _, err := start(rentalA, "99999999-0000-0000-0000-000000000009", "phone-2"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("the key of one vehicle's check-out used for another: %v, want refused", err)
+	}
+	if again, err := start(rentalA, vehicleA, "phone-2"); err != nil || again != first {
+		t.Errorf("the same request again: %s, %v; want %s", again, err, first)
+	}
+}
+
 // Completed, a protocol is frozen -- its items, answers and photographs --
 // by the database, whatever writes to it. A correction is a new protocol
 // naming the one it supersedes. One abandoned is kept and frozen too.

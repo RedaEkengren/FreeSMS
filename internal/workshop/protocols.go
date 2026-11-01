@@ -146,12 +146,10 @@ func StartProtocol(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	var id string
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if key != "" {
-			err := tx.QueryRow(ctx, `SELECT id FROM inspections WHERE request_key = $1`, key).Scan(&id)
-			if err == nil {
-				return nil
-			}
-			if !errors.Is(err, pgx.ErrNoRows) {
-				return fmt.Errorf("read the request: %w", err)
+			var found bool
+			var err error
+			if id, found, err = replayedProtocol(ctx, tx, key, subj); found || err != nil {
+				return err
 			}
 		}
 		var name string
@@ -184,11 +182,18 @@ func StartProtocol(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 			RETURNING id`,
 			scope.ShopID, subj.Kind, subj.RefID, templateID, name, scope.UserID, supersedes, key, subj.VehicleID).Scan(&id)
 		if errors.Is(err, pgx.ErrNoRows) {
-			if key == "" {
-				return ErrNotFound // no such vehicle
+			// Either there is no such vehicle, or the same request, replayed
+			// at the same moment, got there first.
+			var found bool
+			if key != "" {
+				if id, found, err = replayedProtocol(ctx, tx, key, subj); err != nil {
+					return err
+				}
 			}
-			// The same request, replayed at the same moment, got there first.
-			return tx.QueryRow(ctx, `SELECT id FROM inspections WHERE request_key = $1`, key).Scan(&id)
+			if !found {
+				return ErrNotFound
+			}
+			return nil
 		}
 		if err != nil {
 			return fmt.Errorf("start protocol: %w", err)
@@ -203,6 +208,30 @@ func StartProtocol(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		return nil
 	})
 	return id, err
+}
+
+// errKeyReused is a request key already used to start a different protocol.
+var errKeyReused = fmt.Errorf("%w: that request was already used to start a protocol of something else", ErrInvalid)
+
+// replayedProtocol finds the protocol a request key already started. A
+// replay is the same request again, so it must be of the same subject, the
+// same purchase, rental or sale, and the same vehicle; a key that started
+// something else is refused rather than answered with another car's
+// protocol, which findings would then be recorded against.
+func replayedProtocol(ctx context.Context, tx pgx.Tx, key string, subj ProtocolSubject) (id string, found bool, err error) {
+	var subject, vehicle, ref string
+	err = tx.QueryRow(ctx, `
+		SELECT id::text, subject, vehicle_id::text, coalesce(`+subjectColumns[subj.Kind]+`::text, '')
+		FROM inspections WHERE request_key = $1`, key).Scan(&id, &subject, &vehicle, &ref)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return "", false, nil
+	case err != nil:
+		return "", false, fmt.Errorf("read the request: %w", err)
+	case subject != subj.Kind || vehicle != subj.VehicleID || ref != subj.RefID:
+		return "", false, errKeyReused
+	}
+	return id, true, nil
 }
 
 // protocolOf reads the subject of a protocol, or of the protocol an item is

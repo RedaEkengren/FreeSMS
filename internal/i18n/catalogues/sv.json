@@ -7038,6 +7038,9 @@
     },
     "the reason is longer than 300 characters": {
       "other": "anledningen är längre än 300 tecken"
+    },
+    "that request was already used to start a protocol of something else": {
+      "other": "den begäran har redan använts för att börja ett protokoll om något annat"
     }
   }
 }
