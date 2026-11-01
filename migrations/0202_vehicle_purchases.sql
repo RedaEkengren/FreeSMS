@@ -123,38 +123,9 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER vat_eligibility_stays BEFORE INSERT OR UPDATE OR DELETE ON vat_eligibility
     FOR EACH ROW EXECUTE FUNCTION vat_eligibility_stays();
 
--- An odometer reading taken when the car is bought. Widened the way 0201
--- widens the audit log's subjects, so that car sales and rental, each on a
--- branch of its own, keep each other's.
-DO $$
-DECLARE
-    sources text[];
-BEGIN
-    SELECT array_agg(DISTINCT m[1]) INTO sources
-      FROM pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-     WHERE c.conrelid = 'odometer_readings'::regclass AND c.conname = 'odometer_readings_source_check';
-    IF sources IS NULL THEN
-        RAISE EXCEPTION 'odometer_readings_source_check is not there to widen';
-    END IF;
-    IF NOT 'purchase' = ANY (sources) THEN
-        sources := sources || ARRAY['purchase'];
-    END IF;
-    ALTER TABLE odometer_readings DROP CONSTRAINT odometer_readings_source_check;
-    EXECUTE format('ALTER TABLE odometer_readings ADD CONSTRAINT odometer_readings_source_check CHECK (source = ANY (%L::text[]))', sources);
-END
-$$;
-
-DO $$
-DECLARE
-    kinds text[];
-BEGIN
-    SELECT array_agg(DISTINCT m[1]) INTO kinds
-      FROM pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-     WHERE c.conrelid = 'audit_events'::regclass AND c.conname = 'audit_events_subject_kind_check';
-    IF NOT 'purchase' = ANY (kinds) THEN
-        kinds := kinds || ARRAY['purchase'];
-    END IF;
-    ALTER TABLE audit_events DROP CONSTRAINT audit_events_subject_kind_check;
-    EXECUTE format('ALTER TABLE audit_events ADD CONSTRAINT audit_events_subject_kind_check CHECK (subject_kind = ANY (%L::text[]))', kinds);
-END
-$$;
+-- An odometer reading taken when the car is bought, and the purchase as a
+-- subject of the audit log: added to the lists as they stand
+-- (widen_text_check, 0093), so that rental's additions on its own branch
+-- survive whichever order the two are applied in.
+SELECT widen_text_check('odometer_readings', 'odometer_readings_source_check', 'source', ARRAY['purchase']);
+SELECT widen_text_check('audit_events', 'audit_events_subject_kind_check', 'subject_kind', ARRAY['purchase']);

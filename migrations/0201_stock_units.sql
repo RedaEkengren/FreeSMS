@@ -67,24 +67,7 @@ REVOKE ALL ON stock_units FROM freesms_app;
 GRANT SELECT, INSERT ON stock_units TO freesms_app;
 GRANT UPDATE (status, first_for_sale_at, closed_at, closed_by, vehicle_sale_id) ON stock_units TO freesms_app;
 
--- Car sales and rental each widen this list on a branch of their own. Each
--- adds its kinds to whatever the list holds when it runs, rather than
--- writing the whole list out again, so that neither takes away the other's
--- whichever order they are applied in.
-DO $$
-DECLARE
-    kinds text[];
-BEGIN
-    SELECT array_agg(DISTINCT m[1]) INTO kinds
-      FROM pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-     WHERE c.conrelid = 'audit_events'::regclass AND c.conname = 'audit_events_subject_kind_check';
-    IF kinds IS NULL THEN
-        RAISE EXCEPTION 'audit_events_subject_kind_check is not there to widen';
-    END IF;
-    IF NOT 'stock_unit' = ANY (kinds) THEN
-        kinds := kinds || ARRAY['stock_unit'];
-    END IF;
-    ALTER TABLE audit_events DROP CONSTRAINT audit_events_subject_kind_check;
-    EXECUTE format('ALTER TABLE audit_events ADD CONSTRAINT audit_events_subject_kind_check CHECK (subject_kind = ANY (%L::text[]))', kinds);
-END
-$$;
+-- Car sales and rental each widen this list on a branch of their own, so
+-- each adds its kinds to the list as it stands (widen_text_check, 0093)
+-- rather than writing the whole list out again.
+SELECT widen_text_check('audit_events', 'audit_events_subject_kind_check', 'subject_kind', ARRAY['stock_unit']);
