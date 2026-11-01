@@ -482,6 +482,22 @@ func vehicleMergeTx(ctx context.Context, tx pgx.Tx, keepID, dropID string, lock 
 	if clash && p.Blocked == "" {
 		p.Blocked = "They carry the same plate at the same time."
 	}
+	// A car the business books keeps its resource and its bookings on its
+	// own record (0070), which a merge does not move: merged away, they
+	// would be left on a record nothing reads through.
+	var keepRes, dropRes bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM resources WHERE vehicle_id = $1), EXISTS (SELECT 1 FROM resources WHERE vehicle_id = $2)`,
+		keepID, dropID).Scan(&keepRes, &dropRes); err != nil {
+		return p, fmt.Errorf("check resources: %w", err)
+	}
+	switch {
+	case p.Blocked != "":
+	case keepRes && dropRes:
+		p.Blocked = "Both are cars the business books, each with bookings of its own, so they are not put together."
+	case dropRes:
+		p.Blocked = "The other is a car the business books. Keep it, and merge this one into it."
+	}
 	return p, nil
 }
 
@@ -522,6 +538,11 @@ func MergeVehicles(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		}
 		for _, t := range []string{"vehicle_registrations", "vehicle_ownership", "odometer_readings", "work_orders", "attachments", "bookings"} {
 			if _, err := tx.Exec(ctx, `UPDATE `+t+` SET vehicle_id = $1 WHERE vehicle_id = $2`, keepID, dropID); err != nil {
+				// An open job moved onto a car the business has booked
+				// ahead is refused as opening it there would be.
+				if c := blockConflict(err); c != err {
+					return c
+				}
 				if isOverlap(err) {
 					return fmt.Errorf("%w: the periods overlap, so they cannot be put together", ErrInvalid)
 				}

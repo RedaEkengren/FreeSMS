@@ -297,3 +297,40 @@ func TestAMergedVehiclesProtocolsAreReadAsTheKeptOnes(t *testing.T) {
 		t.Errorf("the protocol reads vehicle %s, plate %q; want the vehicle it was made of, under the kept car's plate", ps[0].VehicleID, ps[0].Registration)
 	}
 }
+
+// A car the business books is merged with the bookings in mind. One kept
+// that is booked ahead refuses the other's open job as any job is refused
+// -- naming the rental, not overlapping periods -- and one merged away
+// would leave its resource and its bookings on a record nothing reads, so
+// it is the one kept instead.
+func TestAVehicleMergeMindsTheResourcesBookings(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	res, err := workshop.CreateResource(ctx, pool, rentalDesk(), workshop.NewResource{VehicleID: vehicleA})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rent(pool, rentalDesk(), res, in2031(14, 9), in2031(14, 17)); err != nil {
+		t.Fatal(err)
+	}
+	dup := newOtherVehicle(t, pool, "ABC 12O")
+	if _, err := workshop.TakeIn(ctx, pool, advisor(), "ABC 12O", "Squeal", nil); err != nil {
+		t.Fatal(err)
+	}
+	pv, err := workshop.PreviewVehicleMerge(ctx, pool, advisor(), vehicleA, dup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.MergeVehicles(ctx, pool, advisor(), vehicleA, dup, pv.KeepRevision, pv.DropRevision, "Felläst skylt"); !errors.Is(err, workshop.ErrResourceTaken) ||
+		err.Error() != "workshop: invalid: it is taken then by a rental" {
+		t.Errorf("an open job moved onto a car rented out ahead: %v", err)
+	}
+
+	pv, err = workshop.PreviewVehicleMerge(ctx, pool, advisor(), dup, vehicleA)
+	if err != nil || pv.Blocked != "The other is a car the business books. Keep it, and merge this one into it." {
+		t.Errorf("the resource merged away: %+v, %v", pv, err)
+	}
+	if _, err := workshop.MergeVehicles(ctx, pool, advisor(), dup, vehicleA, pv.KeepRevision, pv.DropRevision, ""); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("the resource merged away: %v, want refused", err)
+	}
+}

@@ -2383,6 +2383,12 @@
     "They carry the same plate at the same time.": {
       "other": "De har samma skylt samtidigt."
     },
+    "Both are cars the business books, each with bookings of its own, so they are not put together.": {
+      "other": "Båda är bilar som företaget bokar, med egna bokningar, så de slås inte ihop."
+    },
+    "The other is a car the business books. Keep it, and merge this one into it.": {
+      "other": "Den andra är en bil som företaget bokar. Behåll den och slå ihop den här med den."
+    },
     "%d issued invoice stays exactly as issued": {
       "one": "%d utfärdad faktura står kvar precis som den utfärdades",
       "other": "%d utfärdade fakturor står kvar precis som de utfärdades"
