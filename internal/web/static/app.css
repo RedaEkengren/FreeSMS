@@ -640,7 +640,7 @@ table.rota-form td { padding: .15rem .25rem; }
 .figure { border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.75rem; font-variant-numeric: tabular-nums; }
 .figure.action { border-color: var(--attention); }
 
-/* The code a customer scans to pay an invoice (#234): big enough for a
+/* The code a customer scans to pay an invoice (issue 234): big enough for a
    phone's camera across a desk, small enough to sit by the total, and
    printed as it is shown. */
 .paycode { margin: 1rem 0; }
