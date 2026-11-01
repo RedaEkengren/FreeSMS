@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/RedaEkengren/FreeSMS/internal/identity"
@@ -101,5 +102,31 @@ func TestKeysAreReadFromConfigurationOrAFile(t *testing.T) {
 		if _, err := identity.ParseKeys(bad); err == nil {
 			t.Errorf("%q accepted", bad)
 		}
+	}
+}
+
+// A comment is read before the keys are split, so one with a comma in it
+// is a comment and not a broken key, whole-line or after a key. Both the
+// variable and the file set is refused, with both names, rather than one
+// quietly winning: a key added to the file to rotate would otherwise change
+// nothing.
+func TestAKeyFileCommentIsACommentAndOnlyOneSourceIsRead(t *testing.T) {
+	text := "# old key, drop after rotation\n" + keys(t, "new") + " # sealing, since 1 Nov\n" + keys(t, "old") + "\n"
+	k, err := identity.ParseKeys(text)
+	if err != nil || k.Current() != "new" {
+		t.Fatalf("a key file with commas in its comments: %v, current %q", err, k.Current())
+	}
+	if _, sealed, err := k.Seal([]byte("x"), nil); err != nil {
+		t.Fatal(err)
+	} else if _, err := k.Open("new", sealed, nil); err != nil {
+		t.Error(err)
+	}
+	path := filepath.Join(t.TempDir(), "identity.keys")
+	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = identity.Load(keys(t, "env"), path)
+	if err == nil || !strings.Contains(err.Error(), "IDENTITY_KEYS") || !strings.Contains(err.Error(), "IDENTITY_KEY_FILE") {
+		t.Errorf("both set: %v, want refused naming both", err)
 	}
 }

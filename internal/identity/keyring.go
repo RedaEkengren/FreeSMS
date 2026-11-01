@@ -50,12 +50,20 @@ type Keyring struct {
 var keyID = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,40}$`)
 
 // ParseKeys reads keys written as "id:base64key,id:base64key", each key 32
-// bytes. The first seals. An empty string is a keyring with no key.
+// bytes, or one or more to a line. A # starts a comment to the end of its
+// line, taken off before the keys are split, so a comment may say anything
+// -- commas too. Neither an id nor base64 has a #. The first key seals. An
+// empty string is a keyring with no key.
 func ParseKeys(spec string) (*Keyring, error) {
 	k := &Keyring{keys: map[string]cipher.AEAD{}}
-	for _, part := range strings.FieldsFunc(spec, func(r rune) bool { return r == ',' || r == '\n' }) {
+	var parts []string
+	for _, line := range strings.Split(spec, "\n") {
+		line, _, _ = strings.Cut(line, "#")
+		parts = append(parts, strings.Split(line, ",")...)
+	}
+	for _, part := range parts {
 		part = strings.TrimSpace(part)
-		if part == "" || strings.HasPrefix(part, "#") {
+		if part == "" {
 			continue
 		}
 		id, b64, ok := strings.Cut(part, ":")
@@ -85,10 +93,15 @@ func ParseKeys(spec string) (*Keyring, error) {
 	return k, nil
 }
 
-// Load reads the keyring from spec, or, when spec is empty, from the file at
-// path; both empty is a keyring with no key.
+// Load reads the keyring from spec (IDENTITY_KEYS) or from the file at path
+// (IDENTITY_KEY_FILE); both empty is a keyring with no key. Both set is
+// refused: reading one and ignoring the other means a key added to the one
+// ignored -- to rotate -- changes nothing, and nothing says so.
 func Load(spec, path string) (*Keyring, error) {
-	if spec == "" && path != "" {
+	if strings.TrimSpace(spec) != "" && path != "" {
+		return nil, fmt.Errorf("identity: both IDENTITY_KEYS and IDENTITY_KEY_FILE are set; set one, so it is clear which keys are in use")
+	}
+	if path != "" {
 		b, err := os.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("identity: read the key file: %w", err)
