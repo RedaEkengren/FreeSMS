@@ -28,7 +28,8 @@
   <li>
     <div class="row"><span>{{.Person}} &middot; {{$.T .Label}}</span>
       {{if .Until}}<span class="tag">{{$.T "until %s" ($.Date ($.Local .Until) "2 Jan 2006")}}</span>{{end}}</div>
-    <div class="waiting">{{$.T "%s, %s: %s" .By ($.Date ($.Local .At) "2 Jan 2006 15:04") .Reason}}</div>
+    {{if .ReasonErased}}<div class="waiting">{{$.T "%s, %s: the reason was erased at a person's request" .By ($.Date ($.Local .At) "2 Jan 2006 15:04")}}</div>
+    {{else}}<div class="waiting">{{$.T "%s, %s: %s" .By ($.Date ($.Local .At) "2 Jan 2006 15:04") .Reason}}</div>{{end}}
     <form method="post" action="/technicians/exceptions/end">
       <input type="hidden" name="user_id" value="{{.UserID}}">
       <input type="hidden" name="field" value="{{.Field}}">

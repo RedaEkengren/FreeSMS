@@ -370,8 +370,23 @@ func TestErasureTakesTheReasonsOfATechniciansExceptions(t *testing.T) {
 	if n := countRows(t, pool, `SELECT count(*) FROM technician_view_exceptions WHERE reason LIKE '%Anna%'`); n != 0 {
 		t.Errorf("%d exceptions still say why in words that name somebody", n)
 	}
-	if _, err := workshop.TechnicianView(ctx, pool, owner()); err != nil {
+	view, err := workshop.TechnicianView(ctx, pool, owner())
+	if err != nil {
 		t.Errorf("the settings page after the erasure: %v", err)
+	}
+	// The settings page says the reason was erased, rather than show a
+	// blank one the data cannot hold.
+	shown := false
+	for _, e := range view.Exceptions {
+		if e.UserID == techUserID {
+			shown = true
+			if e.Reason != "" || !e.ReasonErased {
+				t.Errorf("the settings page shows the erased exception as %+v", e)
+			}
+		}
+	}
+	if !shown {
+		t.Error("the settings page lost the exception after the erasure")
 	}
 	for _, stmt := range []string{`UPDATE technician_view_exceptions SET field = 'hourly_rate'`, `UPDATE technician_view_exceptions SET reason = 'Något annat'`} {
 		if err := asApp(ctx, pool, stmt); err == nil {
