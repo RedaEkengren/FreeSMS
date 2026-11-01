@@ -73,7 +73,10 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 		// A chassis number is compared as one can be, on both sides: one has
 		// no I, O or Q, so either may hold the digit they are mistaken for,
 		// and a number stored with the letter -- an old car's, not ISO 3779 --
-		// is found typed as stored as well as typed with the digit.
+		// is found typed as stored as well as typed with the digit. And
+		// neither side has spaces or hyphens: the typed number loses them
+		// on the way in, and one imported as "YV1 SW612 ..." is compared
+		// without its own, everywhere it is compared (vin_n).
 		//
 		// The ranking happens before the list is cut: the exact plate is
 		// first however many cars match a part of it.
@@ -87,19 +90,20 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 			       CASE
 			         WHEN m.normalised = $1 AND m.valid_to IS NULL THEN 'registration'
 			         WHEN m.normalised = $1 THEN 'a plate it used to carry'
-			         WHEN $5 <> '' AND translate(upper(coalesce(v.vin, '')), 'OQI', '001') LIKE '%' || $5 || '%' THEN 'chassis number'
+			         WHEN $5 <> '' AND n.vin_n LIKE '%' || $5 || '%' THEN 'chassis number'
 			         WHEN v.label ILIKE '%' || $2 || '%' THEN 'description'
 			         ELSE 'owner'
 			       END AS matched,
 			       CASE
 			         WHEN m.normalised = $1 AND m.valid_to IS NULL THEN 0
 			         WHEN m.normalised = $1 THEN 1
-			         WHEN $5 <> '' AND translate(upper(regexp_replace(coalesce(v.vin, ''), '[^A-Za-z0-9]', '', 'g')), 'OQI', '001') = $5 THEN 2
-			         WHEN $5 <> '' AND translate(upper(coalesce(v.vin, '')), 'OQI', '001') LIKE '%' || $5 || '%' THEN 3
+			         WHEN $5 <> '' AND n.vin_n = $5 THEN 2
+			         WHEN $5 <> '' AND n.vin_n LIKE '%' || $5 || '%' THEN 3
 			         ELSE 4
 			       END AS rank,
 			       CASE WHEN $4 THEN coalesce(cp.display_name, c.company_name, '') ELSE '' END AS owner
 			FROM vehicles v
+			CROSS JOIN LATERAL (SELECT translate(upper(regexp_replace(coalesce(v.vin, ''), '[^A-Za-z0-9]', '', 'g')), 'OQI', '001') AS vin_n) n
 			LEFT JOIN vehicle_registrations m ON m.vehicle_id = v.id
 			LEFT JOIN vehicle_registrations cur
 			       ON cur.vehicle_id = v.id AND cur.valid_to IS NULL
@@ -108,7 +112,7 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 			LEFT JOIN customers c ON c.id = o.customer_id
 			LEFT JOIN people cp   ON cp.id = c.person_id
 			WHERE v.merged_into IS NULL AND (($1 <> '' AND m.normalised = $1)
-			   OR ($5 <> '' AND translate(upper(coalesce(v.vin, '')), 'OQI', '001') LIKE '%' || $5 || '%')
+			   OR ($5 <> '' AND n.vin_n LIKE '%' || $5 || '%')
 			   OR ($4 AND (cp.display_name ILIKE '%' || $2 || '%'
 			            OR c.company_name ILIKE '%' || $2 || '%'))
 			   OR ($2 <> '' AND v.label ILIKE '%' || $2 || '%'))

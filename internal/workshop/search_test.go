@@ -176,3 +176,25 @@ func TestTheExactPlateIsFoundAmongMoreMatchesThanAreShown(t *testing.T) {
 		t.Errorf("the exact plate is not first among %d: %+v", len(found), found)
 	}
 }
+
+// A chassis number imported with spaces or hyphens in it is found by
+// typing the number, with or without them, and goes straight there: the
+// stored number is compared without its separators wherever it is
+// compared, not only where the match is ranked.
+func TestAChassisNumberStoredWithSpacesIsFoundTypedWithout(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	currentPool = pool
+	if _, err := pool.Exec(ctx, `UPDATE vehicles SET vin = 'YV1 SW612-52 1234567' WHERE id = $1`, vehicleA); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{"YV1SW612521234567", "yv1 sw612 52 1234567", "SW61252"} {
+		if got := foundKinds(t, technician(), q); len(got) != 1 || got[0] != "vehicle:chassis number" {
+			t.Errorf("%q: %v, want the car by its chassis number", q, got)
+		}
+	}
+	f, ok := workshop.Straight(must(workshop.SearchAll(ctx, pool, advisor(), "YV1SW612521234567")))
+	if !ok || f.Link() != "/vehicles/"+vehicleA {
+		t.Errorf("the whole number goes to %q (%v), want the car", f.Link(), ok)
+	}
+}
