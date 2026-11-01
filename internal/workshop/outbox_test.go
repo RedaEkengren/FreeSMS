@@ -419,3 +419,42 @@ func TestEachCallHasItsOwnLease(t *testing.T) {
 		t.Errorf("sent with %v; want each row once by the other worker", quick.keys)
 	}
 }
+
+// A request cancelled -- by mistake, or with its module switched off and on
+// again -- can be asked for again: the same row queued anew, sent, and its
+// history still saying it was cancelled once.
+func TestACancelledCallCanBeAskedForAgain(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	tpl := purchaseTemplate(t, pool)
+	doc := purchaseAgreement(t, pool, tpl, "")
+	d, _ := workshop.DocumentRecordByID(ctx, pool, buyerScope(), doc)
+	id, err := workshop.QueueSignatureRequest(ctx, pool, buyerScope(), doc, d.Parties[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.CancelOutbox(ctx, pool, owner(), id, "Av misstag"); err != nil {
+		t.Fatal(err)
+	}
+	again, err := workshop.QueueSignatureRequest(ctx, pool, buyerScope(), doc, d.Parties[0].ID)
+	if err != nil || again != id {
+		t.Fatalf("asked for again: %s, %v; want the same call, %s", again, err, id)
+	}
+	if state, attempts := callState(t, id, pool); state != "queued" || attempts != 0 {
+		t.Errorf("asked for again: %s after %d attempts, want queued and none", state, attempts)
+	}
+	a := &countingAdapter{}
+	if run, err := workshop.RunOutbox(ctx, pool, shopID, map[string]workshop.OutboxAdapter{"signature_request": a}, 10); err != nil || run.Sent != 1 {
+		t.Errorf("sent after it was asked for again: %+v, %v", run, err)
+	}
+	if n := outboxEvents(t, pool, id, "cancelled"); n != 1 {
+		t.Errorf("the history has %d cancellations, want the one", n)
+	}
+	// Done, it is not asked for again: the same request is the call made.
+	if _, err := workshop.QueueSignatureRequest(ctx, pool, buyerScope(), doc, d.Parties[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if state, _ := callState(t, id, pool); state != "succeeded" {
+		t.Errorf("a call made, asked for again: %s", state)
+	}
+}

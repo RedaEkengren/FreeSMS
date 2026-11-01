@@ -82,7 +82,9 @@ type NewOutboxItem struct {
 
 // enqueueTx writes a call to make, in the caller's transaction: rolled
 // back, it was never asked for. The same kind and key again is the call
-// already there.
+// already there -- or, when that one was cancelled, the same call asked for
+// again: queued anew on the same row, with its attempts starting again and
+// the cancellation kept in its history.
 func enqueueTx(ctx context.Context, tx pgx.Tx, scope access.Scope, n NewOutboxItem) (string, error) {
 	if !outboxKinds[n.Kind] {
 		return "", fmt.Errorf("outbox: %q is not a kind of call", n.Kind)
@@ -108,8 +110,17 @@ func enqueueTx(ctx context.Context, tx pgx.Tx, scope access.Scope, n NewOutboxIt
 		ON CONFLICT (shop_id, kind, idempotency_key) DO NOTHING RETURNING id`,
 		scope.ShopID, n.Kind, string(n.Module), n.SubjectKind, n.SubjectID, payload, n.Key, notBefore, n.MaxAttempts, scope.UserID).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		err = tx.QueryRow(ctx, `SELECT id FROM outbox WHERE kind = $1 AND idempotency_key = $2`, n.Kind, n.Key).Scan(&id)
-		return id, err
+		if err := tx.QueryRow(ctx, `SELECT id FROM outbox WHERE kind = $1 AND idempotency_key = $2`, n.Kind, n.Key).Scan(&id); err != nil {
+			return "", err
+		}
+		state, err := outboxStateTx(ctx, tx, id)
+		if err != nil || state != "cancelled" {
+			return id, err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE outbox SET claimed_until = NULL WHERE id = $1`, id); err != nil {
+			return "", err
+		}
+		return id, outboxEventTx(ctx, tx, scope.ShopID, id, "queued", nil, "asked for again", scope.UserID)
 	}
 	if err != nil {
 		return "", fmt.Errorf("queue the call: %w", err)
