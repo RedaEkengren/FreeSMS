@@ -740,8 +740,62 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 			return err
 		}
 		lines, _ := overriddenLines(quote.Lines, nil)
+		// The days it adds, counted on the whole rental -- not the
+		// extension's own, rounded up apart -- for what is charged and
+		// included by the day.
+		loc, err := shopLocationTx(ctx, tx)
+		if err != nil {
+			return err
+		}
+		was := rentalDays(b.starts, b.ends, loc)
+		added := rentalDays(b.starts, to, loc) - was
+		if added > 0 {
+			extras, err := perDayExtrasTx(ctx, tx, id, was, added)
+			if err != nil {
+				return err
+			}
+			lines = append(lines, extras...)
+			if quote.IncludedKm != nil && quote.Days > 0 {
+				perDay := *quote.IncludedKm / int(quote.Days)
+				if _, err := tx.Exec(ctx, `UPDATE rental_bookings SET included_km = coalesce(included_km, 0) + $2 WHERE id = $1`,
+					id, perDay*int(added)); err != nil {
+					return fmt.Errorf("add the kilometres: %w", err)
+				}
+			}
+		}
 		return insertRentalLinesTx(ctx, tx, scope, id, event, next, lines)
 	})
+}
+
+// perDayExtrasTx is the extras a booking took by the day, for the days an
+// extension adds: as many of each as it took, at the price it was agreed
+// at.
+func perDayExtrasTx(ctx context.Context, tx pgx.Tx, bookingID string, days, added int64) ([]frozenLine, error) {
+	rows, err := tx.Query(ctx, `
+		SELECT l.extra_id::text, l.unit, l.description, sum(l.quantity_milli), l.unit_price_minor, l.vat_rate_bp, l.vat_category, l.unconfirmed
+		FROM rental_booking_lines l JOIN rental_extras e ON e.id = l.extra_id
+		WHERE l.booking_id = $1 AND e.per = 'day'
+		GROUP BY l.extra_id, l.unit, l.description, l.unit_price_minor, l.vat_rate_bp, l.vat_category, l.unconfirmed
+		ORDER BY min(l.position)`, bookingID)
+	if err != nil {
+		return nil, fmt.Errorf("read the extras: %w", err)
+	}
+	defer rows.Close()
+	var out []frozenLine
+	for rows.Next() {
+		var l QuotedLine
+		var qty int64
+		if err := rows.Scan(&l.ExtraID, &l.Unit, &l.Description, &qty, &l.UnitPriceMinor, &l.VATRateBp, &l.VATCategory, &l.Unconfirmed); err != nil {
+			return nil, err
+		}
+		count := qty / (days * 1000)
+		if count < 1 {
+			continue
+		}
+		l.Kind, l.QuantityMilli = "extra", count*added*1000
+		out = append(out, frozenLine{QuotedLine: l})
+	}
+	return out, rows.Err()
 }
 
 func (b lockedRental) open() bool {

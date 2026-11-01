@@ -547,3 +547,49 @@ func TestARepeatedBookingForSomebodyNewMakesThemOnce(t *testing.T) {
 		t.Errorf("Nina was made %d times, %v", made, err)
 	}
 }
+
+// An extension charges a per-day extra for the days it adds, and adds the
+// kilometres the plan includes for them (review #1).
+func TestAnExtensionCarriesItsExtrasAndKilometres(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := addUnit(t, pool, workshop.NewRentalUnit{Registration: "ABC 12D", FleetNumber: "V1", Category: "Bil"})
+	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), unit, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
+		t.Fatal(err)
+	}
+	plan, _ := workshop.CreateRatePlan(ctx, pool, rentalOwner(), workshop.NewRatePlan{Name: "Bil", Category: "Bil", VATRateBp: 2500, SeasonRule: "at_start"})
+	km := 100
+	if _, err := workshop.AddRateSeason(ctx, pool, rentalOwner(), plan, workshop.RateSeason{ValidFrom: day("2020-01-01"), Day: kr(40000),
+		IncludedKmPerDay: &km, ExtraKmMinor: kr(300)}); err != nil {
+		t.Fatal(err)
+	}
+	seat, _ := workshop.AddRentalExtra(ctx, pool, rentalOwner(), workshop.NewRentalExtra{Kind: "child_seat", Name: "Barnstol", Per: "day",
+		PriceMinor: 5000, VATRateBp: 2500, VATCategory: "S"})
+	waiver, _ := workshop.AddRentalExtra(ctx, pool, rentalOwner(), workshop.NewRentalExtra{Kind: "delivery", Name: "Leverans", Per: "rental",
+		PriceMinor: 20000, VATRateBp: 2500, VATCategory: "S"})
+	renter, _ := workshop.CreateParty(ctx, pool, rentalDesk(), workshop.NewParty{Kind: "private", Name: "R", Role: workshop.PartyRenter})
+	id, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: unit, RenterID: renter,
+		From: in2031(10, 9), To: in2031(11, 9), Extras: []workshop.ExtraChoice{{ExtraID: seat, Count: 2}, {ExtraID: waiver, Count: 1}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, in2031(17, 9), "En vecka"); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id)
+	var seats, deliveries int64
+	for _, l := range b.Lines {
+		switch l.ExtraID {
+		case seat:
+			seats += l.QuantityMilli
+		case waiver:
+			deliveries += l.QuantityMilli
+		}
+	}
+	if seats != 2*7*1000 || deliveries != 1000 {
+		t.Errorf("two seats for seven days and one delivery: %d seat-days, %d deliveries (%+v)", seats/1000, deliveries/1000, b.Lines)
+	}
+	if b.IncludedKm == nil || *b.IncludedKm != 700 {
+		t.Errorf("seven days at 100 km: %v", b.IncludedKm)
+	}
+}
