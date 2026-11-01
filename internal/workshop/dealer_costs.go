@@ -112,7 +112,7 @@ var (
 )
 
 // RecordStockCost records a cost spent on a stock car. One dated after the
-// sale that stands is after it (stock_cost_post_sale, 0205): it changes
+// sale that stands is after it (stock_cost_post_sale, 0099): it changes
 // the margin, never the VAT. For whoever buys cars, in a shop that sells them.
 func RecordStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, unitID string, n NewStockCost) (StockCost, error) {
 	if !scope.Role.BuysVehicles() {

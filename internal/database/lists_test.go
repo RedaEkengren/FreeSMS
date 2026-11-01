@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// After every migration, the lists car sales widened (0201, 0202) still
+// After every migration, the lists car sales widened (0095, 0096) still
 // refuse a value nobody added -- widening a list must never leave it
 // allowing everything -- and allow the values added.
 func TestTheWidenedListsStillRefuseAnUnknownValue(t *testing.T) {
