@@ -14,10 +14,13 @@ cd "$(dirname "$0")/.."
 # A throwaway stack with a throwaway password. Compose requires one, and CI
 # has no .env to take it from.
 export POSTGRES_PASSWORD=throwaway-test-stack
-export COMPOSE_PROJECT_NAME=freesms-browser-test
+# Two runs on one machine under the same project name tear down each other's
+# stack halfway through (#245), so a second run at the same time sets its own
+# BROWSER_TEST_PROJECT and ports.
+export COMPOSE_PROJECT_NAME=${BROWSER_TEST_PROJECT:-freesms-browser-test}
 # The stack, and a mail server for the test that emails a customer.
 export COMPOSE_FILE=docker-compose.yml:deploy/browser-test.compose.yml
-export DB_PORT=55497 HTTP_PORT=18089
+export DB_PORT=${BROWSER_TEST_DB_PORT:-55497} HTTP_PORT=${BROWSER_TEST_HTTP_PORT:-18089}
 # The browser shares the app container's network and reaches it as
 # localhost. Chromium upgrades a plain http:// name like "app" to https and
 # fails; localhost it leaves alone, and treats as a secure context, as it

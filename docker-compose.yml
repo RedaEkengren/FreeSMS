@@ -21,8 +21,13 @@ services:
     healthcheck:
       # pg_isready reports that the server accepts connections. The application
       # waits for this rather than racing the first migration against a
-      # database that is still starting.
-      test: ["CMD-SHELL", "pg_isready -U freesms -d freesms"]
+      # database that is still starting. Over TCP, not the Unix socket: on a
+      # first start the image runs a temporary server for its init scripts
+      # that answers on the socket only, then restarts, and a check over the
+      # socket passed during that window and let the application connect to
+      # a server about to go away (#245). The application also retries for a
+      # minute (database.StartupWait), so either alone would do.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U freesms -d freesms"]
       interval: 5s
       timeout: 5s
       retries: 10
