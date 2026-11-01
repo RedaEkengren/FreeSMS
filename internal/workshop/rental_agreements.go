@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -251,7 +252,8 @@ var (
 	errDriverGone    = fmt.Errorf("%w: that driver has been taken off the rental", ErrInvalid)
 	errNoProfileNeed = fmt.Errorf("%w: this rental's profile needs no licence check", ErrInvalid)
 	errLicenceDate   = fmt.Errorf("%w: say until when the licence is valid", ErrInvalid)
-	errLicenceWhere  = fmt.Errorf("%w: say how the licence was checked, in 200 characters or fewer", ErrInvalid)
+	errLicenceWhere  = fmt.Errorf("%w: say how the licence was checked", ErrInvalid)
+	errLicenceNote   = fmt.Errorf("%w: keep the note to 80 characters, with no licence or identity number in it", ErrInvalid)
 )
 
 // AddRentalDriver names a driver for a rental: a party with the renter
@@ -394,15 +396,33 @@ func rentalDriversTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]Rental
 	return out, rows.Err()
 }
 
+// How a licence is checked: one of a list, so that what is kept says how
+// and nothing else.
+const (
+	LicenceCardInspected    = "card_inspected"
+	LicenceDigitalLicence   = "digital_licence"
+	LicenceForeignInspected = "foreign_licence_inspected"
+	LicenceOtherMethod      = "other"
+)
+
+// LicenceMethods are the ways, in the order a form offers them.
+var LicenceMethods = []string{LicenceCardInspected, LicenceDigitalLicence, LicenceForeignInspected, LicenceOtherMethod}
+
 // LicenceShown is what a driver's licence showed when it was checked: the
-// categories it holds, until when it is valid, and how it was checked -- by
-// looking at the card, through a service. No number and no picture.
+// categories it holds, until when it is valid, how it was checked, and a
+// short note. No number and no picture: a note that holds one is refused.
 type LicenceShown struct {
 	Shown      bool
 	Categories []string
 	ValidUntil time.Time
-	How        string
+	Method     string
+	Note       string
 }
+
+// anIdentifier is a run of six digits or more, spaces and dashes allowed
+// between them: a licence number, a personal identity number, a date of
+// birth.
+var anIdentifier = regexp.MustCompile(`\d(?:[\s-]?\d){5,}`)
 
 // Why a licence check did not pass, as catalogue keys.
 const (
@@ -423,12 +443,14 @@ func RecordLicenceCheck(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 	if !looksLikeUUID(driverID) {
 		return false, ErrNotFound
 	}
-	l.How = strings.TrimSpace(l.How)
+	l.Note = strings.TrimSpace(l.Note)
 	switch {
 	case l.Shown && l.ValidUntil.IsZero():
 		return false, errLicenceDate
-	case l.How == "" || len([]rune(l.How)) > 200:
+	case !slices.Contains(LicenceMethods, l.Method):
 		return false, errLicenceWhere
+	case len([]rune(l.Note)) > 80 || anIdentifier.MatchString(l.Note):
+		return false, errLicenceNote
 	}
 	cats := make([]string, 0, len(l.Categories))
 	for _, c := range l.Categories {
@@ -485,13 +507,12 @@ func RecordLicenceCheck(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 	case dateOnly(l.ValidUntil).Before(dateOnly(ends)):
 		failure = licenceExpires
 	}
-	ref := "Licence not shown; checked by: " + l.How
+	ref := "not shown; " + l.Method
 	if l.Shown {
-		ref = fmt.Sprintf("Licence shown; categories %s; valid until %s; checked by: %s",
-			strings.Join(cats, ", "), l.ValidUntil.Format("2006-01-02"), l.How)
+		ref = fmt.Sprintf("shown; categories %s; valid until %s; %s", strings.Join(cats, ","), l.ValidUntil.Format("2006-01-02"), l.Method)
 	}
-	if len([]rune(ref)) > 200 {
-		ref = string([]rune(ref)[:200])
+	if l.Note != "" {
+		ref += "; " + l.Note
 	}
 	record, err := RecordIdentity(ctx, pool, scope, nil, NewIdentityRecord{PartyID: party, Kind: IdentityLicence,
 		Purpose: "licence_check", Reference: ref})

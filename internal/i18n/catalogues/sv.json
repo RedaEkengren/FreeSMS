@@ -8273,6 +8273,13 @@
     "No licence was shown.": {"other": "Inget körkort visades."},
     "The licence does not hold a category this unit needs.": {"other": "Körkortet har ingen behörighet som enheten kräver."},
     "The licence is not valid for the whole rental.": {"other": "Körkortet gäller inte under hela hyrestiden."},
-    "a rental is at most five years": {"other": "en hyra är högst fem år"}
+    "a rental is at most five years": {"other": "en hyra är högst fem år"},
+    "say how the licence was checked": {"other": "ange hur körkortet kontrollerades"},
+    "keep the note to 80 characters, with no licence or identity number in it": {"other": "håll anteckningen inom 80 tecken, utan körkorts- eller personnummer"},
+    "The card, looked at": {"other": "Kortet, granskat"},
+    "A digital licence, looked at": {"other": "Ett digitalt körkort, granskat"},
+    "A foreign licence, looked at": {"other": "Ett utländskt körkort, granskat"},
+    "Another way, in the note": {"other": "Annat sätt, i anteckningen"},
+    "Note, with no licence or identity number": {"other": "Anteckning, utan körkorts- eller personnummer"}
   }
 }

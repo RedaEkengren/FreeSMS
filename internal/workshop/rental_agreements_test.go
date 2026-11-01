@@ -111,13 +111,13 @@ func TestEveryDriverShowsALicenceForEachRental(t *testing.T) {
 		}
 		return ok
 	}
-	if check(main, workshop.LicenceShown{Shown: true, Categories: []string{"C"}, ValidUntil: day("2035-01-01"), How: "Kortet visat"}) {
+	if check(main, workshop.LicenceShown{Shown: true, Categories: []string{"C"}, ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}) {
 		t.Error("a C licence passed for a B car")
 	}
-	if check(main, workshop.LicenceShown{Shown: true, Categories: []string{"B"}, ValidUntil: in2031(11, 0), How: "Kortet visat"}) {
+	if check(main, workshop.LicenceShown{Shown: true, Categories: []string{"B"}, ValidUntil: in2031(11, 0), Method: workshop.LicenceCardInspected}) {
 		t.Error("a licence that runs out during the rental passed")
 	}
-	if !check(main, workshop.LicenceShown{Shown: true, Categories: []string{"am", "B"}, ValidUntil: day("2035-01-01"), How: "Kortet visat"}) {
+	if !check(main, workshop.LicenceShown{Shown: true, Categories: []string{"am", "B"}, ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}) {
 		t.Error("a valid B licence did not pass")
 	}
 	if got := codes(id); len(got) != 0 {
@@ -180,7 +180,7 @@ func TestATrailerNeedsNoLicenceCheck(t *testing.T) {
 	}
 	d, _ := workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, renter, true)
 	if _, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), d, workshop.LicenceShown{Shown: true, Categories: []string{"B"},
-		ValidUntil: day("2035-01-01"), How: "x"}); !errors.Is(err, workshop.ErrInvalid) {
+		ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("a licence check nobody needs: %v", err)
 	}
 }
@@ -291,5 +291,38 @@ func TestAPlansVATRateIsUsedEverywhere(t *testing.T) {
 	d, _ := workshop.DocumentRecordByID(ctx, pool, rentalDesk(), doc)
 	if d.Data["extra_km"] != "10.60" {
 		t.Errorf("the extra kilometre at 6 %% VAT is printed %q", d.Data["extra_km"])
+	}
+}
+
+// How a licence was checked is one of a list, with a short note that may
+// not hold a licence number or a personal identity number: nothing typed
+// there reaches the identity record as an identifier (review #10).
+func TestALicenceCheckKeepsNoNumber(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	id, err := v.book(pool, in2031(10, 9), in2031(12, 9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver, err := workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, v.renter, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shown := func(method, note string) error {
+		_, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true,
+			Categories: []string{"B"}, ValidUntil: day("2035-01-01"), Method: method, Note: note})
+		return err
+	}
+	for _, note := range []string{"Kort 12345678", "pnr 850101-1234", "8501011234", "19850101 1234"} {
+		if err := shown(workshop.LicenceCardInspected, note); !errors.Is(err, workshop.ErrInvalid) {
+			t.Errorf("a note %q: %v", note, err)
+		}
+	}
+	if err := shown("looked closely", ""); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a method not on the list: %v", err)
+	}
+	if err := shown(workshop.LicenceForeignInspected, "Tyskt körkort, giltigt i Sverige"); err != nil {
+		t.Errorf("a note with no number: %v", err)
 	}
 }

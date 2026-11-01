@@ -52,8 +52,9 @@
         {{range $.Rental.LicenceCategories}}<label class="check"><input type="checkbox" name="categories" value="{{.}}"> {{.}}</label> {{end}}</div>
       <div class="pair">
         <label><span>{{$.T "Valid until"}}</span><input type="date" name="valid_until"></label>
-        <label><span>{{$.T "How it was checked"}}</span><input name="how" maxlength="200" required placeholder="{{$.T "Card shown at the counter"}}"></label>
+        <label><span>{{$.T "How it was checked"}}</span><select name="method">{{range $.Rental.LicenceMethods}}<option value="{{.}}">{{$.T ($.Rental.LicenceMethod .)}}</option>{{end}}</select></label>
       </div>
+      <label><span>{{$.T "Note, with no licence or identity number"}}</span><input name="note" maxlength="80"></label>
       <p class="waiting">{{$.T "No licence number and no picture are kept: only what is asked here, for as long as the licence check's purpose allows."}}</p>
       <button type="submit" class="secondary">{{$.T "Record the check"}}</button>
     </form>

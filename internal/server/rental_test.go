@@ -252,7 +252,7 @@ func TestTheBookingPageTakesTheDriverAndTheAgreement(t *testing.T) {
 		t.Fatal(err)
 	}
 	resp = postModuleForm(t, desk, ts.URL, "/rental/drivers/"+driver+"/check", url.Values{"booking": {strings.TrimPrefix(booking, "/rental/bookings/")},
-		"shown": {"1"}, "categories": {"B"}, "valid_until": {"2035-01-01"}, "how": {"Kortet visat"}})
+		"shown": {"1"}, "categories": {"B"}, "valid_until": {"2035-01-01"}, "method": {"card_inspected"}})
 	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != booking {
 		t.Fatalf("checking the licence: %d %s", resp.StatusCode, readBody(t, resp))
 	}

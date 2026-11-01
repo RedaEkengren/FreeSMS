@@ -136,6 +136,15 @@ func (rentalData) BaseLabel(base string) string {
 		workshop.ProfileMachine: "Machine", workshop.ProfileEquipment: "Equipment"}[base]
 }
 
+// LicenceMethods are the ways a licence is checked, for a form.
+func (rentalData) LicenceMethods() []string { return workshop.LicenceMethods }
+
+// LicenceMethod is a way, as a catalogue key.
+func (rentalData) LicenceMethod(m string) string {
+	return map[string]string{workshop.LicenceCardInspected: "The card, looked at", workshop.LicenceDigitalLicence: "A digital licence, looked at",
+		workshop.LicenceForeignInspected: "A foreign licence, looked at", workshop.LicenceOtherMethod: "Another way, in the note"}[m]
+}
+
 // LicenceCategories are the categories a profile can accept, for a form.
 func (rentalData) LicenceCategories() []string { return workshop.LicenceCategories }
 
@@ -667,7 +676,8 @@ func (s *Server) handleLicenceCheck(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusBadRequest, "Not accepted", "")
 		return
 	}
-	l := workshop.LicenceShown{Shown: r.FormValue("shown") != "", Categories: r.Form["categories"], How: r.FormValue("how")}
+	l := workshop.LicenceShown{Shown: r.FormValue("shown") != "", Categories: r.Form["categories"],
+		Method: r.FormValue("method"), Note: r.FormValue("note")}
 	if until, ok := s.formDate(r, "valid_until"); !ok {
 		s.renderError(w, r, http.StatusBadRequest, "That date did not parse", "Use the picker.")
 		return
