@@ -254,6 +254,61 @@ func TestCostsByRoleAndModule(t *testing.T) {
 
 func refTo(n int64) *int64 { return &n }
 
+// A supplier's cost reversed by hand while its corrected invoice is being
+// noted is reversed once: the hand waits for the invoice, finds the cost
+// already taken back, and is told so rather than failing.
+func TestACostReversedByHandWhileItsInvoiceIsCorrectedIsReversedOnce(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	buy(t, pool, workshop.StockFromPurchase)
+	job, line := turboJob(t, pool)
+	out := sendOut(t, pool, job, line, time.Now().AddDate(0, 0, 3))
+	record(t, pool, out, workshop.OutsourcedEventInput{Kind: "invoice", AmountMinor: pointerTo(int64(450_000)), InvoiceRef: "TV-1"})
+	var entry string
+	if err := pool.QueryRow(ctx, `SELECT id FROM stock_cost_entries WHERE source = 'outsourced'`).Scan(&entry); err != nil {
+		t.Fatal(err)
+	}
+	// The corrected invoice noted, its transaction still open: the trigger
+	// has reversed the cost and not yet committed.
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `INSERT INTO outsourced_events (shop_id, outsourced_id, kind, amount_minor, invoice_ref, by_user)
+		VALUES ($1, $2, 'invoice', 420000, 'TV-1b', $3)`, shopID, out, userID); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := workshop.ReverseStockCost(ctx, pool, buyerScope(), entry, "Fel bil")
+		done <- err
+	}()
+	for deadline := time.Now().Add(10 * time.Second); ; {
+		var waiting int
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM pg_locks WHERE NOT granted`).Scan(&waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the reversal by hand never waited for the invoice")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("the reversal by hand: %v; want it told the cost is already reversed", err)
+	}
+	var reversals int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM stock_cost_entries WHERE reverses_id = $1`, entry).Scan(&reversals); err != nil || reversals != 1 {
+		t.Errorf("reversed %d times (%v)", reversals, err)
+	}
+}
+
 // After the sale is one rule for every cost, and it is about what the cost
 // is for, not when it was posted: work on a job opened before the sale, or
 // a cost dated before the day of the sale, is before it however late its

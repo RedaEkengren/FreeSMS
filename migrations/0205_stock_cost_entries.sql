@@ -139,7 +139,15 @@ BEGIN
     -- the earlier one is reversed, with the new invoice's reference as
     -- why, rather than counted twice. So is one noted without an amount
     -- yet: the earlier invoice no longer stands, and its cost goes with
-    -- it until the new one's amount is noted.
+    -- it until the new one's amount is noted. Each entry is locked first
+    -- the way ReverseStockCost locks it, so a reversal by hand at the same
+    -- moment waits and finds it reversed, rather than both reversing it;
+    -- the INSERT below then reads what the wait let commit.
+    PERFORM pg_advisory_xact_lock(hashtextextended('cost:' || e.id::text, 0))
+       FROM stock_cost_entries e
+       JOIN outsourced_events oe ON oe.id = e.outsourced_event_id
+      WHERE oe.outsourced_id = NEW.outsourced_id
+      ORDER BY e.id;
     INSERT INTO stock_cost_entries (shop_id, stock_unit_id, kind, net_minor, input_vat_minor, vat_rate_basis,
                                     supplier_party_id, external_ref, incurred_on, source, work_order_id, happened_at,
                                     note, reverses_id, recorded_by)
