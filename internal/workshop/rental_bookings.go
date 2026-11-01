@@ -241,12 +241,11 @@ func BookRental(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n N
 			return err
 		}
 		if n.NewRenter != nil {
-			if n.RenterID, err = createPartyTx(ctx, sp, scope, *n.NewRenter, renterNote); err != nil {
-				_ = sp.Rollback(ctx)
-				return err
-			}
+			n.RenterID, err = createPartyTx(ctx, sp, scope, *n.NewRenter, renterNote)
 		}
-		id, err = bookRentalTx(ctx, sp, scope, n, key)
+		if err == nil {
+			id, err = bookRentalTx(ctx, sp, scope, n, key)
+		}
 		if err == nil {
 			return sp.Commit(ctx)
 		}

@@ -3,6 +3,7 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -643,6 +644,29 @@ func TestCancellingARunOutHoldBesideABookingDoesNotDeadlock(t *testing.T) {
 		}
 		if booked != nil {
 			t.Errorf("round %d: booking over a run-out hold: %v", i, booked)
+		}
+	}
+}
+
+// Sent twice at once with a new renter's email, the second finds the first
+// booking rather than being told the email is taken (review 2 #2).
+func TestARepeatedBookingWithAnEmailFindsTheFirst(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	for i := 0; i < 4; i++ {
+		from := in2031(1+3*i, 9)
+		n := workshop.NewRentalBooking{UnitID: v.unit, From: from, To: from.Add(24 * time.Hour), Key: "mail-" + fmt.Sprint(i),
+			NewRenter: &workshop.NewParty{Kind: "private", Name: "Ella", Email: fmt.Sprintf("ella%d@example.test", i)}}
+		var wg sync.WaitGroup
+		ids, errs := make([]string, 2), make([]error, 2)
+		for j := range ids {
+			wg.Add(1)
+			go func() { defer wg.Done(); ids[j], errs[j] = workshop.BookRental(ctx, pool, rentalDesk(), n) }()
+		}
+		wg.Wait()
+		if errs[0] != nil || errs[1] != nil || ids[0] != ids[1] {
+			t.Fatalf("round %d: %v %v, %v %v", i, ids[0], errs[0], ids[1], errs[1])
 		}
 	}
 }
