@@ -219,3 +219,88 @@ func TestACashInvoicesPaymentsStandWithIt(t *testing.T) {
 		t.Errorf("a cash invoice's payment reversed after its credit note: %v, want refused", err)
 	}
 }
+
+// The year's figure in person is sales taken in person and nothing else:
+// invoice payments in cash, by card or by Swish, net of refunds of them;
+// never a payout, nor a deposit while it is held -- a deposit taken by
+// Swish counts as it is applied to an invoice, and one taken by bank does
+// not; and a payment reversed never happened.
+func TestTheYearInPersonIsSalesTakenInPerson(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	currentPool = pool
+	desk := everything(advisor())
+	if err := workshop.SetCashRegisterThreshold(ctx, pool, owner(), 23680000, 1); err != nil {
+		t.Fatal(err)
+	}
+	taken := func() int64 {
+		t.Helper()
+		got, err := workshop.InPersonTurnoverFor(ctx, pool, owner())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got.TakenMinor
+	}
+	// A sale paid by card at the counter: counted.
+	card, err := workshop.RecordPayment(ctx, pool, desk, mustIssue(t), workshop.NewPayment{AmountMinor: minor(100000), Method: "card", PaidOn: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Paid by bank, and by Swish then reversed: not counted.
+	if _, err := workshop.RecordPayment(ctx, pool, desk, mustIssue(t), workshop.NewPayment{AmountMinor: minor(50000), Method: "bank", PaidOn: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	wrong, err := workshop.RecordPayment(ctx, pool, desk, mustIssue(t), workshop.NewPayment{AmountMinor: minor(30000), Method: "swish", PaidOn: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ReversePayment(ctx, pool, desk, wrong.ID, "Fel faktura"); err != nil {
+		t.Fatal(err)
+	}
+	// A car bought from a private seller, paid out by Swish: not counted.
+	payout, err := workshop.CreatePayout(ctx, pool, buyerScope(), workshop.NewHolding{PartyID: privateSeller(t, pool), Purpose: "purchase"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordPayout(ctx, pool, buyerScope(), payout, workshop.NewPayment{AmountMinor: minor(20000000), Method: "swish", PaidOn: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	if got := taken(); got != 100000 {
+		t.Fatalf("after a card sale, a bank payment, a reversed Swish and a payout: %d, want the card sale's 100000", got)
+	}
+	// A deposit by Swish counts only as it is applied, and only what is.
+	swish, _ := depositWith(t, pool, 500000)
+	if got := taken(); got != 100000 {
+		t.Errorf("a deposit held: %d, want it not counted", got)
+	}
+	if err := workshop.ApplyDeposit(ctx, pool, desk, swish, mustIssue(t), 200000, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := taken(); got != 300000 {
+		t.Errorf("200000 of a Swish deposit applied: %d, want 300000", got)
+	}
+	// A deposit by bank applied: not in person.
+	bank, err := workshop.CreateDeposit(ctx, pool, desk, workshop.NewHolding{PartyID: partyOf(t, pool, fixtureCustomer), Purpose: "rental"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordDepositPayment(ctx, pool, desk, bank, workshop.NewPayment{AmountMinor: minor(400000), Method: "bank", PaidOn: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ApplyDeposit(ctx, pool, desk, bank, mustIssue(t), 100000, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := taken(); got != 300000 {
+		t.Errorf("a bank deposit applied: %d, want 300000", got)
+	}
+	// The card sale credited and part of it refunded: net of the refund.
+	if _, err := workshop.CreditNote(ctx, pool, desk, card.InvoiceID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RefundPayment(ctx, pool, desk, card.ID, workshop.NewPayment{AmountMinor: minor(25000), Method: "card", PaidOn: time.Now()}, "Krediterad"); err != nil {
+		t.Fatal(err)
+	}
+	if got := taken(); got != 275000 {
+		t.Errorf("after 25000 of the card sale refunded: %d, want 275000", got)
+	}
+}

@@ -339,7 +339,8 @@ func CheckPaymentFlow(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 }
 
 // InPersonTurnover is what was taken in person -- cash, card and Swish --
-// so far this financial year, net of what was given back, against the
+// so far this financial year, net of what was given back (inPersonSales
+// says what counts), against the
 // threshold the shop has set for the cash register rules; zero threshold
 // when none is set.
 type InPersonTurnover struct {
@@ -380,12 +381,54 @@ func InPersonTurnoverFor(ctx context.Context, pool *pgxpool.Pool, scope access.S
 			year--
 		}
 		t.Since = time.Date(year, time.Month(t.YearStarts), 1, 0, 0, 0, 0, loc)
-		return tx.QueryRow(ctx, `
-			SELECT coalesce(sum(amount_minor), 0) FROM invoice_payments
-			WHERE method IN ('cash', 'card', 'swish') AND paid_on >= $1::date`, t.Since.Format("2006-01-02")).Scan(&t.TakenMinor)
+		return tx.QueryRow(ctx, inPersonSales, t.Since.Format("2006-01-02")).Scan(&t.TakenMinor)
 	})
 	return t, err
 }
+
+// inPersonSales is the figure the cash register threshold is compared with:
+// sales taken in person since $1, and nothing else. The rule:
+//
+//   - An invoice payment in cash, by card or by Swish counts, on the day it
+//     was paid. A payment by bank or any other way does not.
+//   - A refund of such a payment counts against it, on the day it went
+//     back, whichever way it went back.
+//   - A payment reversed never happened: neither it nor its reversal
+//     counts. The same for a refund reversed.
+//   - A payout never counts: it is money out, not a sale.
+//   - A deposit never counts while it is held, nor when it is refunded. It
+//     counts as it is applied to an invoice, on the day it was applied, for
+//     the part of the application its in-person receipts -- cash, card or
+//     Swish, net of their refunds -- can cover, the deposit's earlier
+//     applications taking theirs first. A deposit taken by bank and
+//     applied is not a sale taken in person.
+//   - Rounding is not money taken: the amounts, not what they settled.
+//
+// An application reversed, either half, does not count. In-person first
+// for a deposit taken partly in person is the cautious reading: the figure
+// is a warning against a threshold, and is better a little high than low.
+const inPersonSales = `
+	WITH live AS (
+	  SELECT p.* FROM invoice_payments p
+	  WHERE p.reverses_id IS NULL AND NOT EXISTS (SELECT 1 FROM invoice_payments x WHERE x.reverses_id = p.id)),
+	sold AS (
+	  SELECT id FROM live
+	  WHERE invoice_id IS NOT NULL AND method IN ('cash', 'card', 'swish') AND refunds_id IS NULL AND amount_minor > 0),
+	held AS (
+	  SELECT x.deposit_id, sum(x.amount_minor) AS minor FROM live x LEFT JOIN invoice_payments r ON r.id = x.refunds_id
+	  WHERE x.deposit_id IS NOT NULL
+	    AND ((x.refunds_id IS NULL AND x.amount_minor > 0 AND x.method IN ('cash', 'card', 'swish'))
+	         OR (x.refunds_id IS NOT NULL AND r.method IN ('cash', 'card', 'swish')))
+	  GROUP BY x.deposit_id),
+	applied AS (
+	  SELECT i.amount_minor, i.paid_on, d.deposit_id,
+	         coalesce(sum(i.amount_minor) OVER (PARTITION BY d.deposit_id ORDER BY i.recorded_at, i.id
+	                                           ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS before
+	  FROM deposit_applications a JOIN live i ON i.id = a.invoice_payment_id JOIN live d ON d.id = a.deposit_payment_id)
+	SELECT coalesce((SELECT sum(amount_minor) FROM live WHERE id IN (SELECT id FROM sold) AND paid_on >= $1::date), 0)
+	     + coalesce((SELECT sum(amount_minor) FROM live WHERE refunds_id IN (SELECT id FROM sold) AND paid_on >= $1::date), 0)
+	     + coalesce((SELECT sum(least(a.amount_minor, greatest(0, coalesce(h.minor, 0) - a.before)))
+	                 FROM applied a LEFT JOIN held h ON h.deposit_id = a.deposit_id WHERE a.paid_on >= $1::date), 0)`
 
 // SetCashRegisterThreshold sets the threshold and the financial year's
 // first month. Whoever runs the shop.
