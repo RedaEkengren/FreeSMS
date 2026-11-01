@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -106,6 +108,32 @@ func TestQRCodesDecodeWithAnIndependentReader(t *testing.T) {
 		}
 		if got := strings.TrimSuffix(string(out), "\n"); got != text {
 			t.Errorf("version %d: put in %q, the decoder read %q", (q.Size-17)/4, text, got)
+		}
+	}
+}
+
+// The SVG draws exactly the dark modules: its rectangles, read back, are
+// the code's dark modules and nothing else.
+func TestTheQRSVGDrawsExactlyTheDarkModules(t *testing.T) {
+	q, err := EncodeQR([]byte("C1234567890;1234,50;12345682;0"), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svg := q.SVG("x")
+	drawn := map[[2]int]bool{}
+	for _, m := range regexp.MustCompile(`M(\d+) (\d+)h(\d+)v1h-(\d+)z`).FindAllStringSubmatch(svg, -1) {
+		x, _ := strconv.Atoi(m[1])
+		y, _ := strconv.Atoi(m[2])
+		n, _ := strconv.Atoi(m[3])
+		for i := 0; i < n; i++ {
+			drawn[[2]int{x - 4 + i, y - 4}] = true
+		}
+	}
+	for y := 0; y < q.Size; y++ {
+		for x := 0; x < q.Size; x++ {
+			if drawn[[2]int{x, y}] != q.Dark(x, y) {
+				t.Fatalf("module %d,%d: drawn %v, dark %v", x, y, drawn[[2]int{x, y}], q.Dark(x, y))
+			}
 		}
 	}
 }

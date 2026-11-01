@@ -410,15 +410,24 @@ func abs(n int) int {
 }
 
 // SVG draws the code as one path, a module a unit, with the four-module
-// quiet zone the standard requires, scaled by the page.
+// quiet zone the standard requires, scaled by the page. Each row's runs of
+// dark modules are one rectangle, which keeps an invoice's code a few
+// kilobytes rather than tens.
 func (q *QR) SVG(label string) string {
 	const quiet = 4
 	var d strings.Builder
 	for y := 0; y < q.Size; y++ {
-		for x := 0; x < q.Size; x++ {
-			if q.Dark(x, y) {
-				fmt.Fprintf(&d, "M%d %dh1v1h-1z", x+quiet, y+quiet)
+		for x := 0; x < q.Size; {
+			if !q.Dark(x, y) {
+				x++
+				continue
 			}
+			run := 1
+			for x+run < q.Size && q.Dark(x+run, y) {
+				run++
+			}
+			fmt.Fprintf(&d, "M%d %dh%dv1h-%dz", x+quiet, y+quiet, run, run)
+			x += run
 		}
 	}
 	side := q.Size + 2*quiet
