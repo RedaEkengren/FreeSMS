@@ -197,21 +197,23 @@ func ModuleChanges(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 // its books, which it must for seven years, and reads them through Core.
 //
 // Only whoever runs the shop. Two owners switching at once are serialised on
-// the shop's row, so each decides on what the other committed.
-func SwitchModule(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, m access.Module, on bool, reason string, confirmed bool) error {
+// the shop's row, so each decides on what the other committed. changed is
+// false when the module was already so: nothing happened, and nothing is
+// recorded or logged as if it had.
+func SwitchModule(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, m access.Module, on bool, reason string, confirmed bool) (changed bool, err error) {
 	if !scope.Role.RunsTheShop() {
-		return access.ErrForbidden
+		return false, access.ErrForbidden
 	}
 	reason = strings.TrimSpace(reason)
 	switch {
 	case !m.Valid():
-		return fmt.Errorf("%w: there is no such module", ErrInvalid)
+		return false, fmt.Errorf("%w: there is no such module", ErrInvalid)
 	case on && !available(m):
-		return fmt.Errorf("%w: that module is not part of this release yet", ErrInvalid)
+		return false, fmt.Errorf("%w: that module is not part of this release yet", ErrInvalid)
 	case utf8.RuneCountInString(reason) > 500:
-		return fmt.Errorf("%w: the reason is longer than 500 characters", ErrInvalid)
+		return false, fmt.Errorf("%w: the reason is longer than 500 characters", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `SELECT 1 FROM shops WHERE id = $1 FOR UPDATE`, scope.ShopID); err != nil {
 			return fmt.Errorf("lock the shop: %w", err)
 		}
@@ -262,8 +264,10 @@ func SwitchModule(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, m
 			VALUES ($1, $2, $3, NULLIF($4, '')::uuid, $5)`, scope.ShopID, string(m), on, scope.UserID, reason); err != nil {
 			return fmt.Errorf("record the change: %w", err)
 		}
+		changed = true
 		return nil
 	})
+	return changed && err == nil, err
 }
 
 // openBusinessTx lists what is open in a module. The workshop's: every job

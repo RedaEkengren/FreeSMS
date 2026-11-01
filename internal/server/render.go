@@ -83,6 +83,7 @@ type pageData struct {
 	Modules       []workshop.ModuleState
 	ModuleChanges []workshop.ModuleChange
 	ModuleOpen    *workshop.OpenBusiness
+	ModuleReason  string
 	MyLocale      string
 	// What is waiting for the person signed in, and the header's count of it.
 	Waiting      []workshop.WaitingItem

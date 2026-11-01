@@ -78,9 +78,16 @@ func TestASwitchedOffModulesRoutesAreNotThere(t *testing.T) {
 	_, nothing := missing(owner, http.MethodGet, "/there-is-no-such-page")
 
 	// Off, with the open job confirmed over.
-	resp := postModuleForm(t, owner, ts.URL, "/shop/modules", url.Values{"module": {"workshop"}, "on": {"no"}})
-	if body := readBody(t, resp); resp.StatusCode != http.StatusConflict || !strings.Contains(body, "/jobs/") {
+	resp := postModuleForm(t, owner, ts.URL, "/shop/modules", url.Values{"module": {"workshop"}, "on": {"no"},
+		"reason": {"Closing the workshop"}})
+	body := readBody(t, resp)
+	if resp.StatusCode != http.StatusConflict || !strings.Contains(body, "/jobs/") {
 		t.Fatalf("switching off over an open job answered %d without listing it", resp.StatusCode)
+	}
+	// The reason typed is still there to confirm with, not lost to the
+	// re-rendered page (which would record the change with no reason).
+	if !strings.Contains(body, `value="Closing the workshop"`) {
+		t.Error("the refused switch-off shows the form again without the reason that was typed")
 	}
 	resp = postModuleForm(t, owner, ts.URL, "/shop/modules", url.Values{"module": {"workshop"}, "on": {"no"},
 		"confirm": {"yes"}, "reason": {"Closing the workshop"}})

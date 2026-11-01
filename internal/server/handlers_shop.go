@@ -13,12 +13,15 @@ import (
 // handleShop shows the workshop's own particulars: what goes at the top of an
 // invoice, and what the law requires to be there.
 func (s *Server) handleShop(w http.ResponseWriter, r *http.Request) {
-	s.renderShop(w, r, http.StatusOK, nil)
+	s.renderShop(w, r, http.StatusOK, nil, "")
 }
 
 // renderShop is the shop's page, with what is still open in a module when
 // switching it off was refused for that.
-func (s *Server) renderShop(w http.ResponseWriter, r *http.Request, status int, open *workshop.OpenBusiness) {
+// renderShop shows the shop page; open and reason are a switch-off refused
+// over open business, shown with the list and the reason the person typed,
+// so ticking "I have seen what is open" does not lose why.
+func (s *Server) renderShop(w http.ResponseWriter, r *http.Request, status int, open *workshop.OpenBusiness, reason string) {
 	session := sessionFrom(r.Context())
 
 	details, err := workshop.ShopDetailsFor(r.Context(), s.pool, session.Scope)
@@ -66,6 +69,7 @@ func (s *Server) renderShop(w http.ResponseWriter, r *http.Request, status int, 
 		Modules:       modules,
 		ModuleChanges: changes,
 		ModuleOpen:    open,
+		ModuleReason:  reason,
 	})
 }
 
@@ -75,16 +79,18 @@ func (s *Server) renderShop(w http.ResponseWriter, r *http.Request, status int, 
 func (s *Server) handleSwitchModule(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	module := access.Module(r.FormValue("module"))
-	err := workshop.SwitchModule(r.Context(), s.pool, session.Scope, module,
+	changed, err := workshop.SwitchModule(r.Context(), s.pool, session.Scope, module,
 		r.FormValue("on") == "yes", r.FormValue("reason"), r.FormValue("confirm") == "yes")
 	if open, ok := workshop.AsOpenBusiness(err); ok {
-		s.renderShop(w, r, http.StatusConflict, open)
+		s.renderShop(w, r, http.StatusConflict, open, r.FormValue("reason"))
 		return
 	}
 	if s.handoverError(w, r, err) {
 		return
 	}
-	s.log.Info("module switched", "module", module, "on", r.FormValue("on") == "yes", "by", session.Scope.UserID)
+	if changed {
+		s.log.Info("module switched", "module", module, "on", r.FormValue("on") == "yes", "by", session.Scope.UserID)
+	}
 	http.Redirect(w, r, "/shop", http.StatusSeeOther)
 }
 

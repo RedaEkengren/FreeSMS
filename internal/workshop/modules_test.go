@@ -40,7 +40,7 @@ func TestAShopWithNoRecordedChoiceRunsTheWorkshop(t *testing.T) {
 	if got := shopModules(t, pool); len(got) != 1 || got[0] != "workshop" {
 		t.Fatalf("a shop with no recorded choice runs %v, want [workshop]", got)
 	}
-	if err := workshop.SwitchModule(context.Background(), pool, owner(), access.Workshop, false, "", true); err != nil {
+	if _, err := workshop.SwitchModule(context.Background(), pool, owner(), access.Workshop, false, "", true); err != nil {
 		t.Fatalf("SwitchModule: %v", err)
 	}
 	if got := shopModules(t, pool); len(got) != 0 {
@@ -67,7 +67,7 @@ func TestASwitchedOffWorkshopRefusesNewWorkAndKeepsItsHistory(t *testing.T) {
 	open := newJob(t, pool)
 
 	// Open work is listed, and nothing changes until somebody says they mean it.
-	err = workshop.SwitchModule(ctx, pool, owner(), access.Workshop, false, "Closing", false)
+	_, err = workshop.SwitchModule(ctx, pool, owner(), access.Workshop, false, "Closing", false)
 	ob, ok := workshop.AsOpenBusiness(err)
 	if !ok || len(ob.Items) == 0 || ob.Items[0].Kind != "job" || ob.Items[0].Link != "/jobs/"+open {
 		t.Fatalf("switching off over an open job: %v (%+v); want it refused, listing the job", err, ob)
@@ -75,7 +75,7 @@ func TestASwitchedOffWorkshopRefusesNewWorkAndKeepsItsHistory(t *testing.T) {
 	if got := shopModules(t, pool); len(got) != 1 {
 		t.Fatalf("a refused switch changed what the shop runs: %v", got)
 	}
-	if err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, false, "Closing", true); err != nil {
+	if _, err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, false, "Closing", true); err != nil {
 		t.Fatalf("SwitchModule, confirmed: %v", err)
 	}
 
@@ -113,7 +113,7 @@ func TestASwitchedOffWorkshopRefusesNewWorkAndKeepsItsHistory(t *testing.T) {
 	}
 
 	// On again: the job is where it was.
-	if err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, true, "", false); err != nil {
+	if _, err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, true, "", false); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := workshop.JobByID(ctx, pool, advisor(), open); err != nil {
@@ -127,7 +127,7 @@ func TestSwitchingAModuleIsTheOwnersAndIsKept(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
 	for _, who := range []access.Scope{advisor(), technician(), partsDesk()} {
-		if err := workshop.SwitchModule(ctx, pool, who, access.Workshop, false, "", true); !errors.Is(err, access.ErrForbidden) {
+		if _, err := workshop.SwitchModule(ctx, pool, who, access.Workshop, false, "", true); !errors.Is(err, access.ErrForbidden) {
 			t.Errorf("%s switching the workshop off: %v, want ErrForbidden", who.Role, err)
 		}
 		if _, err := workshop.ModulesFor(ctx, pool, who); !errors.Is(err, access.ErrForbidden) {
@@ -135,18 +135,18 @@ func TestSwitchingAModuleIsTheOwnersAndIsKept(t *testing.T) {
 		}
 	}
 	for _, m := range []access.Module{access.Dealer, access.Rental, "bakery"} {
-		if err := workshop.SwitchModule(ctx, pool, owner(), m, true, "", false); !errors.Is(err, workshop.ErrInvalid) {
+		if _, err := workshop.SwitchModule(ctx, pool, owner(), m, true, "", false); !errors.Is(err, workshop.ErrInvalid) {
 			t.Errorf("switching on %q: %v; this release has nothing behind it", m, err)
 		}
 	}
 	// Switching on what is on records nothing.
-	if err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, true, "", false); err != nil {
+	if _, err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, true, "", false); err != nil {
 		t.Fatal(err)
 	}
 	if changes, _ := workshop.ModuleChanges(ctx, pool, owner()); len(changes) != 0 {
 		t.Errorf("switching on what was on recorded %d changes", len(changes))
 	}
-	if err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, false, "Selling the business", true); err != nil {
+	if _, err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, false, "Selling the business", true); err != nil {
 		t.Fatal(err)
 	}
 	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
@@ -175,7 +175,7 @@ func TestSwitchingTheWorkshopOffStopsTheRunningClocks(t *testing.T) {
 		t.Fatalf("ClockIn: %v", err)
 	}
 
-	err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, false, "Closing", false)
+	_, err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, false, "Closing", false)
 	ob, ok := workshop.AsOpenBusiness(err)
 	if !ok {
 		t.Fatalf("switching off with a clock running: %v, want the open business listed", err)
@@ -187,7 +187,7 @@ func TestSwitchingTheWorkshopOffStopsTheRunningClocks(t *testing.T) {
 	if !listed {
 		t.Errorf("the running clock is not listed: %+v", ob.Items)
 	}
-	if err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, false, "Closing", true); err != nil {
+	if _, err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, false, "Closing", true); err != nil {
 		t.Fatal(err)
 	}
 	var running int
@@ -198,5 +198,25 @@ func TestSwitchingTheWorkshopOffStopsTheRunningClocks(t *testing.T) {
 	}
 	if running != 0 {
 		t.Errorf("%d clocks still running after the workshop was switched off", running)
+	}
+}
+
+// Switching a module to what it already is changes nothing, records
+// nothing, and says so, so the caller does not report a switch that did not
+// happen.
+func TestSwitchingAModuleToWhatItIsSaysNothingChanged(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	before, _ := workshop.ModuleChanges(ctx, pool, owner())
+	changed, err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, true, "", false)
+	if err != nil || changed {
+		t.Errorf("switching the running workshop on = %v, %v; want nothing changed", changed, err)
+	}
+	if after, _ := workshop.ModuleChanges(ctx, pool, owner()); len(after) != len(before) {
+		t.Errorf("%d changes recorded by a switch to what it was, want none", len(after)-len(before))
+	}
+	changed, err = workshop.SwitchModule(ctx, pool, owner(), access.Workshop, false, "", true)
+	if err != nil || !changed {
+		t.Errorf("switching it off = %v, %v; want changed", changed, err)
 	}
 }

@@ -116,7 +116,7 @@
       <input type="hidden" name="module" value="{{.Module}}">
       <span><strong>{{$.T .Module.Label}}</strong>
         {{if .On}}{{with .Since}}{{$.T "on since %s" ($.Date ($.Local .) "2 Jan 2006")}}{{end}}{{else}}{{$.T "switched off"}}{{end}}</span>
-      <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="500"></label>
+      <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="500"{{if and $.ModuleOpen (eq $.ModuleOpen.Module .Module)}} value="{{$.ModuleReason}}"{{end}}></label>
       {{if .On}}
         {{if and $.ModuleOpen (eq $.ModuleOpen.Module .Module)}}
         <label class="tick"><input type="checkbox" name="confirm" value="yes" required>
