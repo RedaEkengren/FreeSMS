@@ -62,7 +62,7 @@ func dayOf(t time.Time) string { return t.Format("2006-01-02") }
 // request it is for. One order can supply several jobs; a request can have
 // several orders behind it.
 func RecordOrder(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in OrderInput) (string, error) {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return "", access.ErrForbidden
 	}
 	in.Supplier, in.Reference = strings.TrimSpace(in.Supplier), strings.TrimSpace(in.Reference)
@@ -179,7 +179,7 @@ func addETATx(ctx context.Context, tx pgx.Tx, scope access.Scope, lineID string,
 // ChangeETA says a line is now expected on another day. The earlier days stay,
 // so how often it has slipped can be read.
 func ChangeETA(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, lineID string, eta time.Time, note string) error {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(lineID) {
@@ -230,7 +230,7 @@ type DeliveryInput struct {
 // is how it is not counted twice. Entering the same delivery note again
 // changes nothing and says so.
 func ReceiveDelivery(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in DeliveryInput) (receiptID string, already bool, err error) {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return "", false, access.ErrForbidden
 	}
 	if !looksLikeUUID(in.LineID) {
@@ -339,7 +339,7 @@ func bookDeliveryTx(ctx context.Context, tx pgx.Tx, scope access.Scope, receiptI
 // AcceptSubstitute says what the supplier sent instead will do. It goes
 // straight to the car it was for, and counts against the request.
 func AcceptSubstitute(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, receiptID string) error {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(receiptID) {
@@ -379,7 +379,7 @@ func AcceptSubstitute(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 
 // RejectSubstitute says what was sent will not do, and plans it going back.
 func RejectSubstitute(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, receiptID string) (string, error) {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return "", access.ErrForbidden
 	}
 	if !looksLikeUUID(receiptID) {
@@ -413,7 +413,7 @@ func RejectSubstitute(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 // ourselves: the supplier has to confirm they stopped it, and until somebody
 // records that it stays on the desk's list.
 func CancelOrder(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, orderID, note string) error {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(orderID) {
@@ -445,7 +445,7 @@ func CancelOrder(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, or
 
 // ConfirmSupplierCancellation records that the supplier said they stopped it.
 func ConfirmSupplierCancellation(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, orderID string) error {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(orderID) {
@@ -490,7 +490,7 @@ type ReturnInput struct {
 // shelf yet and no credit is expected as fact; both come later, in their own
 // steps.
 func PlanReturn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in ReturnInput) (string, error) {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return "", access.ErrForbidden
 	}
 	if !looksLikeUUID(in.ReceiptID) {
@@ -557,7 +557,7 @@ func trimQty(q float64) string {
 // MarkReturned says the part has left. If it had gone onto the shelf it comes
 // off it, in the ledger, at what it cost when it arrived.
 func MarkReturned(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, returnID string) error {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(returnID) {
@@ -603,7 +603,7 @@ func MarkReturned(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, r
 // before the part has left; then the part is credited and still here, which is
 // on the desk's list until it goes.
 func ConfirmCredit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, returnID string, creditedMinor int64, ref string) error {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(returnID) {

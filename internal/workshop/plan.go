@@ -163,7 +163,7 @@ func lockJobTx(ctx context.Context, tx pgx.Tx, jobID string) error {
 // and the technician's own list read. Already on it is not an error.
 func assignTechnicianTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID, userID, reason string) error {
 	var ok bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND active AND role = 'technician')`, userID).Scan(&ok); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM users u WHERE u.id = $1 AND u.active AND EXISTS (SELECT 1 FROM staff_roles sr WHERE sr.user_id = u.id AND sr.role = 'technician'))`, userID).Scan(&ok); err != nil {
 		return fmt.Errorf("check technician: %w", err)
 	}
 	if !ok {

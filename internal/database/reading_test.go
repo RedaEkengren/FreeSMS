@@ -17,8 +17,8 @@ func TestReadsUnderReadingShareOneTransaction(t *testing.T) {
 	seed(t, pool)
 	seedSecondShop(t, pool)
 	ctx := context.Background()
-	scope := access.Scope{ShopID: shopID, UserID: "33333333-3333-3333-3333-333333333333", Role: access.RoleOwner}
-	other := access.Scope{ShopID: otherShopID, UserID: "33333333-3333-3333-3333-333333333333", Role: access.RoleOwner}
+	scope := access.Scope{ShopID: shopID, UserID: "33333333-3333-3333-3333-333333333333", Role: access.Of(access.RoleOwner)}
+	other := access.Scope{ShopID: otherShopID, UserID: "33333333-3333-3333-3333-333333333333", Role: access.Of(access.RoleOwner)}
 
 	// now() is when the transaction began: the same for every statement in
 	// one, different for two.

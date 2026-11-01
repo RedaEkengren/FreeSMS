@@ -14,6 +14,15 @@ import (
 
 const customerPerson = "22222222-2222-2222-2222-222222222223"
 
+// otherRoles is a person holding these roles in a shop that runs every
+// module.
+func otherRoles(roles access.Roles) access.Scope {
+	s := advisor()
+	s.Role = roles
+	s.Modules = access.Modules
+	return s
+}
+
 // Who may call what, by calling it: the business operations that price,
 // read documents, keep the time library and the stock prices, and handle a
 // person's data, each called directly -- no handler in front -- as every
@@ -36,9 +45,22 @@ func TestTheRoleMatrix(t *testing.T) {
 
 	roles := map[string]access.Scope{
 		"technician": technician(), "parts": partsDeskScope(), "front desk": advisor(), "owner": owner(),
+		// Car sales and rental (#145), in a shop that runs every module so
+		// that the refusal is their role's, not the module's. They have no
+		// part in any operation here: the workshop's refuse them in
+		// inWorkshop, Core's by capability.
+		"sales":           otherRoles(access.Of(access.RoleSales)),
+		"buyer":           otherRoles(access.Of(access.RoleBuyer)),
+		"rental desk":     otherRoles(access.Of(access.RoleRentalAgent)),
+		"sales and buyer": otherRoles(access.Of(access.RoleSales, access.RoleBuyer)),
+		"parts and tech": func() access.Scope {
+			s := partsDeskScope()
+			s.Role = access.Of(access.RoleParts, access.RoleTechnician)
+			return s
+		}(),
 	}
 	frontDesk := []string{"front desk", "owner"}
-	stock := []string{"parts", "front desk", "owner"}
+	stock := []string{"parts", "front desk", "owner", "parts and tech"}
 
 	// Each call reports what it handed back, so a refusal can be checked to
 	// have handed back nothing.

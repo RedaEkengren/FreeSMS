@@ -239,7 +239,7 @@ func scanSupplyLine(r pgx.Row, l *SupplyLine) error {
 
 // SupplyDeskFor reads what the parts desk has to act on as of today.
 func SupplyDeskFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, today time.Time) (SupplyDesk, error) {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return SupplyDesk{}, access.ErrForbidden
 	}
 	var d SupplyDesk
@@ -396,7 +396,7 @@ func returnsTx(ctx context.Context, tx pgx.Tx, where string, args []any) ([]Retu
 
 // OrderByID reads an order with its lines, deliveries and returns.
 func OrderByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id string) (OrderView, error) {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return OrderView{}, access.ErrForbidden
 	}
 	if !looksLikeUUID(id) {

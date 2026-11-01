@@ -26,7 +26,7 @@ func TestAnOwnerAddsATechnicianWhoSignsIn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the new technician cannot sign in: %v", err)
 	}
-	if s.Scope.UserID != id || s.Scope.Role != access.RoleTechnician {
+	if s.Scope.UserID != id || s.Scope.Role.Main() != access.RoleTechnician {
 		t.Errorf("signed in as %+v, want the technician just added", s.Scope)
 	}
 
@@ -90,8 +90,8 @@ func TestTheLastOwnerStays(t *testing.T) {
 	ctx := context.Background()
 	first, _ := workshop.AddStaff(ctx, pool, owner(), "Första Ägaren", "first@verkstaden.test", access.RoleOwner, firstPassword)
 	second, _ := workshop.AddStaff(ctx, pool, owner(), "Andra Ägaren", "second@verkstaden.test", access.RoleOwner, firstPassword)
-	asFirst := access.Scope{ShopID: shopID, UserID: first, Role: access.RoleOwner, Modules: workshopOnly}
-	asSecond := access.Scope{ShopID: shopID, UserID: second, Role: access.RoleOwner, Modules: workshopOnly}
+	asFirst := access.Scope{ShopID: shopID, UserID: first, Role: access.Of(access.RoleOwner), Modules: workshopOnly}
+	asSecond := access.Scope{ShopID: shopID, UserID: second, Role: access.Of(access.RoleOwner), Modules: workshopOnly}
 
 	if err := workshop.SetStaffActive(ctx, pool, asFirst, second, false); err != nil {
 		t.Fatalf("one owner switching the other off: %v", err)
@@ -123,5 +123,116 @@ func TestOnlyThoseWhoRunTheShopManageStaff(t *testing.T) {
 		if err := workshop.SetStaffPassword(ctx, pool, s, techUserID, firstPassword); !errors.Is(err, access.ErrForbidden) {
 			t.Errorf("SetStaffPassword as %s: %v", s.Role, err)
 		}
+	}
+}
+
+// A role belongs to a module, and a shop gives only the roles of the modules
+// it runs (#145): a rental desk in a shop that does not rent cannot be made.
+// Core's -- owner, administrator -- are always there.
+func TestARoleIsGivenOnlyIfTheShopRunsItsModule(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	for _, r := range []access.Role{access.RoleRentalAgent, access.RoleSales, access.RoleBuyer} {
+		if _, err := workshop.AddStaff(ctx, pool, owner(), "Nobody", string(r)+"@verkstaden.test", r, firstPassword); !errors.Is(err, workshop.ErrInvalid) {
+			t.Errorf("a %s in a workshop-only shop: %v, want refused", r, err)
+		}
+	}
+	offered := workshop.RolesOffered(owner())
+	for _, r := range offered {
+		if r.Module() != "" && r.Module() != access.Workshop {
+			t.Errorf("a workshop-only shop is offered %s", r)
+		}
+	}
+	all := owner()
+	all.Modules = access.Modules
+	if got := workshop.RolesOffered(all); len(got) != len(access.AllRoles) {
+		t.Errorf("a shop running everything is offered %v", got)
+	}
+	if _, err := workshop.AddStaff(ctx, pool, all, "Hyra", "hyra@verkstaden.test", access.RoleRentalAgent, firstPassword); err != nil {
+		t.Errorf("a rental desk in a shop that rents: %v", err)
+	}
+}
+
+// One person, several roles (#145). A salesperson given the buyer's role
+// sees purchase prices from their next request, through the buyer's
+// capability; nobody changes their own roles; the last owner keeps theirs.
+func TestAPersonHoldsSeveralRolesFromTheirNextRequest(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	all := owner()
+	all.Modules = access.Modules
+	id, err := workshop.AddStaff(ctx, pool, all, "Sälj", "salj@verkstaden.test", access.RoleSales, firstPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, s, err := auth.Login(ctx, pool, shopID, "salj@verkstaden.test", firstPassword, "test")
+	if err != nil || s.Scope.Role.SeesPurchasePrice() {
+		t.Fatalf("the salesperson signed in as %v (%v), seeing purchase prices", s.Scope.Role, err)
+	}
+
+	if err := workshop.SetStaffRoles(ctx, pool, all, id, access.RoleSales, []access.Role{access.RoleBuyer}); err != nil {
+		t.Fatalf("SetStaffRoles: %v", err)
+	}
+	s, err = auth.Authenticate(ctx, pool, shopID, token)
+	if err != nil || s.Scope.Role.Main() != access.RoleSales || !s.Scope.Role.SeesPurchasePrice() {
+		t.Errorf("the next request is %v (%v); want sales first, and the buyer's purchase prices", s.Scope.Role, err)
+	}
+	staff, _ := workshop.Staff(ctx, pool, all)
+	for _, m := range staff {
+		if m.UserID == id && (m.Role != access.RoleSales || len(m.Others) != 1 || m.Others[0] != access.RoleBuyer) {
+			t.Errorf("the staff list shows %s and %v", m.Role, m.Others)
+		}
+	}
+
+	// Taken away again: from the next request.
+	if err := workshop.SetStaffRoles(ctx, pool, all, id, access.RoleSales, nil); err != nil {
+		t.Fatal(err)
+	}
+	if s, _ = auth.Authenticate(ctx, pool, shopID, token); s.Scope.Role.SeesPurchasePrice() {
+		t.Error("the buyer's role taken away still shows purchase prices")
+	}
+
+	// In a shop that runs only the workshop, a dealer's role is not given --
+	// but one already held is kept when the rest change.
+	if err := workshop.SetStaffRoles(ctx, pool, owner(), id, access.RoleSales, []access.Role{access.RoleBuyer}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("giving the buyer's role with no dealer: %v, want refused", err)
+	}
+	if err := workshop.SetStaffRoles(ctx, pool, owner(), id, access.RoleSales, []access.Role{access.RoleTechnician}); err != nil {
+		t.Errorf("adding a workshop role to a salesperson the shop already has: %v", err)
+	}
+
+	if err := workshop.SetStaffRoles(ctx, pool, owner(), userID, access.RoleTechnician, nil); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("changing one's own roles: %v, want refused", err)
+	}
+	if err := workshop.SetStaffRoles(ctx, pool, advisor(), id, access.RoleSales, nil); !errors.Is(err, access.ErrForbidden) {
+		t.Errorf("the front desk changing roles: %v, want forbidden", err)
+	}
+}
+
+// The shop is never left without an owner who can sign in, whether the
+// owner's role is somebody's main one or another they hold.
+func TestTheLastOwnerKeepsTheirRole(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	second, err := workshop.AddStaff(ctx, pool, owner(), "Andra", "andra@verkstaden.test", access.RoleServiceAdvisor, firstPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The second person is made an owner as another role; then the first
+	// owner, by the second, loses theirs -- allowed, the second is one.
+	if err := workshop.SetStaffRoles(ctx, pool, owner(), second, access.RoleServiceAdvisor, []access.Role{access.RoleOwner}); err != nil {
+		t.Fatal(err)
+	}
+	asSecond := access.Scope{ShopID: shopID, UserID: second, Role: access.Of(access.RoleServiceAdvisor, access.RoleOwner), Modules: workshopOnly}
+	if err := workshop.SetStaffRoles(ctx, pool, asSecond, owner().UserID, access.RoleServiceAdvisor, nil); err != nil {
+		t.Fatalf("taking the owner's role from one of two owners: %v", err)
+	}
+	// Now the second is the only owner, and nobody may take it from them.
+	asFirst := access.Scope{ShopID: shopID, UserID: owner().UserID, Role: access.Of(access.RoleOwner), Modules: workshopOnly}
+	if err := workshop.SetStaffRoles(ctx, pool, asFirst, second, access.RoleServiceAdvisor, nil); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("taking the role of the last owner: %v, want refused", err)
+	}
+	if err := workshop.SetStaffActive(ctx, pool, asFirst, second, false); err == nil {
+		t.Error("the last owner, an owner by another role, was switched off")
 	}
 }

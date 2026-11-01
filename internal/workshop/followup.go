@@ -186,7 +186,7 @@ func TakeFollowUp(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 				return ErrNotFound
 			}
 			var ok bool
-			if err := tx.QueryRow(ctx, `SELECT exists(SELECT 1 FROM users WHERE id = $1 AND active AND role IN ('owner', 'admin', 'service_advisor'))`, in.OwnerID).Scan(&ok); err != nil {
+			if err := tx.QueryRow(ctx, `SELECT exists(SELECT 1 FROM users u WHERE u.id = $1 AND u.active AND EXISTS (SELECT 1 FROM staff_roles sr WHERE sr.user_id = u.id AND sr.role IN ('owner', 'admin', 'service_advisor')))`, in.OwnerID).Scan(&ok); err != nil {
 				return fmt.Errorf("check owner: %w", err)
 			}
 			if !ok {
@@ -696,7 +696,7 @@ func DeskPeople(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT u.id::text, p.display_name FROM users u JOIN people p ON p.id = u.person_id
-			WHERE u.active AND u.role IN ('owner', 'admin', 'service_advisor') ORDER BY p.display_name`)
+			WHERE u.active AND EXISTS (SELECT 1 FROM staff_roles sr WHERE sr.user_id = u.id AND sr.role IN ('owner', 'admin', 'service_advisor')) ORDER BY p.display_name`)
 		if err != nil {
 			return fmt.Errorf("list desk people: %w", err)
 		}

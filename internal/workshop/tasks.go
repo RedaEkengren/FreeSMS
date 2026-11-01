@@ -180,7 +180,7 @@ type TaskMove struct {
 // -- and it carries no price. Adding work to a car that was ready puts it
 // back in progress: it is on the lift again.
 func AddTask(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID, title string, linePosition int, findingID string) (string, error) {
-	if scope.Role != access.RoleTechnician && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.FollowsJobs() {
 		return "", access.ErrForbidden
 	}
 	title = strings.TrimSpace(title)
@@ -331,7 +331,7 @@ func TasksFromLines(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 // harmless. Leaving a task out is the front desk's, since it may mean telling
 // the customer something.
 func MoveTask(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, taskID string, m TaskMove) error {
-	if scope.Role != access.RoleTechnician && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.FollowsJobs() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(taskID) {

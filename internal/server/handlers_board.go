@@ -20,7 +20,9 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	// A shop that does not run the workshop has no board to start at. Until
 	// the home page knows every module (#157), it starts at what is Core:
 	// the customers for the counter, the inbox for everybody else.
-	if scope := sessionFrom(r.Context()).Scope; !scope.Uses(access.Workshop) {
+	// So does a person with no part in the workshop -- car sales, the
+	// rental desk (#145) -- whose own pages come with their modules.
+	if scope := sessionFrom(r.Context()).Scope; !scope.Uses(access.Workshop) || !scope.Role.WorksInTheWorkshop() {
 		if scope.Role.SeesCustomerPersonalData() {
 			http.Redirect(w, r, "/customers", http.StatusSeeOther)
 		} else {

@@ -134,8 +134,8 @@ func setupTx(ctx context.Context, tx pgx.Tx, scope access.Scope, env ReadinessEn
 		into *int
 		q    string
 	}{
-		{&technicians, `SELECT count(*) FROM users WHERE role = 'technician' AND active`},
-		{&others, `SELECT count(*) FROM users WHERE role IN ('service_advisor', 'parts') AND active`},
+		{&technicians, `SELECT count(*) FROM users u WHERE u.active AND EXISTS (SELECT 1 FROM staff_roles r WHERE r.user_id = u.id AND r.role = 'technician')`},
+		{&others, `SELECT count(*) FROM users u WHERE u.active AND EXISTS (SELECT 1 FROM staff_roles r WHERE r.user_id = u.id AND r.role IN ('service_advisor', 'parts'))`},
 		{&rotas, `SELECT count(DISTINCT user_id) FROM rotas`},
 		{&labour, `SELECT count(*) FROM labour_times`},
 		{&bands, `SELECT count(*) FROM price_bands`},

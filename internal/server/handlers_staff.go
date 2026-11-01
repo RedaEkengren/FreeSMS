@@ -45,6 +45,29 @@ func (s *Server) handleStaffActive(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/staff", http.StatusSeeOther)
 }
 
+// handleStaffRoles gives somebody their main role and any others (#145).
+func (s *Server) handleStaffRoles(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	if err := r.ParseForm(); err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "Not saved", "The form did not arrive whole.")
+		return
+	}
+	var others []access.Role
+	for _, o := range r.Form["also"] {
+		others = append(others, access.Role(o))
+	}
+	err := workshop.SetStaffRoles(r.Context(), s.pool, session.Scope, r.PathValue("id"),
+		access.Role(r.FormValue("role")), others)
+	if errors.Is(err, workshop.ErrInvalid) {
+		s.renderStaff(w, r, http.StatusBadRequest, staffForm{Role: string(access.RoleTechnician)}, trimInvalid(err))
+		return
+	}
+	if s.staffError(w, r, err) {
+		return
+	}
+	http.Redirect(w, r, "/staff", http.StatusSeeOther)
+}
+
 func (s *Server) handleStaffPassword(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	err := workshop.SetStaffPassword(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("password"))
@@ -69,7 +92,7 @@ func (s *Server) renderStaff(w http.ResponseWriter, r *http.Request, status int,
 	}
 	s.render(w, r, status, "staff", pageData{
 		Title: "Staff", Session: session, Staff: staff, StaffForm: f,
-		Roles: workshop.StaffRoles, Error: problem, MinPassword: workshop.MinPasswordLength,
+		Roles: workshop.RolesOffered(session.Scope), Error: problem, MinPassword: workshop.MinPasswordLength,
 	})
 }
 

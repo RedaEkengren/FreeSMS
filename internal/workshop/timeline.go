@@ -110,7 +110,7 @@ func cleanNote(n *NoteInput) error {
 // Neither is an approval. Agreement to a price is a quote decision, and a note
 // that says the customer agreed changes nothing about the job.
 func AddNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string, n NoteInput) (string, error) {
-	if scope.Role != access.RoleTechnician && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.FollowsJobs() {
 		return "", access.ErrForbidden
 	}
 	if !looksLikeUUID(jobID) {
@@ -165,7 +165,7 @@ func AddNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 // their own; the counter may correct anybody's. Two people correcting the same
 // version is a conflict for the second.
 func CorrectNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, noteID, body string) error {
-	if scope.Role != access.RoleTechnician && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.FollowsJobs() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(noteID) {

@@ -25,13 +25,13 @@ const (
 var workshopOnly = []access.Module{access.Workshop}
 
 func advisor() access.Scope {
-	return access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleServiceAdvisor, Modules: workshopOnly}
+	return access.Scope{ShopID: shopID, UserID: userID, Role: access.Of(access.RoleServiceAdvisor), Modules: workshopOnly}
 }
 
 // owner is the same person as far as the fixtures are concerned, with the role
 // that may change the business's own particulars.
 func owner() access.Scope {
-	return access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleOwner, Modules: workshopOnly}
+	return access.Scope{ShopID: shopID, UserID: userID, Role: access.Of(access.RoleOwner), Modules: workshopOnly}
 }
 
 func setup(t *testing.T) *pgxpool.Pool {

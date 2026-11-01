@@ -125,7 +125,7 @@ func requestPartsTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID, d
 
 // OpenPartRequests is the parts desk's list: what is being waited for.
 func OpenPartRequests(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]PartRequest, error) {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return nil, access.ErrForbidden
 	}
 	var out []PartRequest
@@ -167,7 +167,7 @@ func OpenPartRequests(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 
 // MarkPartArrived records everything still owed on a request as delivered.
 func MarkPartArrived(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, requestID string) error {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return access.ErrForbidden
 	}
 	return ReceivePart(ctx, pool, scope, requestID, 0, "delivery")
@@ -182,7 +182,7 @@ func MarkPartArrived(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 // waiting on three parts, or on the second half of one, does not look ready
 // to work on because something turned up.
 func ReceivePart(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, requestID string, quantity float64, source string) error {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(requestID) {
@@ -243,7 +243,7 @@ func receiveRequestTx(ctx context.Context, tx pgx.Tx, scope access.Scope, reques
 // no longer needed. A job waiting on a part that is never coming has to stop
 // waiting; what did arrive stays recorded.
 func CancelPartRequest(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, requestID, reason string) error {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(requestID) {

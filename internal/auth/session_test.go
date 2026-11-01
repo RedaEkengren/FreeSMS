@@ -70,7 +70,7 @@ func TestLoginReturnsTheUsersScope(t *testing.T) {
 	if token == "" {
 		t.Error("Login returned an empty token")
 	}
-	if s.Scope.UserID != userID || s.Scope.Role != access.RoleTechnician || s.Scope.ShopID != shopID {
+	if s.Scope.UserID != userID || s.Scope.Role.Main() != access.RoleTechnician || s.Scope.ShopID != shopID {
 		t.Errorf("scope = %+v, want the seeded technician", s.Scope)
 	}
 }
@@ -143,7 +143,7 @@ func TestDeactivationEndsSessionsImmediately(t *testing.T) {
 		t.Fatalf("the session was not usable before deactivation: %v", err)
 	}
 
-	owner := access.Scope{ShopID: shopID, UserID: anOwner, Role: access.RoleOwner}
+	owner := access.Scope{ShopID: shopID, UserID: anOwner, Role: access.Of(access.RoleOwner)}
 	if err := Deactivate(ctx, pool, owner, userID); err != nil {
 		t.Fatalf("Deactivate() = %v", err)
 	}
@@ -275,7 +275,7 @@ func TestOnlyThoseWhoRunTheShopDeactivateAUser(t *testing.T) {
 		t.Fatalf("Login: %v", err)
 	}
 	for _, role := range []access.Role{access.RoleTechnician, access.RoleParts, access.RoleServiceAdvisor} {
-		err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: anOwner, Role: role}, userID)
+		err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: anOwner, Role: access.Of(role)}, userID)
 		if !errors.Is(err, access.ErrForbidden) {
 			t.Errorf("Deactivate as %s: %v, want forbidden", role, err)
 		}
@@ -283,7 +283,7 @@ func TestOnlyThoseWhoRunTheShopDeactivateAUser(t *testing.T) {
 	if _, err := Authenticate(ctx, pool, shopID, token); err != nil {
 		t.Errorf("a refused deactivation ended the session anyway: %v", err)
 	}
-	if err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: anOwner, Role: access.RoleOwner}, userID); err != nil {
+	if err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: anOwner, Role: access.Of(access.RoleOwner)}, userID); err != nil {
 		t.Fatalf("Deactivate as owner: %v", err)
 	}
 	if _, err := Authenticate(ctx, pool, shopID, token); !errors.Is(err, ErrNoSession) {
@@ -330,7 +330,7 @@ func TestChangingYourPasswordKeepsThisSessionAndEndsTheRest(t *testing.T) {
 func TestYouCannotSwitchYourselfOff(t *testing.T) {
 	pool := testPool(t)
 	ctx := context.Background()
-	err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleOwner}, userID)
+	err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: userID, Role: access.Of(access.RoleOwner)}, userID)
 	if !errors.Is(err, ErrRefused) {
 		t.Errorf("switching yourself off: %v, want refused", err)
 	}

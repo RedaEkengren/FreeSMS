@@ -106,33 +106,35 @@ func WaitingFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]
 	if !scope.Uses(access.Workshop) {
 		return out, nil
 	}
-	switch scope.Role {
-	case access.RoleTechnician:
-		if err := add(technicianWaiting(ctx, pool, scope)); err != nil {
-			return nil, err
-		}
-	case access.RoleParts:
-		if err := add(partsWaiting(ctx, pool, scope)); err != nil {
-			return nil, err
-		}
-	case access.RoleServiceAdvisor:
-		if err := add(deskWaiting(ctx, pool, scope, false)); err != nil {
-			return nil, err
-		}
-	case access.RoleOwner, access.RoleAdmin:
+	// What each role held is waiting for, once each: a parts person who also
+	// turns spanners gets the parts desk's and the technician's. A role with
+	// no part in the workshop (car sales, rental) gets none of it.
+	roles := scope.Role
+	runsIt := roles.RunsTheShop()
+	switch {
+	case runsIt:
 		// In a small workshop the owner is the counter and the parts desk
 		// too, and the one who minds what is late.
 		if err := add(deskWaiting(ctx, pool, scope, true)); err != nil {
 			return nil, err
 		}
+	case roles.Has(access.RoleServiceAdvisor):
+		if err := add(deskWaiting(ctx, pool, scope, false)); err != nil {
+			return nil, err
+		}
+	}
+	if runsIt || roles.Has(access.RoleParts) {
 		if err := add(partsWaiting(ctx, pool, scope)); err != nil {
 			return nil, err
 		}
-	default:
-		return nil, access.ErrForbidden
+	}
+	if roles.Has(access.RoleTechnician) {
+		if err := add(technicianWaiting(ctx, pool, scope)); err != nil {
+			return nil, err
+		}
 	}
 	// Everybody above the shop floor chases a supplier.
-	if scope.Role != access.RoleTechnician {
+	if roles.SeesParts() {
 		if err := add(outsourcedWaiting(ctx, pool, scope)); err != nil {
 			return nil, err
 		}

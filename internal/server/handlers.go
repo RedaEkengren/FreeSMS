@@ -471,9 +471,14 @@ func (s *Server) handleClock(in bool) http.HandlerFunc {
 // A technician seeing "invoiced" would be reading somebody else's job, and a
 // button they cannot press is a button that teaches them to ignore the row it
 // sits in.
-func stateChoices(role access.Role, from workshop.State, hasWork bool) []workshop.State {
-	if role.SeesCustomerPersonalData() {
-		return workshop.AvailableStates(from, hasWork)
+//
+// The moves offered are those any role the person holds may make.
+func stateChoices(role access.Roles, from workshop.State, hasWork bool) []workshop.State {
+	var out []workshop.State
+	for _, to := range workshop.AvailableStates(from, hasWork) {
+		if workshop.MayTransition(role, from, to) {
+			out = append(out, to)
+		}
 	}
-	return workshop.TechnicianStates(from, hasWork)
+	return out
 }

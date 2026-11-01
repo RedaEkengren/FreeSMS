@@ -15,11 +15,11 @@ import (
 const techUserID = "33333333-3333-3333-3333-333333333334"
 
 func technician() access.Scope {
-	return access.Scope{ShopID: shopID, UserID: techUserID, Role: access.RoleTechnician, Modules: workshopOnly}
+	return access.Scope{ShopID: shopID, UserID: techUserID, Role: access.Of(access.RoleTechnician), Modules: workshopOnly}
 }
 
 func partsDesk() access.Scope {
-	return access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleParts, Modules: workshopOnly}
+	return access.Scope{ShopID: shopID, UserID: userID, Role: access.Of(access.RoleParts), Modules: workshopOnly}
 }
 
 // addTechnician gives the fixture shop somebody to hold the spanner.

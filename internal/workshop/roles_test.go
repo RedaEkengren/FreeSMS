@@ -1,7 +1,9 @@
 package workshop_test
 
 // everyRole is the exported business operations any signed-in role may call,
-// each with the reason. Read from the source by the permission contract
+// each with the reason. "Any role" means any role the workshop has: the
+// workshop's operations read through inWorkshop, which refuses a person
+// holding no workshop role -- car sales, rental -- with ErrForbidden (#145). Read from the source by the permission contract
 // (#144, internal/testsupport/contract.go), which fails on an operation that
 // checks no role and is not here. Everything else that takes a scope checks its role
 // itself, where the data is read or written -- not in the handler that
@@ -53,6 +55,10 @@ var everyRole = map[string]string{
 	"InspectionsFor": "inspection work", "InspectionsForID": "inspection work",
 	"Templates":   "the checklists to start one from",
 	"PhotoInShop": "whether a photograph belongs to the shop, for serving it",
+
+	// Which roles a shop has to give: a list of role names, the same for
+	// everybody in the shop, and no person's data.
+	"RolesOffered": "the roles the shop's modules have, no person's data",
 
 	// Delegates to TakeInWith, which checks.
 	"TakeIn": "delegates to TakeInWith",

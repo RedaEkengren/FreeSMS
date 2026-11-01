@@ -6936,6 +6936,33 @@
     },
     "Run since before modules were recorded": {
       "other": "Använd sedan innan moduler registrerades"
+    },
+    "The form did not arrive whole.": {
+      "other": "Formuläret kom inte fram helt."
+    },
+    "that role belongs to a part of FreeSMS this shop does not run": {
+      "other": "den rollen hör till en del av FreeSMS som verkstaden inte använder"
+    },
+    "those are not all roles": {
+      "other": "det är inte roller allihop"
+    },
+    "you cannot change your own roles; another owner can": {
+      "other": "du kan inte ändra dina egna roller; en annan ägare kan"
+    },
+    "Also": {
+      "other": "Dessutom"
+    },
+    "Save the roles": {
+      "other": "Spara rollerna"
+    },
+    "Sales": {
+      "other": "Säljare"
+    },
+    "Buyer": {
+      "other": "Inköpare"
+    },
+    "Rental desk": {
+      "other": "Hyresdisk"
     }
   }
 }

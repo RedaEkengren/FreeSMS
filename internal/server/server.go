@@ -388,6 +388,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /staff", s.requireSession(s.handleAddStaff))
 	mux.HandleFunc("POST /staff/{id}/active", s.requireSession(s.handleStaffActive))
 	mux.HandleFunc("POST /staff/{id}/password", s.requireSession(s.handleStaffPassword))
+	mux.HandleFunc("POST /staff/{id}/roles", s.requireSession(s.handleStaffRoles))
 	mux.HandleFunc("GET /account", s.requireSession(s.handleAccount))
 	mux.HandleFunc("POST /account/alert", s.requireSession(s.handleAlertSound))
 	mux.HandleFunc("GET /mine", s.requireSession(s.handleMine))

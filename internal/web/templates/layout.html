@@ -44,7 +44,7 @@
     <a href="/privacy" class="nav">{{.T "Privacy"}}</a>{{end}}
     {{/* "Hours" and "Times" were two words apart and meant opposite things:
          your own clock, and the shop's labour guide. Both say which now. */}}
-    {{if .Runs "workshop"}}<a href="/time" class="nav">{{.T "My hours"}}</a>
+    {{if and .Session.Scope.Role.WorksInTheWorkshop (.Runs "workshop")}}<a href="/time" class="nav">{{.T "My hours"}}</a>
     {{end}}<a href="/rota" class="nav">{{.T "Rota"}}</a>
     {{if and .Session.Scope.Role.SeesCustomerPersonalData (.Runs "workshop")}}<a href="/labour" class="nav">{{.T "Labour times"}}</a>{{end}}
     <a href="/help" class="nav">{{.T "Help"}}</a>

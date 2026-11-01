@@ -243,7 +243,7 @@ func technicianNameTx(ctx context.Context, tx pgx.Tx, id string) (string, error)
 	var name string
 	err := tx.QueryRow(ctx, `
 		SELECT p.display_name FROM users u JOIN people p ON p.id = u.person_id
-		WHERE u.id = $1 AND u.active AND u.role = 'technician'`, id).Scan(&name)
+		WHERE u.id = $1 AND u.active AND EXISTS (SELECT 1 FROM staff_roles sr WHERE sr.user_id = u.id AND sr.role = 'technician')`, id).Scan(&name)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", fmt.Errorf("%w: that technician is not working here", ErrInvalid)
 	}

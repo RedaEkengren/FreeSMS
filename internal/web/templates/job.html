@@ -526,7 +526,7 @@
           {{if .PerformedAt}}<span class="tag">{{$.T "done"}}</span>{{end}}
         {{end}}
         {{if and $.Session.Scope.Role.SeesCustomerPersonalData (ne .Status "withdrawn") (ne .Status "declined") (not (or (eq $.Job.State "invoiced") (eq $.Job.State "closed") (eq $.Job.State "cancelled")))}}<a href="/jobs/{{$.Job.ID}}/lines/{{.Position}}/edit">{{$.T "Correct"}}</a>{{end}}
-        {{if and (ne .Status "withdrawn") (or $.Session.Scope.Role.SeesCustomerPersonalData (eq $.Session.Scope.Role "technician"))}}{{if not (or (eq $.Job.State "invoiced") (eq $.Job.State "closed") (eq $.Job.State "cancelled"))}}
+        {{if and (ne .Status "withdrawn") $.Session.Scope.Role.FollowsJobs}}{{if not (or (eq $.Job.State "invoiced") (eq $.Job.State "closed") (eq $.Job.State "cancelled"))}}
         <form class="m-0 inline" method="post" action="/jobs/{{$.Job.ID}}/lines/{{.Position}}/performed">
           {{if .PerformedAt}}<input type="hidden" name="performed" value="no"><button type="submit" class="secondary">{{$.T "Not done"}}</button>
           {{else}}<input type="hidden" name="performed" value="yes"><button type="submit" class="secondary">{{$.T "Mark done"}}</button>{{end}}

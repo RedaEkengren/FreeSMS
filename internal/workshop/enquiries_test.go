@@ -297,7 +297,7 @@ func TestEnquiriesAreTheFrontDesksAlone(t *testing.T) {
 	addTechnician(t, pool)
 	ctx := context.Background()
 	id := enquired(t, pool)
-	tech := access.Scope{ShopID: shopID, UserID: techUserID, Role: access.RoleTechnician, Modules: workshopOnly}
+	tech := access.Scope{ShopID: shopID, UserID: techUserID, Role: access.Of(access.RoleTechnician), Modules: workshopOnly}
 	if _, err := workshop.CreateEnquiry(ctx, pool, tech, workshop.NewEnquiry{Subject: "x"}); !errors.Is(err, access.ErrForbidden) {
 		t.Errorf("a technician creating one: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestEnquiriesAreTheFrontDesksAlone(t *testing.T) {
 		t.Errorf("a technician putting one forward: %v", err)
 	}
 	// Another shop's enquiry is not there.
-	if _, err := workshop.EnquiryByID(ctx, pool, access.Scope{ShopID: "99999999-9999-9999-9999-999999999999", UserID: userID, Role: access.RoleServiceAdvisor, Modules: workshopOnly}, id); err == nil {
+	if _, err := workshop.EnquiryByID(ctx, pool, access.Scope{ShopID: "99999999-9999-9999-9999-999999999999", UserID: userID, Role: access.Of(access.RoleServiceAdvisor), Modules: workshopOnly}, id); err == nil {
 		t.Error("another shop read the enquiry")
 	}
 }

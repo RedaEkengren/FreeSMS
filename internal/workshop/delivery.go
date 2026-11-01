@@ -585,7 +585,7 @@ type Recommendation struct {
 // AddRecommendation notes something worth doing later. The technician is the
 // one who sees it; the counter follows it up.
 func AddRecommendation(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID, body, when string) error {
-	if scope.Role != access.RoleTechnician && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.FollowsJobs() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(jobID) {
@@ -640,7 +640,7 @@ func RecommendationsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 // WithdrawRecommendation takes a suggestion back. Whoever made it may, and the
 // counter may.
 func WithdrawRecommendation(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, recID string) error {
-	if scope.Role != access.RoleTechnician && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.FollowsJobs() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(recID) {

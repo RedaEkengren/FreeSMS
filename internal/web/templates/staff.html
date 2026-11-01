@@ -11,7 +11,7 @@
   <li>
     <div class="row">
       <span>{{.Name}}{{if .You}} ({{$.T "you"}}){{end}}</span>
-      <span class="tag">{{$.T .Role.Label}}</span>
+      <span class="tag">{{$.T .Role.Label}}</span>{{range .Others}} <span class="tag">{{$.T .Label}}</span>{{end}}
     </div>
     <div class="waiting">{{.Email}}{{if not .Active}} &middot; {{$.T "switched off"}}{{end}}{{if .Planner}} &middot; {{$.T "plans staff"}}{{end}}</div>
     {{if not .You}}
@@ -24,7 +24,7 @@
       </form>
       {{/* Planning people is given, not a role: in a larger workshop the
            workshop manager plans the staff and does not run the money. */}}
-      {{if not .Role.RunsTheShop}}
+      {{if not .Roles.RunsTheShop}}
       <form class="mt-s" method="post" action="/staff/{{.UserID}}/planner">
         {{if .Planner}}<input type="hidden" name="on" value="no">
         <button type="submit" class="secondary">{{$.T "Stop them planning staff"}}</button>
@@ -32,6 +32,19 @@
         <button type="submit" class="secondary">{{$.T "Let them plan staff"}}</button>{{end}}
       </form>
       {{end}}
+      {{/* One main role, which the header names, and any others: a small
+           dealer's salesperson is often the buyer too (#145). */}}
+      {{$m := .}}
+      <form class="mt-s" method="post" action="/staff/{{.UserID}}/roles">
+        <label><span>{{$.T "Role"}}</span>
+          <select name="role">
+            {{range $.Roles}}<option value="{{.}}"{{if eq . $m.Role}} selected{{end}}>{{$.T .Label}}</option>{{end}}
+          </select></label>
+        <fieldset><legend>{{$.T "Also"}}</legend>
+          {{range $.Roles}}{{if ne . $m.Role}}<label class="tick"><input type="checkbox" name="also" value="{{.}}"{{if $m.Roles.Has .}} checked{{end}}> <span>{{$.T .Label}}</span></label>{{end}}{{end}}
+        </fieldset>
+        <button type="submit" class="secondary">{{$.T "Save the roles"}}</button>
+      </form>
       <form class="mt-s" method="post" action="/staff/{{.UserID}}/active">
         {{if .Active}}
         <input type="hidden" name="active" value="no">

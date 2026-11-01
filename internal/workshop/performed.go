@@ -19,7 +19,7 @@ import (
 // the desk found out afterwards that the diagnosis had been done. Taking it
 // back on a declined job declines the line, which is what it was.
 func MarkPerformed(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string, position int, performed bool) error {
-	if scope.Role != access.RoleTechnician && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.FollowsJobs() {
 		return access.ErrForbidden
 	}
 	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {

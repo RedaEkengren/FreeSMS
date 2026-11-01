@@ -398,7 +398,7 @@ func PlannerRows(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([
 	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT u.id, p.display_name FROM users u JOIN people p ON p.id = u.person_id
-			WHERE u.active AND u.role = 'technician' ORDER BY p.display_name`)
+			WHERE u.active AND EXISTS (SELECT 1 FROM staff_roles sr WHERE sr.user_id = u.id AND sr.role = 'technician') ORDER BY p.display_name`)
 		if err != nil {
 			return err
 		}

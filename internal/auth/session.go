@@ -103,14 +103,15 @@ func Login(ctx context.Context, pool *pgxpool.Pool, shopID, email, password, use
 
 		const lookup = `
 			SELECT u.id, u.role, u.password_hash, u.active,
-			       ARRAY(SELECT m.module FROM shop_modules m WHERE m.shop_id = u.shop_id ORDER BY m.module)
+			       ARRAY(SELECT m.module FROM shop_modules m WHERE m.shop_id = u.shop_id ORDER BY m.module),
+			       ARRAY(SELECT r.role FROM user_roles r WHERE r.user_id = u.id ORDER BY r.role)
 			FROM users u
 			JOIN people p ON p.id = u.person_id
 			WHERE p.email = $1`
 		var userID, role, hash string
 		var active bool
-		var modules []string
-		scanErr := tx.QueryRow(ctx, lookup, email).Scan(&userID, &role, &hash, &active, &modules)
+		var modules, others []string
+		scanErr := tx.QueryRow(ctx, lookup, email).Scan(&userID, &role, &hash, &active, &modules, &others)
 
 		if errors.Is(scanErr, pgx.ErrNoRows) {
 			// Spend the same effort as a real verification would, so that a
@@ -143,7 +144,7 @@ func Login(ctx context.Context, pool *pgxpool.Pool, shopID, email, password, use
 		ok = true
 		token = tok
 		s = Session{
-			Scope:     access.Scope{ShopID: shopID, UserID: userID, Role: access.Role(role), Modules: asModules(modules)},
+			Scope:     access.Scope{ShopID: shopID, UserID: userID, Role: asRoles(role, others), Modules: asModules(modules)},
 			ExpiresAt: expires,
 		}
 		return nil
@@ -175,6 +176,16 @@ func asModules(names []string) []access.Module {
 		out = append(out, access.Module(n))
 	}
 	return out
+}
+
+// asRoles is a person's main role and their others, in the type a scope
+// carries.
+func asRoles(main string, others []string) access.Roles {
+	rs := make([]access.Role, 0, len(others))
+	for _, r := range others {
+		rs = append(rs, access.Role(r))
+	}
+	return access.Of(access.Role(main), rs...)
 }
 
 // dummyHash is a real argon2id hash of a value nobody knows, used to spend
@@ -229,10 +240,13 @@ func authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string,
 		// The shop's modules come with the session, every request, so that
 		// switching one off takes effect on the next click rather than at the
 		// next sign-in -- and an operation can check without asking again.
+		// The person's roles likewise: a role given or taken away counts
+		// from their next request (#145).
 		const lookup = `
 			SELECT s.id, s.user_id, u.role, s.expires_at, s.last_seen_at, u.active,
 			       coalesce(u.locale, sh.locale, 'en'), u.plans_staff, coalesce(u.theme, ''),
-			       ARRAY(SELECT m.module FROM shop_modules m WHERE m.shop_id = s.shop_id ORDER BY m.module)
+			       ARRAY(SELECT m.module FROM shop_modules m WHERE m.shop_id = s.shop_id ORDER BY m.module),
+			       ARRAY(SELECT r.role FROM user_roles r WHERE r.user_id = s.user_id ORDER BY r.role)
 			FROM sessions s
 			JOIN users u  ON u.id = s.user_id
 			JOIN shops sh ON sh.id = s.shop_id
@@ -240,9 +254,9 @@ func authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string,
 		var sessionID, userID, role, locale, theme string
 		var expires, lastSeen time.Time
 		var active, planner bool
-		var modules []string
+		var modules, others []string
 
-		err := tx.QueryRow(ctx, lookup, sum[:]).Scan(&sessionID, &userID, &role, &expires, &lastSeen, &active, &locale, &planner, &theme, &modules)
+		err := tx.QueryRow(ctx, lookup, sum[:]).Scan(&sessionID, &userID, &role, &expires, &lastSeen, &active, &locale, &planner, &theme, &modules, &others)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNoSession
 		}
@@ -266,7 +280,7 @@ func authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string,
 		}
 
 		s = Session{
-			Scope: access.Scope{ShopID: shopID, UserID: userID, Role: access.Role(role), Planner: planner,
+			Scope: access.Scope{ShopID: shopID, UserID: userID, Role: asRoles(role, others), Planner: planner,
 				Modules: asModules(modules)},
 			ExpiresAt: expires,
 			Locale:    locale,
@@ -289,6 +303,24 @@ func Logout(ctx context.Context, pool *pgxpool.Pool, shopID, token string) error
 	})
 }
 
+// OtherOwners counts the active people besides userID who hold the owner's
+// role, as their main role or another, and locks them while the caller
+// decides: so two owners switching each other off, or taking each other's
+// role away, at the same moment cannot both succeed and leave nobody.
+func OtherOwners(ctx context.Context, tx pgx.Tx, userID string) (int, error) {
+	var n int
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*) FROM (
+		    SELECT u.id FROM users u
+		    WHERE u.active AND u.id <> $1
+		      AND EXISTS (SELECT 1 FROM staff_roles r WHERE r.user_id = u.id AND r.role = 'owner')
+		    FOR UPDATE OF u
+		) o`, userID).Scan(&n); err != nil {
+		return 0, fmt.Errorf("count owners: %w", err)
+	}
+	return n, nil
+}
+
 // Deactivate turns a user off and ends their sessions in the same
 // transaction.
 //
@@ -307,20 +339,19 @@ func Deactivate(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, use
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		// The owners are locked while this is decided, so two owners switching
 		// each other off at once cannot both succeed and leave nobody.
-		var role string
-		if err := tx.QueryRow(ctx, `SELECT role FROM users WHERE id = $1`, userID).Scan(&role); err != nil {
+		var isOwner bool
+		if err := tx.QueryRow(ctx, `
+			SELECT EXISTS (SELECT 1 FROM staff_roles r WHERE r.user_id = u.id AND r.role = 'owner')
+			FROM users u WHERE u.id = $1`, userID).Scan(&isOwner); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrNoSuchUser
 			}
 			return fmt.Errorf("read user: %w", err)
 		}
-		if role == string(access.RoleOwner) {
-			var others int
-			if err := tx.QueryRow(ctx, `
-				SELECT count(*) FROM (
-				    SELECT id FROM users WHERE role = 'owner' AND active AND id <> $1 FOR UPDATE
-				) o`, userID).Scan(&others); err != nil {
-				return fmt.Errorf("count owners: %w", err)
+		if isOwner {
+			others, err := OtherOwners(ctx, tx, userID)
+			if err != nil {
+				return err
 			}
 			if others == 0 {
 				// A workshop with no owner who can sign in cannot add one back:

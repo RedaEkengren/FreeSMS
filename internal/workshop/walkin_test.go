@@ -82,7 +82,7 @@ func TestAWalkInRefusesWhatCannotBeKept(t *testing.T) {
 	if jobs, _, _ := counts(t, pool); jobs != 0 {
 		t.Errorf("%d jobs were left behind by refused intakes", jobs)
 	}
-	if _, err := workshop.TakeInWalkIn(ctx, pool, access.Scope{ShopID: shopID, UserID: techUserID, Role: access.RoleTechnician, Modules: workshopOnly},
+	if _, err := workshop.TakeInWalkIn(ctx, pool, access.Scope{ShopID: shopID, UserID: techUserID, Role: access.Of(access.RoleTechnician), Modules: workshopOnly},
 		workshop.WalkIn{Registration: "WLK 003", Complaint: "x"}); !errors.Is(err, access.ErrForbidden) {
 		t.Errorf("a technician taking a car in: %v", err)
 	}

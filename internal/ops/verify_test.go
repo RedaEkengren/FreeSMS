@@ -35,7 +35,7 @@ const (
 var workshopOnly = []access.Module{access.Workshop}
 
 func advisor() access.Scope {
-	return access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleServiceAdvisor, Modules: workshopOnly}
+	return access.Scope{ShopID: shopID, UserID: userID, Role: access.Of(access.RoleServiceAdvisor), Modules: workshopOnly}
 }
 
 // A workshop with two invoices, a credit, a payment and its reversal, and a

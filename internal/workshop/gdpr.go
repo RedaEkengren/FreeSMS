@@ -98,7 +98,9 @@ type ExportedInvoice struct {
 }
 
 type ExportedEmployment struct {
-	Role          string     `json:"role"`
+	Role string `json:"role"`
+	// Any other roles they hold besides their main one (#145).
+	OtherRoles    []string   `json:"other_roles,omitempty"`
 	Active        bool       `json:"active"`
 	HoursClocked  float64    `json:"hours_clocked"`
 	Since         time.Time  `json:"since"`
@@ -254,9 +256,10 @@ func ExportPerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 		err = tx.QueryRow(ctx, `
 			SELECT u.role, u.active, u.created_at, u.deactivated_at,
 			       coalesce((SELECT sum(extract(epoch from (t.ended_at - t.started_at)) / 3600)
-			                 FROM time_entries t WHERE t.user_id = u.id AND t.ended_at IS NOT NULL), 0)
+			                 FROM time_entries t WHERE t.user_id = u.id AND t.ended_at IS NOT NULL), 0),
+			       ARRAY(SELECT r.role FROM user_roles r WHERE r.user_id = u.id AND r.role <> u.role ORDER BY r.role)
 			FROM users u WHERE u.person_id = $1`, personID).Scan(
-			&emp.Role, &emp.Active, &emp.Since, &emp.DeactivatedAt, &emp.HoursClocked)
+			&emp.Role, &emp.Active, &emp.Since, &emp.DeactivatedAt, &emp.HoursClocked, &emp.OtherRoles)
 		if err == nil {
 			e.Employment = &emp
 		} else if err != pgx.ErrNoRows {

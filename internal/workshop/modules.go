@@ -23,9 +23,19 @@ import (
 // Core operations in this package -- customers, vehicles, documents,
 // payments, people -- use database.InScope and keep working whatever the shop
 // runs, which is how a switched-off workshop's invoices stay readable.
+//
+// It also refuses, with access.ErrForbidden, a person who holds no role in
+// the workshop at all -- a salesperson or the rental desk (#145). The
+// operations the workshop opens to "every role" (everyRole) mean every role
+// the workshop has; one taken on for car sales has no business clocking on
+// to a job or starting an inspection. Each operation's own role check still
+// decides among the workshop's roles.
 func inWorkshop(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fn func(context.Context, pgx.Tx) error) error {
 	if err := scope.Require(access.Workshop); err != nil {
 		return err
+	}
+	if !scope.Role.WorksInTheWorkshop() {
+		return access.ErrForbidden
 	}
 	return database.InScope(ctx, pool, scope, fn)
 }

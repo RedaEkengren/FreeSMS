@@ -52,6 +52,7 @@ var core = map[string]string{
 
 	// People, and when they work.
 	"Staff": "people", "AddStaff": "people", "SetStaffActive": "people", "SetStaffPassword": "people",
+	"SetStaffRoles": "people", "RolesOffered": "people: which roles there are to give",
 	"ScheduleFor": "when people work", "StaffWeek": "when people work", "SetRota": "when people work",
 	"ChangeShift": "when people work", "SetPlanner": "when people work", "MarkScheduleSeen": "when people work",
 	"SetAbsence": "when people work", "ClearAbsence": "when people work",
