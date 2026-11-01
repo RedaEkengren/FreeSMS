@@ -88,6 +88,7 @@ var (
 	errStockNoIdentity = fmt.Errorf("%w: a car in stock needs its chassis number or its registration, because the margin scheme is accounted car by car", ErrInvalid)
 	errStockOpen       = fmt.Errorf("%w: that car is already in stock; finish its cycle before starting another", ErrInvalid)
 	errStockReason     = fmt.Errorf("%w: that is not a way a car comes into stock", ErrInvalid)
+	errStockNotTaken   = fmt.Errorf("%w: a car bought, consigned or imported comes into stock through its purchase, its agreement or its import", ErrInvalid)
 	errStockMove       = fmt.Errorf("%w: a car cannot go straight from there to there", ErrInvalid)
 	errStockEnded      = fmt.Errorf("%w: that cycle is over; a car that comes back starts a new one", ErrInvalid)
 	errStockBooked     = fmt.Errorf("%w: something is still booked on the car; release or replan that first", ErrInvalid)
@@ -233,15 +234,19 @@ func stockUnitTx(ctx context.Context, tx pgx.Tx, where string, arg any) (StockUn
 }
 
 // TakeIntoStock opens a cycle for a car with no purchase to record: one
-// moved over from the rental fleet. A car bought, traded in or taken on
-// consignment comes in through its purchase or its agreement, which opens
-// the unit in the same transaction. For whoever buys cars.
+// moved over from the rental fleet. A car bought, traded in or bought back
+// comes in through its purchase (RecordPurchase), a consigned car through
+// its agreement, an imported one through its import, each opening the
+// unit in its own transaction. For whoever buys cars.
 func TakeIntoStock(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, vehicleID, reason, key string) (StockUnit, error) {
 	if !scope.Role.BuysVehicles() {
 		return StockUnit{}, access.ErrForbidden
 	}
 	if err := scope.Require(access.Dealer); err != nil {
 		return StockUnit{}, err
+	}
+	if reason != StockFromDefleet {
+		return StockUnit{}, errStockNotTaken
 	}
 	var u StockUnit
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {

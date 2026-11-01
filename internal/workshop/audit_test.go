@@ -184,9 +184,15 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 
 	// Dealer
 	// A car's cycle through stock (#160).
-	unit := takeIn(t, pool, workshop.StockFromPurchase)
+	unit := takeIn(t, pool, workshop.StockFromDefleet)
 	moveStock(t, pool, unit.ID, workshop.StockForSale)
 	made["stock_unit.opened"], made["stock_unit.moved"] = subject{"stock_unit", unit.ID}, subject{"stock_unit", unit.ID}
+	// A car bought (#161), its eligibility corrected.
+	bought := boughtCar(t, pool)
+	if _, err := workshop.CorrectVATEligibility(ctx, pool, buyerScope(), bought.ID, workshop.SellerCompanyChargedVAT, nil, "Säljaren var ett företag"); err != nil {
+		t.Fatal(err)
+	}
+	made["purchase.recorded"], made["vat_eligibility.corrected"] = subject{"purchase", bought.ID}, subject{"purchase", bought.ID}
 
 	for _, tr := range workshop.AuditedTransitions {
 		s, ok := made[tr.Event]

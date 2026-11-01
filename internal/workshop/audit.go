@@ -67,6 +67,9 @@ var AuditedTransitions = []AuditTransition{
 	// deal; ending one without a sale says why (MoveStockUnit).
 	{"stock_unit.opened", "stock_unit", "audit_events", false},
 	{"stock_unit.moved", "stock_unit", "audit_events", false},
+	// A car bought (#161), and its VAT eligibility assessed again.
+	{"purchase.recorded", "purchase", "audit_events", false},
+	{"vat_eligibility.corrected", "purchase", "audit_events", true},
 }
 
 func auditTransition(event string) (AuditTransition, bool) {
@@ -145,8 +148,9 @@ var detailSeen = map[string]func(access.Roles) bool{
 // customer's, a vehicle's and a party's for those who see customers; a
 // job's for those who work on or follow jobs; a booked resource's for those
 // who book it, with why only for those who run the shop; a car's cycle
-// through stock for whoever buys or sells cars. What a role may not see of
-// the detail is left out.
+// through stock for whoever buys or sells cars, a purchase's for whoever
+// may see what the car cost. What a role may not see of the detail is left
+// out.
 func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, subjectKind, subjectID string) ([]AuditEvent, error) {
 	if !looksLikeUUID(subjectID) {
 		return nil, ErrNotFound
@@ -184,6 +188,10 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 	case "document", "deposit", "payout":
 	case "stock_unit":
 		if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+			return nil, access.ErrForbidden
+		}
+	case "purchase":
+		if !scope.Role.SeesPurchasePrice() {
 			return nil, access.ErrForbidden
 		}
 	default:

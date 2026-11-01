@@ -118,4 +118,5 @@ var core = map[string]string{
 	// A car's cycles through stock (#160): read whatever is switched on, so
 	// a shop that stops selling cars keeps the history it made.
 	"StockUnitByID": "a car's history in stock", "StockUnitsOfVehicle": "a car's history in stock",
+	"PurchaseOfUnit": "a car's history in stock", "VATEligibilityOfUnit": "a car's history in stock",
 }

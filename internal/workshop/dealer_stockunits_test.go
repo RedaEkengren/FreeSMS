@@ -39,13 +39,21 @@ func moveStock(t *testing.T, pool *pgxpool.Pool, id string, to ...workshop.Stock
 func TestACarBoughtTwiceIsTwoStockUnitsOfOneVehicle(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
-	first := takeIn(t, pool, workshop.StockFromPurchase)
+	bought := buy(t, pool, workshop.StockFromPurchase)
+	first, err := workshop.StockUnitByID(ctx, pool, buyerScope(), bought.StockUnitID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if first.Status != workshop.StockInPreparation || first.ClosedAt != nil || !first.Owned() {
 		t.Fatalf("a unit just taken in: %+v", first)
 	}
 	moveStock(t, pool, first.ID, workshop.StockForSale, workshop.StockReserved, workshop.StockSold, workshop.StockDelivered)
-	again := takeIn(t, pool, workshop.StockFromRepurchase)
-	if again.ID == first.ID || again.VehicleID != first.VehicleID || again.ResourceID != first.ResourceID {
+	boughtBack := buy(t, pool, workshop.StockFromRepurchase)
+	again, err := workshop.StockUnitByID(ctx, pool, buyerScope(), boughtBack.StockUnitID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Reason != workshop.StockFromRepurchase || again.ID == first.ID || again.VehicleID != first.VehicleID || again.ResourceID != first.ResourceID {
 		t.Errorf("bought again: %+v, first %+v; want a new unit of the same vehicle and resource", again, first)
 	}
 	units, err := workshop.StockUnitsOfVehicle(ctx, pool, sales(), vehicleA)
@@ -100,7 +108,7 @@ func TestTwoAttemptsToOpenAUnitAtOnceLeaveOne(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, errs[i] = workshop.TakeIntoStock(context.Background(), pool, buyerScope(), vehicleA, workshop.StockFromPurchase, "")
+			_, errs[i] = workshop.TakeIntoStock(context.Background(), pool, buyerScope(), vehicleA, workshop.StockFromDefleet, "")
 		}()
 	}
 	wg.Wait()
@@ -119,6 +127,19 @@ func TestTwoAttemptsToOpenAUnitAtOnceLeaveOne(t *testing.T) {
 	var n int
 	if err := pool.QueryRow(context.Background(), `SELECT count(*) FROM stock_units`).Scan(&n); err != nil || n != 1 {
 		t.Errorf("%d units, want 1 (%v)", n, err)
+	}
+}
+
+// A car bought comes into stock through its purchase, which records what
+// was paid and on what evidence; only a car with nothing to record is taken
+// in on its own.
+func TestACarBoughtComesInThroughItsPurchase(t *testing.T) {
+	pool := setup(t)
+	for _, reason := range []string{workshop.StockFromPurchase, workshop.StockFromTradeIn, workshop.StockFromRepurchase,
+		workshop.StockFromConsignment, workshop.StockFromImport} {
+		if _, err := workshop.TakeIntoStock(context.Background(), pool, buyerScope(), vehicleA, reason, ""); !errors.Is(err, workshop.ErrInvalid) {
+			t.Errorf("taken in as %s with nothing recorded: %v", reason, err)
+		}
 	}
 }
 
@@ -142,7 +163,7 @@ func TestATakeInReplayedFindsItsUnit(t *testing.T) {
 func TestAStockUnitMovesOnlyAsADealCan(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
-	u := takeIn(t, pool, workshop.StockFromPurchase)
+	u := takeIn(t, pool, workshop.StockFromDefleet)
 	all := everything(owner())
 	if err := workshop.MoveStockUnit(ctx, pool, all, u.ID, workshop.StockSold, ""); !errors.Is(err, workshop.ErrInvalid) ||
 		err.Error() != "workshop: invalid: a car cannot go straight from there to there" {
@@ -193,13 +214,13 @@ func TestACarWithNoChassisNumberOrPlateCannotComeIntoStock(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO vehicles (id, shop_id, make, label) VALUES ($1, $2, 'Volvo', 'den blå')`, bare, shopID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := workshop.TakeIntoStock(ctx, pool, buyerScope(), bare, workshop.StockFromPurchase, ""); !errors.Is(err, workshop.ErrInvalid) {
+	if _, err := workshop.TakeIntoStock(ctx, pool, buyerScope(), bare, workshop.StockFromDefleet, ""); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("a car with neither: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `UPDATE vehicles SET vin = 'YV1SW61R021234567' WHERE id = $1`, bare); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := workshop.TakeIntoStock(ctx, pool, buyerScope(), bare, workshop.StockFromPurchase, ""); err != nil {
+	if _, err := workshop.TakeIntoStock(ctx, pool, buyerScope(), bare, workshop.StockFromDefleet, ""); err != nil {
 		t.Errorf("a car with its chassis number: %v", err)
 	}
 }
@@ -209,10 +230,10 @@ func TestACarWithNoChassisNumberOrPlateCannotComeIntoStock(t *testing.T) {
 func TestStockUnitsByRoleAndModule(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
-	u := takeIn(t, pool, workshop.StockFromPurchase)
+	u := takeIn(t, pool, workshop.StockFromDefleet)
 	for name, s := range map[string]access.Scope{"the front desk": everything(advisor()), "a technician": everything(technician()),
 		"the rental desk": rentalDesk()} {
-		if _, err := workshop.TakeIntoStock(ctx, pool, s, vehicleA, workshop.StockFromPurchase, ""); !errors.Is(err, access.ErrForbidden) {
+		if _, err := workshop.TakeIntoStock(ctx, pool, s, vehicleA, workshop.StockFromDefleet, ""); !errors.Is(err, access.ErrForbidden) {
 			t.Errorf("%s took a car in: %v", name, err)
 		}
 		if _, err := workshop.StockUnitByID(ctx, pool, s, u.ID); !errors.Is(err, access.ErrForbidden) {
@@ -225,7 +246,7 @@ func TestStockUnitsByRoleAndModule(t *testing.T) {
 			t.Errorf("%s read a stock unit's trail: %v", name, err)
 		}
 	}
-	if _, err := workshop.TakeIntoStock(ctx, pool, sales(), vehicleA, workshop.StockFromPurchase, ""); !errors.Is(err, access.ErrForbidden) {
+	if _, err := workshop.TakeIntoStock(ctx, pool, sales(), vehicleA, workshop.StockFromDefleet, ""); !errors.Is(err, access.ErrForbidden) {
 		t.Errorf("a salesperson took a car in: %v", err)
 	}
 	if err := workshop.MoveStockUnit(ctx, pool, sales(), u.ID, workshop.StockForSale, ""); !errors.Is(err, access.ErrForbidden) {
@@ -246,7 +267,7 @@ func TestStockUnitsByRoleAndModule(t *testing.T) {
 
 	off := buyerScope()
 	off.Modules = []access.Module{access.Workshop, access.Rental}
-	if _, err := workshop.TakeIntoStock(ctx, pool, off, vehicleA, workshop.StockFromPurchase, ""); !errors.Is(err, access.ErrModuleOff) {
+	if _, err := workshop.TakeIntoStock(ctx, pool, off, vehicleA, workshop.StockFromDefleet, ""); !errors.Is(err, access.ErrModuleOff) {
 		t.Errorf("taken in with car sales off: %v", err)
 	}
 	if err := workshop.MoveStockUnit(ctx, pool, off, u.ID, workshop.StockInPreparation, ""); !errors.Is(err, access.ErrModuleOff) {
@@ -268,7 +289,7 @@ func TestStockUnitsByRoleAndModule(t *testing.T) {
 func TestAStockUnitKeepsWhatItWas(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
-	takeIn(t, pool, workshop.StockFromPurchase)
+	takeIn(t, pool, workshop.StockFromDefleet)
 	for _, stmt := range []string{
 		`DELETE FROM stock_units`,
 		`UPDATE stock_units SET vehicle_id = vehicle_id`,
