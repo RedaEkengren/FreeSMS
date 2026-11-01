@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -525,5 +526,69 @@ func TestTheCallDueFirstIsSentFirst(t *testing.T) {
 	}
 	if len(a.keys) != 3 || !strings.Contains(a.keys[0], "CCC333") || !strings.Contains(a.keys[1], "BBB222") || !strings.Contains(a.keys[2], "AAA111") {
 		t.Errorf("sent in the order %v; want the one due first, first", a.keys)
+	}
+}
+
+// The queue hears 'actions' from the outbox only when a call enters or
+// leaves what the owner is shown -- given up, or a task for a person --
+// not on every attempt, failure and retry of a call nobody has to look at:
+// each one re-reads every open home page.
+func TestTheOutboxTellsTheQueueOnlyWhatChangesIt(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	tpl := purchaseTemplate(t, pool)
+	doc := purchaseAgreement(t, pool, tpl, "")
+	d, _ := workshop.DocumentRecordByID(ctx, pool, buyerScope(), doc)
+	call, err := workshop.QueueSignatureRequest(ctx, pool, buyerScope(), doc, d.Parties[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Release()
+	if _, err := conn.Exec(ctx, `LISTEN freesms_changes`); err != nil {
+		t.Fatal(err)
+	}
+	heard := func() bool {
+		t.Helper()
+		got := false
+		for {
+			wait, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+			n, err := conn.Conn().WaitForNotification(wait)
+			cancel()
+			if err != nil {
+				return got
+			}
+			got = got || n.Payload == shopID+" actions"
+		}
+	}
+	event := func(e string) {
+		t.Helper()
+		retry := "NULL"
+		if e == "retry_scheduled" {
+			retry = "clock_timestamp()"
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO outbox_events (shop_id, outbox_id, event, retry_at) VALUES ($1, $2, $3, `+retry+`)`,
+			shopID, call, e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, step := range []struct {
+		events []string
+		heard  bool
+	}{
+		{[]string{"attempted", "failed", "retry_scheduled", "attempted", "failed"}, false},
+		{[]string{"given_up"}, true},
+		{[]string{"queued"}, true},
+		{[]string{"attempted", "succeeded"}, false},
+	} {
+		for _, e := range step.events {
+			event(e)
+		}
+		if got := heard(); got != step.heard {
+			t.Errorf("after %v the queue heard 'actions': %v, want %v", step.events, got, step.heard)
+		}
 	}
 }
