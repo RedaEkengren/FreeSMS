@@ -161,7 +161,7 @@ func issueSourcedTx(ctx context.Context, tx pgx.Tx, scope access.Scope, of sourc
 		        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,
 		        $34, NULLIF($35, '')::uuid, NULLIF($36, '')::uuid, $37::uuid)
 		RETURNING id, issued_at`
-	ocr, err := paymentOCR(number)
+	ocr, err := paymentOCR(DefaultSeries, number)
 	if err != nil {
 		return Invoice{}, err
 	}

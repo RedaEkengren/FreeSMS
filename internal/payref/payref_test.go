@@ -3,6 +3,7 @@ package payref
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -39,6 +40,44 @@ func TestTheCheckDigitIsBankgirotsModulus10(t *testing.T) {
 
 // A reference typed with spaces or a hyphen is read; one digit wrong, two
 // swapped, or something that is not digits is refused, each for its reason.
+// The same number in two series is two references, each a valid OCR
+// number; the default series' are the number's own, as they always were.
+func TestTwoSeriesWithTheSameNumberHaveTwoReferences(t *testing.T) {
+	a, err := OCRFor("A", 57)
+	if want, _ := OCR(57); err != nil || a != want {
+		t.Errorf("A-57 = %q, %v; want %q as before", a, err, want)
+	}
+	b, err := OCRFor("B", 57)
+	if err != nil || b != "01105782" {
+		t.Errorf("B-57 = %q, %v; want 01105782", b, err)
+	}
+	seen := map[string]string{}
+	for _, series := range []string{"A", "B", "AA", "Z9", "B1"} {
+		for _, n := range []int64{1, 5, 7, 57, 157, 1057, 11057} {
+			ref, err := OCRFor(series, n)
+			if err != nil {
+				t.Fatalf("%s-%d: %v", series, n, err)
+			}
+			if got, err := CheckOCR(ref); err != nil || got != ref {
+				t.Errorf("%s-%d's reference %q does not check: %v", series, n, ref, err)
+			}
+			if l := ref[len(ref)-2] - '0'; int(l) != len(ref)%10 {
+				t.Errorf("%s-%d's reference %q has the wrong length digit", series, n, ref)
+			}
+			name := series + "-" + strconv.FormatInt(n, 10)
+			if other, dup := seen[ref]; dup {
+				t.Errorf("%s and %s are both %q", other, name, ref)
+			}
+			seen[ref] = name
+		}
+	}
+	for _, bad := range []string{"", "b", "Å", "A-"} {
+		if _, err := OCRFor(bad, 57); err == nil {
+			t.Errorf("series %q has a reference", bad)
+		}
+	}
+}
+
 func TestATypedReferenceIsCheckedBeforeAnythingIsLookedUp(t *testing.T) {
 	if got, err := CheckOCR(" 1234 5682 "); err != nil || got != "12345682" {
 		t.Errorf("spaces: %q, %v", got, err)

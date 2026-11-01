@@ -22,7 +22,7 @@ import (
 // Separate series exist for separate books -- a second workshop, a parts
 // counter -- and each is numbered independently, so the concept has to be in
 // the schema from the start even while there is only one.
-const DefaultSeries = "A"
+const DefaultSeries = payref.DefaultSeries
 
 // ErrAlreadyInvoiced is returned when a work order already has an invoice.
 var ErrAlreadyInvoiced = errors.New("workshop: this order has already been invoiced")
@@ -255,7 +255,7 @@ func issueTx(ctx context.Context, tx pgx.Tx, scope access.Scope, workOrderID str
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
 			        $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34)
 			RETURNING id, issued_at`
-		ocr, err := paymentOCR(number)
+		ocr, err := paymentOCR(DefaultSeries, number)
 		if err != nil {
 			return err
 		}
@@ -579,9 +579,12 @@ func electronicArgs(s Seller, b Buyer, ocr string) []any {
 	}
 }
 
-// paymentOCR is an invoice number as its payment reference.
-func paymentOCR(number int64) (string, error) {
-	ocr, err := payref.OCR(number)
+// paymentOCR is an invoice's payment reference: the number alone in the
+// default series, as it always was, and with the series in it in any
+// other, so the same number in two series is two references and a payment
+// finds the one it pays (payref.OCRFor).
+func paymentOCR(series string, number int64) (string, error) {
+	ocr, err := payref.OCRFor(series, number)
 	if err != nil {
 		return "", fmt.Errorf("make the payment reference: %w", err)
 	}

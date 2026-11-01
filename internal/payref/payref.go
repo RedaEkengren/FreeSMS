@@ -75,6 +75,49 @@ func OCR(number int64) (string, error) {
 	return body + string(CheckDigit(body)), nil
 }
 
+// DefaultSeries is the invoice series whose references are OCR's: the
+// number alone, as every reference issued before there could be another.
+const DefaultSeries = "A"
+
+// OCRFor is the reference of invoice number in series. The default
+// series' is OCR(number). Another series' starts with a 0, which a number
+// never does, so it cannot be one of the default series'; then two digits
+// for each character of the series -- A to Z are 10 to 35, 0 to 9 are 36
+// to 45, none starting with 0 -- and a 0 to end them, then the number, the
+// length digit and the check digit. B-57 is 0 11 0 57, then 8 and 2:
+// 01105782. So the same number in two series is two references, and an
+// invoice is found by its reference whatever its series. A series of
+// anything but capital letters and digits has no reference.
+func OCRFor(series string, number int64) (string, error) {
+	if series == DefaultSeries {
+		return OCR(number)
+	}
+	if number <= 0 {
+		return "", fmt.Errorf("payref: invoice number %d is not one", number)
+	}
+	if series == "" {
+		return "", fmt.Errorf("payref: an invoice series has a name")
+	}
+	body := "0"
+	for _, r := range series {
+		switch {
+		case r >= 'A' && r <= 'Z':
+			body += strconv.Itoa(int(r-'A') + 10)
+		case r >= '0' && r <= '9':
+			body += strconv.Itoa(int(r-'0') + 36)
+		default:
+			return "", fmt.Errorf("payref: series %q is not capital letters and digits", series)
+		}
+	}
+	body += "0" + strconv.FormatInt(number, 10)
+	length := len(body) + 2
+	if length > MaxReference {
+		return "", ErrNotAReference
+	}
+	body += strconv.Itoa(length % 10)
+	return body + string(CheckDigit(body)), nil
+}
+
 // CheckOCR reads a reference as somebody typed or a bank sent it: spaces
 // and hyphens are dropped, and what is left must be 2 to 25 digits whose
 // last is the right check digit. It returns the reference as stored.
