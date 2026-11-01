@@ -156,9 +156,21 @@ func PriceRentalSeasons(from, to time.Time, loc *time.Location, seasons []Season
 		}
 	}
 	var out []RentalLine
-	cursor := start
+	// Each unit's start, counted from the rental's start as priceWall
+	// counts: the months as whole months from it, then weeks, days and
+	// hours from where the months end -- never a month added to a month,
+	// which drifts after the 28th.
+	var months int
+	var after time.Duration
+	unitStart := func(unit string) time.Time {
+		if unit == UnitMonth {
+			return start.AddDate(0, months, 0)
+		}
+		return start.AddDate(0, months, 0).Add(after)
+	}
 	for _, u := range units {
 		for n := int64(0); n < u.Count; n++ {
+			cursor := unitStart(u.Unit)
 			i := 0
 			for j := range starts {
 				if !starts[j].After(cursor) {
@@ -174,7 +186,11 @@ func PriceRentalSeasons(from, to time.Time, loc *time.Location, seasons []Season
 			} else {
 				out = append(out, RentalLine{Unit: u.Unit, Count: 1, UnitPrice: price, Season: first + i})
 			}
-			cursor = advance(cursor, u.Unit)
+			if u.Unit == UnitMonth {
+				months++
+			} else {
+				after += advance(time.Time{}, u.Unit).Sub(time.Time{})
+			}
 		}
 	}
 	return out, nil

@@ -177,3 +177,16 @@ func TestARentalLongerThanFiveYearsIsRefused(t *testing.T) {
 		t.Errorf("five years: %v", err)
 	}
 }
+
+// Split by units, the months are counted from the start as priceWall counts
+// them: from 31 January two months end on 31 March, and the day that starts
+// then is the low season's (review 2 #5).
+func TestSplitMonthsAreCountedFromTheStart(t *testing.T) {
+	low := RateTerms{Prices: RatePrices{Day: price(100), Month: price(1000)}}
+	high := RateTerms{Prices: RatePrices{Day: price(200), Month: price(2000)}}
+	seasons := []Season{{sthlm("2031-01-01 00:00"), low}, {sthlm("2031-04-01 00:00"), high}}
+	lines, err := PriceRentalSeasons(sthlm("2031-01-31 10:00"), sthlm("2031-04-05 10:00"), stockholm, seasons, true)
+	if err != nil || total(lines) != 2*1000+100+4*200 {
+		t.Errorf("two months and five days from 31 January: %+v (%d), %v", lines, total(lines), err)
+	}
+}
