@@ -433,48 +433,58 @@ func readProtocols(ctx context.Context, tx pgx.Tx, where string, arg any) ([]Pro
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	for i := range out {
-		items, err := tx.Query(ctx, `
-			SELECT it.id::text, coalesce(it.item_key, ''), it.label, coalesce(it.status, ''), coalesce(it.note, ''),
-			       coalesce((SELECT array_agg(a.storage_key ORDER BY a.created_at) FROM attachments a
-			                 WHERE a.inspection_item_id = it.id), '{}')
-			FROM inspection_items it WHERE it.inspection_id = $1 ORDER BY it.position`, out[i].ID)
-		if err != nil {
-			return nil, fmt.Errorf("read items: %w", err)
+	if len(out) == 0 {
+		return out, nil
+	}
+	// The items and removals of every protocol at once, two round trips
+	// however many protocols the vehicle has.
+	ids := make([]string, len(out))
+	at := make(map[string]int, len(out))
+	for i, p := range out {
+		ids[i], at[p.ID] = p.ID, i
+	}
+	items, err := tx.Query(ctx, `
+		SELECT it.inspection_id::text, it.id::text, coalesce(it.item_key, ''), it.label, coalesce(it.status, ''), coalesce(it.note, ''),
+		       coalesce((SELECT array_agg(a.storage_key ORDER BY a.created_at) FROM attachments a
+		                 WHERE a.inspection_item_id = it.id), '{}')
+		FROM inspection_items it WHERE it.inspection_id = ANY($1::uuid[]) ORDER BY it.inspection_id, it.position`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("read items: %w", err)
+	}
+	for items.Next() {
+		var of string
+		var it ProtocolItem
+		if err := items.Scan(&of, &it.ID, &it.Key, &it.Label, &it.Status, &it.Note, &it.Photos); err != nil {
+			items.Close()
+			return nil, fmt.Errorf("scan item: %w", err)
 		}
-		for items.Next() {
-			var it ProtocolItem
-			if err := items.Scan(&it.ID, &it.Key, &it.Label, &it.Status, &it.Note, &it.Photos); err != nil {
-				items.Close()
-				return nil, fmt.Errorf("scan item: %w", err)
-			}
-			out[i].Items = append(out[i].Items, it)
+		out[at[of]].Items = append(out[at[of]].Items, it)
+	}
+	items.Close()
+	if err := items.Err(); err != nil {
+		return nil, err
+	}
+	removals, err := tx.Query(ctx, `
+		SELECT r.inspection_id::text, r.inspection_item_id::text, r.removed_at, coalesce(p.display_name, ''), r.reason
+		FROM protocol_photo_removals r
+		LEFT JOIN users u ON u.id = r.removed_by
+		LEFT JOIN people p ON p.id = u.person_id
+		WHERE r.inspection_id = ANY($1::uuid[]) ORDER BY r.removed_at, r.id`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("read removals: %w", err)
+	}
+	for removals.Next() {
+		var of string
+		var r PhotoRemoval
+		if err := removals.Scan(&of, &r.ItemID, &r.RemovedAt, &r.RemovedBy, &r.Reason); err != nil {
+			removals.Close()
+			return nil, fmt.Errorf("scan removal: %w", err)
 		}
-		items.Close()
-		if err := items.Err(); err != nil {
-			return nil, err
-		}
-		removals, err := tx.Query(ctx, `
-			SELECT r.inspection_item_id::text, r.removed_at, coalesce(p.display_name, ''), r.reason
-			FROM protocol_photo_removals r
-			LEFT JOIN users u ON u.id = r.removed_by
-			LEFT JOIN people p ON p.id = u.person_id
-			WHERE r.inspection_id = $1 ORDER BY r.removed_at, r.id`, out[i].ID)
-		if err != nil {
-			return nil, fmt.Errorf("read removals: %w", err)
-		}
-		for removals.Next() {
-			var r PhotoRemoval
-			if err := removals.Scan(&r.ItemID, &r.RemovedAt, &r.RemovedBy, &r.Reason); err != nil {
-				removals.Close()
-				return nil, fmt.Errorf("scan removal: %w", err)
-			}
-			out[i].Removals = append(out[i].Removals, r)
-		}
-		removals.Close()
-		if err := removals.Err(); err != nil {
-			return nil, err
-		}
+		out[at[of]].Removals = append(out[at[of]].Removals, r)
+	}
+	removals.Close()
+	if err := removals.Err(); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

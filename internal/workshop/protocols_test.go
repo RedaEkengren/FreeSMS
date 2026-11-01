@@ -3,6 +3,7 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
@@ -352,5 +353,47 @@ func TestAPhotoIsRemovedFromAFinishedProtocolAndTheProtocolSaysSo(t *testing.T) 
 	}
 	if err := workshop.DeleteAttachment(ctx, pool, advisor(), remover, attachment, "Igen"); !errors.Is(err, workshop.ErrNotFound) {
 		t.Errorf("removing it a second time: %v, want not found", err)
+	}
+}
+
+// countingTracer counts the queries any connection sends.
+type countingTracer struct{ n atomic.Int64 }
+
+func (c *countingTracer) TraceQueryStart(ctx context.Context, _ *pgx.Conn, _ pgx.TraceQueryStartData) context.Context {
+	c.n.Add(1)
+	return ctx
+}
+func (c *countingTracer) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
+
+// A car rented forty times has eighty protocols. Reading them is a fixed
+// number of round trips, not two more for every protocol.
+func TestAVehiclesProtocolsAreReadInRoundTripsThatDoNotGrowWithThem(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	tpl := rentalChecklist(t, pool)
+	cfg := pool.Config()
+	counter := &countingTracer{}
+	cfg.ConnConfig.Tracer = counter
+	counted, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer counted.Close()
+	desk := otherRoles(access.Of(access.RoleRentalAgent))
+	read := func() int64 {
+		before := counter.n.Load()
+		ps, err := workshop.ProtocolsForVehicle(ctx, counted, desk, vehicleA)
+		if err != nil || len(ps) == 0 {
+			t.Fatalf("ProtocolsForVehicle: %d, %v", len(ps), err)
+		}
+		return counter.n.Load() - before
+	}
+	checkOut(t, pool, tpl, "")
+	one := read()
+	for range 3 {
+		checkOut(t, pool, tpl, "")
+	}
+	if four := read(); four != one {
+		t.Errorf("%d round trips for four protocols, %d for one; want the same", four, one)
 	}
 }
