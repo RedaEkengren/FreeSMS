@@ -1,5 +1,5 @@
 {{define "content"}}
-<h1>{{.T "In the shop"}}</h1>
+<h1>{{.T "In the shop"}}</h1>{{template "homecards" .}}
 <div id="live-board" data-live="board">
 {{/* Open jobs that need a decision about who or when. Worked out each time;
      it empties itself when somebody decides. */}}

@@ -74,7 +74,9 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
-func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
+// renderJobs is the list of open jobs: the home page of whoever works in
+// the workshop away from the counter, with the home page's cards above it.
+func (s *Server) renderJobs(w http.ResponseWriter, r *http.Request, home *workshop.Home) {
 	session := sessionFrom(r.Context())
 	jobs, err := workshop.OpenJobs(r.Context(), s.pool, session.Scope)
 	if err != nil {
@@ -85,6 +87,7 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 		Title:   "In the shop",
 		Session: session,
 		Jobs:    jobs,
+		Home:    home,
 	})
 }
 

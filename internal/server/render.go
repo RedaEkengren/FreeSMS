@@ -91,6 +91,8 @@ type pageData struct {
 	MyLocale string
 	// What is waiting for the person signed in, and the header's count of it.
 	Waiting []workshop.ActionItem
+	// The home page's cards and the top of the queue, on the home page only.
+	Home *workshop.Home
 	// Some of the queue's providers failed: what is shown is not all.
 	WaitingIncomplete bool
 	WaitingCount      int
@@ -504,11 +506,11 @@ func (d pageData) Plural(key string, count int) string {
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "planclash", "lineedit", "enquiries", "enquiry", "proposal", "offer", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "einvoice", "shop", "customer", "day", "followup", "comeback", "outsourced", "outsourcedlist", "import", "importbatch", "start", "invoiceexample", "help", "credit", "rebill", "docview", "summary", "summarydoc", "supply", "order", "timeline", "duplicates", "merge", "customers", "customercard", "sell", "checklists", "part", "staff", "account", "mine", "rota", "schedule", "receivables", "setup", "contract", "outbox", "paymentflows", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "planclash", "lineedit", "enquiries", "enquiry", "proposal", "offer", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "einvoice", "shop", "customer", "day", "followup", "comeback", "outsourced", "outsourcedlist", "import", "importbatch", "start", "invoiceexample", "help", "credit", "rebill", "docview", "summary", "summarydoc", "supply", "order", "timeline", "duplicates", "merge", "customers", "customercard", "sell", "checklists", "part", "staff", "account", "mine", "rota", "schedule", "receivables", "setup", "contract", "outbox", "paymentflows", "home", "error"}
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).Funcs(templateFuncs).ParseFS(web.Templates,
-			"templates/layout.html", "templates/_document.html", "templates/"+name+".html")
+			"templates/layout.html", "templates/_document.html", "templates/_home.html", "templates/"+name+".html")
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", name, err)
 		}

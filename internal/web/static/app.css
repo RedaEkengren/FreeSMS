@@ -632,3 +632,10 @@ table.rota td.rota-changed { box-shadow: inset 3px 0 0 var(--attention); }
 table.rota tr.rota-warn td { border-left: 3px solid var(--attention); color: var(--text); white-space: normal; }
 table.rota-form th { text-align: left; padding-right: .75rem; font-weight: 600; }
 table.rota-form td { padding: .15rem .25rem; }
+
+/* The home page's figures: a few short cards in a row that wraps,
+   one column on a phone. Something to do is marked apart from something
+   to know. */
+.figures { list-style: none; padding: 0; margin: 0 0 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.figure { border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.75rem; font-variant-numeric: tabular-nums; }
+.figure.action { border-color: var(--attention); }

@@ -26,7 +26,9 @@ import (
 // made in the commit that does it, with the reason in the message.
 var queryBudgets = map[string]int{
 	// The technician's screens, on the worst connection: these matter most.
-	"tech GET /": 11,
+	// 11 to 19 (#157): the home page's cards and the top of the one queue,
+	// each read under the reader's scope, above the job list.
+	"tech GET /": 19,
 	// 23 to 24: the work list is one more read (two once a job has steps,
 	// which the budget's jobs do not). 24 to 25: whether the job is a return
 	// visit or has been come back to (#119), one read.
@@ -41,6 +43,12 @@ var queryBudgets = map[string]int{
 	// The counter.
 	// 21: the open jobs that need a decision about who or when (#113),
 	// one read in its own scope.
+	// The home page (#157), every module on: the board, with the cards and
+	// the top of the one queue above it, read in a transaction of their own.
+	// The owner's queue is the counter's, the parts desk's and Core's --
+	// payment flows, documents, the outbox -- and two money cards besides.
+	"desk GET /":      35,
+	"owner GET /":     43,
 	"desk GET /board": 21,
 	// 35: the quote the customer was shown and what they answered to it
 	// (two statements), which the counter reads on every live refresh.
@@ -90,8 +98,13 @@ func (c *queryCounter) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryE
 func TestPagesStayWithinTheirQueryBudgetWhateverTheHistory(t *testing.T) {
 	counter := &queryCounter{}
 	ts, pool := testServerOn(t, testsupport.FreshPoolWith(t, counter))
+	// Every module on (#157): the home page asks each module's cards and
+	// queue, and stays within its budget with all three.
+	seedShop(t, pool, shopA, []string{`INSERT INTO shop_module_changes (shop_id, module, enabled) VALUES
+		('` + shopA + `','workshop',true), ('` + shopA + `','dealer',true), ('` + shopA + `','rental',true)`})
 	tech := signIn(t, ts, techEmail)
 	desk := signIn(t, ts, advisorEmail)
+	owner := signIn(t, ts, ownerEmail)
 
 	measure := func() map[string]int {
 		t.Helper()
@@ -101,10 +114,7 @@ func TestPagesStayWithinTheirQueryBudgetWhateverTheHistory(t *testing.T) {
 			method, path, _ := strings.Cut(rest, " ")
 			htmx := strings.HasSuffix(path, " (htmx)")
 			path = strings.TrimSuffix(path, " (htmx)")
-			client := tech
-			if who == "desk" {
-				client = desk
-			}
+			client := map[string]*http.Client{"tech": tech, "desk": desk, "owner": owner}[who]
 			path = strings.ReplaceAll(strings.ReplaceAll(path, "{id}", jobA), "{inspection}", budgetInspection)
 			req, _ := http.NewRequest(method, ts.URL+path, nil)
 			if htmx {

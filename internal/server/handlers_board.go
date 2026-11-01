@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -8,36 +9,49 @@ import (
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
-// handleHome sends each role to the screen it needs.
+// handleHome is everybody's home page (#157): what to do now and how the
+// business is doing, from the modules the shop runs and what the role may
+// see, above the screen the role works from.
 //
-// A technician's first screen is their work; an advisor's is the counter. One
-// address for "where I start" means nobody has to remember a second one, and a
-// bookmark keeps working when somebody's role changes.
+// A technician's first screen is their work; an advisor's is the counter.
+// One address for "where I start" means nobody has to remember a second
+// one, and a bookmark keeps working when somebody's role changes. Somebody
+// with no part in the workshop -- or in a shop that does not run it -- has
+// the cards and the queue alone, and their own pages come with their
+// modules.
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
-	// A shop that does not run the workshop has no board to start at. Until
-	// the home page knows every module (#157), it starts at what is Core:
-	// the customers for the counter, the inbox for everybody else.
-	// So does a person with no part in the workshop -- car sales, the
-	// rental desk (#145) -- whose own pages come with their modules.
-	if scope := sessionFrom(r.Context()).Scope; !scope.Uses(access.Workshop) || !scope.Role.WorksInTheWorkshop() {
-		if scope.Role.SeesCustomerPersonalData() {
-			http.Redirect(w, r, "/customers", http.StatusSeeOther)
-		} else {
-			http.Redirect(w, r, "/mine", http.StatusSeeOther)
-		}
+	session := sessionFrom(r.Context())
+	scope := session.Scope
+	var home workshop.Home
+	var failed []error
+	database.Reading(r.Context(), s.pool, scope, func(ctx context.Context) {
+		home, failed = workshop.HomeFor(ctx, s.pool, scope)
+	})
+	for _, err := range failed {
+		s.log.Error("home page", "error", err)
+	}
+	if !scope.Uses(access.Workshop) || !scope.Role.WorksInTheWorkshop() {
+		s.render(w, r, http.StatusOK, "home", pageData{Title: "Start page", Session: session, Home: &home})
 		return
 	}
-	if sessionFrom(r.Context()).Scope.Role.SeesCustomerPersonalData() {
-		s.handleBoard(w, r)
+	if scope.Role.SeesCustomerPersonalData() {
+		s.renderBoard(w, r, &home)
 		return
 	}
-	s.handleJobs(w, r)
+	s.renderJobs(w, r, &home)
 }
 
 func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
+	s.renderBoard(w, r, nil)
+}
+
+// renderBoard is the counter board, with the home page's cards above it
+// when it is the home page.
+func (s *Server) renderBoard(w http.ResponseWriter, r *http.Request, home *workshop.Home) {
 	session := sessionFrom(r.Context())
 
 	entries, err := workshop.Board(r.Context(), s.pool, session.Scope)
@@ -77,6 +91,7 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 		Session: session,
 		Board:   entries,
 		Backlog: backlog,
+		Home:    home,
 	})
 }
 

@@ -7639,6 +7639,48 @@
     },
     "Some items could not be loaded.": {
       "other": "En del kunde inte hämtas."
+    },
+    "Start page": {
+      "other": "Startsida"
+    },
+    "What to do now": {
+      "other": "Att göra nu"
+    },
+    "How the business is doing": {
+      "other": "Hur verksamheten går"
+    },
+    "Everything waiting for you": {
+      "other": "Allt som väntar på dig"
+    },
+    "%d more is waiting for you": {
+      "one": "%d sak till väntar på dig",
+      "other": "%d saker till väntar på dig"
+    },
+    "Some of this could not be loaded.": {
+      "other": "En del av detta kunde inte hämtas."
+    },
+    "%d car ready": {
+      "one": "%d bil klar",
+      "other": "%d bilar klara"
+    },
+    "%d job waiting for the customer's decision": {
+      "one": "%d jobb väntar på kundens beslut",
+      "other": "%d jobb väntar på kundens beslut"
+    },
+    "%d job waiting for parts": {
+      "one": "%d jobb väntar på delar",
+      "other": "%d jobb väntar på delar"
+    },
+    "%d job past its promised time": {
+      "one": "%d jobb efter utlovad tid",
+      "other": "%d jobb efter utlovad tid"
+    },
+    "%d job in progress": {
+      "one": "%d pågående jobb",
+      "other": "%d pågående jobb"
+    },
+    "Work ready to invoice, before VAT": {
+      "other": "Arbete klart att fakturera, före moms"
     }
   }
 }

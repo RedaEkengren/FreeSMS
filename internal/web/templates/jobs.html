@@ -1,5 +1,5 @@
 {{define "content"}}
-<h1>{{.T "In the shop"}}</h1>
+<h1>{{.T "In the shop"}}</h1>{{template "homecards" .}}
 <div id="live-jobs" data-live="board">
 {{if not .Jobs}}
   <p class="empty">{{.T "Nothing open."}}</p>

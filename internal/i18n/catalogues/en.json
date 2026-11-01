@@ -182,6 +182,30 @@
     "%d call to another service is a task to do by hand": {
       "one": "%d call to another service is a task to do by hand",
       "other": "%d calls to other services are tasks to do by hand"
+    },
+    "%d more is waiting for you": {
+      "one": "%d more is waiting for you",
+      "other": "%d more are waiting for you"
+    },
+    "%d car ready": {
+      "one": "%d car ready",
+      "other": "%d cars ready"
+    },
+    "%d job waiting for the customer's decision": {
+      "one": "%d job waiting for the customer's decision",
+      "other": "%d jobs waiting for the customer's decision"
+    },
+    "%d job waiting for parts": {
+      "one": "%d job waiting for parts",
+      "other": "%d jobs waiting for parts"
+    },
+    "%d job past its promised time": {
+      "one": "%d job past its promised time",
+      "other": "%d jobs past their promised time"
+    },
+    "%d job in progress": {
+      "one": "%d job in progress",
+      "other": "%d jobs in progress"
     }
   }
 }

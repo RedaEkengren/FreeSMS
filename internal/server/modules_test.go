@@ -174,10 +174,11 @@ func TestASwitchedOffModulesRoutesAreNotThere(t *testing.T) {
 	if status, body := missing(owner, http.MethodGet, "/invoices/"+inv.ID); status != http.StatusOK || !strings.Contains(body, customerName) {
 		t.Errorf("the invoice the workshop issued is not readable after it was switched off: %d", status)
 	}
-	// Home, with no board to start at.
-	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/", nil)
-	if resp, err := owner.Do(req); err != nil || resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/customers" {
-		t.Errorf("home with the workshop off: %v %v", resp, err)
+	// Home, with no board to start at: the start page, and nothing of the
+	// workshop on it.
+	if status, body := missing(owner, http.MethodGet, "/"); status != http.StatusOK || !strings.Contains(body, "Start page") ||
+		strings.Contains(body, `href="/jobs/`) || strings.Contains(body, `id="live-board"`) {
+		t.Errorf("home with the workshop off: %d", status)
 	}
 
 	// On again, and it is all there.
