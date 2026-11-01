@@ -173,29 +173,39 @@ func CreateResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 			return tx.QueryRow(ctx, `INSERT INTO resources (shop_id, kind, name, created_by) VALUES ($1, 'item', $2, NULLIF($3, '')::uuid) RETURNING id`,
 				scope.ShopID, n.Name, scope.UserID).Scan(&id)
 		}
-		err := tx.QueryRow(ctx, `
-			INSERT INTO resources (shop_id, kind, vehicle_id, created_by)
-			SELECT $1, 'vehicle', v.id, NULLIF($3, '')::uuid FROM vehicles v WHERE v.id = $2 AND v.merged_into IS NULL
-			ON CONFLICT (vehicle_id) DO NOTHING RETURNING id`, scope.ShopID, n.VehicleID, scope.UserID).Scan(&id)
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		var retired bool
-		err = tx.QueryRow(ctx, `SELECT id, retired_at IS NOT NULL FROM resources WHERE vehicle_id = $1 FOR UPDATE`, n.VehicleID).Scan(&id, &retired)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNotFound
-		}
-		if err != nil || !retired {
-			return err
-		}
-		if _, err := tx.Exec(ctx, `
-			UPDATE resource_retirements SET returned_at = clock_timestamp(), returned_by = NULLIF($2, '')::uuid
-			WHERE resource_id = $1 AND returned_at IS NULL`, id, scope.UserID); err != nil {
-			return fmt.Errorf("bring back into use: %w", err)
-		}
-		_, err = tx.Exec(ctx, `UPDATE resources SET retired_at = NULL, retired_by = NULL WHERE id = $1`, id)
+		var err error
+		id, err = vehicleResourceTx(ctx, tx, scope, n.VehicleID)
 		return err
 	})
+	return id, err
+}
+
+// vehicleResourceTx is CreateResource for a vehicle, in the caller's
+// transaction: the vehicle's one resource, made or brought back into use.
+// A stock unit opens with it (#160).
+func vehicleResourceTx(ctx context.Context, tx pgx.Tx, scope access.Scope, vehicleID string) (string, error) {
+	var id string
+	err := tx.QueryRow(ctx, `
+		INSERT INTO resources (shop_id, kind, vehicle_id, created_by)
+		SELECT $1, 'vehicle', v.id, NULLIF($3, '')::uuid FROM vehicles v WHERE v.id = $2 AND v.merged_into IS NULL
+		ON CONFLICT (vehicle_id) DO NOTHING RETURNING id`, scope.ShopID, vehicleID, scope.UserID).Scan(&id)
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return id, err
+	}
+	var retired bool
+	err = tx.QueryRow(ctx, `SELECT id, retired_at IS NOT NULL FROM resources WHERE vehicle_id = $1 FOR UPDATE`, vehicleID).Scan(&id, &retired)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil || !retired {
+		return id, err
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE resource_retirements SET returned_at = clock_timestamp(), returned_by = NULLIF($2, '')::uuid
+		WHERE resource_id = $1 AND returned_at IS NULL`, id, scope.UserID); err != nil {
+		return "", fmt.Errorf("bring back into use: %w", err)
+	}
+	_, err = tx.Exec(ctx, `UPDATE resources SET retired_at = NULL, retired_by = NULL WHERE id = $1`, id)
 	return id, err
 }
 
@@ -212,38 +222,44 @@ func RetireResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		return ErrNotFound
 	}
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		var retired bool
-		err := tx.QueryRow(ctx, `SELECT retired_at IS NOT NULL FROM resources WHERE id = $1 FOR UPDATE`, id).Scan(&retired)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNotFound
-		}
-		if err != nil {
-			return fmt.Errorf("read resource: %w", err)
-		}
-		if retired {
-			return nil
-		}
-		if _, err := tx.Exec(ctx, `SELECT release_expired_holds($1, tstzrange(clock_timestamp(), NULL))`, id); err != nil {
-			return fmt.Errorf("release expired holds: %w", err)
-		}
-		var ahead int
-		if err := tx.QueryRow(ctx, `
-			SELECT count(*) FROM resource_blocks
-			WHERE resource_id = $1 AND status IN ('held', 'confirmed') AND period && tstzrange(clock_timestamp(), NULL)`, id).Scan(&ahead); err != nil {
-			return fmt.Errorf("read what is booked: %w", err)
-		}
-		if ahead > 0 {
-			return fmt.Errorf("%w: something is still booked on it; release or replan that first", ErrInvalid)
-		}
-		// The period out of use is the row; the column is what it says now,
-		// which booking and the job trigger read.
-		if _, err := tx.Exec(ctx, `INSERT INTO resource_retirements (shop_id, resource_id, retired_by) VALUES ($1, $2, NULLIF($3, '')::uuid)`,
-			scope.ShopID, id, scope.UserID); err != nil {
-			return fmt.Errorf("take out of use: %w", err)
-		}
-		_, err = tx.Exec(ctx, `UPDATE resources SET retired_at = now(), retired_by = NULLIF($2, '')::uuid WHERE id = $1`, id, scope.UserID)
-		return err
+		return retireResourceTx(ctx, tx, scope, id)
 	})
+}
+
+// retireResourceTx is RetireResource in the caller's transaction: a stock
+// unit's cycle ends with it (#160).
+func retireResourceTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id string) error {
+	var retired bool
+	err := tx.QueryRow(ctx, `SELECT retired_at IS NOT NULL FROM resources WHERE id = $1 FOR UPDATE`, id).Scan(&retired)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("read resource: %w", err)
+	}
+	if retired {
+		return nil
+	}
+	if _, err := tx.Exec(ctx, `SELECT release_expired_holds($1, tstzrange(clock_timestamp(), NULL))`, id); err != nil {
+		return fmt.Errorf("release expired holds: %w", err)
+	}
+	var ahead int
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*) FROM resource_blocks
+		WHERE resource_id = $1 AND status IN ('held', 'confirmed') AND period && tstzrange(clock_timestamp(), NULL)`, id).Scan(&ahead); err != nil {
+		return fmt.Errorf("read what is booked: %w", err)
+	}
+	if ahead > 0 {
+		return fmt.Errorf("%w: something is still booked on it; release or replan that first", ErrInvalid)
+	}
+	// The period out of use is the row; the column is what it says now,
+	// which booking and the job trigger read.
+	if _, err := tx.Exec(ctx, `INSERT INTO resource_retirements (shop_id, resource_id, retired_by) VALUES ($1, $2, NULLIF($3, '')::uuid)`,
+		scope.ShopID, id, scope.UserID); err != nil {
+		return fmt.Errorf("take out of use: %w", err)
+	}
+	_, err = tx.Exec(ctx, `UPDATE resources SET retired_at = now(), retired_by = NULLIF($2, '')::uuid WHERE id = $1`, id, scope.UserID)
+	return err
 }
 
 // ResourceBooking is a use to block a resource for. From and To are the use itself;

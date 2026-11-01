@@ -20,3 +20,16 @@ func TestTheSameNumberInTwoSeriesIsTwoReferences(t *testing.T) {
 		t.Errorf("B-57: %q, %v; A-57 is %q", b, err, a)
 	}
 }
+
+// A series no reference can be made for -- a lower-case letter, a hyphen,
+// a name too long to fit in 25 digits -- is issued without one rather than
+// not at all: a correction must not be refused because its original's
+// series has no reference.
+func TestASeriesWithNoReferenceIssuesWithoutOne(t *testing.T) {
+	for _, series := range []string{"b", "K-2", "Å", "ABCDEFGHIJKL"} {
+		ocr, err := paymentOCR(series, 57)
+		if err != nil || ocr != "" {
+			t.Errorf("%s-57: %q, %v; want no reference and no error", series, ocr, err)
+		}
+	}
+}

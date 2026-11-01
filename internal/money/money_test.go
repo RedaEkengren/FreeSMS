@@ -275,3 +275,27 @@ func TestAMarkupRoundsLikeEveryOtherAmount(t *testing.T) {
 		}
 	}
 }
+
+// The margin scheme's VAT (#176, #163): the margin of one car, VAT
+// included, times the rate over one plus the rate -- 20 per cent of the
+// margin at 25 per cent -- and nothing for a car sold at a loss or at
+// cost, whatever another car made.
+func TestTheMarginSchemeTaxesEachCarsOwnMargin(t *testing.T) {
+	for _, c := range []struct {
+		sale, purchase int64
+		rate           int
+		want           int64
+	}{
+		{12_500_000, 10_000_000, 2500, 500_000}, // 25 000 kr margin, 5 000 kr VAT
+		{10_000_000, 10_000_000, 2500, 0},       // at cost
+		{9_000_000, 10_000_000, 2500, 0},        // at a loss: nothing, never negative
+		{10_000_003, 10_000_000, 2500, 1},       // 0,03 kr margin: 0,006 rounds to 0,01
+		{10_000_002, 10_000_000, 2500, 0},       // 0,02 kr margin: 0,004 rounds to nothing
+		{100_000_000_000, 0, 2500, 20_000_000_000},
+		{12_500_000, 10_000_000, 0, 0},
+	} {
+		if got := MarginSchemeVAT(c.sale, c.purchase, c.rate); got != c.want {
+			t.Errorf("MarginSchemeVAT(%d, %d, %d) = %d, want %d", c.sale, c.purchase, c.rate, got, c.want)
+		}
+	}
+}

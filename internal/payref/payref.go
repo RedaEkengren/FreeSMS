@@ -42,6 +42,9 @@ var (
 	ErrNotAReference = errors.New("payref: an OCR reference is 2 to 25 digits")
 	// ErrCheckDigit is a reference whose check digit is wrong: mistyped.
 	ErrCheckDigit = errors.New("payref: the reference's check digit is wrong")
+	// ErrLengthDigit is a reference whose length digit fits it with no
+	// leading 0 and with one: not copied whole.
+	ErrLengthDigit = errors.New("payref: the reference's length digit is wrong")
 )
 
 // CheckDigit is the modulus 10 check digit of digits, which must be digits.
@@ -121,6 +124,13 @@ func OCRFor(series string, number int64) (string, error) {
 // CheckOCR reads a reference as somebody typed or a bank sent it: spaces
 // and hyphens are dropped, and what is left must be 2 to 25 digits whose
 // last is the right check digit. It returns the reference as stored.
+//
+// Leading zeros are what a bank or a banking app may drop or add, and the
+// check digit cannot see them: the modulus 10 method ignores them. Every
+// reference FreeSMS issues has a length digit, and starts with no 0 (the
+// default series) or with exactly one (any other, OCRFor), so the length
+// digit says which of the two it was: the one whose length it gives. A
+// reference whose length digit fits neither was not copied whole.
 func CheckOCR(typed string) (string, error) {
 	s := strings.Map(func(r rune) rune {
 		if r == ' ' || r == '-' {
@@ -139,7 +149,13 @@ func CheckOCR(typed string) (string, error) {
 	if CheckDigit(s[:len(s)-1]) != s[len(s)-1] {
 		return "", ErrCheckDigit
 	}
-	return s, nil
+	bare := strings.TrimLeft(s, "0")
+	for _, ref := range []string{bare, "0" + bare} {
+		if len(ref) >= 3 && len(ref) <= MaxReference && int(ref[len(ref)-2]-'0') == len(ref)%10 {
+			return ref, nil
+		}
+	}
+	return "", ErrLengthDigit
 }
 
 // Swish's prefilled payment code. Swish documents a prefilled code through
@@ -232,17 +248,19 @@ type Giro struct {
 //
 // A space may group a number's digits -- a plusgiro is often written
 // "12 34 56-7" -- but does not join two numbers: once the hyphen before
-// the check part has been written, or ten digits, the most a giro has,
-// a space and more digits are something else, such as the telephone
-// number printed after it. Anything other than a digit, a hyphen or a
-// space ends the number too.
+// the check part has been written, or eight digits, the most a bankgiro
+// or a plusgiro has, a space and more digits are something else, such as
+// the telephone number printed after it. Anything other than a digit, a
+// hyphen or a space ends the number too. A bankgiro is seven or eight
+// digits and a plusgiro two to eight; anything else is no giro.
 func GiroOf(scheme, printed string) Giro {
 	var t string
+	least := 0
 	switch scheme {
 	case "bankgiro":
-		t = "BG"
+		t, least = "BG", 7
 	case "plusgiro":
-		t = "PG"
+		t, least = "PG", 2
 	default:
 		return Giro{}
 	}
@@ -251,7 +269,7 @@ func GiroOf(scheme, printed string) Giro {
 	for _, r := range printed {
 		switch {
 		case r >= '0' && r <= '9':
-			if spaced && (hyphen || digits >= 10) {
+			if spaced && (hyphen || digits >= maxGiroDigits) {
 				goto done
 			}
 			b.WriteRune(r)
@@ -271,11 +289,14 @@ func GiroOf(scheme, printed string) Giro {
 	}
 done:
 	acc := strings.Trim(b.String(), "-")
-	if n := len(strings.ReplaceAll(acc, "-", "")); n < 2 || n > 10 {
+	if n := len(strings.ReplaceAll(acc, "-", "")); n < least || n > maxGiroDigits {
 		return Giro{}
 	}
 	return Giro{Type: t, Account: acc}
 }
+
+// maxGiroDigits is the most digits a bankgiro or a plusgiro has.
+const maxGiroDigits = 8
 
 // UsingQR is the bankgiro code's JSON for an invoice.
 func UsingQR(seller, orgNumber, reference string, issued, due time.Time, amountMinor int64, giro Giro) (string, error) {

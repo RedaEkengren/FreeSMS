@@ -258,6 +258,13 @@ type pageData struct {
 	StaffForm staffForm
 	Roles     []access.Role
 	Changed   bool
+
+	// Dealer
+	// The vehicle's cycles through stock (#160), for whoever buys or sells
+	// cars.
+	StockUnits []workshop.StockUnit
+	// What a car-sales page shows (handlers_dealer.go).
+	Dealer *dealerData
 }
 
 // intakeBooking is the booking behind an intake, with the people the desk
@@ -512,6 +519,8 @@ func (d pageData) Plural(key string, count int) string {
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
 	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "planclash", "lineedit", "enquiries", "enquiry", "proposal", "offer", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "einvoice", "shop", "customer", "day", "followup", "comeback", "outsourced", "outsourcedlist", "import", "importbatch", "start", "invoiceexample", "help", "credit", "rebill", "docview", "summary", "summarydoc", "supply", "order", "timeline", "duplicates", "merge", "customers", "customercard", "sell", "checklists", "part", "staff", "account", "mine", "rota", "schedule", "receivables", "setup", "contract", "outbox", "paymentflows", "technicians", "home", "error"}
+	// Dealer
+	pages = append(pages, "carcalc")
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).Funcs(templateFuncs).ParseFS(web.Templates,

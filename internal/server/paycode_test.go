@@ -91,6 +91,15 @@ func TestAnInvoiceIsPaidByItsReference(t *testing.T) {
 	if body := post(t, desk, ts.URL+"/payments/by-reference", url.Values{"ocr": {wrong}, "amount": {"500"}, "paid_on": {time.Now().Format("2006-01-02")}, "method": {"bank"}}); !strings.Contains(body, "check digit") {
 		t.Errorf("a mistyped reference was not refused for its check digit:\n%s", visibleText(body))
 	}
+	// A technician records no payment, with an amount or without: the role
+	// is refused before what was asked is read.
+	tech := signIn(t, ts, techEmail)
+	for _, amount := range []string{"", "500"} {
+		if status := postStatus(t, tech, ts.URL+"/payments/by-reference", url.Values{"ocr": {ref[1]}, "amount": {amount},
+			"paid_on": {time.Now().Format("2006-01-02")}, "method": {"bank"}}); status != http.StatusForbidden {
+			t.Errorf("a technician paying by reference with amount %q answered %d, want forbidden", amount, status)
+		}
+	}
 	// A bank payment is what arrived: no amount is not "all of it".
 	if status := postStatus(t, desk, ts.URL+"/payments/by-reference", url.Values{"ocr": {ref[1]}, "paid_on": {time.Now().Format("2006-01-02")}, "method": {"bank"}}); status != http.StatusBadRequest {
 		t.Errorf("paid by its reference with no amount answered %d", status)

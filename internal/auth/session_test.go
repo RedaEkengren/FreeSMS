@@ -449,3 +449,55 @@ func TestASessionCarriesWhatIsOpenedForThisTechnicianAlone(t *testing.T) {
 		t.Errorf("opened for somebody who is no longer a technician: %v, %v", s.Scope.Opened, err)
 	}
 }
+
+// What is open for a technician is one rule in the database
+// (technician_fields_open_rows), read by the session and by the view the
+// settings page reads (technician_fields_open). Changed, as a later
+// migration might change it, both see the change: there is no second copy
+// of the rule to drift apart from the first.
+func TestTheSessionAndTheSettingsReadOneRuleForWhatIsOpen(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `
+			INSERT INTO technician_view_exceptions (shop_id, user_id, field, granted, until, reason, by_user)
+			VALUES ($1, $2, 'invoice_status', true, clock_timestamp() - interval '1 hour', 'Förra veckan', $2)`, shopID, userID)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The rule changed: an exception past its end still counts.
+	if _, err := pool.Exec(ctx, `
+		CREATE OR REPLACE FUNCTION technician_fields_open_rows(only_user uuid)
+		RETURNS TABLE (shop_id uuid, user_id uuid, field text) LANGUAGE sql STABLE AS $$
+		    SELECT e.shop_id, e.user_id, e.field
+		      FROM (SELECT DISTINCT ON (x.user_id, x.field) x.shop_id, x.user_id, x.field, x.granted
+		              FROM technician_view_exceptions x
+		             WHERE only_user IS NULL OR x.user_id = only_user
+		             ORDER BY x.user_id, x.field, x.seq DESC) e
+		     WHERE e.granted
+		$$`); err != nil {
+		t.Fatalf("change the rule: %v", err)
+	}
+	token, _, err := Login(ctx, pool, shopID, email, pass, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := Check(ctx, pool, shopID, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"invoice_status"}; !slices.Equal(s.Scope.Opened, want) {
+		t.Errorf("the session read %v after the rule changed, want %v", s.Scope.Opened, want)
+	}
+	var viewed []string
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT coalesce(array_agg(field ORDER BY field), '{}') FROM technician_fields_open WHERE user_id = $1`, userID).Scan(&viewed)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"invoice_status"}; !slices.Equal(viewed, want) {
+		t.Errorf("the view read %v after the rule changed, want %v", viewed, want)
+	}
+}

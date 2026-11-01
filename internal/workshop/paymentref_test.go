@@ -82,6 +82,15 @@ func TestAPaymentFindsItsInvoiceByItsReference(t *testing.T) {
 	if _, _, err := workshop.InvoiceByPaymentReference(ctx, pool, advisor(), wrong); !errors.Is(err, workshop.ErrInvalid) || !strings.Contains(err.Error(), "check digit") {
 		t.Errorf("a wrong check digit: %v", err)
 	}
+	// Padded with a 0 by a bank, it is still found.
+	if id, _, err := workshop.InvoiceByPaymentReference(ctx, pool, advisor(), "0"+d.PaymentOCR); err != nil || id != inv {
+		t.Errorf("by its reference with a leading 0 added: %q %v", id, err)
+	}
+	// Not copied whole: the length digit fits no form of it.
+	cut := "12" + string(payref.CheckDigit("12"))
+	if _, _, err := workshop.InvoiceByPaymentReference(ctx, pool, advisor(), cut); !errors.Is(err, workshop.ErrInvalid) || !strings.Contains(err.Error(), "length") {
+		t.Errorf("a wrong length digit: %v", err)
+	}
 	nobody, _ := payref.OCR(99999)
 	if _, _, err := workshop.InvoiceByPaymentReference(ctx, pool, advisor(), nobody); !errors.Is(err, workshop.ErrInvalid) || !strings.Contains(err.Error(), "no invoice") {
 		t.Errorf("a reference nobody has: %v", err)
