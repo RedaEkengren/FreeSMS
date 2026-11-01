@@ -266,7 +266,11 @@ func IdentityRecordsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		}
 		rows, err := tx.Query(ctx, `
 			SELECT r.id::text, r.kind, r.purpose, r.legal_basis, r.recorded_at, coalesce(p.display_name, ''), r.expires_at, r.ended_at,
-			       r.sealed IS NOT NULL, CASE WHEN $2 THEN coalesce(r.verification_ref, '') ELSE '' END, r.value_removed_at IS NOT NULL
+			       -- Past its expiry a value is gone, whether or not the
+			       -- sweep has taken it out yet.
+			       r.sealed IS NOT NULL AND r.expires_at > clock_timestamp(),
+			       CASE WHEN $2 AND r.expires_at > clock_timestamp() THEN coalesce(r.verification_ref, '') ELSE '' END,
+			       r.value_removed_at IS NOT NULL OR r.expires_at <= clock_timestamp()
 			FROM identity_records r
 			LEFT JOIN users u ON u.id = r.recorded_by LEFT JOIN people p ON p.id = u.person_id
 			WHERE r.party_id = ANY((SELECT party_ids_read_as(party_now($1)))::uuid[])
@@ -316,8 +320,12 @@ func ReadIdentityValue(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		var keyID *string
 		var sealed []byte
 		var removed bool
+		// Past its expiry it is removed, as far as a read is concerned: the
+		// sweep that takes it out of the row runs when it runs, and the
+		// retention ends at the expiry, not then.
 		err := tx.QueryRow(ctx, `
-			SELECT party_id::text, kind, purpose, key_id, sealed, value_removed_at IS NOT NULL
+			SELECT party_id::text, kind, purpose, key_id, sealed,
+			       value_removed_at IS NOT NULL OR expires_at <= clock_timestamp()
 			FROM identity_records WHERE id = $1`, recordID).Scan(&party, &kind, &purpose, &keyID, &sealed, &removed)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound

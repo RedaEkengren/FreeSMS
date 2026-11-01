@@ -293,3 +293,57 @@ func TestIdentityKeysRotateAndTheRecordsFactsStay(t *testing.T) {
 		}
 	}
 }
+
+// Past its expiry a value is not read, whether or not the sweep has run
+// yet: the read itself refuses it, and the list shows it as gone and hands
+// no reference. Retention ends at the expiry, not at three in the morning.
+func TestAnExpiredIdentityValueIsNotReadBeforeTheSweep(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	keys := identityKeys(t, "k1")
+	party := partyOf(t, pool, fixtureCustomer)
+	if err := workshop.StartPartyRole(ctx, pool, everything(advisor()), party, workshop.PartyRenter, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.StartPartyRole(ctx, pool, everything(advisor()), party, workshop.PartyBuyer, ""); err != nil {
+		t.Fatal(err)
+	}
+	number, err := workshop.RecordIdentity(ctx, pool, sales(), keys, workshop.NewIdentityRecord{PartyID: party,
+		Kind: workshop.IdentityNumber, Purpose: "ownership_change", Value: seededNumber})
+	if err != nil {
+		t.Fatal(err)
+	}
+	desk := otherRoles(access.Of(access.RoleRentalAgent))
+	if _, err := workshop.RecordIdentity(ctx, pool, desk, keys, workshop.NewIdentityRecord{PartyID: party,
+		Kind: workshop.IdentityLicence, Purpose: "licence_check", Reference: "Körkort kontrollerat"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `ALTER TABLE identity_records DISABLE TRIGGER USER`); err != nil {
+		t.Fatal(err)
+	}
+	_, err = pool.Exec(ctx, `UPDATE identity_records SET recorded_at = now() - interval '1 year', expires_at = now() - interval '1 second'`)
+	if _, e := pool.Exec(ctx, `ALTER TABLE identity_records ENABLE TRIGGER USER`); e != nil || err != nil {
+		t.Fatal(err, e)
+	}
+	// No sweep.
+	if _, err := workshop.ReadIdentityValue(ctx, pool, sales(), keys, number, true); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("an expired number read before the sweep: %v", err)
+	}
+	if _, err := workshop.ReadIdentityValue(ctx, pool, sales(), keys, number, false); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("an expired number read masked before the sweep: %v", err)
+	}
+	if n := countRows(t, pool, `SELECT count(*) FROM audit_events WHERE event = 'identity.read'`); n != 0 {
+		t.Errorf("%d reads logged of a value past its expiry", n)
+	}
+	for _, s := range []access.Scope{sales(), desk} {
+		listed, err := workshop.IdentityRecordsFor(ctx, pool, s, party)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range listed {
+			if r.HasValue || r.Reference != "" || !r.ValueRemoved {
+				t.Errorf("%v lists an expired record as %+v", s.Role, r)
+			}
+		}
+	}
+}
