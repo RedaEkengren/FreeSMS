@@ -227,6 +227,7 @@ test.describe.serial('the whole job scene', () => {
       const invoice = d.locator('form[action$="/invoice"]');
       await expect(invoice).toContainText('1 rad lades till efter att kunden godkänt och saknar godkännande.');
       await invoice.getByLabel('Fakturera med raderna ingen godkänt').check();
+      await invoice.getByLabel('Varför de faktureras ändå').fill('Kunden sa ja till att byta beläggen, och det här är beläggen');
       await d.getByRole('button', { name: 'Fakturera den' }).click();
       await d.getByRole('link', { name: /A-\d+/ }).first().click();
       const pay = d.locator('form[action$="/payments"]');
