@@ -57,11 +57,20 @@ func (s *Server) handleVehicle(w http.ResponseWriter, r *http.Request) {
 			s.log.Error("read vehicle changes", "error", err)
 		}
 	}
+	// Its cycles through the dealer's stock (#160): a car bought twice is
+	// two. Not asked for a role that may not read them.
+	var units []workshop.StockUnit
+	if session.Scope.Role.BuysVehicles() || session.Scope.Role.SellsVehicles() {
+		if units, err = workshop.StockUnitsOfVehicle(r.Context(), s.pool, session.Scope, vehicle.ID); err != nil {
+			s.log.Error("read stock units", "error", err)
+		}
+	}
 	s.render(w, r, http.StatusOK, "vehicle", pageData{
 		Title:          vehicle.Describe(),
 		Session:        session,
 		Vehicle:        vehicle,
 		VehicleChanges: changes,
+		StockUnits:     units,
 	})
 }
 

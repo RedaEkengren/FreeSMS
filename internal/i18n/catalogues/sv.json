@@ -7854,6 +7854,29 @@
       "other": "Betalningsuppgifterna går inte att läsa som ett bankgiro- eller plusgironummer, så fakturorna får ingen bankgiro- eller plusgirokod att betala med och kan inte skickas elektroniskt. Skriv numret för sig, till exempel Bankgiro 123-4567."
     },
     "%s, %s: the reason was erased at a person's request": {"other": "%s, %s: anledningen raderades på en persons begäran"},
-    "that reference's length digit is wrong, so part of it is missing; check it against the invoice": {"other": "referensens längdsiffra stämmer inte, så en del av den saknas; jämför med fakturan"}
+    "that reference's length digit is wrong, so part of it is missing; check it against the invoice": {"other": "referensens längdsiffra stämmer inte, så en del av den saknas; jämför med fakturan"},
+    "a car in stock needs its chassis number or its registration, because the margin scheme is accounted car by car": {"other": "en lagerbil behöver sitt chassinummer eller sitt registreringsnummer, eftersom vinstmarginalbeskattningen redovisas bil för bil"},
+    "that car is already in stock; finish its cycle before starting another": {"other": "bilen finns redan i lager; avsluta dess lagervarv innan ett nytt börjar"},
+    "that is not a way a car comes into stock": {"other": "så kan en bil inte komma in i lager"},
+    "a car cannot go straight from there to there": {"other": "en bil kan inte gå direkt därifrån dit"},
+    "that cycle is over; a car that comes back starts a new one": {"other": "lagervarvet är avslutat; en bil som kommer tillbaka börjar ett nytt"},
+    "something is still booked on the car; release or replan that first": {"other": "något är fortfarande bokat på bilen; släpp eller planera om det först"},
+    "say why the cycle ends without a sale, in 300 characters or fewer": {"other": "säg varför lagervarvet slutar utan försäljning, med högst 300 tecken"},
+    "that request was already used to take another car in": {"other": "den begäran har redan använts för att ta in en annan bil"},
+    "In preparation": {"other": "I förberedelse"},
+    "For sale": {"other": "Till salu"},
+    "Reserved": {"other": "Reserverad"},
+    "Delivered": {"other": "Levererad"},
+    "Closed without a sale": {"other": "Avslutad utan försäljning"},
+    "Bought": {"other": "Inköpt"},
+    "Traded in": {"other": "Inbytt"},
+    "On consignment": {"other": "I förmedling"},
+    "Bought back": {"other": "Återköpt"},
+    "From the rental fleet": {"other": "Från hyrflottan"},
+    "Imported": {"other": "Importerad"},
+    "Sold, not yet delivered": {"other": "Såld, inte levererad"},
+    "Written off (scrapped or lost)": {"other": "Avskriven (skrotad eller förlorad)"},
+    "In stock": {"other": "I lager"},
+    "Sold on behalf of its owner; not the dealer's car": {"other": "Säljs för ägarens räkning; inte handlarens bil"}
   }
 }

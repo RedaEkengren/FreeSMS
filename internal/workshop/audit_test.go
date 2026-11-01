@@ -182,6 +182,12 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 	}
 	made["technician_view.granted"], made["technician_view.ended"] = subject{"user", staff}, subject{"user", staff}
 
+	// Dealer
+	// A car's cycle through stock (#160).
+	unit := takeIn(t, pool, workshop.StockFromPurchase)
+	moveStock(t, pool, unit.ID, workshop.StockForSale)
+	made["stock_unit.opened"], made["stock_unit.moved"] = subject{"stock_unit", unit.ID}, subject{"stock_unit", unit.ID}
+
 	for _, tr := range workshop.AuditedTransitions {
 		s, ok := made[tr.Event]
 		if !ok {

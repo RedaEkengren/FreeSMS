@@ -62,6 +62,11 @@ var AuditedTransitions = []AuditTransition{
 	{"technician_view.changed", "shop", "technician_view_changes", true},
 	{"technician_view.granted", "user", "technician_view_exceptions", true},
 	{"technician_view.ended", "user", "technician_view_exceptions", true},
+	// Dealer
+	// A car's cycle through stock (#160): opened, and every move of its
+	// deal; ending one without a sale says why (MoveStockUnit).
+	{"stock_unit.opened", "stock_unit", "audit_events", false},
+	{"stock_unit.moved", "stock_unit", "audit_events", false},
 }
 
 func auditTransition(event string) (AuditTransition, bool) {
@@ -139,8 +144,9 @@ var detailSeen = map[string]func(access.Roles) bool{
 // payout's for those who may make one; money's, a
 // customer's, a vehicle's and a party's for those who see customers; a
 // job's for those who work on or follow jobs; a booked resource's for those
-// who book it, with why only for those who run the shop. What a role may not
-// see of the detail is left out.
+// who book it, with why only for those who run the shop; a car's cycle
+// through stock for whoever buys or sells cars. What a role may not see of
+// the detail is left out.
 func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, subjectKind, subjectID string) ([]AuditEvent, error) {
 	if !looksLikeUUID(subjectID) {
 		return nil, ErrNotFound
@@ -176,6 +182,10 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 			return nil, access.ErrForbidden
 		}
 	case "document", "deposit", "payout":
+	case "stock_unit":
+		if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+			return nil, access.ErrForbidden
+		}
 	default:
 		return nil, fmt.Errorf("%w: that is not something with a history", ErrInvalid)
 	}

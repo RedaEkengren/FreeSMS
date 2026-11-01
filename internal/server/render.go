@@ -120,20 +120,23 @@ type pageData struct {
 	ContractLink     string
 	ContractCustomer bool
 	// What an invoice lacks to be written as an electronic invoice.
-	Missing                    []string
-	Balance                    workshop.Balance
-	Receivables                []workshop.Balance
-	Methods                    []string
-	Today                      string
-	Contact                    workshop.Contact
-	Shop                       workshop.ShopDetails
-	Customers                  []workshop.Customer
-	CustomerQuery              string
-	Requests                   []workshop.PartRequest
-	Findings                   []workshop.Finding
-	Tasks                      []workshop.Task
-	CustomerCard               workshop.CustomerCard
-	VehicleChanges             []workshop.Change
+	Missing        []string
+	Balance        workshop.Balance
+	Receivables    []workshop.Balance
+	Methods        []string
+	Today          string
+	Contact        workshop.Contact
+	Shop           workshop.ShopDetails
+	Customers      []workshop.Customer
+	CustomerQuery  string
+	Requests       []workshop.PartRequest
+	Findings       []workshop.Finding
+	Tasks          []workshop.Task
+	CustomerCard   workshop.CustomerCard
+	VehicleChanges []workshop.Change
+	// Dealer: the vehicle's cycles through stock (#160), for whoever buys
+	// or sells cars.
+	StockUnits                 []workshop.StockUnit
 	Saved                      bool
 	Comeback                   workshop.Comeback
 	Comebacks                  []workshop.Comeback
