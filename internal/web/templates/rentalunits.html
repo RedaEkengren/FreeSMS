@@ -1,6 +1,32 @@
 {{define "content"}}
 <h1>{{.T "Rental"}}</h1>
-<p><a href="/rental/settings">{{.T "Rental settings"}}</a></p>
+<p><a href="/rental/settings">{{.T "Rental settings"}}</a> &middot; <a href="/rental/prices">{{.T "Rental prices"}}</a></p>
+
+<h2>{{.T "Today"}}</h2>
+{{if .Rental.Day}}
+<ul class="lines">
+  {{range .Rental.Day}}
+  <li><div class="row"><a href="{{.Link}}">{{$.T .Says .Text}}</a><span>{{$.Date ($.Local .Due) "15:04"}}</span></div></li>
+  {{end}}
+</ul>
+{{else}}
+<p>{{.T "Nothing goes out or comes back today."}}</p>
+{{end}}
+
+<h2>{{.T "Bookings"}}</h2>
+{{if .Rental.Bookings}}
+<ul class="lines">
+  {{range .Rental.Bookings}}
+  <li>
+    <div class="row"><a href="/rental/bookings/{{.ID}}">{{.Reference}} &middot; {{.UnitLabel}}</a>
+      <span class="tag{{if or (.Overdue $.Rental.Now) .AtRisk}} late{{end}}">{{if .Overdue $.Rental.Now}}{{$.T "out past its return"}}{{else if .AtRisk}}{{$.T "at risk"}}{{else}}{{$.T ($.Rental.StateLabel .State)}}{{end}}</span></div>
+    <div class="waiting">{{.RenterName}} &middot; {{$.Date ($.Local .Starts) "Mon 2 Jan 15:04"}} &ndash; {{$.Date ($.Local .Ends) "Mon 2 Jan 15:04"}}</div>
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p>{{.T "No bookings ahead."}}</p>
+{{end}}
 
 <h2>{{.T "Units"}}</h2>
 {{if .Rental.Units}}

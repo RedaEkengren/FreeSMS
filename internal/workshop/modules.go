@@ -290,6 +290,9 @@ func SwitchModule(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, m
 // and rental have none until they exist.
 func openBusinessTx(ctx context.Context, tx pgx.Tx, m access.Module) (*OpenBusiness, error) {
 	open := &OpenBusiness{Module: m}
+	if m == access.Rental {
+		return rentalOpenBusinessTx(ctx, tx, open)
+	}
 	if m != access.Workshop {
 		return open, nil
 	}

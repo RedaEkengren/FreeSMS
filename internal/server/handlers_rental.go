@@ -17,7 +17,7 @@ import (
 // does not exist; the operations check the role and the module again.
 
 // rentalPages are the templates Rental adds.
-var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "rentalprices"}
+var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "rentalprices", "rentalbooking"}
 
 // rentalData is what Rental's pages are given.
 type rentalData struct {
@@ -30,6 +30,49 @@ type rentalData struct {
 	InTheWay []workshop.Block
 	Plans    []workshop.RatePlan
 	Extras   []workshop.RentalExtra
+	Day      []workshop.ActionItem
+	Bookings []workshop.RentalBooking
+	Booking  workshop.RentalBooking
+	Renters  []workshop.Renter
+	// A booking form's own key: sent twice, one booking.
+	Key string
+	Now time.Time
+}
+
+// LineGross is a frozen line's amount with its VAT, as the renter reads it.
+func (rentalData) LineGross(l workshop.RentalBookingLine) int64 {
+	return l.Net() + money.VAT(l.Net(), l.VATRateBp)
+}
+
+// UnitGross is a frozen line's unit price with its VAT.
+func (rentalData) UnitGross(l workshop.RentalBookingLine) int64 {
+	return l.UnitPriceMinor + money.VAT(l.UnitPriceMinor, l.VATRateBp)
+}
+
+// PricedNet is what a changed line was priced at, net.
+func (rentalData) PricedNet(l workshop.RentalBookingLine) int64 {
+	if l.PricedMinor == nil {
+		return 0
+	}
+	return *l.PricedMinor
+}
+
+// Count is a line's quantity as a plain number, for $.Num.
+func (rentalData) Count(milli int64) string {
+	if milli%1000 == 0 {
+		return strconv.FormatInt(milli/1000, 10)
+	}
+	return strconv.FormatFloat(float64(milli)/1000, 'f', -1, 64)
+}
+
+// StateLabel is a booking's state, or what happened to it, as a catalogue
+// key.
+func (rentalData) StateLabel(state string) string {
+	return map[string]string{
+		workshop.RentalHeld: "Held", workshop.RentalHoldExpired: "Hold run out", workshop.RentalConfirmed: "Confirmed",
+		workshop.RentalCheckedOut: "Out with the renter", workshop.RentalReturned: "Returned", workshop.RentalCancelled: "Cancelled",
+		workshop.RentalNoShow: "No-show", "requested": "Requested", "moved": "Moved", "extended": "Extended",
+	}[state]
 }
 
 // ExtraKinds are the kinds of extra, for a form.
@@ -114,6 +157,9 @@ func (rentalData) HasCategory(p workshop.RentalProfile, c string) bool {
 func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("GET /rental", s.requireSession(s.handleRentalUnits))
 	m.HandleFunc("GET /rental/prices", s.requireSession(s.handleRentalPrices))
+	m.HandleFunc("POST /rental/bookings", s.requireSession(s.handleRentalBook))
+	m.HandleFunc("GET /rental/bookings/{id}", s.requireSession(s.handleRentalBooking))
+	m.HandleFunc("POST /rental/bookings/{id}/{action}", s.requireSession(s.handleRentalBookingAction))
 	m.HandleFunc("POST /rental/plans", s.requireSession(s.handleRatePlanAdd))
 	m.HandleFunc("POST /rental/plans/{id}/seasons", s.requireSession(s.handleRateSeasonAdd))
 	m.HandleFunc("POST /rental/plans/{id}/archive", s.requireSession(s.handleRatePlanArchive))
@@ -253,6 +299,14 @@ func (s *Server) handleRentalUnits(w http.ResponseWriter, r *http.Request) {
 	if d.Profiles, err = workshop.RentalProfiles(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
 		return
 	}
+	if d.Day, err = workshop.RentalDay(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
+	}
+	now := time.Now()
+	if d.Bookings, err = workshop.RentalBookings(r.Context(), s.pool, session.Scope, now, now.AddDate(0, 2, 0)); s.handoverError(w, r, err) {
+		return
+	}
+	d.Now = now
 	s.render(w, r, http.StatusOK, "rentalunits", pageData{Title: "Rental", Session: session, Rental: d})
 }
 
@@ -274,8 +328,21 @@ func (s *Server) renderRentalUnit(w http.ResponseWriter, r *http.Request, id str
 	if s.handoverError(w, r, err) {
 		return
 	}
+	d := rentalData{Unit: u, InTheWay: inTheWay, Key: newFormKey(), Now: time.Now()}
+	if d.Renters, err = workshop.Renters(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
+	}
+	if d.Extras, err = workshop.RentalExtras(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
+	}
+	if d.Plans, err = workshop.RatePlans(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
+	}
+	if d.Bookings, err = workshop.RentalBookings(r.Context(), s.pool, session.Scope, time.Now(), time.Now().AddDate(1, 0, 0)); s.handoverError(w, r, err) {
+		return
+	}
 	s.render(w, r, status, "rentalunit", pageData{Title: "Rental unit", Session: session,
-		Rental: rentalData{Unit: u, InTheWay: inTheWay}, Today: time.Now().In(s.shopLocation(r)).Format(wallClockLayout)})
+		Rental: d, Today: time.Now().In(s.shopLocation(r)).Format(wallClockLayout)})
 }
 
 func (s *Server) handleRentalUnit(w http.ResponseWriter, r *http.Request) {
@@ -442,4 +509,103 @@ func (s *Server) handleRentalExtraAdd(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleRentalExtraArchive(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	s.rentalPricesDone(w, r, workshop.ArchiveRentalExtra(r.Context(), s.pool, session.Scope, r.PathValue("id")))
+}
+
+// handleRentalBook books a unit from its page: for a renter picked, or one
+// made on the spot.
+func (s *Server) handleRentalBook(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	if err := r.ParseForm(); err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "Not accepted", "")
+		return
+	}
+	loc := s.shopLocation(r)
+	from, err1 := parseWallClock(r.FormValue("from"), loc, "")
+	to, err2 := parseWallClock(r.FormValue("to"), loc, "")
+	if err1 != nil || err2 != nil {
+		s.renderError(w, r, http.StatusBadRequest, "That date did not parse", "Use the picker.")
+		return
+	}
+	n := workshop.NewRentalBooking{UnitID: r.FormValue("unit"), RenterID: r.FormValue("renter"), From: from, To: to,
+		PlanID: r.FormValue("plan"), Key: r.FormValue("key")}
+	if v := strings.TrimSpace(r.FormValue("hold_until")); v != "" {
+		until, err := parseWallClock(v, loc, "")
+		if err != nil {
+			s.renderError(w, r, http.StatusBadRequest, "That date did not parse", "Use the picker.")
+			return
+		}
+		n.HoldUntil = &until
+	}
+	for _, e := range r.Form["extra"] {
+		n.Extras = append(n.Extras, workshop.ExtraChoice{ExtraID: e, Count: 1})
+	}
+	if v := strings.TrimSpace(r.FormValue("rent_price")); v != "" {
+		rate, _ := strconv.Atoi(r.FormValue("rent_vat_bp"))
+		net, err := grossToNet(v, rate)
+		if err != nil {
+			s.renderError(w, r, http.StatusBadRequest, "Not accepted", "Write prices as amounts and kilometres and minutes as whole numbers.")
+			return
+		}
+		n.Overrides = []workshop.PriceOverride{{Position: 1, UnitPriceMinor: *net, Reason: r.FormValue("rent_reason")}}
+	}
+	if n.RenterID == "" {
+		renter, err := workshop.CreateParty(r.Context(), s.pool, session.Scope, workshop.NewParty{Kind: "private",
+			Name: r.FormValue("renter_name"), Phone: r.FormValue("renter_phone"), Email: r.FormValue("renter_email"),
+			Role: workshop.PartyRenter})
+		if s.handoverError(w, r, err) {
+			return
+		}
+		n.RenterID = renter
+	}
+	id, err := workshop.BookRental(r.Context(), s.pool, session.Scope, n)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/rental/bookings/"+id, http.StatusSeeOther)
+}
+
+func (s *Server) handleRentalBooking(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	b, err := workshop.RentalBookingByID(r.Context(), s.pool, session.Scope, r.PathValue("id"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "rentalbooking", pageData{Title: "Rental booking", Session: session,
+		Rental: rentalData{Booking: b, Now: time.Now()}})
+}
+
+func (s *Server) handleRentalBookingAction(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id, loc := r.PathValue("id"), s.shopLocation(r)
+	var err error
+	switch r.PathValue("action") {
+	case "confirm":
+		err = workshop.ConfirmRentalBooking(r.Context(), s.pool, session.Scope, id)
+	case "cancel", "no-show":
+		err = workshop.CancelRentalBooking(r.Context(), s.pool, session.Scope, id, r.FormValue("reason"), r.PathValue("action") == "no-show")
+	case "move":
+		from, err1 := parseWallClock(r.FormValue("from"), loc, r.FormValue("from_was"))
+		to, err2 := parseWallClock(r.FormValue("to"), loc, r.FormValue("to_was"))
+		if err1 != nil || err2 != nil {
+			s.renderError(w, r, http.StatusBadRequest, "That date did not parse", "Use the picker.")
+			return
+		}
+		err = workshop.MoveRentalBooking(r.Context(), s.pool, session.Scope, id, from, to, r.FormValue("reason"))
+	case "extend":
+		to, perr := parseWallClock(r.FormValue("to"), loc, r.FormValue("to_was"))
+		if perr != nil {
+			s.renderError(w, r, http.StatusBadRequest, "That date did not parse", "Use the picker.")
+			return
+		}
+		err = workshop.ExtendRentalBooking(r.Context(), s.pool, session.Scope, id, to, r.FormValue("reason"))
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/rental/bookings/"+id, http.StatusSeeOther)
 }

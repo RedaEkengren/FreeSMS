@@ -1,0 +1,69 @@
+{{define "content"}}
+{{with .Rental.Booking}}
+<h1>{{.Reference}} &middot; {{.UnitLabel}}</h1>
+<p><span class="tag{{if or ($.Rental.Booking.Overdue $.Rental.Now) .AtRisk}} late{{end}}">{{if .Overdue $.Rental.Now}}{{$.T "out past its return"}}{{else if .AtRisk}}{{$.T "at risk"}}{{else}}{{$.T ($.Rental.StateLabel .State)}}{{end}}</span>
+  {{.RenterName}} &middot; {{$.Date ($.Local .Starts) "Mon 2 Jan 2006 15:04"}} &ndash; {{$.Date ($.Local .Ends) "Mon 2 Jan 2006 15:04"}}
+  &middot; <a href="/rental/units/{{.UnitID}}">{{$.T "the unit"}}</a></p>
+{{if .HeldUntil}}<p class="waiting">{{$.T "Held until %s" ($.Date ($.Local .HeldUntil) "Mon 2 Jan 15:04")}}</p>{{end}}
+{{if .AtRisk}}<p class="waiting">{{$.T "The unit is out with somebody else past its return, and may not be back in time."}}</p>{{end}}
+
+<h2>{{$.T "Price"}}</h2>
+<p class="waiting">{{$.T "Agreed when it was booked. A later change to a plan or an extra does not change it."}}</p>
+<ul class="lines">
+  {{range .Lines}}
+  <li>
+    <div class="row"><span>{{.Description}} &middot; {{$.Num ($.Rental.Count .QuantityMilli)}} &times; {{$.T ($.Rental.RentalWord .Unit)}} &agrave; {{$.Money ($.Rental.UnitGross .)}}</span><span>{{$.Money ($.Rental.LineGross .)}}</span></div>
+    {{if .Unconfirmed}}<div class="waiting"><span class="tag late">{{$.T "VAT treatment not confirmed"}}</span></div>{{end}}
+    {{if .OverrideReason}}<div class="waiting">{{$.T "Priced at %s net; changed by %s: %s" ($.Money ($.Rental.PricedNet .)) .OverrideBy .OverrideReason}}</div>{{end}}
+  </li>
+  {{end}}
+</ul>
+<dl>
+  <dt>{{$.T "Total including VAT"}}</dt><dd>{{$.Money .Totals.GrossMinor}}</dd>
+  <dt>{{$.T "Of which VAT"}}</dt><dd>{{$.Money .Totals.VATMinor}}</dd>
+  {{with .IncludedKm}}<dt>{{$.T "Kilometres included"}}</dt><dd>{{.}}</dd>{{end}}
+</dl>
+
+{{if .Open}}
+<h2>{{$.T "Change the booking"}}</h2>
+{{if eq .State "held"}}<form method="post" action="/rental/bookings/{{.ID}}/confirm" class="inline"><button type="submit">{{$.T "Confirm the booking"}}</button></form>{{end}}
+{{if ne .State "checked_out"}}
+<details><summary>{{$.T "Move it"}}</summary>
+<form method="post" action="/rental/bookings/{{.ID}}/move">
+  <div class="pair">
+    <label><span>{{$.T "From"}}</span><input type="datetime-local" name="from" value="{{($.Local .Starts).Format "2006-01-02T15:04"}}" required><input type="hidden" name="from_was" value="{{$.Instant .Starts}}"></label>
+    <label><span>{{$.T "To"}}</span><input type="datetime-local" name="to" value="{{($.Local .Ends).Format "2006-01-02T15:04"}}" required><input type="hidden" name="to_was" value="{{$.Instant .Ends}}"></label>
+  </div>
+  <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="300"></label>
+  <button type="submit" class="secondary">{{$.T "Move it"}}</button>
+</form>
+</details>
+{{end}}
+<details><summary>{{$.T "Extend it"}}</summary>
+<form method="post" action="/rental/bookings/{{.ID}}/extend">
+  <label><span>{{$.T "Until"}}</span><input type="datetime-local" name="to" value="{{($.Local .Ends).Format "2006-01-02T15:04"}}" required><input type="hidden" name="to_was" value="{{$.Instant .Ends}}"></label>
+  <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="300"></label>
+  <button type="submit" class="secondary">{{$.T "Extend it"}}</button>
+</form>
+</details>
+{{if ne .State "checked_out"}}
+<details><summary>{{$.T "Cancel it"}}</summary>
+<form method="post" action="/rental/bookings/{{.ID}}/cancel">
+  <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="300" required></label>
+  <button type="submit" class="secondary">{{$.T "Cancel the booking"}}</button>
+  <button type="submit" class="link" formaction="/rental/bookings/{{.ID}}/no-show">{{$.T "The renter did not come"}}</button>
+</form>
+</details>
+{{end}}
+{{end}}
+
+<h2>{{$.T "What happened"}}</h2>
+<ul class="lines">
+  {{range .Events}}
+  <li><div class="row"><span>{{$.T ($.Rental.StateLabel .Kind)}}{{with .By}} &middot; {{.}}{{end}}</span><span>{{$.Date ($.Local .At) "2 Jan 15:04"}}</span></div>
+    {{if .NewEnds}}<div class="waiting">{{$.Date ($.Local .OldStarts) "2 Jan 15:04"}}&ndash;{{$.Date ($.Local .OldEnds) "2 Jan 15:04"}} &rarr; {{$.Date ($.Local .NewStarts) "2 Jan 15:04"}}&ndash;{{$.Date ($.Local .NewEnds) "2 Jan 15:04"}}</div>{{end}}
+    {{with .Reason}}<div class="waiting">{{.}}</div>{{end}}</li>
+  {{end}}
+</ul>
+{{end}}
+{{end}}

@@ -43,7 +43,7 @@ var ExportTables = []string{
 	"technician_view_changes", "technician_view_exceptions",
 	// Rental
 	"rental_permits", "rental_permit_revocations", "rental_profiles", "rental_units", "fleet_memberships",
-	"rate_plans", "rate_plan_seasons", "rental_extras",
+	"rate_plans", "rate_plan_seasons", "rental_extras", "rental_bookings", "rental_booking_events", "rental_booking_lines",
 }
 
 // exportQueries are tables exported with chosen columns, because one of

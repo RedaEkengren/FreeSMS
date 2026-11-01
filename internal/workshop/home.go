@@ -85,6 +85,13 @@ var cardSources = []CardSource{
 		May: access.Roles.RunsTheShop, JobsWhere: openJob},
 	{Module: access.Workshop, Kind: CardInformation, Title: "Work ready to invoice, before VAT",
 		May: access.Roles.RunsTheShop, Read: readyToInvoiceMinor, Money: true},
+	// Rental
+	{Module: access.Rental, Kind: CardAction, Title: "%d rental to hand over today", Link: "/rental",
+		May: access.Roles.HandsOverRentals, Read: rentalCount(rentalHandoverToday)},
+	{Module: access.Rental, Kind: CardAction, Title: "%d rental due back today", Link: "/rental",
+		May: access.Roles.HandsOverRentals, Read: rentalCount(rentalReturnToday)},
+	{Module: access.Rental, Kind: CardAction, Title: "%d rental out past its return", Link: "/rental",
+		May: access.Roles.HandsOverRentals, Read: rentalCount(rentalOverdue)},
 }
 
 // countJobs counts the workshop's jobs for every card that counts them, in

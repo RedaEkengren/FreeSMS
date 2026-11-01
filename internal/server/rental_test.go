@@ -146,3 +146,65 @@ func TestTheRentalPricesPage(t *testing.T) {
 		t.Errorf("the rental desk adding a plan: %d", resp.StatusCode)
 	}
 }
+
+// The rental desk books a unit in the fleet for a new renter from its
+// page, sees the price including VAT and the renter on the booking, and
+// cancels it; the same form sent twice is one booking.
+func TestTheRentalDeskBooksAUnit(t *testing.T) {
+	ts, pool := testServer(t)
+	seedRentalDesk(t, func(t *testing.T, stmts []string) { seedShop(t, pool, shopA, stmts) })
+	desk := signIn(t, ts, rentalEmail)
+	owner := signIn(t, ts, ownerEmail)
+
+	resp, _ := desk.Get(ts.URL + "/rental")
+	body := readBody(t, resp)
+	i := strings.Index(body, `name="profile"><option value="`)
+	profile := body[i+len(`name="profile"><option value="`):][:36]
+	resp = postModuleForm(t, desk, ts.URL, "/rental/units", url.Values{"registration": {"KLM 123"},
+		"fleet_number": {"V7"}, "category": {"Liten skåpbil"}, "profile": {profile}})
+	unit := resp.Header.Get("Location")
+	postModuleForm(t, desk, ts.URL, unit+"/fleet", url.Values{"at": {"2026-01-05T08:00"}, "how": {"bought"}})
+	postModuleForm(t, owner, ts.URL, "/rental/plans", url.Values{"name": {"Standard"}, "category": {"Liten skåpbil"},
+		"vat_percent": {"25"}, "season_rule": {"at_start"}})
+	var plan string
+	if err := pool.QueryRow(t.Context(), `SELECT id FROM rate_plans`).Scan(&plan); err != nil {
+		t.Fatal(err)
+	}
+	postModuleForm(t, owner, ts.URL, "/rental/plans/"+plan+"/seasons", url.Values{"vat_bp": {"2500"}, "valid_from": {"2026-01-01"}, "day": {"500"}})
+
+	form := url.Values{"unit": {strings.TrimPrefix(unit, "/rental/units/")}, "key": {"form-1"},
+		"from": {"2031-05-10T09:00"}, "to": {"2031-05-12T09:00"}, "renter_name": {"Rita Hyrare"}, "renter_phone": {"070-1234567"}}
+	resp = postModuleForm(t, desk, ts.URL, "/rental/bookings", form)
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("booking: %d %s", resp.StatusCode, readBody(t, resp))
+	}
+	booking := resp.Header.Get("Location")
+	resp, _ = desk.Get(ts.URL + booking)
+	body = readBody(t, resp)
+	for _, want := range []string{"R-1", "V7 · KLM 123", "Rita Hyrare", "1,000.00", "Confirmed"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the booking page lacks %q", want)
+		}
+	}
+	// The same form again, the renter picked this time: one booking.
+	var renter string
+	if err := pool.QueryRow(t.Context(), `SELECT renter_party_id FROM rental_bookings`).Scan(&renter); err != nil {
+		t.Fatal(err)
+	}
+	form.Set("renter", renter)
+	if resp := postModuleForm(t, desk, ts.URL, "/rental/bookings", form); resp.Header.Get("Location") != booking {
+		t.Errorf("the form sent again went to %q", resp.Header.Get("Location"))
+	}
+	resp = postModuleForm(t, desk, ts.URL, booking+"/cancel", url.Values{"reason": {"Kunden ringde"}})
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("cancelling: %d %s", resp.StatusCode, readBody(t, resp))
+	}
+	resp, _ = desk.Get(ts.URL + booking)
+	if body := readBody(t, resp); !strings.Contains(body, "Kunden ringde") || !strings.Contains(body, "Cancelled") {
+		t.Error("the cancelled booking does not say so, or why")
+	}
+	tech := signIn(t, ts, techEmail)
+	if resp, _ := tech.Get(ts.URL + booking); resp.StatusCode != http.StatusForbidden {
+		t.Errorf("a technician's view of a booking: %d", resp.StatusCode)
+	}
+}

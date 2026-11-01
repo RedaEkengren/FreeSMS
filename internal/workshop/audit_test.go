@@ -182,6 +182,9 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 	}
 	made["technician_view.granted"], made["technician_view.ended"] = subject{"user", staff}, subject{"user", staff}
 
+	// Rental
+	rentalAudited(t, pool, func(event, kind, id string) { made[event] = subject{kind, id} })
+
 	for _, tr := range workshop.AuditedTransitions {
 		s, ok := made[tr.Event]
 		if !ok {

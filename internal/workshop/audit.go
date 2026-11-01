@@ -62,6 +62,8 @@ var AuditedTransitions = []AuditTransition{
 	{"technician_view.changed", "shop", "technician_view_changes", true},
 	{"technician_view.granted", "user", "technician_view_exceptions", true},
 	{"technician_view.ended", "user", "technician_view_exceptions", true},
+	// Rental
+	{"rental.price_overridden", "rental_booking", "audit_events", true},
 }
 
 func auditTransition(event string) (AuditTransition, bool) {
@@ -176,6 +178,10 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 			return nil, access.ErrForbidden
 		}
 	case "document", "deposit", "payout":
+	case "rental_booking":
+		if !scope.Role.HandsOverRentals() {
+			return nil, access.ErrForbidden
+		}
 	default:
 		return nil, fmt.Errorf("%w: that is not something with a history", ErrInvalid)
 	}
