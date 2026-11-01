@@ -153,10 +153,31 @@ func TestTheBankgiroCodeIsUsingQRs(t *testing.T) {
 		"Bankgiro 5050-1055, tel 08-123 45": "5050-1055",
 		"PG 17 60 99-0":                     "176099-0",
 		"BG 5050-1055-08":                   "5050-1055",
-		"1234567890 08 123 45":              "1234567890",
+		// Written without its hyphen, a bankgiro is still eight digits at
+		// most: the telephone number after it is not more of it.
+		"Bankgiro 50501055 08-123 45 67": "50501055",
+		// Seven digits and a space cannot be told from a number grouped
+		// with spaces, so it is not read rather than read wrong; the shop
+		// page says so (GiroUnread).
+		"BG 5050105 08 123 45": "",
+		// Too many or too few digits to be a bankgiro at all.
+		"1234567890":   "",
+		"BG 123456":    "",
+		"BG 505010550": "",
 	} {
 		if g := GiroOf("bankgiro", printed); g.Account != want {
 			t.Errorf("%q read as %q, want %q", printed, g.Account, want)
+		}
+	}
+	// A plusgiro is two to eight digits.
+	for printed, want := range map[string]string{
+		"PG 1-2":                     "1-2",
+		"PG 1234567-8 070 123 45 67": "1234567-8",
+		"PG 12345678 070 123":        "12345678",
+		"PG 123456789":               "",
+	} {
+		if g := GiroOf("plusgiro", printed); g.Account != want {
+			t.Errorf("plusgiro %q read as %q, want %q", printed, g.Account, want)
 		}
 	}
 	if _, err := UsingQR("A", "", "18", issued, issued, 100, giro); err == nil {

@@ -232,17 +232,19 @@ type Giro struct {
 //
 // A space may group a number's digits -- a plusgiro is often written
 // "12 34 56-7" -- but does not join two numbers: once the hyphen before
-// the check part has been written, or ten digits, the most a giro has,
-// a space and more digits are something else, such as the telephone
-// number printed after it. Anything other than a digit, a hyphen or a
-// space ends the number too.
+// the check part has been written, or eight digits, the most a bankgiro
+// or a plusgiro has, a space and more digits are something else, such as
+// the telephone number printed after it. Anything other than a digit, a
+// hyphen or a space ends the number too. A bankgiro is seven or eight
+// digits and a plusgiro two to eight; anything else is no giro.
 func GiroOf(scheme, printed string) Giro {
 	var t string
+	least := 0
 	switch scheme {
 	case "bankgiro":
-		t = "BG"
+		t, least = "BG", 7
 	case "plusgiro":
-		t = "PG"
+		t, least = "PG", 2
 	default:
 		return Giro{}
 	}
@@ -251,7 +253,7 @@ func GiroOf(scheme, printed string) Giro {
 	for _, r := range printed {
 		switch {
 		case r >= '0' && r <= '9':
-			if spaced && (hyphen || digits >= 10) {
+			if spaced && (hyphen || digits >= maxGiroDigits) {
 				goto done
 			}
 			b.WriteRune(r)
@@ -271,11 +273,14 @@ func GiroOf(scheme, printed string) Giro {
 	}
 done:
 	acc := strings.Trim(b.String(), "-")
-	if n := len(strings.ReplaceAll(acc, "-", "")); n < 2 || n > 10 {
+	if n := len(strings.ReplaceAll(acc, "-", "")); n < least || n > maxGiroDigits {
 		return Giro{}
 	}
 	return Giro{Type: t, Account: acc}
 }
+
+// maxGiroDigits is the most digits a bankgiro or a plusgiro has.
+const maxGiroDigits = 8
 
 // UsingQR is the bankgiro code's JSON for an invoice.
 func UsingQR(seller, orgNumber, reference string, issued, due time.Time, amountMinor int64, giro Giro) (string, error) {
