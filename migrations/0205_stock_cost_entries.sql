@@ -95,6 +95,20 @@ BEGIN
     IF NEW.kind <> 'invoice' OR NEW.amount_minor IS NULL THEN
         RETURN NEW;
     END IF;
+    -- An invoice noted again for the same work replaces the one before,
+    -- as the workshop reads it (the latest stands): the cost posted from
+    -- the earlier one is reversed, with the new invoice's reference as
+    -- why, rather than counted twice.
+    INSERT INTO stock_cost_entries (shop_id, stock_unit_id, kind, net_minor, input_vat_minor, vat_rate_basis,
+                                    supplier_party_id, external_ref, incurred_on, source, work_order_id, post_sale,
+                                    note, reverses_id, recorded_by)
+    SELECT e.shop_id, e.stock_unit_id, e.kind, -e.net_minor, -e.input_vat_minor, e.vat_rate_basis, e.supplier_party_id,
+           e.external_ref, (NEW.at AT TIME ZONE (SELECT timezone FROM shops WHERE id = NEW.shop_id))::date, 'manual',
+           e.work_order_id, e.post_sale, NEW.invoice_ref, e.id, NEW.by_user
+      FROM stock_cost_entries e
+      JOIN outsourced_events oe ON oe.id = e.outsourced_event_id
+     WHERE oe.outsourced_id = NEW.outsourced_id
+       AND NOT EXISTS (SELECT 1 FROM stock_cost_entries r WHERE r.reverses_id = e.id);
     SELECT u.id, u.closed_at IS NOT NULL INTO unit, ended
       FROM outsourced_work o
       JOIN work_orders w ON w.id = o.work_order_id

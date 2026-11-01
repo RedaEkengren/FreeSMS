@@ -169,6 +169,15 @@ func TestOutsourcedWorkOnAStockCarPostsTheSuppliersCost(t *testing.T) {
 		c.ExternalRef != "TV-2291" || c.WorkOrderID != job {
 		t.Errorf("the supplier's cost: %+v", c)
 	}
+
+	// The supplier's invoice noted again, corrected: it replaces the first,
+	// which is reversed, not counted twice.
+	record(t, pool, stock, workshop.OutsourcedEventInput{Kind: "invoice", AmountMinor: pointerTo(int64(420_000)), InvoiceRef: "TV-2291b"})
+	costs, _ = workshop.CostsOfUnit(ctx, pool, buyerScope(), p.StockUnitID)
+	if len(costs.Entries) != 3 || costs.BeforeSale != 420_000 || costs.InputVATMinor != 105_000 {
+		t.Errorf("after the corrected invoice: %d entries, %d net, %d VAT; want the first reversed and the second standing",
+			len(costs.Entries), costs.BeforeSale, costs.InputVATMinor)
+	}
 }
 
 // Costs are for whoever may see what a car cost: a salesperson asking
