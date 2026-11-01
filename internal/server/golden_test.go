@@ -458,6 +458,11 @@ func compareGolden(t *testing.T, pool *pgxpool.Pool, world goldenWorld, issuedBe
 		}
 		if issuedBefore0091 {
 			want = goldenPaymentCode.ReplaceAll(want, nil)
+			// The electronic invoice is paid with its number instead,
+			// the only reference it has.
+			if id := goldenDocumentID.FindSubmatch(want); id != nil {
+				want = goldenPaymentID.ReplaceAll(want, []byte("<cbc:PaymentID>"+string(id[1])+"</cbc:PaymentID>"))
+			}
 			if goldenPaymentCode.MatchString(got) {
 				t.Errorf("%s: a document issued before 0091 shows a payment reference", p.file)
 			}
@@ -548,6 +553,8 @@ var (
 	goldenWeekday = regexp.MustCompile(`(^|[^\pL])(Mon|Tue|Wed|Thu|Fri|Sat|Sun|mån|tis|ons|tor|fre|lör|sön)( \d{1,2})?([^\pL]|$)`)
 	goldenAsset   = regexp.MustCompile(`\?v=[0-9a-f]+`)
 	// The payment reference and code on an invoice (#234), in Swedish.
+	goldenDocumentID  = regexp.MustCompile(`\n  <cbc:ID>([A-Z]+-[0-9]+)</cbc:ID>`)
+	goldenPaymentID   = regexp.MustCompile(`<cbc:PaymentID>[0-9]+</cbc:PaymentID>`)
 	goldenPaymentCode = regexp.MustCompile(`(?s)\n  <p>Betalningsreferens \(OCR\).*?</p>(\n  <figure class="paycode">.*?</figure>)?`)
 )
 

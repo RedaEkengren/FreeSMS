@@ -55,7 +55,7 @@
   </cac:AccountingCustomerParty>
   <cac:PaymentMeans>
     <cbc:PaymentMeansCode>30</cbc:PaymentMeansCode>
-    <cbc:PaymentID>A-1</cbc:PaymentID>
+    <cbc:PaymentID>133</cbc:PaymentID>
     <cac:PayeeFinancialAccount>
       <cbc:ID>1234567</cbc:ID>
       <cac:FinancialInstitutionBranch>
