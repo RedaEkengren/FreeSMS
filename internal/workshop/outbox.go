@@ -182,91 +182,153 @@ type OutboxRun struct {
 
 // RunOutbox sends what is due in a shop, at most limit rows, each through
 // its kind's adapter -- the manual one where none is given. Run by the
-// worker, as the system: no person is behind it. Two workers never send the
-// same row: each claims what it sends, skipping what another holds, and
-// holds it for the lease.
+// worker, as the system: no person is behind it.
+//
+// One row at a time: claimed, sent, and its outcome written, before the
+// next is claimed. The lease is that one row's, so a slow provider never
+// lets the lease on rows still waiting in this worker's memory run out
+// while another worker takes them. The lease is the claim's own time: the
+// worker checks it still holds it, and that the call was not cancelled,
+// before it sends and again when it writes what came of it. Two workers
+// never send the same row while a lease runs, and a worker whose lease ran
+// out writes nothing over the one that took the row after it.
 func RunOutbox(ctx context.Context, pool *pgxpool.Pool, shopID string, adapters map[string]OutboxAdapter, limit int) (OutboxRun, error) {
 	var run OutboxRun
-	var items []OutboxItem
-	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `
-			WITH due AS (
-			  SELECT id, attempts FROM outbox_state
-			  WHERE state IN ('queued', 'retry_scheduled', 'attempted') AND due_at <= clock_timestamp()
-			  ORDER BY due_at LIMIT $1)
-			SELECT o.id::text, o.kind, coalesce(o.subject_kind, ''), coalesce(o.subject_id::text, ''), o.idempotency_key, o.payload, due.attempts
-			FROM outbox o JOIN due ON due.id = o.id
-			WHERE o.claimed_until IS NULL OR o.claimed_until <= clock_timestamp()
-			FOR UPDATE OF o SKIP LOCKED`, limit)
-		if err != nil {
-			return fmt.Errorf("claim calls: %w", err)
+	for range limit {
+		it, lease, ok, err := claimOutboxTx(ctx, pool, shopID)
+		if err != nil || !ok {
+			return run, err
 		}
-		for rows.Next() {
-			it := OutboxItem{ShopID: shopID}
-			if err := rows.Scan(&it.ID, &it.Kind, &it.SubjectKind, &it.SubjectID, &it.Key, &it.Payload, &it.Attempts); err != nil {
-				rows.Close()
-				return err
-			}
-			it.Attempts++
-			items = append(items, it)
-		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return err
-		}
-		for _, it := range items {
-			if _, err := tx.Exec(ctx, `UPDATE outbox SET claimed_until = clock_timestamp() + $2::interval WHERE id = $1`,
-				it.ID, fmt.Sprintf("%d seconds", int(outboxLease.Seconds()))); err != nil {
-				return fmt.Errorf("claim a call: %w", err)
-			}
-			if err := outboxEventTx(ctx, tx, shopID, it.ID, "attempted", nil, "", ""); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return run, err
-	}
-	for _, it := range items {
-		var a OutboxAdapter = ManualAdapter{}
-		if given, ok := adapters[it.Kind]; ok && given != nil {
-			a = given
-		}
-		sendCtx, cancel := context.WithTimeout(ctx, outboxLease/2)
-		sendErr := a.Send(sendCtx, it)
-		cancel()
-		err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
-			// The attempt is over, whatever came of it: the lease goes.
-			var max int
-			if err := tx.QueryRow(ctx, `UPDATE outbox SET claimed_until = NULL WHERE id = $1 RETURNING max_attempts`, it.ID).Scan(&max); err != nil {
-				return err
-			}
-			switch {
-			case sendErr == nil:
-				run.Sent++
-				return outboxEventTx(ctx, tx, shopID, it.ID, "succeeded", nil, "", "")
-			case errors.Is(sendErr, ErrManualTask):
-				run.Manual++
-				return outboxEventTx(ctx, tx, shopID, it.ID, "manual_task", nil, "", "")
-			}
-			detail := redactError(sendErr)
-			if err := outboxEventTx(ctx, tx, shopID, it.ID, "failed", nil, detail, ""); err != nil {
-				return err
-			}
-			if errors.Is(sendErr, ErrPermanent) || it.Attempts >= max {
-				run.GaveUp++
-				return outboxEventTx(ctx, tx, shopID, it.ID, "given_up", nil, detail, "")
-			}
-			run.Retried++
-			at := time.Now().Add(outboxBackoff(it.Attempts))
-			return outboxEventTx(ctx, tx, shopID, it.ID, "retry_scheduled", &at, "", "")
-		})
-		if err != nil {
-			return run, fmt.Errorf("record the call's outcome: %w", err)
+		if err := sendOutbox(ctx, pool, shopID, adapters, it, lease, &run); err != nil {
+			return run, err
 		}
 	}
 	return run, nil
+}
+
+// claimOutboxTx claims the next row due, skipping what another worker
+// holds, and returns the lease it took.
+func claimOutboxTx(ctx context.Context, pool *pgxpool.Pool, shopID string) (OutboxItem, time.Time, bool, error) {
+	it := OutboxItem{ShopID: shopID}
+	var lease time.Time
+	found := false
+	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		err := tx.QueryRow(ctx, `
+			WITH due AS (
+			  SELECT id, attempts FROM outbox_state
+			  WHERE state IN ('queued', 'retry_scheduled', 'attempted') AND due_at <= clock_timestamp()
+			  ORDER BY due_at)
+			SELECT o.id::text, o.kind, coalesce(o.subject_kind, ''), coalesce(o.subject_id::text, ''), o.idempotency_key, o.payload, due.attempts
+			FROM outbox o JOIN due ON due.id = o.id
+			WHERE o.claimed_until IS NULL OR o.claimed_until <= clock_timestamp()
+			LIMIT 1
+			FOR UPDATE OF o SKIP LOCKED`).Scan(&it.ID, &it.Kind, &it.SubjectKind, &it.SubjectID, &it.Key, &it.Payload, &it.Attempts)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("claim a call: %w", err)
+		}
+		it.Attempts++
+		if err := tx.QueryRow(ctx, `UPDATE outbox SET claimed_until = clock_timestamp() + $2::interval WHERE id = $1 RETURNING claimed_until`,
+			it.ID, fmt.Sprintf("%d seconds", int(outboxLease.Seconds()))).Scan(&lease); err != nil {
+			return fmt.Errorf("claim a call: %w", err)
+		}
+		found = true
+		return outboxEventTx(ctx, tx, shopID, it.ID, "attempted", nil, "", "")
+	})
+	return it, lease, found, err
+}
+
+// outboxHeldTx locks a claimed row and reports whether lease is still this
+// worker's -- no other worker has claimed it since -- whether it has not
+// yet run out, and the row's state, read after the lock so a cancel
+// committed while waiting for it is seen.
+func outboxHeldTx(ctx context.Context, tx pgx.Tx, id string, lease time.Time) (ours, live bool, state string, max int, err error) {
+	if err := tx.QueryRow(ctx, `
+		SELECT coalesce(claimed_until = $2, false), coalesce(claimed_until = $2 AND claimed_until > clock_timestamp(), false), max_attempts
+		FROM outbox WHERE id = $1 FOR UPDATE`, id, lease).Scan(&ours, &live, &max); err != nil {
+		return false, false, "", 0, fmt.Errorf("read the call: %w", err)
+	}
+	if err := tx.QueryRow(ctx, `SELECT state FROM outbox_state WHERE id = $1`, id).Scan(&state); err != nil {
+		return false, false, "", 0, fmt.Errorf("read the call: %w", err)
+	}
+	return ours, live, state, max, nil
+}
+
+// sendOutbox sends one claimed row and writes what came of it.
+func sendOutbox(ctx context.Context, pool *pgxpool.Pool, shopID string, adapters map[string]OutboxAdapter, it OutboxItem, lease time.Time, run *OutboxRun) error {
+	// Before sending: still ours, and not cancelled since it was claimed.
+	var send bool
+	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		_, live, state, _, err := outboxHeldTx(ctx, tx, it.ID, lease)
+		if err != nil || !live {
+			return err
+		}
+		if state != "attempted" {
+			_, err := tx.Exec(ctx, `UPDATE outbox SET claimed_until = NULL WHERE id = $1`, it.ID)
+			return err
+		}
+		send = true
+		return nil
+	})
+	if err != nil || !send {
+		return err
+	}
+	var a OutboxAdapter = ManualAdapter{}
+	if given, ok := adapters[it.Kind]; ok && given != nil {
+		a = given
+	}
+	sendCtx, cancel := context.WithTimeout(ctx, outboxLease/2)
+	sendErr := a.Send(sendCtx, it)
+	cancel()
+	err = database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		ours, _, state, max, err := outboxHeldTx(ctx, tx, it.ID, lease)
+		if err != nil {
+			return err
+		}
+		if !ours {
+			// Another worker took the row after this lease ran out: what
+			// happens to it is that worker's to write.
+			return nil
+		}
+		// The attempt is over, whatever came of it: the lease goes.
+		if _, err := tx.Exec(ctx, `UPDATE outbox SET claimed_until = NULL WHERE id = $1`, it.ID); err != nil {
+			return err
+		}
+		if state != "attempted" {
+			// Cancelled while it was being sent. A failure is not retried;
+			// a call that went through did, and the record says so.
+			if sendErr == nil {
+				run.Sent++
+				return outboxEventTx(ctx, tx, shopID, it.ID, "succeeded", nil, "made before the cancellation reached it", "")
+			}
+			return nil
+		}
+		switch {
+		case sendErr == nil:
+			run.Sent++
+			return outboxEventTx(ctx, tx, shopID, it.ID, "succeeded", nil, "", "")
+		case errors.Is(sendErr, ErrManualTask):
+			run.Manual++
+			return outboxEventTx(ctx, tx, shopID, it.ID, "manual_task", nil, "", "")
+		}
+		detail := redactError(sendErr)
+		if err := outboxEventTx(ctx, tx, shopID, it.ID, "failed", nil, detail, ""); err != nil {
+			return err
+		}
+		if errors.Is(sendErr, ErrPermanent) || it.Attempts >= max {
+			run.GaveUp++
+			return outboxEventTx(ctx, tx, shopID, it.ID, "given_up", nil, detail, "")
+		}
+		run.Retried++
+		at := time.Now().Add(outboxBackoff(it.Attempts))
+		return outboxEventTx(ctx, tx, shopID, it.ID, "retry_scheduled", &at, "", "")
+	})
+	if err != nil {
+		return fmt.Errorf("record the call's outcome: %w", err)
+	}
+	return nil
 }
 
 // OutboxEntry is a call as whoever runs the shop sees it.
@@ -317,12 +379,18 @@ var (
 	ErrOutboxCancelNoReason = fmt.Errorf("%w: say why the call is cancelled, in 300 characters or fewer", ErrInvalid)
 )
 
+// outboxStateTx locks a row and reads where it stands. The state is read
+// after the lock, in a statement of its own, so it includes whatever the
+// worker holding the lock wrote before it let go.
 func outboxStateTx(ctx context.Context, tx pgx.Tx, id string) (string, error) {
-	var state string
-	err := tx.QueryRow(ctx, `SELECT s.state FROM outbox_state s JOIN outbox o ON o.id = s.id WHERE s.id = $1 FOR UPDATE OF o`, id).Scan(&state)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", ErrNotFound
+	if err := tx.QueryRow(ctx, `SELECT id FROM outbox WHERE id = $1 FOR UPDATE`, id).Scan(&id); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrNotFound
+		}
+		return "", err
 	}
+	var state string
+	err := tx.QueryRow(ctx, `SELECT state FROM outbox_state WHERE id = $1`, id).Scan(&state)
 	return state, err
 }
 
@@ -398,14 +466,32 @@ func CancelOutbox(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 	})
 }
 
-// cancelOutboxTx cancels every call not yet made that where says, with
-// the reason, as the system on behalf of the person whose change it was.
-func cancelOutboxTx(ctx context.Context, tx pgx.Tx, shopID, by, reason, where string, args ...any) error {
-	_, err := tx.Exec(ctx, `
+// cancelOutboxTx cancels every call not yet made that where says -- a
+// condition on outbox_state s, with arg as $1 -- with the reason, as the
+// system on behalf of the person whose change it was.
+//
+// The rows are locked first, as a worker writing an outcome locks its row,
+// so a cancel and an outcome are one after the other and never interleave;
+// which are still to cancel is read after the lock.
+func cancelOutboxTx(ctx context.Context, tx pgx.Tx, shopID, by, reason, where string, arg any) error {
+	const open = `s.state IN ('queued', 'retry_scheduled', 'attempted', 'failed', 'manual_task', 'given_up')`
+	rows, err := tx.Query(ctx, `
+		SELECT o.id::text FROM outbox o WHERE o.id IN (SELECT s.id FROM outbox_state s WHERE `+open+` AND `+where+`)
+		ORDER BY o.id FOR UPDATE OF o`, arg)
+	if err != nil {
+		return fmt.Errorf("cancel the calls: %w", err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return fmt.Errorf("cancel the calls: %w", err)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	_, err = tx.Exec(ctx, `
 		INSERT INTO outbox_events (shop_id, outbox_id, event, detail, by_user)
 		SELECT $1, s.id, 'cancelled', $2, NULLIF($3, '')::uuid FROM outbox_state s
-		WHERE s.state IN ('queued', 'retry_scheduled', 'attempted', 'failed', 'manual_task', 'given_up') AND `+where,
-		append([]any{shopID, reason, by}, args...)...)
+		WHERE `+open+` AND s.id = ANY($4::uuid[])`, shopID, reason, by, ids)
 	if err != nil {
 		return fmt.Errorf("cancel the calls: %w", err)
 	}
@@ -416,17 +502,17 @@ func cancelOutboxTx(ctx context.Context, tx pgx.Tx, shopID, by, reason, where st
 // switched off, on behalf of whoever switched it.
 func cancelModuleOutboxTx(ctx context.Context, tx pgx.Tx, scope access.Scope, m access.Module) error {
 	return cancelOutboxTx(ctx, tx, scope.ShopID, scope.UserID, "the module was switched off",
-		`s.id IN (SELECT id FROM outbox WHERE module = $4)`, string(m))
+		`s.id IN (SELECT id FROM outbox WHERE module = $1)`, string(m))
 }
 
 // cancelPersonOutboxTx cancels the calls not yet made about a person being
 // erased: their customer, their party, a contract naming them.
 func cancelPersonOutboxTx(ctx context.Context, tx pgx.Tx, scope access.Scope, personID string) error {
 	return cancelOutboxTx(ctx, tx, scope.ShopID, scope.UserID, "the person was erased", `s.subject_id IN (
-		SELECT id FROM customers WHERE person_id = $4
-		UNION ALL SELECT pa.id FROM parties pa LEFT JOIN customers c ON c.id = pa.customer_id WHERE pa.person_id = $4 OR c.person_id = $4
+		SELECT id FROM customers WHERE person_id = $1
+		UNION ALL SELECT pa.id FROM parties pa LEFT JOIN customers c ON c.id = pa.customer_id WHERE pa.person_id = $1 OR c.person_id = $1
 		UNION ALL SELECT dp.document_id FROM document_record_parties dp JOIN parties pa ON pa.id = dp.party_id
-		          LEFT JOIN customers c ON c.id = pa.customer_id WHERE pa.person_id = $4 OR c.person_id = $4)`, personID)
+		          LEFT JOIN customers c ON c.id = pa.customer_id WHERE pa.person_id = $1 OR c.person_id = $1)`, personID)
 }
 
 // QueueSignatureRequest asks for a party's signature on a document through

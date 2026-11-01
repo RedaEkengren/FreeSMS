@@ -276,3 +276,146 @@ func TestACallWhoseWorkerDiedGoesAgainWithTheSameKey(t *testing.T) {
 		t.Errorf("after: %s, %d attempts", state, attempts)
 	}
 }
+
+// blockingAdapter holds each send until the test releases it with what
+// the provider answered.
+type blockingAdapter struct {
+	started chan string
+	release chan error
+}
+
+func newBlockingAdapter() *blockingAdapter {
+	return &blockingAdapter{started: make(chan string, 4), release: make(chan error)}
+}
+
+func (a *blockingAdapter) Send(_ context.Context, it workshop.OutboxItem) error {
+	a.started <- it.ID
+	return <-a.release
+}
+
+func outboxEvents(t *testing.T, pool interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}, id, event string) int {
+	t.Helper()
+	var n int
+	if err := pool.QueryRow(context.Background(), `SELECT count(*) FROM outbox_events WHERE outbox_id = $1 AND event = $2`, id, event).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+// A call cancelled while it is being sent stays cancelled: a failure that
+// comes back after is not retried, and nothing sends it again -- whether
+// whoever runs the shop cancelled it or the module was switched off.
+func TestACallCancelledWhileItIsSentStaysCancelled(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	tpl := purchaseTemplate(t, pool)
+	for _, how := range []string{"by the owner", "by the module"} {
+		doc := purchaseAgreement(t, pool, tpl, "")
+		d, _ := workshop.DocumentRecordByID(ctx, pool, buyerScope(), doc)
+		id, err := workshop.QueueSignatureRequest(ctx, pool, buyerScope(), doc, d.Parties[0].ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a := newBlockingAdapter()
+		done := make(chan workshop.OutboxRun)
+		go func() {
+			run, err := workshop.RunOutbox(ctx, pool, shopID, map[string]workshop.OutboxAdapter{"signature_request": a}, 1)
+			if err != nil {
+				t.Error(err)
+			}
+			done <- run
+		}()
+		if got := <-a.started; got != id {
+			t.Fatalf("%s: sending %s, want %s", how, got, id)
+		}
+		if how == "by the owner" {
+			if err := workshop.CancelOutbox(ctx, pool, owner(), id, "Fel avtal"); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			if _, err := pool.Exec(ctx, `INSERT INTO shop_module_changes (shop_id, module, enabled, reason) VALUES ($1, 'dealer', true, 'test')`, shopID); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := workshop.SwitchModule(ctx, pool, owner(), access.Dealer, false, "Slutar sälja bilar", true); err != nil {
+				t.Fatal(err)
+			}
+		}
+		a.release <- errors.New("signing service: timeout")
+		if run := <-done; run.Retried != 0 {
+			t.Errorf("%s: the cancelled call was scheduled again: %+v", how, run)
+		}
+		if state, _ := callState(t, id, pool); state != "cancelled" {
+			t.Errorf("%s: after the send failed: %s, want cancelled", how, state)
+		}
+		again := &countingAdapter{}
+		if run, err := workshop.RunOutbox(ctx, pool, shopID, map[string]workshop.OutboxAdapter{"signature_request": again}, 10); err != nil || run.Sent != 0 || len(again.keys) != 0 {
+			t.Errorf("%s: sent after it was cancelled: %+v, %v, %v", how, run, err, again.keys)
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO shop_module_changes (shop_id, module, enabled, reason) VALUES ($1, 'dealer', true, 'test')`, shopID); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// Each row has its own lease, taken as it is sent: a row waiting behind a
+// slow one is not held, so another worker sends it; and a worker whose
+// lease ran out mid-send, and whose row another worker then sent, writes
+// nothing over that worker's outcome.
+func TestEachCallHasItsOwnLease(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	tpl := purchaseTemplate(t, pool)
+	doc := purchaseAgreement(t, pool, tpl, "")
+	d, _ := workshop.DocumentRecordByID(ctx, pool, buyerScope(), doc)
+	var ids []string
+	for _, p := range d.Parties {
+		id, err := workshop.QueueSignatureRequest(ctx, pool, buyerScope(), doc, p.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, id)
+	}
+	slow := newBlockingAdapter()
+	done := make(chan workshop.OutboxRun)
+	go func() {
+		run, err := workshop.RunOutbox(ctx, pool, shopID, map[string]workshop.OutboxAdapter{"signature_request": slow}, 10)
+		if err != nil {
+			t.Error(err)
+		}
+		done <- run
+	}()
+	first := <-slow.started
+	other := ids[0]
+	if other == first {
+		other = ids[1]
+	}
+	// The second row is not held by the slow worker: another sends it now.
+	quick := &countingAdapter{}
+	if run, err := workshop.RunOutbox(ctx, pool, shopID, map[string]workshop.OutboxAdapter{"signature_request": quick}, 10); err != nil || run.Sent != 1 {
+		t.Errorf("the row behind the slow one: %+v, %v; want sent by the other worker", run, err)
+	}
+	if state, _ := callState(t, other, pool); state != "succeeded" {
+		t.Errorf("the row behind the slow one is %s", state)
+	}
+	// The slow worker's lease runs out; another worker takes the row and
+	// sends it. The slow one's answer, when it comes, is not written.
+	if _, err := pool.Exec(ctx, `UPDATE outbox SET claimed_until = now() - interval '1 second' WHERE id = $1`, first); err != nil {
+		t.Fatal(err)
+	}
+	if run, err := workshop.RunOutbox(ctx, pool, shopID, map[string]workshop.OutboxAdapter{"signature_request": quick}, 10); err != nil || run.Sent != 1 {
+		t.Errorf("the row whose lease ran out: %+v, %v", run, err)
+	}
+	slow.release <- errors.New("signing service: timeout")
+	<-done
+	if state, attempts := callState(t, first, pool); state != "succeeded" || attempts != 2 {
+		t.Errorf("the row the slow worker lost: %s after %d attempts; want succeeded after 2", state, attempts)
+	}
+	if n := outboxEvents(t, pool, first, "failed") + outboxEvents(t, pool, first, "retry_scheduled"); n != 0 {
+		t.Errorf("the slow worker wrote %d outcomes over the one that sent it", n)
+	}
+	if len(quick.keys) != 2 || quick.keys[0] == quick.keys[1] {
+		t.Errorf("sent with %v; want each row once by the other worker", quick.keys)
+	}
+}
