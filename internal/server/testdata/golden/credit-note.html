@@ -163,6 +163,7 @@
     
     <form method="post" action="/payments/<id-2>/reverse">
       <input type="hidden" name="invoice" value="/invoices/<id-3>">
+      <label><span>Varför den rättas</span><input name="reason" maxlength="300" required></label>
       <button type="submit" class="link">Felregistrerad: rätta den</button>
     </form>
     
@@ -186,6 +187,7 @@
   <label class="tick"><input type="checkbox" name="confirm_over" value="1"> <span>Kunden betalade verkligen mer än fakturan</span></label>
   <label><span>Varför, om de gjorde det</span><input name="over_reason" maxlength="300"></label>
   <p class="waiting">Lämnas beloppet tomt betalas det som är kvar; kontant avrundas det till hel krona och skillnaden hålls isär.</p>
+  <p class="waiting">En betalning som registreras här är en anteckning om att pengar har kommit in, inte ett kassakvitto: FreeSMS är inget kassaregister.</p>
   <button type="submit">Registrera betalningen</button>
 </form>
 </section>
