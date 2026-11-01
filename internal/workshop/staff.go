@@ -35,6 +35,23 @@ type StaffMember struct {
 // Roles is every role the person holds, main role first.
 func (m StaffMember) Roles() access.Roles { return access.Of(m.Role, m.Others...) }
 
+// Choices is what the roles form offers for this person: the roles the shop
+// may give, and every role they already hold, in StaffRoles order. A role
+// whose module has been switched off is kept by the switch, and SetStaffRoles
+// rewrites what the form sends -- so a form that left it out would take it
+// away the next time anything else was ticked, and a main role it did not
+// list would fall back to the first option.
+func (m StaffMember) Choices(offered []access.Role) []access.Role {
+	held := m.Roles()
+	var out []access.Role
+	for _, r := range StaffRoles {
+		if slices.Contains(offered, r) || held.Has(r) {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 // StaffRoles are the roles somebody can be given, in the order a form offers
 // them: the common ones first. RolesOffered is the ones a shop may give.
 var StaffRoles = []access.Role{

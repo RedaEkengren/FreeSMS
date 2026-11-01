@@ -38,10 +38,10 @@
       <form class="mt-s" method="post" action="/staff/{{.UserID}}/roles">
         <label><span>{{$.T "Role"}}</span>
           <select name="role">
-            {{range $.Roles}}<option value="{{.}}"{{if eq . $m.Role}} selected{{end}}>{{$.T .Label}}</option>{{end}}
+            {{range $m.Choices $.Roles}}<option value="{{.}}"{{if eq . $m.Role}} selected{{end}}>{{$.T .Label}}</option>{{end}}
           </select></label>
         <fieldset><legend>{{$.T "Also"}}</legend>
-          {{range $.Roles}}{{if ne . $m.Role}}<label class="tick"><input type="checkbox" name="also" value="{{.}}"{{if $m.Roles.Has .}} checked{{end}}> <span>{{$.T .Label}}</span></label>{{end}}{{end}}
+          {{range $m.Choices $.Roles}}{{if ne . $m.Role}}<label class="tick"><input type="checkbox" name="also" value="{{.}}"{{if $m.Roles.Has .}} checked{{end}}> <span>{{$.T .Label}}</span></label>{{end}}{{end}}
         </fieldset>
         <button type="submit" class="secondary">{{$.T "Save the roles"}}</button>
       </form>
