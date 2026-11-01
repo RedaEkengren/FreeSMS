@@ -81,6 +81,45 @@ func TestACheckIsWidenedWhateverFormItIsPrintedIn(t *testing.T) {
 	}
 }
 
+// A value with an apostrophe in it is read as itself in either form, so it
+// is neither added again nor written back doubled: o'clock stays o'clock
+// however many times the list is widened.
+func TestAValueWithAnApostropheIsReadAsItself(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	for _, stmt := range []string{
+		`CREATE TABLE probe_quote_list (k text CONSTRAINT probe_quote_list_k_check CHECK (k IN ('a', 'o''clock')))`,
+		`CREATE TABLE probe_quote_array (k text CONSTRAINT probe_quote_array_k_check CHECK (k = ANY ('{a,o''clock}'::text[])))`,
+	} {
+		if _, err := pool.Exec(ctx, stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, table := range []string{"probe_quote_list", "probe_quote_array"} {
+		con := table + "_k_check"
+		if _, err := pool.Exec(ctx, `INSERT INTO `+table+` (k) VALUES ('o''clock')`); err != nil {
+			t.Fatal(err)
+		}
+		for range 2 {
+			if err := widen(pool, table, con, "k", "o'clock", "b"); err != nil {
+				t.Fatalf("%s: %v", table, err)
+			}
+		}
+		var def string
+		if err := pool.QueryRow(ctx, `SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = $1`, con).Scan(&def); err != nil {
+			t.Fatal(err)
+		}
+		if n := strings.Count(def, "clock"); n != 1 || !strings.Contains(def, "'o''clock'") {
+			t.Errorf("%s reads %s; want o'clock in it once, as itself", table, def)
+		}
+		for v, want := range map[string]bool{"o'clock": false, "o''clock": true, "b": false} {
+			if got := refused(pool, table, v); got != want {
+				t.Errorf("%s: %q refused = %v, want %v", table, v, got, want)
+			}
+		}
+	}
+}
+
 // Two branches adding their own values, in either order, end with both.
 func TestTwoWideningsInEitherOrderKeepBoth(t *testing.T) {
 	pool := testPool(t)
