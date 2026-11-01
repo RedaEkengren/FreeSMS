@@ -284,8 +284,15 @@ const moduleCacheFor = 5 * time.Second
 type moduleCache struct {
 	mu    sync.Mutex
 	shops map[string]cachedModules
+	// Counts forgets. A read stores what it found only if none happened
+	// while it was reading: one begun before a switch committed would
+	// otherwise put the old modules back after forget had cleared them.
+	gen uint64
 	// Reads made, for the test that counts them.
 	reads atomic.Int64
+	// Called between the read and the store, for the test that switches a
+	// module there. Nil outside tests.
+	afterRead func()
 }
 
 type cachedModules struct {
@@ -299,6 +306,7 @@ func (c *moduleCache) runs(ctx context.Context, pool *pgxpool.Pool, shopID strin
 	}
 	c.mu.Lock()
 	cached, ok := c.shops[shopID]
+	gen := c.gen
 	c.mu.Unlock()
 	if ok && time.Since(cached.at) < moduleCacheFor {
 		return cached.on[m], nil
@@ -312,18 +320,25 @@ func (c *moduleCache) runs(ctx context.Context, pool *pgxpool.Pool, shopID strin
 	for _, mod := range modules {
 		on[mod] = true
 	}
-	c.mu.Lock()
-	if c.shops == nil {
-		c.shops = map[string]cachedModules{}
+	if c.afterRead != nil {
+		c.afterRead()
 	}
-	c.shops[shopID] = cachedModules{on: on, at: time.Now()}
+	c.mu.Lock()
+	if c.gen == gen {
+		if c.shops == nil {
+			c.shops = map[string]cachedModules{}
+		}
+		c.shops[shopID] = cachedModules{on: on, at: time.Now()}
+	}
 	c.mu.Unlock()
 	return on[m], nil
 }
 
-// forget drops what is kept, after a switch or a setup.
+// forget drops what is kept, after a switch or a setup, and keeps any read
+// already under way from storing what it found.
 func (c *moduleCache) forget() {
 	c.mu.Lock()
 	c.shops = nil
+	c.gen++
 	c.mu.Unlock()
 }

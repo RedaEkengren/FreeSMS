@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // postModuleForm posts a form as a signed-in client, from the page's own origin.
@@ -281,5 +282,29 @@ func TestWhatTheShopRunsIsReadOnceForABurstOfRequestsWithNoSession(t *testing.T)
 	c.forget()
 	if _, err := c.runs(ctx, pool, shopA, access.Workshop); err != nil || c.reads.Load() != 2 {
 		t.Errorf("after forget: %v, %d reads; want it read again", err, c.reads.Load())
+	}
+}
+
+// A read that began before a switch committed must not put the old modules
+// back after forget cleared them: for five seconds a customer's links would
+// keep answering for a module that is off.
+func TestAReadBegunBeforeASwitchDoesNotRefillTheCache(t *testing.T) {
+	_, pool := testServer(t)
+	ctx := context.Background()
+	var c moduleCache
+	c.afterRead = func() {
+		c.afterRead = nil
+		// The switch commits and forgets while this read is in flight.
+		if _, err := workshop.SwitchModule(ctx, pool, access.Scope{ShopID: shopA, UserID: "aaaaaaaa-0000-0000-0000-000000000011",
+			Role: access.Of(access.RoleOwner), Modules: []access.Module{access.Workshop}}, access.Workshop, false, "", true); err != nil {
+			t.Fatalf("switch: %v", err)
+		}
+		c.forget()
+	}
+	if on, err := c.runs(ctx, pool, shopA, access.Workshop); err != nil || !on {
+		t.Fatalf("the read in flight: %v, %v; want what it read, the workshop on", on, err)
+	}
+	if on, err := c.runs(ctx, pool, shopA, access.Workshop); err != nil || on {
+		t.Errorf("after the switch: %v, %v; want the workshop off", on, err)
 	}
 }
