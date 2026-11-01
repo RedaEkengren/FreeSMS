@@ -455,27 +455,34 @@ func ProduceDocument(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 				return fmt.Errorf("%w: a correction supersedes a document of the same kind about the same thing", ErrInvalid)
 			}
 		}
+		// Naming a party copies its name and address onto the document, so
+		// it is reading the party: only one the caller may see (PartyByID),
+		// and read the way the party's own page reads it.
+		seen := partyRolesSeen(scope.Role, PartyRoles)
 		parties := make([]DocumentParty, len(n.Parties))
 		for i, p := range n.Parties {
-			var merged string
-			err := tx.QueryRow(ctx, `
-				SELECT coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, ''),
-				       coalesce(c.org_number, pa.org_number, ''),
-				       coalesce(nullif(CASE WHEN c.id IS NOT NULL
-				                            THEN concat_ws(', ', c.address_line1, c.address_line2, concat_ws(' ', c.postal_code, c.city))
-				                            ELSE concat_ws(', ', pa.address_line1, pa.address_line2, concat_ws(' ', pa.postal_code, pa.city)) END, ''), ''),
-				       coalesce(pa.merged_into::text, '')`+partyJoins+` WHERE pa.id = $1`, p.PartyID).Scan(
-				&parties[i].Name, &parties[i].OrgNumber, &parties[i].Address, &merged)
+			var visible bool
+			if err := tx.QueryRow(ctx, `
+				SELECT EXISTS (SELECT 1 FROM party_roles r WHERE party_now(r.party_id) = party_now($1) AND r.role = ANY($2))`,
+				p.PartyID, seen).Scan(&visible); err != nil {
+				return fmt.Errorf("read party: %w", err)
+			}
+			if !visible {
+				return ErrNotFound
+			}
+			var pa Party
+			err := tx.QueryRow(ctx, `SELECT`+partyColumns+partyJoins+` WHERE pa.id = $1`, p.PartyID, false).Scan(
+				&pa.ID, &pa.Kind, &pa.Name, &pa.OrgNumber, &pa.Phone, &pa.Email, &pa.Address, &pa.CustomerID, &pa.MergedInto, &pa.Revision)
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrNotFound
 			}
 			if err != nil {
 				return fmt.Errorf("read party: %w", err)
 			}
-			if merged != "" {
+			if pa.MergedInto != "" {
 				return errPartyMerged
 			}
-			parties[i].PartyID, parties[i].Role = p.PartyID, p.Role
+			parties[i] = DocumentParty{PartyID: p.PartyID, Role: p.Role, Name: pa.Name, OrgNumber: pa.OrgNumber, Address: pa.Address}
 		}
 		body := render(tpl, n.Data)
 		data, err := json.Marshal(n.Data)

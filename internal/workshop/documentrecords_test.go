@@ -44,6 +44,18 @@ func theSeller(t *testing.T, pool *pgxpool.Pool) string {
 	return id
 }
 
+// theCustomerAsSeller is the dealer's workshop customer's party, given the
+// seller's role the buyer deals in, so the buyer may name it on a contract.
+func theCustomerAsSeller(t *testing.T, pool *pgxpool.Pool) string {
+	t.Helper()
+	id := partyOf(t, pool, fixtureCustomer)
+	if err := workshop.StartPartyRole(context.Background(), pool, buyerScope(), id, workshop.PartySeller, ""); err != nil &&
+		!errors.Is(err, workshop.ErrInvalid) {
+		t.Fatalf("StartPartyRole: %v", err)
+	}
+	return id
+}
+
 // purchaseAgreement is a seller's purchase agreement, made by the buyer,
 // with the dealer's customer on it as guarantor so it has two parties.
 func purchaseAgreement(t *testing.T, pool *pgxpool.Pool, tpl workshop.DocumentTemplate, supersedes string) string {
@@ -53,7 +65,7 @@ func purchaseAgreement(t *testing.T, pool *pgxpool.Pool, tpl workshop.DocumentTe
 		TemplateVersionID: tpl.VersionID, Title: "Köpeavtal ABC 12D",
 		Parties: []workshop.DocumentPartyRole{
 			{PartyID: theSeller(t, pool), Role: "seller"},
-			{PartyID: partyOf(t, pool, fixtureCustomer), Role: "guarantor"},
+			{PartyID: theCustomerAsSeller(t, pool), Role: "guarantor"},
 		},
 		Data:       map[string]string{"seller": "Sven Säljare", "registration": "ABC 12D", "price": "85 000 kr"},
 		Supersedes: supersedes,
@@ -168,7 +180,7 @@ func TestSigningIsEvidenceOfTheDocumentAsItIs(t *testing.T) {
 	}
 	if _, err := workshop.ProduceDocument(ctx, pool, buyerScope(), workshop.NewDocumentRecord{
 		Kind: workshop.DocPurchaseAgreement, SubjectKind: "purchase", SubjectID: purchaseA, TemplateVersionID: tpl.VersionID,
-		Title: "x", Parties: []workshop.DocumentPartyRole{{PartyID: partyOf(t, pool, fixtureCustomer), Role: "seller"}}, Supersedes: id,
+		Title: "x", Parties: []workshop.DocumentPartyRole{{PartyID: theCustomerAsSeller(t, pool), Role: "seller"}}, Supersedes: id,
 	}); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("a second correction of the same document: %v, want refused", err)
 	}
@@ -280,7 +292,7 @@ func TestErasureBlanksOnlyContractsPastTheirRetention(t *testing.T) {
 	recent, err := workshop.ProduceDocument(ctx, pool, buyerScope(), workshop.NewDocumentRecord{
 		Kind: workshop.DocPurchaseAgreement, SubjectKind: "purchase", SubjectID: "77777777-0000-0000-0000-000000000002",
 		TemplateVersionID: tpl.VersionID, Title: "Nyare",
-		Parties: []workshop.DocumentPartyRole{{PartyID: partyOf(t, pool, fixtureCustomer), Role: "seller"}},
+		Parties: []workshop.DocumentPartyRole{{PartyID: theCustomerAsSeller(t, pool), Role: "seller"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -322,5 +334,43 @@ func TestErasureBlanksOnlyContractsPastTheirRetention(t *testing.T) {
 	}
 	if n := countRows(t, pool, `SELECT count(*) FROM erasures WHERE cleared LIKE '%1 contracts past their retention%' AND kept LIKE '%1 contracts still within%'`); n != 1 {
 		t.Error("the erasure does not say which contracts it blanked and which it kept")
+	}
+}
+
+// A contract copies its parties' names and addresses onto itself, so naming
+// a party is reading it: a salesperson cannot put a workshop customer they
+// do not deal with onto a sales contract and read back who they are. Once
+// the customer is a buyer -- the salesperson's own dealing -- they can.
+func TestADocumentNamesOnlyPartiesTheCallerMaySee(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	sales := otherRoles(access.Of(access.RoleSales))
+	tpl, err := workshop.SaveDocumentTemplate(ctx, pool, owner(), "", workshop.DocSalesContract, "Köpeavtal", "{buyer} köper bilen.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	customer := partyOf(t, pool, fixtureCustomer)
+	contract := workshop.NewDocumentRecord{
+		Kind: workshop.DocSalesContract, SubjectKind: "sale", SubjectID: "77777777-0000-0000-0000-000000000009",
+		TemplateVersionID: tpl.VersionID, Title: "Köpeavtal",
+		Parties: []workshop.DocumentPartyRole{{PartyID: customer, Role: "buyer"}},
+	}
+	if _, err := workshop.ProduceDocument(ctx, pool, sales, contract); !errors.Is(err, workshop.ErrNotFound) {
+		t.Errorf("a salesperson named a workshop customer on a contract: %v, want not found", err)
+	}
+	if n := countRows(t, pool, `SELECT count(*) FROM document_records`); n != 0 {
+		t.Errorf("%d documents produced, want none", n)
+	}
+	if err := workshop.StartPartyRole(ctx, pool, sales, customer, workshop.PartyBuyer, ""); err != nil {
+		t.Fatal(err)
+	}
+	id, err := workshop.ProduceDocument(ctx, pool, sales, contract)
+	if err != nil {
+		t.Fatalf("the customer, now a buyer: %v", err)
+	}
+	d, err := workshop.DocumentRecordByID(ctx, pool, sales, id)
+	want, _ := workshop.PartyByID(ctx, pool, sales, customer)
+	if err != nil || len(d.Parties) != 1 || d.Parties[0].Name != want.Name || d.Parties[0].Address != want.Address || want.Name == "" {
+		t.Errorf("the contract names %+v, %v; want the party as it is read, %+v", d.Parties, err, want)
 	}
 }
