@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 )
 
 // Role is what a user may do. Four working roles plus an administrator.
@@ -139,14 +140,7 @@ const (
 var Modules = []Module{Workshop, Dealer, Rental}
 
 // Valid reports whether m is a module the schema accepts.
-func (m Module) Valid() bool {
-	for _, known := range Modules {
-		if m == known {
-			return true
-		}
-	}
-	return false
-}
+func (m Module) Valid() bool { return slices.Contains(Modules, m) }
 
 var moduleLabels = map[Module]string{
 	Workshop: "Workshop",
@@ -190,14 +184,7 @@ type Scope struct {
 // across modules -- a rental's damage as a workshop job -- asks for both.
 func (s Scope) Uses(modules ...Module) bool {
 	for _, want := range modules {
-		found := false
-		for _, m := range s.Modules {
-			if m == want {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !slices.Contains(s.Modules, want) {
 			return false
 		}
 	}

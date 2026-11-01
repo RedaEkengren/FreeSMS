@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -284,12 +285,7 @@ func (f intakeForm) Runs(m access.Module) bool {
 	if f.Modules == nil {
 		return m == access.Workshop
 	}
-	for _, chosen := range f.Modules {
-		if chosen == m {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(f.Modules, m)
 }
 
 // setupForm is intakeForm under a name that says which page it belongs to.

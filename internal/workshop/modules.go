@@ -39,14 +39,7 @@ func inWorkshop(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fn 
 var Available = []access.Module{access.Workshop}
 
 // available reports whether this release offers m.
-func available(m access.Module) bool {
-	for _, a := range Available {
-		if a == m {
-			return true
-		}
-	}
-	return false
-}
+func available(m access.Module) bool { return slices.Contains(Available, m) }
 
 // OpenBusiness is what is still open in a module somebody is switching off:
 // a job in the workshop, a booking still to come. Switching off with any of
@@ -78,9 +71,10 @@ func (e *OpenBusiness) Error() string {
 type ModuleState struct {
 	Module access.Module
 	On     bool
-	// When it was last switched on or off, and by whom; nil and empty for a
-	// module never touched, or switched on by the migration that brought
-	// modules in.
+	// When it was last switched on, and by whom, for a module that is on;
+	// nil for one that is off. A module the migration that brought modules
+	// in switched on is on since the shop was created, by nobody: By is
+	// empty, and so is it for a shop the release before set up.
 	Since *time.Time
 	By    string
 }
