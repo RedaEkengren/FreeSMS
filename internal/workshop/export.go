@@ -39,6 +39,8 @@ var ExportTables = []string{
 	"bookings", "booking_events", "staff_absences", "shop_closures", "rotas", "rota_hours", "shift_changes", "outbound_messages", "message_events",
 	"work_order_state_changes", "quotes", "quote_lines", "quote_decisions", "enquiries", "enquiry_lines", "job_assignments", "job_plans", "work_order_line_revisions", "job_tasks", "job_task_events", "record_changes", "customer_people", "job_notes",
 	"supplier_orders", "supplier_order_lines", "supplier_line_etas", "supplier_receipts", "supplier_returns", "job_recommendations", "delivery_summaries", "invoice_deliveries", "invoice_corrections", "receivable_cases", "receivable_events", "day_settlements", "day_reviews", "comebacks", "comeback_claims", "comeback_events", "outsourced_work", "outsourced_events", "import_batches", "import_refs", "setup_steps", "shop_module_changes", "user_roles", "protocol_photo_removals", "parties", "party_roles", "resources", "resource_block_jobs", "resource_retirements", "audit_events", "deposits", "deposit_applications", "vehicle_lookups", "cash_invoices", "payment_flows", "payment_flow_checks", "cash_register_settings", "payouts", "bank_statement_lines", "payment_matches", "identity_retention_settings", "outbox", "outbox_events", "document_templates", "document_template_versions", "document_record_parties", "document_retention_settings",
+	// What technicians see (#225): the shop's decisions, with who and why.
+	"technician_view_changes", "technician_view_exceptions",
 }
 
 // exportQueries are tables exported with chosen columns, because one of
