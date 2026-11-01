@@ -144,3 +144,31 @@ func TestThePageNeverSaysAShopIsExemptFromTheCashRegisterRules(t *testing.T) {
 		}
 	}
 }
+
+// The public page says what CLAUDE.md decided about hosting (#95): running
+// it yourself is free under AGPL-3.0, and a paid hosted service exists for
+// a workshop that would rather not -- never that there is none, in any
+// language.
+func TestThePageSaysSelfHostingIsFreeAndHostingIsPaid(t *testing.T) {
+	none := regexp.MustCompile(`(?i)no hosted service|ingen hostad tjänst`)
+	hosted := map[string]string{"sv": "hostad tjänst mot betalning", "en": "paid hosted service"}
+	for _, p := range Pages {
+		for _, file := range []string{p.Source, p.Output} {
+			b, err := os.ReadFile(filepath.Join("../..", file))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if m := none.Find(b); m != nil {
+				t.Errorf("%s says there is no hosted service: %q", file, m)
+			}
+			want, ok := hosted[p.Locale]
+			if !ok {
+				t.Errorf("%s is in %q, for which the test has no words to look for", file, p.Locale)
+				continue
+			}
+			if !bytes.Contains(b, []byte(want)) || !bytes.Contains(b, []byte("AGPL-3.0")) {
+				t.Errorf("%s does not say self-hosting is free under AGPL-3.0 and a %q exists", file, want)
+			}
+		}
+	}
+}
