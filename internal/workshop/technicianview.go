@@ -126,7 +126,7 @@ func TechnicianView(ctx context.Context, pool *pgxpool.Pool, scope access.Scope)
 		}
 
 		rows, err = tx.Query(ctx, `
-			SELECT e.user_id::text, coalesce(tp.display_name, ''), e.field, e.reason, coalesce(bp.display_name, ''), e.at, e.until
+			SELECT e.user_id::text, coalesce(tp.display_name, ''), e.field, coalesce(e.reason, ''), coalesce(bp.display_name, ''), e.at, e.until
 			FROM (SELECT DISTINCT ON (user_id, field) * FROM technician_view_exceptions ORDER BY user_id, field, seq DESC) e
 			JOIN users tu ON tu.id = e.user_id LEFT JOIN people tp ON tp.id = tu.person_id
 			LEFT JOIN users bu ON bu.id = e.by_user LEFT JOIN people bp ON bp.id = bu.person_id

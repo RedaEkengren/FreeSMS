@@ -253,5 +253,12 @@ func eraseAuditReasonsTx(ctx context.Context, tx pgx.Tx, personID string) error 
 	if err != nil {
 		return fmt.Errorf("clear the reasons of events about them: %w", err)
 	}
+	// And why a field was opened for them as a technician, or closed
+	// again (0092): that it was, by whom and until when stays.
+	if _, err := tx.Exec(ctx, `
+		UPDATE technician_view_exceptions SET reason = NULL, reason_erased_at = clock_timestamp()
+		WHERE reason IS NOT NULL AND user_id IN (SELECT id FROM users WHERE person_id = $1)`, personID); err != nil {
+		return fmt.Errorf("clear the reasons of their technician exceptions: %w", err)
+	}
 	return nil
 }

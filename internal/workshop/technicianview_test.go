@@ -332,3 +332,50 @@ func TestAJobInvoicedAtNothingIsInvoiced(t *testing.T) {
 		t.Errorf("credited whole: %q, want not invoiced", s)
 	}
 }
+
+// Erasing a technician takes away the reasons their exceptions were
+// opened and ended with, which can name them, as it takes the reasons of
+// the events about them: that a field was opened for them, by whom and
+// when stays, and the rows are still never otherwise changed.
+func TestErasureTakesTheReasonsOfATechniciansExceptions(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	addTechnician(t, pool)
+	if err := workshop.GrantTechnicianField(ctx, pool, owner(), techUserID, access.FieldCustomerPhone, "Täcker för Anna medan hon är föräldraledig", nil); err != nil {
+		t.Fatal(err)
+	}
+	var person string
+	if err := pool.QueryRow(ctx, `UPDATE users SET active = false, deactivated_at = now() WHERE id = $1 RETURNING person_id::text`, techUserID).Scan(&person); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ErasePerson(ctx, pool, advisor(), &recordingRemover{}, person, "Begäran"); err != nil {
+		t.Fatal(err)
+	}
+	events, err := workshop.AuditTrail(ctx, pool, owner(), "user", techUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, e := range events {
+		if e.KeptIn == "technician_view_exceptions" {
+			found = true
+			if e.Reason != "" || !e.ReasonErased || e.Actor == "" || e.To != access.FieldCustomerPhone {
+				t.Errorf("after the erasure: %+v", e)
+			}
+		}
+	}
+	if !found {
+		t.Error("the erasure took the exception away")
+	}
+	if n := countRows(t, pool, `SELECT count(*) FROM technician_view_exceptions WHERE reason LIKE '%Anna%'`); n != 0 {
+		t.Errorf("%d exceptions still say why in words that name somebody", n)
+	}
+	if _, err := workshop.TechnicianView(ctx, pool, owner()); err != nil {
+		t.Errorf("the settings page after the erasure: %v", err)
+	}
+	for _, stmt := range []string{`UPDATE technician_view_exceptions SET field = 'hourly_rate'`, `UPDATE technician_view_exceptions SET reason = 'Något annat'`} {
+		if err := asApp(ctx, pool, stmt); err == nil {
+			t.Errorf("%q as the application was let through", stmt)
+		}
+	}
+}
