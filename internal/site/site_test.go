@@ -133,8 +133,13 @@ func TestThePageNeverSaysAShopIsExemptFromTheCashRegisterRules(t *testing.T) {
 			if m := exempt.Find(b); m != nil {
 				t.Errorf("%s says a shop is exempt: %q", file, m)
 			}
-			if !bytes.Contains(b, []byte(check[p.Locale])) {
-				t.Errorf("%s does not say to check with %s", file, check[p.Locale])
+			want, ok := check[p.Locale]
+			if !ok {
+				t.Errorf("%s is in %q, for which the test has no words to look for", file, p.Locale)
+				continue
+			}
+			if !bytes.Contains(b, []byte(want)) {
+				t.Errorf("%s does not say to check with %s", file, want)
 			}
 		}
 	}
