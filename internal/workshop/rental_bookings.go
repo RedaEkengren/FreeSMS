@@ -163,6 +163,7 @@ var (
 	errMoveLength       = fmt.Errorf("%w: a move keeps the rental as long as it was; extend it to make it longer", ErrInvalid)
 	errExtendLater      = fmt.Errorf("%w: an extension ends later than the rental does now", ErrInvalid)
 	errCancelWhy        = fmt.Errorf("%w: say why, in 300 characters or fewer", ErrInvalid)
+	errExtendLicence    = fmt.Errorf("%w: a driver's licence does not last until the new end; check it again before extending", ErrInvalid)
 	errNoShowBeforeTime = fmt.Errorf("%w: a renter is a no-show only once the rental was due to start", ErrInvalid)
 )
 
@@ -736,6 +737,11 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 		if !to.After(b.ends) {
 			return errExtendLater
 		}
+		if b.state == RentalCheckedOut {
+			if err := licencesLastTx(ctx, tx, id, to); err != nil {
+				return err
+			}
+		}
 		if err := inFleetTx(ctx, tx, b.unit, b.starts, to.Add(b.buffer)); err != nil {
 			return err
 		}
@@ -1010,4 +1016,35 @@ func Renters(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Ren
 		return rows.Err()
 	})
 	return out, err
+}
+
+// licencesLastTx refuses an extension of a rental already out past the end
+// of a driver's licence, when its profile needs a licence check: the unit
+// is with them, and a check at the counter is the only way to know.
+func licencesLastTx(ctx context.Context, tx pgx.Tx, bookingID string, to time.Time) error {
+	var needed bool
+	if err := tx.QueryRow(ctx, `SELECT v.licence_check_required FROM rental_bookings b JOIN rental_profile_versions v ON v.id = b.profile_version_id
+		WHERE b.id = $1`, bookingID).Scan(&needed); err != nil {
+		return fmt.Errorf("read profile: %w", err)
+	}
+	if !needed {
+		return nil
+	}
+	loc, err := shopLocationTx(ctx, tx)
+	if err != nil {
+		return err
+	}
+	drivers, err := rentalDriversTx(ctx, tx, bookingID)
+	if err != nil {
+		return err
+	}
+	for _, d := range drivers {
+		if d.Removed {
+			continue
+		}
+		if d.Check == nil || !d.Check.Passed || d.Check.ValidUntil == nil || !licenceLasts(*d.Check.ValidUntil, to, loc) {
+			return errExtendLicence
+		}
+	}
+	return nil
 }

@@ -8280,6 +8280,7 @@
     "A digital licence, looked at": {"other": "Ett digitalt körkort, granskat"},
     "A foreign licence, looked at": {"other": "Ett utländskt körkort, granskat"},
     "Another way, in the note": {"other": "Annat sätt, i anteckningen"},
-    "Note, with no licence or identity number": {"other": "Anteckning, utan körkorts- eller personnummer"}
+    "Note, with no licence or identity number": {"other": "Anteckning, utan körkorts- eller personnummer"},
+    "a driver's licence does not last until the new end; check it again before extending": {"other": "en förares körkort gäller inte till det nya slutet; kontrollera det igen innan hyran förlängs"}
   }
 }

@@ -370,3 +370,29 @@ func TestALicenceCheckIsAskedAgainstTheRentalAsItIsNow(t *testing.T) {
 		t.Errorf("a licence that ends the day before the rental does, by the shop's clock: %v, %v", ok, err)
 	}
 }
+
+// A rental already out is not extended past a driver's licence: the desk
+// is told to check the licence again first (review 2 #3).
+func TestARentalOutIsNotExtendedPastADriversLicence(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	id, err := v.book(pool, wallAt("2031-06-08 09:00"), wallAt("2031-06-09 09:00"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver, _ := workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, v.renter, true)
+	if _, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true,
+		Categories: []string{"B"}, ValidUntil: day("2031-06-10"), Method: workshop.LicenceCardInspected}); err != nil {
+		t.Fatal(err)
+	}
+	if err := asApp(ctx, pool, `INSERT INTO rental_booking_events (shop_id, booking_id, kind) VALUES ('`+shopID+`', '`+id+`', 'checked_out')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, wallAt("2031-06-20 09:00"), ""); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("out, and extended past the licence: %v", err)
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, wallAt("2031-06-10 09:00"), ""); err != nil {
+		t.Errorf("out, and extended within the licence: %v", err)
+	}
+}
