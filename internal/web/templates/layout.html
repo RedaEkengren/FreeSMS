@@ -21,7 +21,7 @@
     <a class="brand" href="/">FreeSMS</a>
     {{/* The count fills in after the page has loaded, so it costs no page
          anything; empty when nothing is waiting. */}}
-    <a href="/mine" class="nav" data-live-topics="board parts staff">{{.T "For me"}} <span id="mine-count" class="count"
+    <a href="/mine" class="nav" data-live-topics="board parts staff actions">{{.T "For me"}} <span id="mine-count" class="count"
       hx-get="/mine/count" hx-trigger="load" hx-swap="outerHTML" hx-headers='{"X-FreeSMS-Live": "1"}'></span></a>
     {{/* A module's links only when the shop runs it (#143). The routes
          answer "not found" regardless; this keeps the menu honest. */ -}}

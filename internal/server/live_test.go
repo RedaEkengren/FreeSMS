@@ -185,3 +185,30 @@ func TestManyChangesAtOnceAreOneRefresh(t *testing.T) {
 		t.Errorf("a hundred rows in one transaction were %d refreshes, want 1", parts)
 	}
 }
+
+// The header's "For me" count is the same queue as /mine, so it refreshes
+// on every topic the queue listens for: a call given up or a contract
+// waiting for a signature ('actions') changes the count on every page,
+// not only on /mine and the home page.
+func TestTheHeaderCountListensForEveryTopicTheQueueDoes(t *testing.T) {
+	ts, _ := testServer(t)
+	owner := signIn(t, ts, ownerEmail)
+	page := get(t, owner, ts.URL+"/mine", http.StatusOK)
+	attr := func(name string) []string {
+		i := strings.Index(page, name+`="`)
+		if i < 0 {
+			t.Fatalf("no %s on /mine", name)
+		}
+		rest := page[i+len(name)+2:]
+		return strings.Fields(rest[:strings.IndexByte(rest, '"')])
+	}
+	header := map[string]bool{}
+	for _, topic := range attr("data-live-topics") {
+		header[topic] = true
+	}
+	for _, topic := range attr(`id="live-mine" data-live`) {
+		if !header[topic] {
+			t.Errorf("the header's count does not listen for %q, which the queue does", topic)
+		}
+	}
+}
