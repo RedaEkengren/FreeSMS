@@ -278,3 +278,32 @@ func TestADocumentIssuedBeforeTheSellerWasKeptIsNotAccusedOfLackingIt(t *testing
 		t.Errorf("a document with no seller at all was flagged: %v", gaps)
 	}
 }
+
+// Getting started is Core's and keeps working with the workshop off; it does
+// not send the owner to the workshop's pages, which are not there then
+// (#143), nor ask for a technician.
+func TestGettingStartedWithTheWorkshopOffAsksNothingOfTheWorkshop(t *testing.T) {
+	pool := setup(t)
+	s, err := workshop.ReadinessFor(context.Background(), pool, runningNothing(owner()), workshop.ReadinessEnv{})
+	if err != nil {
+		t.Fatalf("ReadinessFor with the workshop off: %v", err)
+	}
+	for _, x := range s.Tasks {
+		switch x.Key {
+		case "rates", "catalogue", "final_check":
+			t.Errorf("the workshop's task %q is listed with the workshop off", x.Key)
+		case "staff":
+			if x.Required {
+				t.Error("a technician is required with the workshop off")
+			}
+		}
+		for _, page := range []string{"/labour", "/checklists"} {
+			if x.Link == page {
+				t.Errorf("%s links to the workshop's %s", x.Key, page)
+			}
+		}
+	}
+	if on := readiness(t, pool, workshop.ReadinessEnv{}); taskOf(t, on, "final_check").Key == "" {
+		t.Error("the workshop's tasks went with it switched on")
+	}
+}
