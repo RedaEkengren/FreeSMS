@@ -446,3 +446,35 @@ func TestTheRentalDesksDayIsInTheQueueAndOnTheHomePage(t *testing.T) {
 		t.Errorf("switching Rental off with two rentals open: %+v, %v", open, err)
 	}
 }
+
+// The booking after an overdue rental is in the queue as at risk, whatever
+// day it starts, and never as a handover today when it is not (review #8).
+func TestABookingAtRiskIsQueuedAsAtRisk(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	out, err := v.book(pool, time.Now().Add(-48*time.Hour), time.Now().Add(-2*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	next, err := v.book(pool, in2031(10, 9), in2031(11, 9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := asApp(ctx, pool, `INSERT INTO rental_booking_events (shop_id, booking_id, kind) VALUES ('`+shopID+`', '`+out+`', 'checked_out')`); err != nil {
+		t.Fatal(err)
+	}
+	items, err := workshop.WaitingFor(ctx, pool, rentalDesk())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var kinds []string
+	for _, it := range items {
+		if it.SubjectID == next {
+			kinds = append(kinds, it.Kind)
+		}
+	}
+	if len(kinds) != 1 || kinds[0] != "rental_at_risk" {
+		t.Errorf("the booking after the overdue van is queued as %v", kinds)
+	}
+}

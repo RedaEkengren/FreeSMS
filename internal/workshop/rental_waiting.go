@@ -40,7 +40,7 @@ func rentalWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 		rows, err := tx.Query(ctx, `
 			SELECT CASE WHEN `+rentalOverdue+` THEN 'rental_overdue'
 			            WHEN `+rentalReturnToday+` THEN 'rental_return'
-			            WHEN (`+rentalHandoverToday+`) AND x.at_risk THEN 'rental_at_risk'
+			            WHEN `+rentalState+` = 'confirmed' AND x.at_risk THEN 'rental_at_risk'
 			            ELSE 'rental_handover' END,
 			       b.id::text, b.number, u.fleet_number || coalesce(' · ' || reg.registration, ' · ' || r.name, ''),
 			       CASE WHEN `+rentalState+` = 'checked_out' THEN b.ends_at ELSE b.starts_at END
@@ -52,7 +52,7 @@ func rentalWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 			CROSS JOIN `+rentalToday+`
 			CROSS JOIN LATERAL (SELECT EXISTS (
 				SELECT 1 FROM rental_bookings o JOIN resource_blocks ok ON ok.id = o.block_id
-				 WHERE o.unit_id = b.unit_id AND o.id <> b.id AND o.ends_at < clock_timestamp()
+				 WHERE o.unit_id = b.unit_id AND o.id <> b.id AND o.ends_at < clock_timestamp() AND o.starts_at < b.starts_at
 				   AND (SELECT e.kind FROM rental_booking_events e WHERE e.booking_id = o.id
 				          AND e.kind IN ('held', 'confirmed', 'checked_out', 'returned', 'cancelled', 'no_show')
 				        ORDER BY e.seq DESC LIMIT 1) = 'checked_out') AS at_risk) x
