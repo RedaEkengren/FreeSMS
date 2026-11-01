@@ -136,6 +136,7 @@ func (s *Server) bookingForm(r *http.Request) (workshop.NewBooking, error) {
 		CustomerPhone: r.FormValue("customer_phone"),
 		What:          r.FormValue("what"),
 		PartsNeeded:   r.FormValue("parts_needed") == "yes",
+		ConfirmedPast: r.FormValue("confirm_past") != "",
 	}
 	if v := strings.TrimSpace(r.FormValue("estimate_hours")); v != "" {
 		h, err := parseScaled(v, 2)

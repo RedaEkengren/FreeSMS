@@ -67,6 +67,12 @@ func checkLine(line *NewLine) error {
 		return fmt.Errorf("%w: the line needs a description", ErrInvalid)
 	case line.QuantityMilli < 0:
 		return fmt.Errorf("%w: quantity cannot be negative", ErrInvalid)
+	// A line of nothing prints on the invoice as "0 x 895,00 = 0,00": a
+	// forgotten quantity more often than a meant one, and never something a
+	// customer is better for reading. A line that should not be there is
+	// withdrawn, which keeps why.
+	case line.QuantityMilli == 0:
+		return fmt.Errorf("%w: a line needs a quantity; to take one off, withdraw it", ErrInvalid)
 	case line.UnitPriceMinor < 0:
 		return fmt.Errorf("%w: a negative price is a credit note, not a line", ErrInvalid)
 	case !money.LineWithinLimits(line.QuantityMilli, line.UnitPriceMinor):

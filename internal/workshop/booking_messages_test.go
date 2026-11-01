@@ -24,7 +24,9 @@ func aBooking(t *testing.T, pool *pgxpool.Pool, in time.Duration) string {
 	t.Helper()
 	starts := time.Now().Add(in).Truncate(time.Minute)
 	id, err := workshop.CreateBooking(context.Background(), pool, advisor(), workshop.NewBooking{
-		Starts: starts, Ends: starts.Add(time.Hour), What: "Service", CustomerName: "Greta Gren", CustomerPhone: "070-123 45 67", Registration: "ABC 12D"})
+		// A fixed date, which may have gone by: meant.
+		ConfirmedPast: true,
+		Starts:        starts, Ends: starts.Add(time.Hour), What: "Service", CustomerName: "Greta Gren", CustomerPhone: "070-123 45 67", Registration: "ABC 12D"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -69,7 +69,17 @@ type NewBooking struct {
 	What            string
 	EstimateMinutes *int
 	PartsNeeded     bool
+
+	// Set when the person has been told the booking starts on a day that has
+	// gone and says it is meant: a visit written down afterwards. Without it
+	// 2020 typed for 2026 is a booking nobody will ever come to.
+	ConfirmedPast bool
 }
+
+// ErrBookingInThePast is a booking that starts before today, on the shop's
+// calendar, until somebody says it is meant. Earlier today is not asked
+// about: the car that came in at eight and was written up at nine.
+var ErrBookingInThePast = fmt.Errorf("%w: that booking starts on a day that has already gone; if it is meant, tick that and book it again", ErrInvalid)
 
 // BookingEvent is one thing that happened to a booking.
 type BookingEvent struct {
@@ -135,6 +145,16 @@ func CreateBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	}
 	var id string
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		if !nb.ConfirmedPast {
+			loc, err := shopLocationTx(ctx, tx)
+			if err != nil {
+				return err
+			}
+			now := time.Now().In(loc)
+			if nb.Starts.Before(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)) {
+				return ErrBookingInThePast
+			}
+		}
 		var err error
 		id, err = createBookingTx(ctx, tx, scope, nb, "", "")
 		return err

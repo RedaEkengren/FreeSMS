@@ -30,11 +30,15 @@ func TestABookingOnAShutDayIsRefused(t *testing.T) {
 	// Half past midnight in Stockholm is still the day before in UTC: the
 	// shop's day is the one that counts.
 	if _, err := workshop.CreateBooking(ctx, pool, advisor(), workshop.NewBooking{
-		Starts: at("2026-06-19", 0, 30), Ends: at("2026-06-19", 1, 0), What: "Service"}); !errors.Is(err, workshop.ErrInvalid) {
+		// A fixed date, which may have gone by: meant.
+		ConfirmedPast: true,
+		Starts:        at("2026-06-19", 0, 30), Ends: at("2026-06-19", 1, 0), What: "Service"}); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("booked on a shut day: %v", err)
 	}
 	id, err := workshop.CreateBooking(ctx, pool, advisor(), workshop.NewBooking{
-		Starts: at("2026-06-18", 8, 0), Ends: at("2026-06-18", 9, 0), What: "Service"})
+		// A fixed date, which may have gone by: meant.
+		ConfirmedPast: true,
+		Starts:        at("2026-06-18", 8, 0), Ends: at("2026-06-18", 9, 0), What: "Service"})
 	if err != nil {
 		t.Fatalf("the day before is open: %v", err)
 	}
@@ -54,7 +58,9 @@ func TestSomebodyAwayLeavesTheirBookingsNeedingSomebodyElse(t *testing.T) {
 	ctx := context.Background()
 	addTechnician(t, pool)
 	id, err := workshop.CreateBooking(ctx, pool, advisor(), workshop.NewBooking{
-		Starts: at("2026-10-15", 9, 0), Ends: at("2026-10-15", 10, 0), What: "Service", TechnicianID: techUserID})
+		// A fixed date, which may have gone by: meant.
+		ConfirmedPast: true,
+		Starts:        at("2026-10-15", 9, 0), Ends: at("2026-10-15", 10, 0), What: "Service", TechnicianID: techUserID})
 	if err != nil {
 		t.Fatal(err)
 	}

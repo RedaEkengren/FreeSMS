@@ -20,7 +20,9 @@ import (
 func booked(t *testing.T, pool *pgxpool.Pool) string {
 	t.Helper()
 	id, err := workshop.CreateBooking(context.Background(), pool, advisor(), workshop.NewBooking{
-		Starts: at("2026-10-15", 8, 0), Ends: at("2026-10-15", 9, 0), What: "Service", Registration: "BKG 123"})
+		// A fixed date, which may have gone by: meant.
+		ConfirmedPast: true,
+		Starts:        at("2026-10-15", 8, 0), Ends: at("2026-10-15", 9, 0), What: "Service", Registration: "BKG 123"})
 	if err != nil {
 		t.Fatalf("CreateBooking: %v", err)
 	}
@@ -142,7 +144,9 @@ func TestAnIntakeThatFailsLeavesTheBookingAsItWas(t *testing.T) {
 func bookedFor(t *testing.T, pool *pgxpool.Pool, reg, name, phone, tech string) string {
 	t.Helper()
 	id, err := workshop.CreateBooking(context.Background(), pool, advisor(), workshop.NewBooking{
-		Starts: at("2026-10-15", 8, 0), Ends: at("2026-10-15", 9, 0), What: "Service", Registration: reg,
+		// A fixed date, which may have gone by: meant.
+		ConfirmedPast: true,
+		Starts:        at("2026-10-15", 8, 0), Ends: at("2026-10-15", 9, 0), What: "Service", Registration: reg,
 		CustomerName: name, CustomerPhone: phone, TechnicianID: tech})
 	if err != nil {
 		t.Fatalf("CreateBooking: %v", err)

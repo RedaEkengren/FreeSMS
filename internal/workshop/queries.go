@@ -412,8 +412,24 @@ func ClockIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 }
 
 // ClockOut stops the caller's running clock.
+//
+// Stopping a clock that is not running is not an error: it leaves the clock
+// stopped, which is what was asked, and the answer is the button as it truly
+// is. A double tap, a second device, a clock already closed by clocking in on
+// another car, and the offline queue replaying the tap all end here. A job
+// that does not exist, or is not this shop's, is not found.
 func ClockOut(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) error {
+	if !looksLikeUUID(jobID) {
+		return ErrNotFound
+	}
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT exists(SELECT 1 FROM work_orders WHERE id = $1)`, jobID).Scan(&exists); err != nil {
+			return fmt.Errorf("read job: %w", err)
+		}
+		if !exists {
+			return ErrNotFound
+		}
 		_, err := tx.Exec(ctx,
 			`UPDATE time_entries SET ended_at = now()
 			 WHERE user_id = $1 AND work_order_id = $2 AND ended_at IS NULL`,

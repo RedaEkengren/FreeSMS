@@ -201,3 +201,22 @@ func TestATechnicianIsNotAskedAboutALineNobodyAgreedTo(t *testing.T) {
 		t.Errorf("a technician invoicing with the tick answered %d, want 403", status)
 	}
 }
+
+// #137: a well-formed id that is no job is not found, on the two routes that
+// used to answer 500 for it.
+func TestStartingAnInspectionOrClockingOutOfNoJobIsNotFound(t *testing.T) {
+	ts, pool := testServer(t)
+	tech := signIn(t, ts, techEmail)
+	var template string
+	if err := database.InShop(context.Background(), pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `INSERT INTO inspection_templates (shop_id, name) VALUES ($1, 'Service check') RETURNING id::text`, shopA).Scan(&template)
+	}); err != nil {
+		t.Fatalf("a template to start with: %v", err)
+	}
+	const nothing = "aaaaaaaa-0000-0000-0000-0000000000ff"
+	for _, path := range []string{"/jobs/" + nothing + "/inspect", "/jobs/" + nothing + "/clock-out"} {
+		if got := postStatus(t, tech, ts.URL+path, url.Values{"template_id": {template}}); got != http.StatusNotFound {
+			t.Errorf("POST %s answered %d, want 404", path, got)
+		}
+	}
+}

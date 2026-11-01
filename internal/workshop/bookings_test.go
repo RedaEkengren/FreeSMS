@@ -35,7 +35,9 @@ func TestABookingHoldsASlotWithoutInventingAJob(t *testing.T) {
 	}
 	before = count()
 	id, err := workshop.CreateBooking(ctx, pool, advisor(), workshop.NewBooking{
-		Starts: at("2026-10-15", 8, 0), Ends: at("2026-10-15", 10, 0),
+		// A fixed date, which may have gone by: meant.
+		ConfirmedPast: true,
+		Starts:        at("2026-10-15", 8, 0), Ends: at("2026-10-15", 10, 0),
 		Registration: "abc 123", CustomerName: "Karin Kund", What: "Service"})
 	if err != nil {
 		t.Fatalf("CreateBooking: %v", err)
@@ -81,7 +83,9 @@ func TestMovingCancellingAndArrivingAreRecorded(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
 	id, _ := workshop.CreateBooking(ctx, pool, advisor(), workshop.NewBooking{
-		Starts: at("2026-10-15", 8, 0), Ends: at("2026-10-15", 9, 0), What: "Däckbyte", Registration: "XYZ 789",
+		// A fixed date, which may have gone by: meant.
+		ConfirmedPast: true,
+		Starts:        at("2026-10-15", 8, 0), Ends: at("2026-10-15", 9, 0), What: "Däckbyte", Registration: "XYZ 789",
 		EstimateMinutes: ptr(90)})
 	b, _, _ := workshop.BookingByID(ctx, pool, advisor(), id)
 	if !b.Overbooked() {
@@ -108,7 +112,9 @@ func TestMovingCancellingAndArrivingAreRecorded(t *testing.T) {
 	}
 
 	other, _ := workshop.CreateBooking(ctx, pool, advisor(), workshop.NewBooking{
-		Starts: at("2026-10-15", 8, 0), Ends: at("2026-10-15", 9, 0), What: "Service"})
+		// A fixed date, which may have gone by: meant.
+		ConfirmedPast: true,
+		Starts:        at("2026-10-15", 8, 0), Ends: at("2026-10-15", 9, 0), What: "Service"})
 	if err := workshop.CancelBooking(ctx, pool, advisor(), other, "Kunden ringde"); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +131,9 @@ func TestBookingsAreTheCounters(t *testing.T) {
 	ctx := context.Background()
 	addTechnician(t, pool)
 	if _, err := workshop.CreateBooking(ctx, pool, technician(), workshop.NewBooking{
-		Starts: at("2026-10-15", 8, 0), Ends: at("2026-10-15", 9, 0), What: "x"}); !errors.Is(err, access.ErrForbidden) {
+		// A fixed date, which may have gone by: meant.
+		ConfirmedPast: true,
+		Starts:        at("2026-10-15", 8, 0), Ends: at("2026-10-15", 9, 0), What: "x"}); !errors.Is(err, access.ErrForbidden) {
 		t.Errorf("a technician took a booking: %v", err)
 	}
 	if _, err := workshop.BookingsBetween(ctx, pool, technician(), time.Now(), time.Now().Add(time.Hour)); !errors.Is(err, access.ErrForbidden) {
@@ -190,7 +198,9 @@ func TestABookingKnowsWhetherItsJobIsStillOpen(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
 	id, _ := workshop.CreateBooking(ctx, pool, advisor(), workshop.NewBooking{
-		Starts: at("2026-10-15", 8, 0), Ends: at("2026-10-15", 9, 0), What: "Service"})
+		// A fixed date, which may have gone by: meant.
+		ConfirmedPast: true,
+		Starts:        at("2026-10-15", 8, 0), Ends: at("2026-10-15", 9, 0), What: "Service"})
 	job, _, err := workshop.TakeInBooking(ctx, pool, advisor(), workshop.BookingIntake{BookingID: id, Registration: "ABC 12D", Complaint: "Service"})
 	if err != nil {
 		t.Fatal(err)

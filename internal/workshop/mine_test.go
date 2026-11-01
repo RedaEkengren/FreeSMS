@@ -143,7 +143,9 @@ func TestACarBookedOnATechnicianWaitsForThemWhenItComesIn(t *testing.T) {
 	ctx := context.Background()
 	addTechnician(t, pool)
 	id, err := workshop.CreateBooking(ctx, pool, advisor(), workshop.NewBooking{
-		Starts: at("2026-10-15", 8, 0), Ends: at("2026-10-15", 9, 0), What: "Service", TechnicianID: techUserID})
+		// A fixed date, which may have gone by: meant.
+		ConfirmedPast: true,
+		Starts:        at("2026-10-15", 8, 0), Ends: at("2026-10-15", 9, 0), What: "Service", TechnicianID: techUserID})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -47,7 +47,8 @@ func TestABookingIsTakenInFromThePlanner(t *testing.T) {
 	}
 
 	status, where := post("/calendar", url.Values{"date": {"2026-10-15"}, "time": {"09:00"}, "minutes": {"90"},
-		"registration": {"BKG 123"}, "what": {"Service och bromsar"}, "customer_name": {"Bo Kund"}})
+		"registration": {"BKG 123"}, "what": {"Service och bromsar"}, "customer_name": {"Bo Kund"},
+		"confirm_past": {"1"}}) // a fixed date, which may have gone by
 	if status != http.StatusSeeOther || !strings.HasPrefix(where, "/bookings/") {
 		t.Fatalf("booking answered %d, %q", status, where)
 	}

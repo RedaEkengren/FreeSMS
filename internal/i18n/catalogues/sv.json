@@ -5483,6 +5483,15 @@
     "nothing can be added to a %s order": {
       "other": "inget kan läggas till på en %s order"
     },
+    "a line needs a quantity; to take one off, withdraw it": {
+      "other": "en rad behöver en mängd; dra tillbaka raden för att ta bort den"
+    },
+    "that booking starts on a day that has already gone; if it is meant, tick that and book it again": {
+      "other": "bokningen börjar en dag som redan har varit; om det är meningen, kryssa i det och boka igen"
+    },
+    "It is meant to be on a day that has gone": {
+      "other": "Den ska ligga på en dag som redan har varit"
+    },
     "quantity cannot be negative": {
       "other": "mängden kan inte vara negativ"
     },
