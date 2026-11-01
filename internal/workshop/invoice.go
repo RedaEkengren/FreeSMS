@@ -828,9 +828,7 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 		       i.customer_endpoint_id, i.customer_reference,
 		       p.display_name, coalesce(r.registration, ''),
 		       i.seller_swish_number, i.payment_ocr,
-		       i.gross_minor
-		         + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = i.id), 0)
-		         - coalesce((SELECT sum(pm.amount_minor + pm.rounding_minor) FROM invoice_payments pm WHERE pm.invoice_id = i.id), 0)
+		       `+owedSQL("i")+`
 		FROM invoices i
 		LEFT JOIN users u ON u.id = i.issued_by
 		LEFT JOIN people p ON p.id = u.person_id

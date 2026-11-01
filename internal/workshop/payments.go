@@ -61,6 +61,19 @@ type Payment struct {
 // rounding.
 func (p Payment) Settles() int64 { return p.AmountMinor + p.RoundingMinor }
 
+// owedSQL is what is still owed on the original invoice the alias i
+// names, as SQL: its total, less its credit notes, less what has been
+// paid and rounded on it. The one place the rule is written -- the
+// invoice's page, its payment code, the receivables list, the day's
+// figures and a technician's "paid" all read it from here -- so a change
+// to it, such as how a deposit counts, cannot leave them disagreeing.
+// Balance is the same sum, worked out in Go from the rows it lists.
+func owedSQL(i string) string {
+	return i + `.gross_minor
+	         + coalesce((SELECT sum(owed_c.gross_minor) FROM invoices owed_c WHERE owed_c.credit_of_id = ` + i + `.id), 0)
+	         - coalesce((SELECT sum(owed_p.amount_minor + owed_p.rounding_minor) FROM invoice_payments owed_p WHERE owed_p.invoice_id = ` + i + `.id), 0)`
+}
+
 // Balance is what is owed on an invoice, derived from the invoice, its credit
 // notes and its payments -- never a column written over.
 type Balance struct {
@@ -609,11 +622,7 @@ func Receivables(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT i.id FROM invoices i
-			WHERE i.credit_of_id IS NULL
-			  AND i.gross_minor
-			      + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = i.id), 0)
-			      - coalesce((SELECT sum(p.amount_minor + p.rounding_minor) FROM invoice_payments p
-			                  WHERE p.invoice_id = i.id), 0) <> 0
+			WHERE i.credit_of_id IS NULL AND `+owedSQL("i")+` <> 0
 			ORDER BY i.issued_at`)
 		if err != nil {
 			return fmt.Errorf("list receivables: %w", err)

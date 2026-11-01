@@ -300,8 +300,7 @@ func TechnicianJobFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			                                 AND i.gross_minor + coalesce((SELECT sum(cr.gross_minor) FROM invoices cr WHERE cr.credit_of_id = i.id), 0) <> 0)
 			              THEN 'not invoiced'
 			              WHEN EXISTS (SELECT 1 FROM invoices i WHERE i.work_order_id = w.id AND i.credit_of_id IS NULL
-			                             AND i.gross_minor + coalesce((SELECT sum(cr.gross_minor) FROM invoices cr WHERE cr.credit_of_id = i.id), 0)
-			                                 - coalesce((SELECT sum(pm.amount_minor + pm.rounding_minor) FROM invoice_payments pm WHERE pm.invoice_id = i.id), 0) > 0)
+			                             AND `+owedSQL("i")+` > 0)
 			              THEN 'invoiced'
 			              ELSE 'paid' END
 			       ELSE '' END,

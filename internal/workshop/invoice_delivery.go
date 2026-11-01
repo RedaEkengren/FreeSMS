@@ -342,9 +342,7 @@ func undeliveredTx(ctx context.Context, tx pgx.Tx, since time.Time) ([]Undeliver
 		WHERE NOT coalesce(s.reached, false) AND (s.tries = 0 OR coalesce(s.failed, false))
 		  -- A document whose invoice is paid up has evidently been received;
 		  -- chasing it is for what is still owed.
-		  AND (o.gross_minor
-		       + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = o.id), 0)
-		       - coalesce((SELECT sum(p.amount_minor + p.rounding_minor) FROM invoice_payments p WHERE p.invoice_id = o.id), 0)) <> 0
+		  AND (`+owedSQL("o")+`) <> 0
 		ORDER BY s.issued_at`, since)
 	if err != nil {
 		return nil, fmt.Errorf("list undelivered: %w", err)

@@ -646,9 +646,7 @@ func Worklist(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, today
 			         -- was issued to, which may since be merged into another.
 			         (SELECT n.now FROM now_of n
 			           WHERE n.id = coalesce(i.customer_id, (SELECT w.customer_id FROM work_orders w WHERE w.id = i.work_order_id))) AS customer_id,
-			         i.gross_minor
-			           + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = i.id), 0)
-			           - coalesce((SELECT sum(p.amount_minor + p.rounding_minor) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) AS owed
+			         `+owedSQL("i")+` AS owed
 			  FROM invoices i WHERE i.credit_of_id IS NULL)
 			SELECT o.id::text, o.ref, o.customer_name, o.owed, (o.issued_at AT TIME ZONE $1)::date + o.terms,
 			       coalesce(c.owner_id::text, ''), coalesce(op.display_name, ''), c.next_follow_up, c.disputed_at IS NOT NULL,

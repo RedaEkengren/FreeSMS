@@ -333,9 +333,7 @@ func dayTx(ctx context.Context, tx pgx.Tx, day string) (DayFigures, error) {
 	// What is owed, now.
 	if err := tx.QueryRow(ctx, `
 		WITH open AS (
-		  SELECT i.gross_minor
-		         + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = i.id), 0)
-		         - coalesce((SELECT sum(p.amount_minor + p.rounding_minor) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) AS owed
+		  SELECT `+owedSQL("i")+` AS owed
 		  FROM invoices i WHERE i.credit_of_id IS NULL)
 		SELECT coalesce(sum(owed) FILTER (WHERE owed > 0), 0), coalesce(-sum(owed) FILTER (WHERE owed < 0), 0) FROM open`).Scan(&d.OwedToUs, &d.OwedBack); err != nil {
 		return d, fmt.Errorf("read what is owed: %w", err)
@@ -435,9 +433,7 @@ func exceptionsTx(ctx context.Context, tx pgx.Tx) (DayExceptions, error) {
 	if err := tx.QueryRow(ctx, `
 		SELECT count(*)::int FROM (
 		  SELECT i.id FROM invoices i WHERE i.credit_of_id IS NULL
-		    AND i.gross_minor
-		        + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = i.id), 0)
-		        - coalesce((SELECT sum(p.amount_minor + p.rounding_minor) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) < 0) x`).Scan(&e.RefundTasks); err != nil {
+		    AND `+owedSQL("i")+` < 0) x`).Scan(&e.RefundTasks); err != nil {
 		return e, fmt.Errorf("count refund tasks: %w", err)
 	}
 	return e, nil
