@@ -593,3 +593,21 @@ func TestAnExtensionCarriesItsExtrasAndKilometres(t *testing.T) {
 		t.Errorf("seven days at 100 km: %v", b.IncludedKm)
 	}
 }
+
+// A hold is not moved to start before it runs out: the renter would have
+// the van before saying yes (review).
+func TestAHoldIsNotMovedToStartBeforeItRunsOut(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	until := time.Now().Add(48 * time.Hour)
+	id, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: v.unit, RenterID: v.renter,
+		From: in2031(10, 9), To: in2031(11, 9), HoldUntil: &until})
+	if err != nil {
+		t.Fatal(err)
+	}
+	from := time.Now().Add(24 * time.Hour)
+	if err := workshop.MoveRentalBooking(ctx, pool, rentalDesk(), id, from, from.Add(24*time.Hour), ""); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a hold moved to start before it runs out: %v", err)
+	}
+}

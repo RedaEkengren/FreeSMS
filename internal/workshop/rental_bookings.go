@@ -664,6 +664,13 @@ func MoveRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		if to.Sub(from) != b.ends.Sub(b.starts) {
 			return errMoveLength
 		}
+		var heldUntil *time.Time
+		if err := tx.QueryRow(ctx, `SELECT expires_at FROM resource_blocks WHERE id = $1 AND status = 'held'`, b.block).Scan(&heldUntil); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("read the hold: %w", err)
+		}
+		if heldUntil != nil && heldUntil.After(from) {
+			return errBookingHold
+		}
 		if err := inFleetTx(ctx, tx, b.unit, from, to.Add(b.buffer)); err != nil {
 			return err
 		}
