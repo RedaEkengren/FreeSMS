@@ -339,3 +339,41 @@ func TestACarsOpenJobsShareOneWorkshopBlock(t *testing.T) {
 		t.Errorf("rented once every job has ended: %v", err)
 	}
 }
+
+// A car sold and bought back is the same resource, and bookable again: made
+// a resource once more, it comes back into use, and each period it was out
+// of use stays as a row.
+func TestAResourceTakenOutOfUseCanComeBack(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	res, err := workshop.CreateResource(ctx, pool, rentalDesk(), workshop.NewResource{VehicleID: vehicleA})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.RetireResource(ctx, pool, rentalDesk(), res); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rent(pool, rentalDesk(), res, in2031(11, 9), in2031(11, 17)); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a retired resource booked: %v", err)
+	}
+	back, err := workshop.CreateResource(ctx, pool, rentalDesk(), workshop.NewResource{VehicleID: vehicleA})
+	if err != nil || back != res {
+		t.Fatalf("the car bought back: %s, %v; want %s", back, err, res)
+	}
+	rental, err := rent(pool, rentalDesk(), res, in2031(11, 9), in2031(11, 17))
+	if err != nil {
+		t.Fatalf("the car bought back is not bookable: %v", err)
+	}
+	if err := workshop.ReleaseBlock(ctx, pool, rentalDesk(), rental); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.TakeIn(ctx, pool, advisor(), "ABC 12D", "Service", nil); err != nil {
+		t.Fatal(err)
+	}
+	if n := countRows(t, pool, `SELECT count(*) FROM resource_blocks WHERE resource_id = $1 AND kind = 'workshop'`, res); n != 1 {
+		t.Errorf("a job on the car bought back made %d workshop blocks, want 1", n)
+	}
+	if n := countRows(t, pool, `SELECT count(*) FROM resource_retirements WHERE resource_id = $1 AND returned_at IS NOT NULL`, res); n != 1 {
+		t.Errorf("%d periods out of use recorded, want the one that ended", n)
+	}
+}

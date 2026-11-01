@@ -153,7 +153,9 @@ type NewResource struct {
 }
 
 // CreateResource makes a resource. A vehicle is one resource however many
-// times it is bought and sold; making it again finds the one there is.
+// times it is bought and sold; making it again finds the one there is, and
+// brings it back into use if it was taken out of it -- the car bought back.
+// The period it was out of use stays (resource_retirements).
 func CreateResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n NewResource) (string, error) {
 	if !scope.Role.KeepsResources() {
 		return "", access.ErrForbidden
@@ -175,12 +177,23 @@ func CreateResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 			INSERT INTO resources (shop_id, kind, vehicle_id, created_by)
 			SELECT $1, 'vehicle', v.id, NULLIF($3, '')::uuid FROM vehicles v WHERE v.id = $2 AND v.merged_into IS NULL
 			ON CONFLICT (vehicle_id) DO NOTHING RETURNING id`, scope.ShopID, n.VehicleID, scope.UserID).Scan(&id)
-		if errors.Is(err, pgx.ErrNoRows) {
-			err = tx.QueryRow(ctx, `SELECT id FROM resources WHERE vehicle_id = $1`, n.VehicleID).Scan(&id)
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrNotFound
-			}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
 		}
+		var retired bool
+		err = tx.QueryRow(ctx, `SELECT id, retired_at IS NOT NULL FROM resources WHERE vehicle_id = $1 FOR UPDATE`, n.VehicleID).Scan(&id, &retired)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil || !retired {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE resource_retirements SET returned_at = clock_timestamp(), returned_by = NULLIF($2, '')::uuid
+			WHERE resource_id = $1 AND returned_at IS NULL`, id, scope.UserID); err != nil {
+			return fmt.Errorf("bring back into use: %w", err)
+		}
+		_, err = tx.Exec(ctx, `UPDATE resources SET retired_at = NULL, retired_by = NULL WHERE id = $1`, id)
 		return err
 	})
 	return id, err
@@ -189,7 +202,8 @@ func CreateResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 // RetireResource takes a resource out of use: sold, scrapped, off fleet.
 // Refused while anything is still booked or held on it from now on, so a
 // renter is not left with a booking for a car that has gone; release or
-// override those first. Its past stays.
+// override those first. Its past stays, and so does this: each period out
+// of use is a row, and CreateResource brings a vehicle back.
 func RetireResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id string) error {
 	if !scope.Role.KeepsResources() {
 		return access.ErrForbidden
@@ -220,6 +234,12 @@ func RetireResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		}
 		if ahead > 0 {
 			return fmt.Errorf("%w: something is still booked on it; release or replan that first", ErrInvalid)
+		}
+		// The period out of use is the row; the column is what it says now,
+		// which booking and the job trigger read.
+		if _, err := tx.Exec(ctx, `INSERT INTO resource_retirements (shop_id, resource_id, retired_by) VALUES ($1, $2, NULLIF($3, '')::uuid)`,
+			scope.ShopID, id, scope.UserID); err != nil {
+			return fmt.Errorf("take out of use: %w", err)
 		}
 		_, err = tx.Exec(ctx, `UPDATE resources SET retired_at = now(), retired_by = NULLIF($2, '')::uuid WHERE id = $1`, id, scope.UserID)
 		return err
