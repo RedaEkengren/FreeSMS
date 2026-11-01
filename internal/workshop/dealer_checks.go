@@ -454,6 +454,39 @@ func overriddenTx(ctx context.Context, tx pgx.Tx, unitID string) (bool, error) {
 	return ok, err
 }
 
+var (
+	errPayoutSubject     = fmt.Errorf("%w: a payout for a car names the purchase it pays, and is to its seller or to a lender on it", ErrInvalid)
+	errConsignmentPayout = fmt.Errorf("%w: a consigned car's principal is paid under the consignment agreement, which this release does not keep yet", ErrInvalid)
+)
+
+// payoutSubjectTx refuses a payout of purpose that does not say what it
+// pays, or pays somebody it does not owe: a purchase's payout names the
+// purchase, and is to the seller or a lender on it, so that the checks it
+// is let through on are that car's. A consignment's waits for its
+// agreement (#166). Called when a payout is opened and when it is paid.
+func payoutSubjectTx(ctx context.Context, tx pgx.Tx, purpose, subjectKind, subjectID, partyID string) error {
+	switch purpose {
+	case "purchase":
+		if subjectKind != "purchase" || !looksLikeUUID(subjectID) {
+			return errPayoutSubject
+		}
+		var owed bool
+		if err := tx.QueryRow(ctx, `
+			SELECT EXISTS (SELECT 1 FROM vehicle_purchases p WHERE p.id = $1 AND (
+			       party_now(p.seller_party_id) = party_now($2)
+			    OR EXISTS (SELECT 1 FROM purchase_loans l WHERE l.purchase_id = p.id AND party_now(l.lender_party_id) = party_now($2))))`,
+			subjectID, partyID).Scan(&owed); err != nil {
+			return fmt.Errorf("read the purchase paid: %w", err)
+		}
+		if !owed {
+			return errPayoutSubject
+		}
+	case "consignment":
+		return errConsignmentPayout
+	}
+	return nil
+}
+
 // purchaseChecksClearTx refuses a payout for a purchase whose unit's
 // required checks do not all stand passed in time, unless an owner let it
 // through. Called by RecordPayout, inside its transaction.

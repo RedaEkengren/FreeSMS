@@ -177,8 +177,13 @@ func TestACheckThatHasExpiredKeepsTheMoneyBack(t *testing.T) {
 func TestAPurchasePayoutNamesItsPurchase(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
-	payout, err := workshop.CreatePayout(ctx, pool, buyerScope(), workshop.NewHolding{PartyID: privateSeller(t, pool), Purpose: "purchase"})
-	if err != nil {
+	if _, err := workshop.CreatePayout(ctx, pool, buyerScope(), workshop.NewHolding{PartyID: privateSeller(t, pool), Purpose: "purchase"}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a purchase payout naming no purchase was opened: %v", err)
+	}
+	// One written as an earlier release could, with no purchase, is not paid.
+	var payout string
+	if err := pool.QueryRow(ctx, `INSERT INTO payouts (shop_id, party_id, purpose, created_by) SELECT $1, id, 'purchase', $2 FROM parties LIMIT 1 RETURNING id`,
+		shopID, userID).Scan(&payout); err != nil {
 		t.Fatal(err)
 	}
 	if err := payOut(pool, buyerScope(), payout, 100); !errors.Is(err, workshop.ErrInvalid) {
@@ -304,6 +309,53 @@ func TestChecksByRoleAndModule(t *testing.T) {
 		`DELETE FROM stock_check_settings`, `UPDATE purchase_loans SET amount_minor = 1`} {
 		if err := asApp(ctx, pool, stmt); err == nil {
 			t.Errorf("%q as the application was let through", stmt)
+		}
+	}
+}
+
+// A purchase payout pays the purchase it names, to its seller or to a
+// lender on it: naming another car's purchase -- one whose checks passed --
+// does not step round this car's. A consignment payout waits for its
+// agreement (#166), and none can be opened before there is one.
+func TestAPayoutPaysThePurchaseItNamesToThoseItOwes(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	sellerA := theSeller(t, pool)
+	a := boughtCarFrom(t, pool, sellerA)
+	other, err := workshop.CreateParty(ctx, pool, buyerScope(), workshop.NewParty{Kind: "private", Name: "Siv Säljare",
+		Phone: "070-111 22 33", Role: workshop.PartySeller})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := boughtCarFrom(t, pool, other)
+	passEveryCheck(t, pool, b.StockUnitID)
+	for name, n := range map[string]workshop.NewHolding{
+		"another car's purchase":  {PartyID: sellerA, Purpose: "purchase", SubjectKind: "purchase", SubjectID: b.ID},
+		"a purchase there is not": {PartyID: sellerA, Purpose: "purchase", SubjectKind: "purchase", SubjectID: "99999999-9999-9999-9999-999999999999"},
+		"no purchase at all":      {PartyID: sellerA, Purpose: "purchase"},
+		"a consignment":           {PartyID: sellerA, Purpose: "consignment", SubjectKind: "consignment", SubjectID: a.StockUnitID},
+	} {
+		if _, err := workshop.CreatePayout(ctx, pool, buyerScope(), n); !errors.Is(err, workshop.ErrInvalid) && !errors.Is(err, workshop.ErrNotFound) {
+			t.Errorf("a payout for %s: %v", name, err)
+		}
+	}
+	lender, err := workshop.CreateParty(ctx, pool, buyerScope(), workshop.NewParty{Kind: "company", Name: "Bilfinans AB",
+		OrgNumber: "556000-0000", Role: workshop.PartySupplier})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.CreatePayout(ctx, pool, buyerScope(), workshop.NewHolding{PartyID: lender, Purpose: "purchase",
+		SubjectKind: "purchase", SubjectID: a.ID}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a payout to a lender with no loan on the purchase: %v", err)
+	}
+	if err := workshop.RecordPurchaseLoan(ctx, pool, buyerScope(), a.ID, workshop.PurchaseLoan{LenderPartyID: lender,
+		AmountMinor: 1_000_000, SettlementReference: "Lösen 1"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, party := range []string{sellerA, lender} {
+		if _, err := workshop.CreatePayout(ctx, pool, buyerScope(), workshop.NewHolding{PartyID: party, Purpose: "purchase",
+			SubjectKind: "purchase", SubjectID: a.ID}); err != nil {
+			t.Errorf("a payout of the purchase to %s: %v", party, err)
 		}
 	}
 }

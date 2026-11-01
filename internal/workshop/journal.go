@@ -126,7 +126,6 @@ var (
 	errReversedRefund   = fmt.Errorf("%w: that payment has been reversed, so there is nothing of it to give back", ErrInvalid)
 	errRefundsStand     = fmt.Errorf("%w: that payment has refunds; reverse them first, then the payment", ErrInvalid)
 	errDepositShort     = fmt.Errorf("%w: that is more than the deposit still holds", ErrInvalid)
-	errPayoutNoPurchase = fmt.Errorf("%w: a payout for a car names the purchase it pays, so its checks can be read", ErrInvalid)
 	errGivenBackTooMuch = fmt.Errorf("%w: that is more than the customer paid beyond the invoice; if the invoice was wrong, credit it first", ErrInvalid)
 	// ErrReversalNoReason is reversing a payment without saying why.
 	ErrReversalNoReason = fmt.Errorf("%w: say why the payment is reversed, in 300 characters or fewer", ErrInvalid)
@@ -236,6 +235,12 @@ func createHolding(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := partySeenTx(ctx, tx, scope, n.PartyID); err != nil {
 			return err
+		}
+		// Dealer: a car's payout pays its purchase, to those it owes (#162).
+		if table == "payouts" {
+			if err := payoutSubjectTx(ctx, tx, n.Purpose, n.SubjectKind, n.SubjectID, n.PartyID); err != nil {
+				return err
+			}
 		}
 		err := tx.QueryRow(ctx, `
 			INSERT INTO `+table+` (shop_id, party_id, purpose, subject_kind, subject_id, note, created_by)
@@ -423,9 +428,9 @@ func RecordPayout(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 	out := Payment{PayoutID: payoutID, AmountMinor: -*p.AmountMinor, Method: p.Method, PaidOn: p.PaidOn,
 		Reference: strings.TrimSpace(p.Reference), Provider: p.Provider, ExternalID: p.ExternalID, Key: p.Key}
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		var purpose, subjectKind, subjectID string
-		err := tx.QueryRow(ctx, `SELECT purpose, coalesce(subject_kind, ''), coalesce(subject_id::text, '') FROM payouts WHERE id = $1`,
-			payoutID).Scan(&purpose, &subjectKind, &subjectID)
+		var purpose, subjectKind, subjectID, partyID string
+		err := tx.QueryRow(ctx, `SELECT purpose, coalesce(subject_kind, ''), coalesce(subject_id::text, ''), party_id FROM payouts WHERE id = $1`,
+			payoutID).Scan(&purpose, &subjectKind, &subjectID, &partyID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
@@ -437,10 +442,10 @@ func RecordPayout(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 		}
 		// Dealer: no money leaves for a car before its checks pass (#162),
 		// so a purchase's payout names the purchase it pays.
+		if err := payoutSubjectTx(ctx, tx, purpose, subjectKind, subjectID, partyID); err != nil {
+			return err
+		}
 		if purpose == "purchase" {
-			if subjectKind != "purchase" {
-				return errPayoutNoPurchase
-			}
 			if err := purchaseChecksClearTx(ctx, tx, subjectID); err != nil {
 				return err
 			}
