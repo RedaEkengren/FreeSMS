@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/payref"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
@@ -45,12 +46,18 @@ func TestAnInvoiceWithEverythingIsWrittenAsAnElectronicInvoice(t *testing.T) {
 		Payable string `xml:"LegalMonetaryTotal>PayableAmount"`
 		Buyer   string `xml:"AccountingCustomerParty>Party>PostalAddress>StreetName"`
 		Account string `xml:"PaymentMeans>PayeeFinancialAccount>ID"`
+		PayWith string `xml:"PaymentMeans>PaymentID"`
 	}
 	if err := xml.Unmarshal(body, &doc); err != nil {
 		t.Fatalf("not XML: %v", err)
 	}
 	if doc.XMLName.Local != "Invoice" || doc.ID != inv.Reference() || doc.Account != "1234567" || doc.Buyer != "Kundgatan 2" {
 		t.Errorf("document: %+v", doc)
+	}
+	// Paid with the reference the paper copy asks for (#234), not the
+	// invoice's number, which a bank checking OCR numbers refuses.
+	if ocr, _ := payref.OCR(inv.Number); doc.PayWith != ocr {
+		t.Errorf("the electronic invoice is paid with %q, the paper one with %q", doc.PayWith, ocr)
 	}
 	// Payable is what the invoice comes to, written the way a network reads it.
 	if want := fmt.Sprintf("%d.%02d", inv.GrossMinor/100, inv.GrossMinor%100); doc.Payable != want {

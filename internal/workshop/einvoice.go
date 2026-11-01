@@ -105,6 +105,7 @@ func ublInvoice(d Document, loc *time.Location) (ubl.Invoice, []string) {
 	in := ubl.Invoice{
 		Credit:         d.IsCreditNote(),
 		Reference:      d.Reference(),
+		PaymentID:      d.PaymentOCR,
 		CreditOf:       d.CreditOf,
 		IssueDate:      d.IssuedAt.In(loc),
 		DueDate:        d.DueIn(loc),

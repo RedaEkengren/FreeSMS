@@ -71,6 +71,11 @@ type Invoice struct {
 	Credit bool
 	// Reference is the number it is known by on paper: A-1001.
 	Reference string
+	// PaymentID is the reference the invoice is paid with (#234): the OCR
+	// number frozen on it, the same the paper copy and its payment code
+	// ask for. Empty for a credit note and an invoice issued before
+	// references were kept, which are written with Reference instead.
+	PaymentID string
 	// CreditOf is the invoice a credit note takes back.
 	CreditOf       string
 	IssueDate      time.Time
@@ -155,7 +160,11 @@ func (in Invoice) Marshal() ([]byte, error) {
 
 	w.open("cac:PaymentMeans")
 	w.text("cbc:PaymentMeansCode", "30")
-	w.text("cbc:PaymentID", in.Reference)
+	paymentID := in.PaymentID
+	if paymentID == "" {
+		paymentID = in.Reference
+	}
+	w.text("cbc:PaymentID", paymentID)
 	w.open("cac:PayeeFinancialAccount")
 	w.text("cbc:ID", in.Payment.Account)
 	switch in.Payment.Kind {
