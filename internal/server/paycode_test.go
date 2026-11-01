@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -87,14 +88,33 @@ func TestAnInvoiceIsPaidByItsReference(t *testing.T) {
 		t.Fatalf("the invoice shows no reference or no code:\n%s", page)
 	}
 	wrong := ref[1][:len(ref[1])-1] + string('0'+(ref[1][len(ref[1])-1]-'0'+1)%10)
-	if body := post(t, desk, ts.URL+"/payments/by-reference", url.Values{"ocr": {wrong}, "paid_on": {time.Now().Format("2006-01-02")}, "method": {"bank"}}); !strings.Contains(body, "check digit") {
+	if body := post(t, desk, ts.URL+"/payments/by-reference", url.Values{"ocr": {wrong}, "amount": {"500"}, "paid_on": {time.Now().Format("2006-01-02")}, "method": {"bank"}}); !strings.Contains(body, "check digit") {
 		t.Errorf("a mistyped reference was not refused for its check digit:\n%s", visibleText(body))
 	}
-	if status := postStatus(t, desk, ts.URL+"/payments/by-reference", url.Values{"ocr": {ref[1]}, "paid_on": {time.Now().Format("2006-01-02")}, "method": {"bank"}}); status != http.StatusSeeOther {
-		t.Fatalf("paid by its reference answered %d", status)
+	// A bank payment is what arrived: no amount is not "all of it".
+	if status := postStatus(t, desk, ts.URL+"/payments/by-reference", url.Values{"ocr": {ref[1]}, "paid_on": {time.Now().Format("2006-01-02")}, "method": {"bank"}}); status != http.StatusBadRequest {
+		t.Errorf("paid by its reference with no amount answered %d", status)
+	}
+	if page := get(t, desk, ts.URL+"/invoices/"+m[1], http.StatusOK); !strings.Contains(page, `class="paycode"`) {
+		t.Fatal("a payment with no amount settled the invoice")
+	}
+	if status := postStatus(t, desk, ts.URL+"/payments/by-reference", url.Values{"ocr": {ref[1]}, "amount": {"500"}, "paid_on": {time.Now().Format("2006-01-02")}, "method": {"bank"}}); status != http.StatusSeeOther {
+		t.Fatalf("paid in part by its reference answered %d", status)
 	}
 	page = get(t, desk, ts.URL+"/invoices/"+m[1], http.StatusOK)
-	if strings.Contains(page, `class="paycode"`) || !strings.Contains(page, ref[1]) {
-		t.Errorf("a paid invoice still has a code to pay it with, or its payment lost the reference")
+	if !strings.Contains(page, `class="paycode"`) || !strings.Contains(page, ref[1]) {
+		t.Errorf("an invoice paid in part has no code for the rest, or its payment lost the reference")
+	}
+	var owed int64
+	if err := pool.QueryRow(context.Background(), `SELECT gross_minor - (SELECT sum(amount_minor + rounding_minor) FROM invoice_payments WHERE invoice_id = $1)
+		FROM invoices WHERE id = $1`, m[1]).Scan(&owed); err != nil || owed <= 0 {
+		t.Fatalf("owed after paying in part: %d, %v", owed, err)
+	}
+	rest := fmt.Sprintf("%d.%02d", owed/100, owed%100)
+	if status := postStatus(t, desk, ts.URL+"/payments/by-reference", url.Values{"ocr": {ref[1]}, "amount": {rest}, "paid_on": {time.Now().Format("2006-01-02")}, "method": {"bank"}}); status != http.StatusSeeOther {
+		t.Fatalf("paid the rest by its reference answered %d", status)
+	}
+	if page := get(t, desk, ts.URL+"/invoices/"+m[1], http.StatusOK); strings.Contains(page, `class="paycode"`) {
+		t.Errorf("a paid invoice still has a code to pay it with")
 	}
 }

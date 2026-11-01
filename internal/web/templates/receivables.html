@@ -10,7 +10,7 @@
   <form method="post" action="/payments/by-reference">
     <div class="pair">
       <label><span>{{.T "Payment reference (OCR)"}}</span><input name="ocr" inputmode="numeric" maxlength="40" required></label>
-      <label><span>{{.T "Amount"}}</span><input name="amount" inputmode="decimal"></label>
+      <label><span>{{.T "Amount"}}</span><input name="amount" inputmode="decimal" required></label>
     </div>
     <div class="pair">
       <label><span>{{.T "Paid on"}}</span><input type="date" name="paid_on" value="{{.Today}}" required></label>

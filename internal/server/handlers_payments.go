@@ -89,9 +89,16 @@ func (s *Server) paymentError(w http.ResponseWriter, r *http.Request, err error)
 
 // handleRecordPaymentByReference records a payment found by its payment
 // reference (#234) -- the OCR number off the bank's line -- on the invoice
-// the reference is for, as the invoice's own form would.
+// the reference is for, as the invoice's own form would. With the amount
+// the bank's line says, always: the invoice's own form takes a blank
+// amount as everything owed, settled at the counter, and a bank payment
+// is whatever arrived, part of it as often as not.
 func (s *Server) handleRecordPaymentByReference(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
+	if strings.TrimSpace(r.FormValue("amount")) == "" {
+		s.renderError(w, r, http.StatusBadRequest, "Not recorded", "Say how much arrived, as the bank's line has it.")
+		return
+	}
 	id, reference, err := workshop.InvoiceByPaymentReference(r.Context(), s.pool, session.Scope, r.FormValue("ocr"))
 	if s.paymentError(w, r, err) {
 		return
