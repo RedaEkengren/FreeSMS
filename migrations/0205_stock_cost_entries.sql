@@ -1,0 +1,118 @@
+-- rollback: safe
+-- New tables, and a trigger on outsourced_events that writes to them only
+-- when the job's car is in the dealer's stock. Nothing puts a car in stock
+-- but this release's car sales, so for the previous release, as for a
+-- workshop-only shop, the trigger finds no stock unit and does nothing.
+--
+-- Every krona spent on a stock car (#164): reconditioning, workshop work,
+-- parts, transport, inspection, registration fees, advertising. They make
+-- the business margin true (#182). They are never part of the tax purchase
+-- price the margin scheme reads (#161): under the scheme, repairs and
+-- transport are not part of what the car was bought for, and the VAT on
+-- them is deducted as usual. Nothing here adds them to it.
+--
+-- Append-only: a correction is an entry reversing another, a supplier's
+-- credit note an entry below nothing.
+CREATE TABLE stock_cost_entries (
+    id                 uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    shop_id            uuid        NOT NULL REFERENCES shops(id) ON DELETE RESTRICT,
+    stock_unit_id      uuid        NOT NULL REFERENCES stock_units(id) ON DELETE RESTRICT,
+    kind               text        NOT NULL CHECK (kind IN ('reconditioning', 'workshop', 'parts', 'transport', 'inspection',
+                                                            'registration', 'advertising', 'other')),
+    -- In kronor, minor units; below nothing for a credit.
+    net_minor          bigint      NOT NULL CHECK (net_minor BETWEEN -10000000000 AND 10000000000),
+    input_vat_minor    bigint      NOT NULL DEFAULT 0 CHECK (input_vat_minor BETWEEN -10000000000 AND 10000000000),
+    vat_rate_basis     integer     NOT NULL DEFAULT 2500 CHECK (vat_rate_basis BETWEEN 0 AND 10000),
+    supplier_party_id  uuid        REFERENCES parties(id) ON DELETE RESTRICT,
+    external_ref       text        CHECK (external_ref IS NULL OR length(external_ref) <= 100),
+    incurred_on        date        NOT NULL,
+    source             text        NOT NULL CHECK (source IN ('work_order', 'outsourced', 'supplier_invoice', 'manual')),
+    work_order_id      uuid        REFERENCES work_orders(id) ON DELETE RESTRICT,
+    outsourced_event_id uuid       UNIQUE REFERENCES outsourced_events(id) ON DELETE RESTRICT,
+    -- Spent after the car was sold -- a complaint repaired: it changes the
+    -- business margin, never the VAT.
+    post_sale          boolean     NOT NULL DEFAULT false,
+    -- An invoice in another currency: what it said, and the rate it was
+    -- turned into kronor at, in millionths, and from where.
+    currency           char(3)     CHECK (currency IS NULL OR (currency ~ '^[A-Z]{3}$' AND currency <> 'SEK')),
+    original_net_minor bigint,
+    rate_micro         bigint      CHECK (rate_micro IS NULL OR rate_micro BETWEEN 1 AND 100000000),
+    rate_source        text        CHECK (rate_source IS NULL OR length(btrim(rate_source)) BETWEEN 1 AND 200),
+    note               text        CHECK (note IS NULL OR length(note) <= 500),
+    reverses_id        uuid        UNIQUE REFERENCES stock_cost_entries(id) ON DELETE RESTRICT,
+    recorded_at        timestamptz NOT NULL DEFAULT clock_timestamp(),
+    recorded_by        uuid        REFERENCES users(id) ON DELETE RESTRICT,
+    CHECK ((currency IS NULL) = (original_net_minor IS NULL)
+       AND (currency IS NULL) = (rate_micro IS NULL)
+       AND (currency IS NULL) = (rate_source IS NULL)),
+    CHECK ((source = 'outsourced') = (outsourced_event_id IS NOT NULL)),
+    CHECK (source <> 'work_order' OR work_order_id IS NOT NULL)
+);
+CREATE INDEX stock_cost_entries_unit_idx ON stock_cost_entries (stock_unit_id, incurred_on);
+-- A job's posting at cost, found again rather than made twice.
+CREATE INDEX stock_cost_entries_job_idx ON stock_cost_entries (work_order_id) WHERE work_order_id IS NOT NULL;
+
+ALTER TABLE stock_cost_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stock_cost_entries FORCE ROW LEVEL SECURITY;
+CREATE POLICY shop_isolation ON stock_cost_entries
+    USING (shop_id = nullif(current_setting('app.current_shop', true), '')::uuid)
+    WITH CHECK (shop_id = nullif(current_setting('app.current_shop', true), '')::uuid);
+REVOKE ALL ON stock_cost_entries FROM freesms_app;
+GRANT SELECT, INSERT ON stock_cost_entries TO freesms_app;
+
+-- The rate the workshop's own hours on a stock car are costed at: the
+-- shop's cost of an hour, not what a customer pays for one. A setting
+-- changed is a row.
+CREATE TABLE stock_cost_settings (
+    id                         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    shop_id                    uuid        NOT NULL REFERENCES shops(id) ON DELETE RESTRICT,
+    seq                        bigint      GENERATED ALWAYS AS IDENTITY,
+    internal_labour_rate_minor bigint      NOT NULL CHECK (internal_labour_rate_minor BETWEEN 0 AND 10000000),
+    changed_at                 timestamptz NOT NULL DEFAULT clock_timestamp(),
+    changed_by                 uuid        REFERENCES users(id) ON DELETE RESTRICT
+);
+
+ALTER TABLE stock_cost_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stock_cost_settings FORCE ROW LEVEL SECURITY;
+CREATE POLICY shop_isolation ON stock_cost_settings
+    USING (shop_id = nullif(current_setting('app.current_shop', true), '')::uuid)
+    WITH CHECK (shop_id = nullif(current_setting('app.current_shop', true), '')::uuid);
+REVOKE ALL ON stock_cost_settings FROM freesms_app;
+GRANT SELECT, INSERT ON stock_cost_settings TO freesms_app;
+
+-- A supplier's invoice for work sent out from a job on a car in stock is
+-- the car's cost, posted in the same transaction as the invoice is
+-- recorded, whichever release records it: kind workshop, as it is work
+-- done on the car, with the VAT a Swedish supplier charges on it. A job
+-- opened while the car was not in stock -- every customer's car, the car
+-- after it was sold -- posts nothing. A job opened in stock and invoiced
+-- by the supplier after the cycle ended posts after the sale.
+CREATE FUNCTION outsourced_invoice_costs_stock() RETURNS trigger AS $$
+DECLARE
+    unit uuid;
+    ended boolean;
+BEGIN
+    IF NEW.kind <> 'invoice' OR NEW.amount_minor IS NULL THEN
+        RETURN NEW;
+    END IF;
+    SELECT u.id, u.closed_at IS NOT NULL INTO unit, ended
+      FROM outsourced_work o
+      JOIN work_orders w ON w.id = o.work_order_id
+      JOIN stock_units u ON u.vehicle_id = w.vehicle_id AND u.opened_at <= w.opened_at
+                         AND (u.closed_at IS NULL OR u.closed_at > w.opened_at)
+     WHERE o.id = NEW.outsourced_id;
+    IF unit IS NULL THEN
+        RETURN NEW;
+    END IF;
+    INSERT INTO stock_cost_entries (shop_id, stock_unit_id, kind, net_minor, input_vat_minor, incurred_on, source,
+                                    work_order_id, outsourced_event_id, external_ref, post_sale, recorded_by)
+    SELECT NEW.shop_id, unit, 'workshop', NEW.amount_minor, round(NEW.amount_minor * 0.25)::bigint,
+           (NEW.at AT TIME ZONE (SELECT timezone FROM shops WHERE id = NEW.shop_id))::date, 'outsourced',
+           o.work_order_id, NEW.id, NEW.invoice_ref, ended, NEW.by_user
+      FROM outsourced_work o WHERE o.id = NEW.outsourced_id;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER outsourced_invoice_costs_stock AFTER INSERT ON outsourced_events
+    FOR EACH ROW EXECUTE FUNCTION outsourced_invoice_costs_stock();

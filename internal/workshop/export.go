@@ -46,6 +46,8 @@ var ExportTables = []string{
 	"stock_units", "vehicle_purchases", "stock_checks", "purchase_loans", "stock_check_overrides",
 	// What a buyer worked out before bidding (#163).
 	"purchase_calculations", "purchase_calculation_costs", "purchase_calculation_acceptances",
+	// What a car cost beyond its price (#164).
+	"stock_cost_entries", "stock_cost_settings",
 }
 
 // exportQueries are tables exported with chosen columns, because one of
