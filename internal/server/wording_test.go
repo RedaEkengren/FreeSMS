@@ -46,7 +46,7 @@ func TestAnOverpaymentIsShownAsWhatIsOwedBack(t *testing.T) {
 	}
 	desk := signIn(t, ts, advisorEmail)
 	day := time.Now().Format("2006-01-02")
-	postStatus(t, desk, ts.URL+"/invoices/"+invoice+"/payments", url.Values{"amount": {"1500"}, "paid_on": {day}, "method": {"bank"}, "confirm_over": {"1"}})
+	postStatus(t, desk, ts.URL+"/invoices/"+invoice+"/payments", url.Values{"amount": {"1500"}, "paid_on": {day}, "method": {"bank"}, "confirm_over": {"1"}, "over_reason": {"Betalade två gånger"}})
 	_, body := page(t, desk, ts.URL+"/invoices/"+invoice)
 	owed := regexp.MustCompile(`Owed back to the customer</dt>\s*<dd[^>]*>\s*([^<]*)`).FindStringSubmatch(body)
 	if owed == nil {
@@ -91,6 +91,7 @@ func TestAPaymentThatCannotBeRightIsNotRecordedUnasked(t *testing.T) {
 		t.Errorf("a payment on a settled invoice answered %d, want 400", got)
 	}
 	more.Set("confirm_over", "1")
+	more.Set("over_reason", "Betalade två gånger")
 	if got := postStatus(t, desk, pay, more); got != http.StatusSeeOther {
 		t.Errorf("a confirmed overpayment answered %d, want 303", got)
 	}
@@ -118,7 +119,7 @@ func TestMoneyOwedBackHasNoMinusSignOnAnyPage(t *testing.T) {
 	desk := signIn(t, ts, advisorEmail)
 	day := time.Now().Format("2006-01-02")
 	if got := postStatus(t, desk, ts.URL+"/invoices/"+invoice+"/payments", url.Values{
-		"amount": {"1500"}, "paid_on": {day}, "method": {"bank"}, "confirm_over": {"1"}}); got != http.StatusSeeOther {
+		"amount": {"1500"}, "paid_on": {day}, "method": {"bank"}, "confirm_over": {"1"}, "over_reason": {"Betalade två gånger"}}); got != http.StatusSeeOther {
 		t.Fatalf("the overpayment answered %d", got)
 	}
 	minus := regexp.MustCompile(`[-−]\s*(SEK\s*)?250[.,]00`)

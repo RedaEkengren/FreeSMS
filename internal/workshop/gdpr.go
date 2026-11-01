@@ -473,6 +473,12 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fi
 			"The technical history of vehicles, which belongs to the vehicle rather than to a person. " +
 			"Clocked hours, where the person was an employee, because they support payroll records."
 
+		// Why things were done about them, which can say who they are; that
+		// they were done stays (#151).
+		if err := eraseAuditReasonsTx(ctx, tx, personID); err != nil {
+			return err
+		}
+
 		// Contracts naming them (#150): blanked past their kind's retention,
 		// kept within it, and the record says which.
 		blanked, keptDocs, docScans, err := eraseDocumentsTx(ctx, tx, personID)

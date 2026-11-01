@@ -2380,6 +2380,21 @@
     "Both have an owner at the same time. Sell one of them first, so the dates agree.": {
       "other": "Båda har en ägare samtidigt. Sälj den ena först, så att datumen stämmer."
     },
+    "Why, if they did": {
+      "other": "Varför, om de gjorde det"
+    },
+    "Why they are invoiced anyway": {
+      "other": "Varför de faktureras ändå"
+    },
+    "say why the lines nobody agreed to are invoiced, in 300 characters or fewer": {
+      "other": "säg varför raderna som ingen godkänt faktureras, med högst 300 tecken"
+    },
+    "say why more than is owed is recorded, in 300 characters or fewer": {
+      "other": "säg varför mer än det som är skyldigt registreras, med högst 300 tecken"
+    },
+    "that is not something with a history": {
+      "other": "det är inte något som har en historik"
+    },
     "They carry the same plate at the same time.": {
       "other": "De har samma skylt samtidigt."
     },

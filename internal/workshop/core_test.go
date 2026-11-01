@@ -13,6 +13,8 @@ package workshop_test
 var core = map[string]string{
 	// Documents and money: issued whatever made them, corrected, paid and
 	// handed to the accountant as long as the books are kept.
+	// Audit events (#151): the trail of every module's transitions.
+	"AuditTrail":   "who did what and why, whichever module it was in",
 	"DocumentByID": "an issued document", "CreditNote": "correcting an issued document",
 	"IssueCredit": "correcting an issued document", "PreviewCredit": "correcting an issued document",
 	"EligibleLines": "correcting an issued document", "CorrectionsFor": "correcting an issued document",

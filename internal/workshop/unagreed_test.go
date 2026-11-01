@@ -26,7 +26,7 @@ func TestALineNobodyAgreedToIsNotInvoicedUnasked(t *testing.T) {
 		t.Fatalf("Issue with an unagreed line = %v, want ErrUnagreedLines", err)
 	}
 	// Refused whole: no number was used.
-	inv, err := workshop.Issue(ctx, pool, advisor(), job, workshop.InvoiceUnagreedLines())
+	inv, err := workshop.Issue(ctx, pool, advisor(), job, workshop.InvoiceUnagreedLines("Kunden godkände per telefon"))
 	if err != nil {
 		t.Fatalf("Issue when told to include it: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestAPaymentOutOfProportionIsRefusedUntilConfirmed(t *testing.T) {
 		t.Errorf("ten times the invoice = %v, want ErrOverpayment", err)
 	}
 	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
-		AmountMinor: &ten, Method: "bank", PaidOn: time.Now(), ConfirmedOverpayment: true}); err != nil {
+		AmountMinor: &ten, Method: "bank", PaidOn: time.Now(), ConfirmedOverpayment: true, OverpaymentReason: "Betalade två gånger"}); err != nil {
 		t.Errorf("a confirmed overpayment = %v", err)
 	}
 }
@@ -98,7 +98,7 @@ func TestAJobWhoseEveryLineIsUnagreedIsAskedAboutAndCanBeCredited(t *testing.T) 
 	if _, err := workshop.Issue(ctx, pool, advisor(), job); !errors.Is(err, workshop.ErrUnagreedLines) {
 		t.Fatalf("Issue with every line unagreed = %v, want ErrUnagreedLines", err)
 	}
-	inv, err := workshop.Issue(ctx, pool, advisor(), job, workshop.InvoiceUnagreedLines())
+	inv, err := workshop.Issue(ctx, pool, advisor(), job, workshop.InvoiceUnagreedLines("Kunden godkände per telefon"))
 	if err != nil {
 		t.Fatalf("Issue when told to: %v", err)
 	}

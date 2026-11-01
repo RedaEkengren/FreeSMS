@@ -178,6 +178,8 @@ func TestWhatABrokenRestoreLooksLikeIsNoticed(t *testing.T) {
 		"a payment taken back on another invoice": {"payment reversals", `UPDATE invoice_payments SET invoice_id = (SELECT id FROM invoices WHERE number = 1) WHERE reverses_id IS NOT NULL`},
 		"a job invoiced and no invoice": {"jobs and invoices", `UPDATE work_orders SET state = 'invoiced' WHERE id = (SELECT w.id FROM work_orders w WHERE NOT EXISTS (SELECT 1 FROM invoices i WHERE i.work_order_id = w.id) LIMIT 1);
 			INSERT INTO work_orders (shop_id, number, vehicle_id, customer_id, state) SELECT shop_id, 99, vehicle_id, customer_id, 'invoiced' FROM work_orders LIMIT 1`},
+		"an event about something not there": {"audit events", `INSERT INTO audit_events (shop_id, subject_kind, subject_id, event)
+			SELECT id, 'invoice', '99999999-0000-0000-0000-000000000000', 'payment.recorded' FROM shops LIMIT 1`},
 		"a photograph that did not come back": {"photographs", `INSERT INTO attachments (shop_id, work_order_id, storage_key, content_type, byte_size)
 			SELECT shop_id, id, 'abcdef0123456789abcdef0123456789', 'image/jpeg', 100 FROM work_orders LIMIT 1`},
 	} {

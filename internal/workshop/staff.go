@@ -236,7 +236,13 @@ func SetStaffRoles(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 				return fmt.Errorf("give a role: %w", err)
 			}
 		}
-		return nil
+		// What somebody may do is responsibility moved: from what to what,
+		// and by whom, as an event (#151). Saving the same roles is no change.
+		from, to := roleList(held), roleList(want)
+		if from == to {
+			return nil
+		}
+		return auditTx(ctx, tx, scope, userID, "roles.changed", from, to, "", nil)
 	})
 }
 
@@ -284,4 +290,20 @@ func staffError(err error) error {
 		return ErrNotFound
 	}
 	return err
+}
+
+// roleList is roles as an event records them: the main one first, then the
+// rest in order.
+func roleList(roles access.Roles) string {
+	if len(roles) == 0 {
+		return ""
+	}
+	rest := make([]string, 0, len(roles)-1)
+	for _, r := range roles[1:] {
+		if r != roles[0] && !slices.Contains(rest, string(r)) {
+			rest = append(rest, string(r))
+		}
+	}
+	slices.Sort(rest)
+	return strings.Join(append([]string{string(roles[0])}, rest...), ",")
 }

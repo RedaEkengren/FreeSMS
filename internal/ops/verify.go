@@ -281,6 +281,29 @@ func verifyShop(ctx context.Context, tx pgx.Tx, files Files, sr *ShopReport) err
 		add("approvals", Pass, "every charged line on a finished job was approved")
 	}
 
+	// Every audit event is about something that is there (#151): a restore
+	// that lost a table, or a row, leaves an event naming nothing.
+	if n, err := count(`
+		SELECT count(*) FROM audit_events e
+		WHERE NOT CASE e.subject_kind
+		  WHEN 'shop'           THEN EXISTS (SELECT 1 FROM shops x WHERE x.id = e.subject_id)
+		  WHEN 'user'           THEN EXISTS (SELECT 1 FROM users x WHERE x.id = e.subject_id)
+		  WHEN 'resource_block' THEN EXISTS (SELECT 1 FROM resource_blocks x WHERE x.id = e.subject_id)
+		  WHEN 'document'       THEN EXISTS (SELECT 1 FROM document_records x WHERE x.id = e.subject_id)
+		  WHEN 'invoice'        THEN EXISTS (SELECT 1 FROM invoices x WHERE x.id = e.subject_id)
+		  WHEN 'payment'        THEN EXISTS (SELECT 1 FROM invoice_payments x WHERE x.id = e.subject_id)
+		  WHEN 'party'          THEN EXISTS (SELECT 1 FROM parties x WHERE x.id = e.subject_id)
+		  WHEN 'customer'       THEN EXISTS (SELECT 1 FROM customers x WHERE x.id = e.subject_id)
+		  WHEN 'vehicle'        THEN EXISTS (SELECT 1 FROM vehicles x WHERE x.id = e.subject_id)
+		  WHEN 'work_order'     THEN EXISTS (SELECT 1 FROM work_orders x WHERE x.id = e.subject_id)
+		  ELSE false END`); err != nil {
+		return err
+	} else if n > 0 {
+		add("audit events", Fail, "%d events are about something that is not there", n)
+	} else {
+		add("audit events", Pass, "every event is about something that is there")
+	}
+
 	// The photographs a job refers to are on disk.
 	if files != nil {
 		rows, err := tx.Query(ctx, `SELECT storage_key, byte_size FROM attachments ORDER BY created_at DESC LIMIT 5000`)

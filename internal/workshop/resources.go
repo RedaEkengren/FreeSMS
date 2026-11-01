@@ -447,10 +447,9 @@ func ReleaseBlock(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 
 // OverrideBlock is the explicit replanning a conflict needs: it ends a block
 // that is in the way -- from now, if it has begun -- or, given a new period,
-// moves it there, and records who did it, when and why. A car in the
-// workshop is rented only after somebody who runs the shop has done this
-// for the job's block. Audit events (#151) will read these records as
-// theirs.
+// moves it there, and records who did it, when and why, as an audit event
+// (#151). A car in the workshop is rented only after somebody who runs the
+// shop has done this for the job's block.
 func OverrideBlock(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id string, moveFrom, moveTo time.Time, reason string) error {
 	if !scope.Role.RunsTheShop() {
 		return access.ErrForbidden
@@ -458,9 +457,9 @@ func OverrideBlock(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if !looksLikeUUID(id) {
 		return ErrNotFound
 	}
-	reason = strings.TrimSpace(reason)
-	if reason == "" || utf8.RuneCountInString(reason) > 300 {
-		return fmt.Errorf("%w: say why it is replanned, in 300 characters or fewer", ErrInvalid)
+	reason, err := checkReason(reason, fmt.Errorf("%w: say why it is replanned, in 300 characters or fewer", ErrInvalid))
+	if err != nil {
+		return err
 	}
 	move := !moveFrom.IsZero()
 	if move && !moveTo.IsZero() && !moveTo.After(moveFrom) {
@@ -474,26 +473,27 @@ func OverrideBlock(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		if (status != BlockHeld && status != BlockConfirmed) || expired {
 			return fmt.Errorf("%w: that is no longer booked", ErrInvalid)
 		}
+		var oldFrom time.Time
+		var oldTo *time.Time
+		if err := tx.QueryRow(ctx, `SELECT lower(period), upper(period) FROM resource_blocks WHERE id = $1`, id).Scan(&oldFrom, &oldTo); err != nil {
+			return fmt.Errorf("read the block: %w", err)
+		}
+		detail := map[string]any{"old_from": oldFrom, "old_to": oldTo}
 		if move {
 			var upper any
 			if !moveTo.IsZero() {
 				upper = moveTo
 			}
-			_, err := tx.Exec(ctx, `
-				WITH old AS (SELECT period FROM resource_blocks WHERE id = $1)
-				INSERT INTO resource_block_changes (shop_id, block_id, change, old_period, new_period, by_user, reason)
-				SELECT $2, $1, 'moved', old.period, tstzrange($3, $4), $5, $6 FROM old`,
-				id, scope.ShopID, moveFrom, upper, scope.UserID, reason)
-			if err != nil {
-				return fmt.Errorf("record the change: %w", err)
+			detail["change"], detail["new_from"], detail["new_to"] = "moved", moveFrom, upper
+			if err := auditTx(ctx, tx, scope, id, "block.overridden", status, "moved", reason, detail); err != nil {
+				return err
 			}
 			_, err = tx.Exec(ctx, `UPDATE resource_blocks SET period = tstzrange($2, $3) WHERE id = $1`, id, moveFrom, upper)
 			return blockConflict(err)
 		}
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO resource_block_changes (shop_id, block_id, change, old_period, by_user, reason)
-			SELECT $2, id, 'ended', period, $3, $4 FROM resource_blocks WHERE id = $1`, id, scope.ShopID, scope.UserID, reason); err != nil {
-			return fmt.Errorf("record the change: %w", err)
+		detail["change"] = "ended"
+		if err := auditTx(ctx, tx, scope, id, "block.overridden", status, "ended", reason, detail); err != nil {
+			return err
 		}
 		// Begun already: what has been stays, as it was, and it ends now.
 		// Not begun: it does not happen.

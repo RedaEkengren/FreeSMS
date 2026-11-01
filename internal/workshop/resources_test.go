@@ -239,7 +239,7 @@ func TestACarInTheWorkshopIsNotRentedWithoutReplanning(t *testing.T) {
 	if err := workshop.OverrideBlock(ctx, pool, owner(), block, time.Time{}, time.Time{}, "Bromsarna kan vänta, kunden behöver bilen"); err != nil {
 		t.Fatal(err)
 	}
-	if n := countRows(t, pool, `SELECT count(*) FROM resource_block_changes WHERE block_id = $1 AND change = 'ended' AND reason <> ''`, block); n != 1 {
+	if n := countRows(t, pool, `SELECT count(*) FROM audit_trail WHERE subject_id = $1 AND event = 'block.overridden' AND to_state = 'ended' AND reason <> ''`, block); n != 1 {
 		t.Errorf("%d recorded replannings, want 1", n)
 	}
 	rental, err := rent(pool, rentalDesk(), res, in2031(8, 9), in2031(8, 17))

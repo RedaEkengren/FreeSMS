@@ -291,7 +291,7 @@ func (s *Server) handleInvoice(w http.ResponseWriter, r *http.Request) {
 
 	var opts []workshop.IssueOption
 	if r.FormValue("confirm_unagreed") != "" {
-		opts = append(opts, workshop.InvoiceUnagreedLines())
+		opts = append(opts, workshop.InvoiceUnagreedLines(r.FormValue("unagreed_reason")))
 	}
 	_, err := workshop.Issue(r.Context(), s.pool, session.Scope, id, opts...)
 

@@ -78,14 +78,24 @@ func (i Invoice) Gross() string { return money.Format(i.GrossMinor) }
 // to, until somebody says that is what they mean.
 var ErrUnagreedLines = fmt.Errorf("%w: a line was put on after the customer agreed and has no agreement; put it to the customer, take it off, or tick that it is to be invoiced anyway", ErrInvalid)
 
-type issueOptions struct{ unagreed bool }
+type issueOptions struct {
+	unagreed bool
+	why      string
+}
 
 // IssueOption changes how Issue behaves.
 type IssueOption func(*issueOptions)
 
 // InvoiceUnagreedLines lets Issue include lines the customer has not agreed
-// to. The invoice still marks them.
-func InvoiceUnagreedLines() IssueOption { return func(o *issueOptions) { o.unagreed = true } }
+// to, for the reason given, which is required. The invoice still marks
+// them, and the decision is its own event: who, when, which lines and why
+// (#151).
+func InvoiceUnagreedLines(reason string) IssueOption {
+	return func(o *issueOptions) { o.unagreed, o.why = true, reason }
+}
+
+// ErrUnagreedNoReason is invoicing lines nobody agreed to without saying why.
+var ErrUnagreedNoReason = fmt.Errorf("%w: say why the lines nobody agreed to are invoiced, in 300 characters or fewer", ErrInvalid)
 
 // Issue turns a work order into an invoice and moves it to invoiced.
 //
@@ -173,18 +183,24 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 			return ErrNothingToInvoice
 		}
 		// A line put on after the customer said yes is not part of what they
-		// said yes to. Invoicing it is possible, but somebody decides to.
-		if !o.unagreed && !wasDeclined {
-			var n int
+		// said yes to. Invoicing it is possible, but somebody decides to,
+		// and says why.
+		var unagreed []string
+		if !wasDeclined {
 			if err := tx.QueryRow(ctx, `
-				SELECT count(*) FROM work_order_lines
+				SELECT coalesce(array_agg(id::text ORDER BY position, id), '{}') FROM work_order_lines
 				WHERE work_order_id = $1 AND cost_bearer = 'customer' AND declined_at IS NULL
 				  AND withdrawn_at IS NULL AND approved_at IS NULL AND customer_decision_id IS NULL`,
-				workOrderID).Scan(&n); err != nil {
-				return fmt.Errorf("count unagreed lines: %w", err)
+				workOrderID).Scan(&unagreed); err != nil {
+				return fmt.Errorf("read unagreed lines: %w", err)
 			}
-			if n > 0 {
-				return ErrUnagreedLines
+		}
+		if len(unagreed) > 0 && !o.unagreed {
+			return ErrUnagreedLines
+		}
+		if len(unagreed) > 0 {
+			if o.why, err = checkReason(o.why, ErrUnagreedNoReason); err != nil {
+				return err
 			}
 		}
 		// Förbrukningsmaterial and the invoicing fee, as lines of their own
@@ -240,6 +256,12 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 
 		if err := copyLines(ctx, tx, scope.ShopID, inv.ID, lines, 1); err != nil {
 			return err
+		}
+		if len(unagreed) > 0 {
+			if err := auditTx(ctx, tx, scope, inv.ID, "invoice.unagreed_lines_invoiced", "", "", o.why,
+				map[string]any{"work_order_id": workOrderID, "lines": unagreed, "count": len(unagreed)}); err != nil {
+				return err
+			}
 		}
 
 		// The parts leave the shelf here, in the transaction that issues the

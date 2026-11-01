@@ -89,9 +89,10 @@ type NewPayment struct {
 	Reference   string
 
 	// Set when the person has been told the amount is more than is owed and
-	// says it is meant. Without it an extra zero is recorded as money that
-	// arrived.
+	// says it is meant, and why. Without it an extra zero is recorded as
+	// money that arrived; with it, the decision is its own event (#151).
 	ConfirmedOverpayment bool
+	OverpaymentReason    string
 }
 
 // overpaymentMargin is how far above what is owed a payment may go before
@@ -117,6 +118,10 @@ const maxPaidBeforeInvoiceDays = 31
 // ErrOverpayment is refusing a payment far above what is owed until the person
 // says that is what they mean.
 var ErrOverpayment = fmt.Errorf("%w: that is more than is owed on the invoice; if the customer really paid more, tick that and record it again", ErrInvalid)
+
+// ErrOverpaymentNoReason is recording far more than is owed without saying
+// why.
+var ErrOverpaymentNoReason = fmt.Errorf("%w: say why more than is owed is recorded, in 300 characters or fewer", ErrInvalid)
 
 // ErrNothingOwed is refusing to settle a balance that is already settled.
 var ErrNothingOwed = fmt.Errorf("%w: nothing is owed on that invoice", ErrInvalid)
@@ -247,8 +252,15 @@ func RecordPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		if issued := b.IssuedAt.In(b.Today.Location()); p.PaidOn.Format("2006-01-02") < issued.AddDate(0, 0, -maxPaidBeforeInvoiceDays).Format("2006-01-02") {
 			return fmt.Errorf("%w: that is more than %d days before the invoice was issued, on %s", ErrInvalid, maxPaidBeforeInvoiceDays, issued.Format("2006-01-02"))
 		}
-		if p.AmountMinor != nil && *p.AmountMinor > b.OutstandingMinor()+overpaymentMargin && !p.ConfirmedOverpayment {
+		over := p.AmountMinor != nil && *p.AmountMinor > b.OutstandingMinor()+overpaymentMargin
+		var why string
+		switch {
+		case over && !p.ConfirmedOverpayment:
 			return ErrOverpayment
+		case over:
+			if why, err = checkReason(p.OverpaymentReason, ErrOverpaymentNoReason); err != nil {
+				return err
+			}
 		}
 		out = Payment{Method: p.Method, PaidOn: p.PaidOn, Reference: strings.TrimSpace(p.Reference)}
 		if p.AmountMinor != nil {
@@ -268,6 +280,12 @@ func RecordPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		}
 		if err := insertPayment(ctx, tx, scope, b.InvoiceID, &out, ""); err != nil {
 			return err
+		}
+		if over {
+			if err := auditTx(ctx, tx, scope, out.ID, "payment.overpayment_confirmed", "", "", why,
+				map[string]any{"invoice_id": b.InvoiceID, "amount_minor": out.AmountMinor, "owed_minor": b.OutstandingMinor()}); err != nil {
+				return err
+			}
 		}
 		// The money that settles it may be what finishes the job.
 		return closeIfFinishedTx(ctx, tx, b.WorkOrderID)

@@ -790,6 +790,7 @@
     {{if and .NotAgreedLines (ne .Job.State "declined")}}
     <p class="waiting">{{.N "%d line was put on after the customer agreed, and has no agreement." .NotAgreedLines}}</p>
     <label class="tick"><input type="checkbox" name="confirm_unagreed" value="1"> <span>{{.T "Invoice it with the lines nobody agreed to"}}</span></label>
+    <label><span>{{.T "Why they are invoiced anyway"}}</span><input name="unagreed_reason" maxlength="300"></label>
     {{end}}
     <button type="submit">{{.T "Invoice it"}}</button>
   </form>

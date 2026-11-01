@@ -53,6 +53,7 @@
     <label><span>{{$.T "Reference"}}</span><input name="reference" placeholder="OCR"></label>
   </div>
   <label class="tick"><input type="checkbox" name="confirm_over" value="1"> <span>{{$.T "The customer really paid more than is owed"}}</span></label>
+  <label><span>{{$.T "Why, if they did"}}</span><input name="over_reason" maxlength="300"></label>
   <p class="waiting">{{$.T "Left empty, the amount is whatever is owed; in cash it is rounded to the krona and the difference kept apart."}}</p>
   <button type="submit">{{$.T "Record the payment"}}</button>
 </form>
