@@ -194,7 +194,7 @@ func TestDeletingAnAttachmentRemovesTheFile(t *testing.T) {
 	}
 
 	remover := &recordingRemover{}
-	if err := workshop.DeleteAttachment(ctx, pool, advisor(), remover, attachmentID); err != nil {
+	if err := workshop.DeleteAttachment(ctx, pool, advisor(), remover, attachmentID, ""); err != nil {
 		t.Fatalf("DeleteAttachment: %v", err)
 	}
 	if len(remover.removed) != 1 || remover.removed[0] != "abc123" {

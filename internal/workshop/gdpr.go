@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
@@ -448,22 +449,53 @@ type PhotoRemover interface {
 // workshop catches what it was not aimed at -- another customer's plate, a
 // colleague, paperwork on a bench -- so the file is the personal data and it
 // has to go with the record of it.
-func DeleteAttachment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, photos PhotoRemover, attachmentID string) error {
+//
+// reason is why, and is required for a protocol's photograph: the protocol
+// is evidence, and what it lost is recorded on it (Protocol.Removals).
+func DeleteAttachment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, photos PhotoRemover, attachmentID, reason string) error {
 	if !scope.Role.SeesCustomerPersonalData() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(attachmentID) {
 		return ErrNotFound
 	}
+	reason = strings.TrimSpace(reason)
+	if utf8.RuneCountInString(reason) > 300 {
+		return fmt.Errorf("%w: the reason is longer than 300 characters", ErrInvalid)
+	}
 
 	var key string
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		err := tx.QueryRow(ctx,
+		// A photograph on a protocol -- a purchase, a check-out, a check-in,
+		// a delivery -- is part of evidence that is frozen once finished.
+		// It can still go, because it is personal data, but the protocol
+		// keeps a record that it had one: when, by whom, and why (0067).
+		var inspectionID, itemID string
+		err := tx.QueryRow(ctx, `
+			SELECT it.inspection_id::text, it.id::text
+			FROM attachments a JOIN inspection_items it ON it.id = a.inspection_item_id
+			JOIN inspections i ON i.id = it.inspection_id
+			WHERE a.id = $1 AND i.subject <> 'work_order'`, attachmentID).Scan(&inspectionID, &itemID)
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+		case err != nil:
+			return fmt.Errorf("read the attachment's protocol: %w", err)
+		case reason == "":
+			return fmt.Errorf("%w: say why the photograph is removed; the protocol keeps that it was", ErrInvalid)
+		default:
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO protocol_photo_removals (shop_id, inspection_id, inspection_item_id, attachment_id, removed_by, reason)
+				VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid, $6)`,
+				scope.ShopID, inspectionID, itemID, attachmentID, scope.UserID, reason); err != nil {
+				return fmt.Errorf("record the removal: %w", err)
+			}
+		}
+		err = tx.QueryRow(ctx,
 			`DELETE FROM attachments WHERE id = $1 RETURNING storage_key`, attachmentID).Scan(&key)
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
-		return err
+		return finished(err)
 	})
 	if err != nil {
 		return err

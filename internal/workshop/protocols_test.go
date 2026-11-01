@@ -261,3 +261,58 @@ func TestChecklistsAreCoreAndSayWhatTheyAreFor(t *testing.T) {
 		t.Errorf("a workshop-only shop is offered %v", got)
 	}
 }
+
+// A photograph on a finished protocol is still personal data, and the
+// privacy deletion removes it -- but the protocol is evidence, so it keeps a
+// record that it had one: from which checkpoint, when, by whom and why.
+// Without a reason it is refused, readably, and the database still refuses
+// a deletion that recorded nothing.
+func TestAPhotoIsRemovedFromAFinishedProtocolAndTheProtocolSaysSo(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	desk := otherRoles(access.Of(access.RoleRentalAgent))
+	id := checkOut(t, pool, rentalChecklist(t, pool), "")
+	p, _ := workshop.ProtocolByID(ctx, pool, desk, id)
+	item := p.Items[0].ID
+	const key = "cccccccccccccccccccccccccccccccc"
+	if err := workshop.AttachProtocolPhoto(ctx, pool, desk, item, key, "image/jpeg", 10, "dorr.jpg"); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.CompleteProtocol(ctx, pool, desk, id); err != nil {
+		t.Fatal(err)
+	}
+	var attachment string
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT id FROM attachments WHERE storage_key = $1`, key).Scan(&attachment)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	remover := &recordingRemover{}
+	if err := workshop.DeleteAttachment(ctx, pool, advisor(), remover, attachment, " "); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("removed from a protocol with no reason: %v, want refused", err)
+	}
+	if err := workshop.DeleteAttachment(ctx, pool, advisor(), remover, attachment, "En förbipasserande syns i bild"); err != nil {
+		t.Fatalf("removing a photograph from a finished protocol: %v", err)
+	}
+	if len(remover.removed) != 1 || remover.removed[0] != key {
+		t.Errorf("the file was not removed: %v", remover.removed)
+	}
+	p, err := workshop.ProtocolByID(ctx, pool, desk, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Items[0].Photos) != 0 {
+		t.Error("the photograph is still on the protocol")
+	}
+	if len(p.Removals) != 1 {
+		t.Fatalf("the protocol records %d removals, want 1", len(p.Removals))
+	}
+	r := p.Removals[0]
+	if r.ItemID != item || r.Reason != "En förbipasserande syns i bild" || r.RemovedBy == "" || r.RemovedAt.IsZero() {
+		t.Errorf("the removal reads %+v", r)
+	}
+	if err := workshop.DeleteAttachment(ctx, pool, advisor(), remover, attachment, "Igen"); !errors.Is(err, workshop.ErrNotFound) {
+		t.Errorf("removing it a second time: %v, want not found", err)
+	}
+}
