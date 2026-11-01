@@ -178,14 +178,20 @@ func (s *Server) handleSaveCalculation(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	in, form, err := calculationForm(r)
 	data := &dealerData{Form: form}
+	calculation := r.FormValue("calculation")
+	// Refused, an edit comes back as the version it was made from, so it
+	// stays an edit of that calculation, with what was typed in the form.
 	refuse := func(msg string) {
+		if calculation != "" && data.Calculation.ID == "" {
+			data.Calculation, _ = workshop.CalculationByID(r.Context(), s.pool, session.Scope, r.FormValue("from"))
+			data.Result = data.Calculation.Result()
+		}
 		s.render(w, r, http.StatusBadRequest, "carcalc", pageData{Title: "Before the bid", Session: session, Dealer: data, Error: msg})
 	}
 	if err != nil {
 		refuse(err.Error())
 		return
 	}
-	calculation := r.FormValue("calculation")
 	version, _ := strconv.Atoi(r.FormValue("version"))
 	vehicleID := r.FormValue("vehicle")
 	if calculation == "" {
@@ -201,9 +207,6 @@ func (s *Server) handleSaveCalculation(w http.ResponseWriter, r *http.Request) {
 	}
 	saved, err := workshop.SaveCalculation(r.Context(), s.pool, session.Scope, vehicleID, calculation, version, in)
 	if errors.Is(err, workshop.ErrInvalid) {
-		if calculation != "" {
-			data.Calculation, _ = workshop.CalculationByID(r.Context(), s.pool, session.Scope, r.FormValue("from"))
-		}
 		refuse(trimInvalid(err))
 		return
 	}

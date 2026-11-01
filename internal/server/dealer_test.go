@@ -217,3 +217,25 @@ func getBody(t *testing.T, c *http.Client, target string) (int, string) {
 	b, _ := io.ReadAll(resp.Body)
 	return resp.StatusCode, string(b)
 }
+
+// A version edited with something that does not read as a number comes
+// back as the same version, still an edit of that calculation, with what
+// was typed: not as a new calculation asking for the car again.
+func TestAnEditWithAMistakeStaysAnEditOfTheCalculation(t *testing.T) {
+	ts, pool := testServer(t)
+	dealerShop(t, pool)
+	buyer := signIn(t, ts, buyerEmail)
+	resp := postResponse(t, buyer, ts.URL+"/cars/calculations", url.Values{"registration": {"KLM 456"}, "sale": {"125000"}})
+	where := resp.Header.Get("Location")
+	id := strings.TrimPrefix(where, "/cars/calculations/")
+	c, err := workshop.CalculationByID(context.Background(), pool, dealerShopOwner(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := post(t, buyer, ts.URL+"/cars/calculations", url.Values{"calculation": {c.CalculationID}, "version": {"1"},
+		"vehicle": {c.VehicleID}, "from": {id}, "sale": {"abc"}})
+	if !strings.Contains(body, `name="calculation" value="`+c.CalculationID+`"`) || strings.Contains(body, `name="registration"`) ||
+		!strings.Contains(body, `value="abc"`) {
+		t.Errorf("the edit came back as a new calculation, or lost what was typed:\n%s", visibleText(body))
+	}
+}
