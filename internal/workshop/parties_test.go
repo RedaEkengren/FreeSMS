@@ -116,8 +116,8 @@ func TestAPartysRolesAreRowsWithPeriods(t *testing.T) {
 	if err := workshop.StartPartyRole(ctx, pool, buyer, seller, workshop.PartySeller, ""); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("a second open seller role: %v, want refused", err)
 	}
-	if err := workshop.StartPartyRole(ctx, pool, desk, seller, workshop.PartyRenter, "Hyr släp"); err != nil {
-		t.Fatalf("the seller becomes a renter: %v", err)
+	if err := workshop.StartPartyRole(ctx, pool, everything(advisor()), seller, workshop.PartyRenter, "Hyr släp"); err != nil {
+		t.Fatalf("the front desk makes the seller a renter: %v", err)
 	}
 	p, err := workshop.PartyByID(ctx, pool, owner(), seller)
 	if err != nil {
@@ -162,8 +162,54 @@ func TestAPartysRolesAreRowsWithPeriods(t *testing.T) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)
 		}
 	}
-	if err := workshop.StartPartyRole(ctx, pool, partsDeskScope(), seller, workshop.PartySupplier, ""); err != nil {
-		t.Errorf("the parts desk, a supplier, in a workshop-only shop: %v", err)
+	if err := workshop.StartPartyRole(ctx, pool, advisor(), seller, workshop.PartySupplier, ""); err != nil {
+		t.Errorf("the front desk, a supplier, in a workshop-only shop: %v", err)
+	}
+}
+
+// A role makes a party visible to whoever deals in it, so a role is given
+// only to a party the caller already sees: a salesperson cannot make a
+// workshop customer a buyer and so read them, and is answered exactly as
+// for an id that names nothing. The front desk hands a customer on; after
+// that the salesperson deals with them.
+func TestARoleIsGivenOnlyToAPartyTheCallerSees(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	sales := otherRoles(access.Of(access.RoleSales))
+	desk := otherRoles(access.Of(access.RoleRentalAgent))
+	customer := partyOf(t, pool, fixtureCustomer)
+	seller := privateSeller(t, pool)
+	before := countRows(t, pool, `SELECT count(*) FROM party_roles`)
+
+	for name, c := range map[string]struct {
+		s     access.Scope
+		party string
+		role  string
+	}{
+		"sales, a workshop customer":      {sales, customer, workshop.PartyBuyer},
+		"sales, no such party":            {sales, "77777777-0000-0000-0000-00000000dead", workshop.PartyBuyer},
+		"rental desk, the buyer's seller": {desk, seller, workshop.PartyRenter},
+		"parts desk, the buyer's seller":  {partsDeskScope(), seller, workshop.PartySupplier},
+	} {
+		if err := workshop.StartPartyRole(ctx, pool, c.s, c.party, c.role, ""); !errors.Is(err, workshop.ErrNotFound) || errors.Is(err, workshop.ErrInvalid) {
+			t.Errorf("%s: %v, want not found", name, err)
+		}
+	}
+	if n := countRows(t, pool, `SELECT count(*) FROM party_roles`); n != before {
+		t.Errorf("%d roles given to parties the caller cannot see", n-before)
+	}
+	if _, err := workshop.PartyByID(ctx, pool, sales, customer); !errors.Is(err, workshop.ErrNotFound) {
+		t.Errorf("the salesperson reads the workshop customer: %v", err)
+	}
+
+	if err := workshop.StartPartyRole(ctx, pool, everything(advisor()), customer, workshop.PartyBuyer, "Vill köpa bil"); err != nil {
+		t.Fatalf("the front desk hands the customer to sales: %v", err)
+	}
+	if p, err := workshop.PartyByID(ctx, pool, sales, customer); err != nil || p.Name == "" {
+		t.Errorf("the salesperson, once the customer is a buyer: %+v, %v", p, err)
+	}
+	if err := workshop.StartPartyRole(ctx, pool, advisor(), customer, workshop.PartyRenter, ""); !errors.Is(err, access.ErrModuleOff) {
+		t.Errorf("the front desk gave a renter's role with rental off: %v", err)
 	}
 }
 
@@ -177,7 +223,7 @@ func TestEachRoleIsShownOfAPartyWhatItsWorkNeeds(t *testing.T) {
 	buyer := otherRoles(access.Of(access.RoleBuyer))
 	// A workshop customer who sells the dealer a car.
 	party := partyOf(t, pool, fixtureCustomer)
-	if err := workshop.StartPartyRole(ctx, pool, buyer, party, workshop.PartySeller, ""); err != nil {
+	if err := workshop.StartPartyRole(ctx, pool, everything(advisor()), party, workshop.PartySeller, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -262,7 +308,7 @@ func TestMergingJoinsPartiesWithoutRewritingTheirHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	dupParty := partyOf(t, pool, dupCustomer)
-	if err := workshop.StartPartyRole(ctx, pool, buyer, dupParty, workshop.PartySeller, ""); err != nil {
+	if err := workshop.StartPartyRole(ctx, pool, everything(advisor()), dupParty, workshop.PartySeller, ""); err != nil {
 		t.Fatal(err)
 	}
 	pv, err := workshop.PreviewCustomerMerge(ctx, pool, advisor(), fixtureCustomer, dupCustomer)
@@ -299,7 +345,7 @@ func TestMergingJoinsPartiesWithoutRewritingTheirHistory(t *testing.T) {
 	if err := workshop.MergeParties(ctx, pool, advisor(), keep, seller, "Samma person"); err != nil {
 		t.Fatal(err)
 	}
-	if err := workshop.StartPartyRole(ctx, pool, otherRoles(access.Of(access.RoleRentalAgent)), seller, workshop.PartyRenter, ""); !errors.Is(err, workshop.ErrInvalid) {
+	if err := workshop.StartPartyRole(ctx, pool, everything(advisor()), seller, workshop.PartyRenter, ""); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("a role given to a merged-away party: %v, want refused", err)
 	}
 	p, _ = workshop.PartyByID(ctx, pool, advisor(), keep)

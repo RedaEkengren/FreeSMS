@@ -45,12 +45,13 @@ func theSeller(t *testing.T, pool *pgxpool.Pool) string {
 	return id
 }
 
-// theCustomerAsSeller is the dealer's workshop customer's party, given the
-// seller's role the buyer deals in, so the buyer may name it on a contract.
+// theCustomerAsSeller is the dealer's workshop customer's party, given by
+// the front desk the seller's role the buyer deals in, so the buyer may name
+// it on a contract.
 func theCustomerAsSeller(t *testing.T, pool *pgxpool.Pool) string {
 	t.Helper()
 	id := partyOf(t, pool, fixtureCustomer)
-	if err := workshop.StartPartyRole(context.Background(), pool, buyerScope(), id, workshop.PartySeller, ""); err != nil &&
+	if err := workshop.StartPartyRole(context.Background(), pool, everything(advisor()), id, workshop.PartySeller, ""); err != nil &&
 		!errors.Is(err, workshop.ErrInvalid) {
 		t.Fatalf("StartPartyRole: %v", err)
 	}
@@ -341,7 +342,8 @@ func TestErasureBlanksOnlyContractsPastTheirRetention(t *testing.T) {
 // A contract copies its parties' names and addresses onto itself, so naming
 // a party is reading it: a salesperson cannot put a workshop customer they
 // do not deal with onto a sales contract and read back who they are. Once
-// the customer is a buyer -- the salesperson's own dealing -- they can.
+// the front desk has made the customer a buyer -- the salesperson's own
+// dealing -- they can.
 func TestADocumentNamesOnlyPartiesTheCallerMaySee(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
@@ -362,7 +364,10 @@ func TestADocumentNamesOnlyPartiesTheCallerMaySee(t *testing.T) {
 	if n := countRows(t, pool, `SELECT count(*) FROM document_records`); n != 0 {
 		t.Errorf("%d documents produced, want none", n)
 	}
-	if err := workshop.StartPartyRole(ctx, pool, sales, customer, workshop.PartyBuyer, ""); err != nil {
+	if err := workshop.StartPartyRole(ctx, pool, sales, customer, workshop.PartyBuyer, ""); !errors.Is(err, workshop.ErrNotFound) {
+		t.Errorf("a salesperson made a workshop customer a buyer: %v, want not found", err)
+	}
+	if err := workshop.StartPartyRole(ctx, pool, everything(advisor()), customer, workshop.PartyBuyer, ""); err != nil {
 		t.Fatal(err)
 	}
 	id, err := workshop.ProduceDocument(ctx, pool, sales, contract)

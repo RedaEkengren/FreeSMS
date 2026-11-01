@@ -144,7 +144,7 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 	// An identity number read under its purpose.
 	keys := identityKeys(t, "k1")
 	buyer := partyOf(t, pool, fixtureCustomer)
-	if err := workshop.StartPartyRole(ctx, pool, sales(), buyer, workshop.PartyBuyer, ""); err != nil {
+	if err := workshop.StartPartyRole(ctx, pool, everything, buyer, workshop.PartyBuyer, ""); err != nil {
 		t.Fatal(err)
 	}
 	record, err := workshop.RecordIdentity(ctx, pool, sales(), keys, workshop.NewIdentityRecord{PartyID: buyer,

@@ -50,7 +50,7 @@ func TestAnIdentityNumberIsSealedAndEveryReadIsLogged(t *testing.T) {
 	ctx := context.Background()
 	keys := identityKeys(t, "k1")
 	party := partyOf(t, pool, fixtureCustomer)
-	if err := workshop.StartPartyRole(ctx, pool, sales(), party, workshop.PartyBuyer, ""); err != nil {
+	if err := workshop.StartPartyRole(ctx, pool, everything(advisor()), party, workshop.PartyBuyer, ""); err != nil {
 		t.Fatal(err)
 	}
 	record := func(s access.Scope, n workshop.NewIdentityRecord) (string, error) {
@@ -113,7 +113,7 @@ func TestAnIdentityNumberIsSealedAndEveryReadIsLogged(t *testing.T) {
 
 	// A licence check keeps a reference only.
 	desk := otherRoles(access.Of(access.RoleRentalAgent))
-	if err := workshop.StartPartyRole(ctx, pool, desk, party, workshop.PartyRenter, ""); err != nil {
+	if err := workshop.StartPartyRole(ctx, pool, everything(advisor()), party, workshop.PartyRenter, ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := workshop.RecordIdentity(ctx, pool, desk, keys, workshop.NewIdentityRecord{PartyID: party,
@@ -133,7 +133,7 @@ func TestAnIdentityValueIsInNoExportTrailOrSearch(t *testing.T) {
 	ctx := context.Background()
 	keys := identityKeys(t, "k1")
 	party := partyOf(t, pool, fixtureCustomer)
-	if err := workshop.StartPartyRole(ctx, pool, sales(), party, workshop.PartyBuyer, ""); err != nil {
+	if err := workshop.StartPartyRole(ctx, pool, everything(advisor()), party, workshop.PartyBuyer, ""); err != nil {
 		t.Fatal(err)
 	}
 	id, err := workshop.RecordIdentity(ctx, pool, sales(), keys, workshop.NewIdentityRecord{PartyID: party,
@@ -194,7 +194,7 @@ func TestAnIdentityValueGoesWhenItsPurposeDoes(t *testing.T) {
 	ctx := context.Background()
 	keys := identityKeys(t, "k1")
 	party := partyOf(t, pool, fixtureCustomer)
-	if err := workshop.StartPartyRole(ctx, pool, sales(), party, workshop.PartyBuyer, ""); err != nil {
+	if err := workshop.StartPartyRole(ctx, pool, everything(advisor()), party, workshop.PartyBuyer, ""); err != nil {
 		t.Fatal(err)
 	}
 	rec := func(purpose string) string {
@@ -255,7 +255,7 @@ func TestIdentityKeysRotateAndTheRecordsFactsStay(t *testing.T) {
 	oldKey, _ := identity.NewKey("old")
 	oldKeys, _ := identity.ParseKeys(oldKey)
 	party := partyOf(t, pool, fixtureCustomer)
-	if err := workshop.StartPartyRole(ctx, pool, sales(), party, workshop.PartyBuyer, ""); err != nil {
+	if err := workshop.StartPartyRole(ctx, pool, everything(advisor()), party, workshop.PartyBuyer, ""); err != nil {
 		t.Fatal(err)
 	}
 	id, err := workshop.RecordIdentity(ctx, pool, sales(), oldKeys, workshop.NewIdentityRecord{PartyID: party,

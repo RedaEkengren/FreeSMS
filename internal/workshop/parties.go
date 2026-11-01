@@ -231,11 +231,37 @@ func emailTaken(err error, what string) error {
 	return fmt.Errorf("%s: %w", what, err)
 }
 
+// mayGivePartyRole checks roles, and the scope's modules, for giving a
+// party role: whoever records it, or the front desk and those who run the
+// shop, who see every customer and so are the deliberate way a workshop
+// customer is handed to the dealer's or the rental desk's dealings.
+func mayGivePartyRole(roles access.Roles, scope access.Scope, role string) error {
+	err := mayRecordPartyRole(roles, scope, role)
+	if errors.Is(err, access.ErrForbidden) && roles.SeesCustomerPersonalData() {
+		// Written out per module, so the permission contract sees the gate.
+		switch partyRoleModule(role) {
+		case access.Dealer:
+			return scope.Require(access.Dealer)
+		case access.Rental:
+			return scope.Require(access.Rental)
+		}
+		return nil
+	}
+	return err
+}
+
 // StartPartyRole gives a party a role from now: a workshop customer who
 // sells the dealer a car becomes a seller as well. One open period of a role
 // at a time.
+//
+// Only to a party the caller can already see. A role is what makes a party
+// visible to those who deal in it (partyRolesSeen), so giving one to any id
+// would let a salesperson make a workshop customer a buyer and then read
+// them; the front desk, which sees every customer, is the way a customer
+// reaches the dealer or the rental desk, or the person is entered anew. A
+// party the caller cannot see answers as one that does not exist.
 func StartPartyRole(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, partyID, role, note string) error {
-	if err := mayRecordPartyRole(scope.Role, scope, role); err != nil {
+	if err := mayGivePartyRole(scope.Role, scope, role); err != nil {
 		return err
 	}
 	if !looksLikeUUID(partyID) {
@@ -246,6 +272,9 @@ func StartPartyRole(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		return err
 	}
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		if err := partySeenTx(ctx, tx, scope, partyID); err != nil {
+			return err
+		}
 		var merged *string
 		err := tx.QueryRow(ctx, `SELECT merged_into::text FROM parties WHERE id = $1 FOR UPDATE`, partyID).Scan(&merged)
 		if errors.Is(err, pgx.ErrNoRows) {
