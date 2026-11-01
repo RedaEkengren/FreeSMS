@@ -218,8 +218,10 @@ func RunOutbox(ctx context.Context, pool *pgxpool.Pool, shopID string, adapters 
 	return run, nil
 }
 
-// claimOutboxTx claims the next row due, skipping what another worker
-// holds, and returns the lease it took.
+// claimOutboxTx claims the next row due -- the one due earliest, the
+// order said in the statement that takes it, since an order inside a CTE
+// is not one its join keeps -- skipping what another worker holds, and
+// returns the lease it took.
 func claimOutboxTx(ctx context.Context, pool *pgxpool.Pool, shopID string) (OutboxItem, time.Time, bool, error) {
 	it := OutboxItem{ShopID: shopID}
 	var lease time.Time
@@ -227,12 +229,12 @@ func claimOutboxTx(ctx context.Context, pool *pgxpool.Pool, shopID string) (Outb
 	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
 		err := tx.QueryRow(ctx, `
 			WITH due AS (
-			  SELECT id, attempts FROM outbox_state
-			  WHERE state IN ('queued', 'retry_scheduled', 'attempted') AND due_at <= clock_timestamp()
-			  ORDER BY due_at)
+			  SELECT id, attempts, due_at FROM outbox_state
+			  WHERE state IN ('queued', 'retry_scheduled', 'attempted') AND due_at <= clock_timestamp())
 			SELECT o.id::text, o.kind, coalesce(o.subject_kind, ''), coalesce(o.subject_id::text, ''), o.idempotency_key, o.payload, due.attempts
 			FROM outbox o JOIN due ON due.id = o.id
 			WHERE o.claimed_until IS NULL OR o.claimed_until <= clock_timestamp()
+			ORDER BY due.due_at, o.id
 			LIMIT 1
 			FOR UPDATE OF o SKIP LOCKED`).Scan(&it.ID, &it.Kind, &it.SubjectKind, &it.SubjectID, &it.Key, &it.Payload, &it.Attempts)
 		if errors.Is(err, pgx.ErrNoRows) {

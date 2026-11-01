@@ -503,3 +503,27 @@ func TestACallAskedForAgainWhileItIsSentIsNotSentTwice(t *testing.T) {
 		t.Errorf("after the first worker's send went through: %s, want succeeded", state)
 	}
 }
+
+// The call waiting longest goes first: a worker taking one row at a time
+// takes the one due earliest, not whichever the database finds first.
+func TestTheCallDueFirstIsSentFirst(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	if n, err := workshop.QueueVehicleLookups(ctx, pool, buyerScope(), workshop.LookupPurchase, []string{"AAA111", "BBB222", "CCC333"}); err != nil || n != 3 {
+		t.Fatalf("queued %d, %v", n, err)
+	}
+	// The last queued has waited longest.
+	if _, err := pool.Exec(ctx, `UPDATE outbox SET not_before = now() - (CASE WHEN idempotency_key LIKE '%CCC333%' THEN interval '2 days'
+		WHEN idempotency_key LIKE '%BBB222%' THEN interval '1 day' ELSE interval '1 hour' END)`); err != nil {
+		t.Fatal(err)
+	}
+	a := &countingAdapter{}
+	for range 3 {
+		if _, err := workshop.RunOutbox(ctx, pool, shopID, map[string]workshop.OutboxAdapter{"vehicle_lookup": a}, 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(a.keys) != 3 || !strings.Contains(a.keys[0], "CCC333") || !strings.Contains(a.keys[1], "BBB222") || !strings.Contains(a.keys[2], "AAA111") {
+		t.Errorf("sent in the order %v; want the one due first, first", a.keys)
+	}
+}
