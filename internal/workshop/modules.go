@@ -41,12 +41,12 @@ func inWorkshop(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fn 
 }
 
 // Available is the modules this release has something for, in the order
-// they are offered. Car sales and rental are known to the schema and to
-// access.Scope so that their work can start on a foundation; they are not
-// offered at setup, or switched on, until there is a page behind them. A
-// shop that chose "rental" and found nothing would be told a thing that is
-// not so.
-var Available = []access.Module{access.Workshop}
+// they are offered. A module is known to the schema and to access.Scope
+// before it is offered; it is not offered at setup, or switched on, until
+// there is a page behind it. A shop that chose one and found nothing would
+// be told a thing that is not so. Rental is offered from its settings
+// (#189) on.
+var Available = []access.Module{access.Workshop, access.Rental}
 
 // available reports whether this release offers m.
 func available(m access.Module) bool { return slices.Contains(Available, m) }

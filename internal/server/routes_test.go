@@ -72,6 +72,9 @@ var swept = map[string]string{
 	"POST /stock/move": "", "POST /stock/count": "", "GET /stock/parts/new": "", "POST /stock/parts": "",
 	"GET /staff": "", "GET /receivables": "", "POST /staff": "", "GET /account": "", "POST /account/password": "", "POST /account/language": "", "POST /stock/bands": "", "GET /parts": "",
 	"POST /parts/arrived": "", "GET /checklists": "", "POST /checklists": "",
+	// Rental
+	"GET /rental/settings": "", "POST /rental/permits": "", "POST /rental/profiles": "",
+	"POST /rental/permits/{id}/revoke": "sweep", "POST /rental/profiles/{id}": "sweep",
 
 	// The customer's link. Not a shop identifier: it is an unguessable token,
 	// and asking for it with a uuid is a different test -- the share tests
@@ -256,6 +259,9 @@ func fill(pattern string) (method, path string) {
 		"{version}":           "1",
 		"{quoteID}":           "cccccccc-0000-0000-0000-0000000000cc",
 		"{key}":               photoB,
+		// Rental: ids that are nobody's.
+		"/rental/permits/{id}":  "/rental/permits/bbbbbbbb-0000-0000-0000-0000000000e1",
+		"/rental/profiles/{id}": "/rental/profiles/bbbbbbbb-0000-0000-0000-0000000000e2",
 	} {
 		path = strings.ReplaceAll(path, from, to)
 	}
