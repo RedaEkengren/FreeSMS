@@ -570,3 +570,25 @@ func TestARequestKeyNamesOneRequest(t *testing.T) {
 		t.Errorf("the payment repeated: %s, %v; want %s", again.ID, err, paid.ID)
 	}
 }
+
+// Money a customer has paid in is always returnable: a rental deposit
+// still held is refunded after Rental is switched off, by the rental desk
+// that took it or by the front desk. Taking a new one is refused.
+func TestAHeldDepositIsRefundedWithRentalSwitchedOff(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	dep, in := depositWith(t, pool, 300000)
+	off := func(s access.Scope) access.Scope { s.Modules = []access.Module{access.Workshop}; return s }
+	desk, front := off(otherRoles(access.Of(access.RoleRentalAgent))), off(advisor())
+	if _, err := workshop.CreateDeposit(ctx, pool, desk, workshop.NewHolding{PartyID: partyOf(t, pool, fixtureCustomer), Purpose: "rental"}); !errors.Is(err, access.ErrModuleOff) {
+		t.Errorf("a new rental deposit with Rental off: %v", err)
+	}
+	for _, s := range []access.Scope{desk, front} {
+		if _, err := workshop.RefundPayment(ctx, pool, s, in.ID, workshop.NewPayment{AmountMinor: minor(100000), Method: "bank", PaidOn: time.Now()}, "Hyran avslutad"); err != nil {
+			t.Errorf("%v refunding a held deposit with Rental off: %v", s.Role, err)
+		}
+	}
+	if d, err := workshop.DepositBalanceFor(ctx, pool, desk, dep); err != nil || d.Held() != 100000 {
+		t.Errorf("the deposit after both refunds: %+v, %v", d, err)
+	}
+}
