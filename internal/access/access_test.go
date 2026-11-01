@@ -61,7 +61,7 @@ func TestSeveralRolesHaveWhatAnyOfThemHas(t *testing.T) {
 	if !both.SeesPurchasePrice() || !both.SellsVehicles() || both.SeesCustomerPersonalData() {
 		t.Errorf("sales and buyer: %v %v %v", both.SeesPurchasePrice(), both.SellsVehicles(), both.SeesCustomerPersonalData())
 	}
-	if both.Main() != RoleSales || both.Label() != "Sales" {
+	if both.Main() != RoleSales || both.Label() != "Salesperson" {
 		t.Errorf("the main role is %s (%s), want the first given", both.Main(), both.Label())
 	}
 	if got := Of(RoleParts, RoleTechnician, RoleParts); len(got) != 2 || !got.Has(RoleTechnician) {

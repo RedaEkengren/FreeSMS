@@ -71,7 +71,7 @@ var roleLabels = map[Role]string{
 	RoleTechnician:     "Technician",
 	RoleParts:          "Parts",
 	RoleAdmin:          "Administrator",
-	RoleSales:          "Sales",
+	RoleSales:          "Salesperson",
 	RoleBuyer:          "Buyer",
 	RoleRentalAgent:    "Rental desk",
 }
