@@ -20,7 +20,8 @@
 #
 # Then the real ones (#142): every migration from M6 on that says
 # "rollback: safe" is put to the same test with the releases that bracket it
-# -- the commit that added it, and the commit before. The workshop's own data
+# -- the last commit that changed it (or this tree, if it has uncommitted
+# changes), and the commit before it was added. The workshop's own data
 # is written by the newer release, after its migration, and the older one
 # must start over it, show it, and pass -verify. This needs the history, so
 # CI checks out with fetch-depth 0. A migration not committed yet is tested
@@ -156,10 +157,12 @@ done
 
 # --- The M6 migrations marked safe, between the releases that bracket them ---
 
-# The newest migration of the release before M6 (lastBeforeM6 in
-# internal/server/golden_test.go). Everything above it is Core work that a
-# workshop-only installation must be able to roll back from.
-LAST_BEFORE_M6=62
+# The newest migration of the release before M6, read from lastBeforeM6 in
+# internal/server/golden_test.go rather than written here a second time.
+# Everything above it is Core work that a workshop-only installation must be
+# able to roll back from.
+LAST_BEFORE_M6="$(sed -n 's/^const lastBeforeM6 = \([0-9][0-9]*\)$/\1/p' internal/server/golden_test.go)"
+[ -n "$LAST_BEFORE_M6" ] || fail "could not read lastBeforeM6 from internal/server/golden_test.go"
 SEED_EMAIL=anna@example.test SEED_PASSWORD=workshop
 
 # A release's tree, as the image would be built from it: a commit, or this
@@ -190,14 +193,24 @@ for file in migrations/*.sql; do
     grep -Eq '^--[[:space:]]*rollback:[[:space:]]*safe[[:space:]]*$' "$file" || continue
     m6=$((m6 + 1))
     name="$(basename "$file")"
+    # The release before is the one before the migration was added. The
+    # migration itself is tested as it is now: as last committed, or as it
+    # stands in this tree when it has changes not committed yet -- a fix to
+    # a migration after it was added is what has to be safe, not the first
+    # draft of it.
     added="$(git -C "$ROOT" log --diff-filter=A --format=%H -1 -- "$file" 2>/dev/null || true)"
     if [ -n "$added" ]; then
-        next_commit="$added" previous_commit="$added^"
+        previous_commit="$added^"
     else
-        next_commit="" previous_commit="HEAD"
+        previous_commit="HEAD"
+    fi
+    if [ -z "$added" ] || [ -n "$(git -C "$ROOT" status --porcelain -- "$file")" ]; then
+        next_commit=""
+    else
+        next_commit="$(git -C "$ROOT" log --format=%H -1 -- "$file")"
     fi
 
-    say "$name: building the release that added it and the one before"
+    say "$name: building the release that has it as it is now, and the one before it was added"
     build_release m6-previous "$(git -C "$ROOT" rev-parse "$previous_commit")"
     build_release m6-next "$next_commit"
 
