@@ -44,7 +44,7 @@ type CashPayment struct {
 
 // CashSale is how an invoice issued at payment is paid, and through which
 // of the shop's payment flows. Named, a flow's way of paying fills in a
-// payment that names none. Not named, the sale is put through the shop's
+// payment that names none, and a payment that names another is refused. Not named, the sale is put through the shop's
 // one flow for the way it was paid, when there is exactly one: the
 // register says that is how the shop takes money that way. With none, or
 // several and none chosen, it is through no flow.
@@ -71,7 +71,11 @@ type PaidWith struct {
 
 var (
 	errCashMethod = fmt.Errorf("%w: a cash invoice is paid in cash, by card or by Swish at the counter", ErrInvalid)
-	errCashSplit  = fmt.Errorf("%w: the payments add up to more or less than the invoice; only the last may be the rest", ErrInvalid)
+	// errCashFlowMethod is a payment through a flow paid another way than
+	// the flow takes money: recorded, it would put the sale through a flow
+	// it did not go through.
+	errCashFlowMethod = fmt.Errorf("%w: a payment through a flow is paid the way the flow takes money", ErrInvalid)
+	errCashSplit      = fmt.Errorf("%w: the payments add up to more or less than the invoice; only the last may be the rest", ErrInvalid)
 	// errCashInvoicePayment is a cash invoice's payment reversed.
 	errCashInvoicePayment = fmt.Errorf("%w: that payment is how a cash invoice was paid on issue, and stands; correct the invoice with a credit note", ErrInvalid)
 )
@@ -171,13 +175,16 @@ func payOnIssueTx(ctx context.Context, tx pgx.Tx, scope access.Scope, inv Invoic
 			return fmt.Errorf("read the payment flow: %w", err)
 		}
 		for i := range payments {
-			if payments[i].Method != "" {
-				continue
-			}
-			if method == "other" {
+			switch {
+			case payments[i].Method == "" && method == "other":
 				return errCashMethod
+			case payments[i].Method == "":
+				payments[i].Method = method
+			// A flow for something else names no way of paying, so says
+			// nothing a payment's could contradict.
+			case method != "other" && payments[i].Method != method:
+				return errCashFlowMethod
 			}
-			payments[i].Method = method
 		}
 	} else if one := payments[0].Method; func() bool {
 		for _, p := range payments {

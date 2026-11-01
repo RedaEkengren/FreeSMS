@@ -115,11 +115,11 @@ func TestPaymentFlowsAreCheckedAndTheYearIsCounted(t *testing.T) {
 	if _, err := workshop.AddPaymentFlow(ctx, pool, advisor(), "Kort i disken", "card"); !errors.Is(err, access.ErrForbidden) {
 		t.Errorf("the front desk noted a flow: %v", err)
 	}
-	flow, err := workshop.AddPaymentFlow(ctx, pool, owner(), "Kort i disken för hyrtillägg", "card")
+	flow, err := workshop.AddPaymentFlow(ctx, pool, owner(), "Swish i disken för hyrtillägg", "swish")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := workshop.AddPaymentFlow(ctx, pool, owner(), "kort i disken för hyrtillägg ", "card"); !errors.Is(err, workshop.ErrInvalid) {
+	if _, err := workshop.AddPaymentFlow(ctx, pool, owner(), "swish i disken för hyrtillägg ", "swish"); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("the same flow twice: %v", err)
 	}
 	if n := len(waiting(t, owner(), "flow_unchecked")); n != 0 {
@@ -132,7 +132,7 @@ func TestPaymentFlowsAreCheckedAndTheYearIsCounted(t *testing.T) {
 		workshop.CashSale{FlowID: flow, Payments: []workshop.CashPayment{{Method: "swish", Reference: "SW-77"}}}); err != nil {
 		t.Fatalf("a rental extra paid by Swish at the return: %v", err)
 	}
-	if items := waiting(t, owner(), "flow_unchecked"); len(items) != 1 || items[0].Text != "Kort i disken för hyrtillägg" {
+	if items := waiting(t, owner(), "flow_unchecked"); len(items) != 1 || items[0].Text != "Swish i disken för hyrtillägg" {
 		t.Errorf("the flow in use, not checked: %+v", items)
 	}
 	if err := workshop.CheckPaymentFlow(ctx, pool, owner(), flow, true, "", time.Now(), ""); !errors.Is(err, workshop.ErrInvalid) {
@@ -369,5 +369,34 @@ func TestACashInvoiceSaysWhichFlowItWasPaidThrough(t *testing.T) {
 	}
 	if _, err := workshop.IssueAndPay(ctx, pool, desk, readyToInvoice(t, pool), workshop.CashSale{Payments: []workshop.CashPayment{{}}}); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("no way of paying and no flow: %v, want refused", err)
+	}
+}
+
+// A payment through a flow is paid the way the flow takes money: a card
+// flow named with a payment in cash is refused, writing nothing, rather
+// than recorded as paid through a flow it did not go through.
+func TestAPaymentThroughAFlowIsPaidTheWayTheFlowTakesMoney(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	currentPool = pool
+	desk := advisor()
+	card, err := workshop.AddPaymentFlow(ctx, pool, owner(), "Kortterminal", "card")
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := readyToInvoice(t, pool)
+	for name, payments := range map[string][]workshop.CashPayment{
+		"cash":          {{Method: "cash"}},
+		"card and cash": {{Method: "card", AmountMinor: 10000}, {Method: "cash"}},
+	} {
+		if _, err := workshop.IssueAndPay(ctx, pool, desk, job, workshop.CashSale{FlowID: card, Payments: payments}); !errors.Is(err, workshop.ErrInvalid) {
+			t.Errorf("a card flow paid by %s: %v, want refused", name, err)
+		}
+	}
+	if n := countRows(t, pool, `SELECT count(*) FROM invoices`); n != 0 {
+		t.Fatalf("%d invoices written through a flow they did not go through", n)
+	}
+	if _, err := workshop.IssueAndPay(ctx, pool, desk, job, workshop.CashSale{FlowID: card, Payments: []workshop.CashPayment{{Method: "card"}}}); err != nil {
+		t.Errorf("a card flow paid by card: %v", err)
 	}
 }

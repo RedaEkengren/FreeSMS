@@ -7514,6 +7514,9 @@
     "a cash invoice is paid in cash, by card or by Swish at the counter": {
       "other": "en kontantfaktura betalas kontant, med kort eller med Swish i disken"
     },
+    "a payment through a flow is paid the way the flow takes money": {
+      "other": "en betalning genom ett betalflöde görs på det sätt som flödet tar emot pengar"
+    },
     "a flow takes cash, card, Swish or something else": {
       "other": "ett betalflöde tar emot kontanter, kort, Swish eller något annat"
     },
