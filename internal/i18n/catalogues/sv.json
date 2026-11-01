@@ -1562,6 +1562,18 @@
     "Waiting for the customer's answer.": {
       "other": "Väntar på kundens svar."
     },
+    "the job was taken back from the customer; put the quote to them again first": {
+      "other": "jobbet har tagits tillbaka från kunden; lägg fram offerten för kunden igen först"
+    },
+    "Taken back from the customer: their answer is written down once the quote is put to them again.": {
+      "other": "Tagen tillbaka från kunden: svaret skrivs ner när offerten har lagts fram för kunden igen."
+    },
+    "The workshop is still working on the quote": {
+      "other": "Verkstaden arbetar fortfarande med offerten"
+    },
+    "You can answer it once the workshop has finished it.": {
+      "other": "Du kan svara på den när verkstaden är klar med den."
+    },
     "Nothing has been put to the customer yet.": {
       "other": "Inget har lagts fram för kunden än."
     },

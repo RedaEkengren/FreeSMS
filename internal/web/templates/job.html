@@ -605,6 +605,13 @@
   <p class="waiting">{{.T "Nothing has been put to the customer yet."}}</p>
 {{end}}
 
+{{/* A job taken back to a draft or an estimate is not being asked: an
+     answer written down now would be refused (#136). Putting the quote
+     forward again asks the customer again. */}}
+{{$asked := not (or (eq .Job.State "draft") (eq .Job.State "estimated"))}}
+{{if and .Quote.Latest (not $asked)}}
+<p class="waiting">{{.T "Taken back from the customer: their answer is written down once the quote is put to them again."}}</p>
+{{end}}
 {{if .Quote.Pending}}
 <p><span class="tag warranty">{{.N "%d line has no agreement yet" .Quote.Pending}}</span></p>
 <form class="my" method="post" action="/jobs/{{.Job.ID}}/quote">
@@ -612,7 +619,7 @@
 </form>
 {{end}}
 
-{{with .Quote.Latest}}
+{{if $asked}}{{with .Quote.Latest}}
 <form class="my" method="post" action="/jobs/{{$.Job.ID}}/quote/{{.ID}}/answer">
   <p class="waiting">{{$.T "The customer answered by telephone or at the counter? Write it down."}}</p>
   <div class="pair">
@@ -629,7 +636,7 @@
     <button name="decision" value="declined" class="secondary">{{$.T "They said no"}}</button>
   </div>
 </form>
-{{end}}
+{{end}}{{end}}
 
 {{if .Quote.Decisions}}
 <ul class="lines">

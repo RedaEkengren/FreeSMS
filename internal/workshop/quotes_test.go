@@ -294,3 +294,58 @@ func TestAJobIsNotApprovedWithoutTheCustomersAgreement(t *testing.T) {
 		t.Errorf("approving a job whose every line was declined = %v", err)
 	}
 }
+
+// #136: a yes recorded on a draft used to approve the lines and move nothing,
+// so the job still said "Price the work" and whoever wrote the yes down
+// believed it had been taken. Putting the quote forward now asks the customer:
+// the draft goes to waiting for their answer, and the yes lands where "Mark it
+// approved" is. A job taken back to an estimate after that is not being asked,
+// and an answer to it -- the desk's or the customer's -- is refused rather
+// than kept where nothing reads it.
+func TestPuttingTheQuoteForwardAsksTheCustomerAndATakenBackJobIsNotAnswered(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	job := newJob(t, pool)
+	token, err := workshop.CreateJobLink(ctx, pool, advisor(), job)
+	if err != nil {
+		t.Fatal(err)
+	}
+	quote(t, pool, job, "Brake pads", 1000)
+	q, err := workshop.PresentQuote(ctx, pool, advisor(), job)
+	if err != nil {
+		t.Fatalf("PresentQuote on a draft: %v", err)
+	}
+	if j, _, _ := workshop.JobByID(ctx, pool, advisor(), job); workshop.State(j.State) != workshop.StateAwaitingApproval {
+		t.Fatalf("a draft whose quote was put forward is %s, want awaiting_approval", j.State)
+	}
+
+	move(t, pool, job, workshop.StateEstimated)
+	if err := workshop.RecordQuoteAnswer(ctx, pool, advisor(), job, q.ID, workshop.QuoteAnswer{
+		Decision: "approved", Via: "phone", AgreedGrossMinor: q.GrossMinor}); !errors.Is(err, workshop.ErrNotAskedYet) {
+		t.Errorf("the desk's yes on a job taken back = %v, want ErrNotAskedYet", err)
+	}
+	if err := workshop.QuoteAnswerFromLink(ctx, pool, shopID, token, q.ID, "approved"); !errors.Is(err, workshop.ErrNotAskedYet) {
+		t.Errorf("the customer's yes on a job taken back = %v, want ErrNotAskedYet", err)
+	}
+	if st, err := workshop.JobStatus(ctx, pool, shopID, token); err != nil || st.Quote != nil {
+		t.Errorf("the link of a job taken back shows a quote to answer: %+v, %v", st.Quote, err)
+	}
+	if n := decisionsOn(t, pool, job); n != 0 {
+		t.Errorf("%d answers were recorded on a job taken back", n)
+	}
+	if got := statuses(t, pool, job); got[0] == "approved" {
+		t.Error("a refused yes approved the line")
+	}
+
+	// Put forward again: the same version, asked again.
+	again, err := workshop.PresentQuote(ctx, pool, advisor(), job)
+	if err != nil || again.ID != q.ID {
+		t.Fatalf("putting it forward again = %v, %v; want the same version", again.ID, err)
+	}
+	if err := workshop.QuoteAnswerFromLink(ctx, pool, shopID, token, q.ID, "approved"); err != nil {
+		t.Fatalf("the customer's yes once asked again: %v", err)
+	}
+	if err := workshop.SetState(ctx, pool, advisor(), job, workshop.StateApproved); err != nil {
+		t.Errorf("approving after the yes: %v", err)
+	}
+}

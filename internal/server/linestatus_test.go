@@ -155,3 +155,63 @@ func TestTheCustomerAnswersTheQuoteTheyWereShown(t *testing.T) {
 		t.Error("the job page does not show the quote waiting for an answer")
 	}
 }
+
+// #136: putting the quote forward from a draft asks the customer, so their
+// yes lands on a job waiting for it and the next step is "Mark it approved".
+// Taken back to an estimate, neither the job page nor the link offers a
+// button that would be refused, and a page opened before says why rather
+// than "try once more".
+func TestAQuotePutForwardFromADraftAsksTheCustomerAndATakenBackOneOffersNoButton(t *testing.T) {
+	ts, pool := testServer(t)
+	desk := signIn(t, ts, advisorEmail)
+	job := ts.URL + "/jobs/" + jobA
+
+	postStatus(t, desk, job+"/lines", url.Values{"kind": {"labour"}, "description": {"Brake pads"}, "quantity": {"1"}, "unit_price": {"895"}})
+	if status := postStatus(t, desk, job+"/quote", url.Values{}); status != http.StatusSeeOther {
+		t.Fatalf("putting a draft's quote forward answered %d", status)
+	}
+	var state, quoteID string
+	database.InShop(context.Background(), pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT w.state, q.id FROM work_orders w JOIN quotes q ON q.work_order_id = w.id WHERE w.id = $1`,
+			jobA).Scan(&state, &quoteID)
+	})
+	if state != "awaiting_approval" {
+		t.Fatalf("a draft whose quote was put forward is %q, want awaiting_approval", state)
+	}
+	m := regexp.MustCompile(`/k/([A-Za-z0-9_-]{20,})`).FindStringSubmatch(post(t, desk, job+"/link", url.Values{}))
+	if m == nil {
+		t.Fatal("the job page gave no link")
+	}
+	customer := &http.Client{}
+	if _, link := page(t, customer, ts.URL+"/k/"+m[1]); !strings.Contains(link, "Yes, do it") {
+		t.Fatal("the link of a job waiting for the customer has no button")
+	}
+
+	// Taken back to an estimate.
+	if status := postStatus(t, desk, job+"/state", url.Values{"state": {"estimated"}}); status != http.StatusSeeOther {
+		t.Fatalf("back to an estimate answered %d", status)
+	}
+	if _, link := page(t, customer, ts.URL+"/k/"+m[1]); strings.Contains(link, "Yes, do it") || strings.Contains(link, "/quote/") {
+		t.Error("the link of an estimate offers a button that would be refused")
+	}
+	_, counter := page(t, desk, job)
+	if strings.Contains(counter, "They said yes") {
+		t.Error("the job page of an estimate offers to write down a yes")
+	}
+	if !strings.Contains(counter, "Taken back from the customer") {
+		t.Error("the job page of an estimate does not say why there is nothing to write down")
+	}
+	status, body := postBody(t, customer, ts.URL+"/k/"+m[1]+"/quote/"+quoteID, url.Values{"decision": {"approved"}})
+	if status != http.StatusConflict || !strings.Contains(body, "The workshop is still working on the quote") {
+		t.Errorf("a yes from a page opened before answered %d:\n%s", status, firstLines(body, 40))
+	}
+
+	// Put forward again: the same version, asked again, answered.
+	postStatus(t, desk, job+"/quote", url.Values{})
+	if status := postStatus(t, customer, ts.URL+"/k/"+m[1]+"/quote/"+quoteID, url.Values{"decision": {"approved"}}); status != http.StatusSeeOther {
+		t.Errorf("the yes once asked again answered %d", status)
+	}
+	if status := postStatus(t, desk, job+"/state", url.Values{"state": {"approved"}}); status != http.StatusSeeOther {
+		t.Errorf("approving after the yes answered %d", status)
+	}
+}

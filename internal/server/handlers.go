@@ -143,6 +143,12 @@ func (s *Server) handleCustomerQuote(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/k/"+token, http.StatusSeeOther)
 	case errors.Is(err, workshop.ErrQuoteSuperseded):
 		http.Redirect(w, r, "/k/"+token+"?changed=1", http.StatusSeeOther)
+	case errors.Is(err, workshop.ErrNotAskedYet):
+		s.render(w, r, http.StatusConflict, "status", pageData{
+			Locale: s.shopLocale(r),
+			Title:  "The workshop is still working on the quote",
+			Error:  "You can answer it once the workshop has finished it.",
+		})
 	case errors.Is(err, workshop.ErrShareNotUsable), errors.Is(err, workshop.ErrNotFound):
 		s.render(w, r, http.StatusNotFound, "status", pageData{
 			Locale: s.shopLocale(r),

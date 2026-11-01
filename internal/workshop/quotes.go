@@ -219,6 +219,22 @@ func lockedState(ctx context.Context, tx pgx.Tx, jobID string) (State, error) {
 	return state, nil
 }
 
+// ErrNotAskedYet is an answer to a quote on a job that is a draft or an
+// estimate: one that was put to the customer and then taken back.
+//
+// The customer is asked when the job waits for their answer, and approving it
+// after their yes is the front desk's own move, as it is for every job. A yes
+// taken on a draft used to approve the lines and move nothing: the job still
+// read "Price the work", and the person who wrote the yes down believed it had
+// been taken (#136). Putting the quote forward now sends the job to the
+// customer (PresentQuote), so an ordinary yes always lands on a job waiting
+// for it; one that arrives after the desk took the job back is refused with
+// the way through, not kept where nothing reads it.
+var ErrNotAskedYet = fmt.Errorf("%w: the job was taken back from the customer; put the quote to them again first", ErrInvalid)
+
+// notAskedYet is a job the customer is not being asked about.
+func notAskedYet(s State) bool { return s == StateDraft || s == StateEstimated }
+
 func settled(s State) bool {
 	switch s {
 	case StateInvoiced, StateClosed, StateCancelled, StateDeclined:
@@ -254,6 +270,17 @@ func PresentQuote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, j
 		}
 		if len(pending) == 0 {
 			return fmt.Errorf("%w: there is nothing on this order that the customer has not answered", ErrInvalid)
+		}
+		// Putting the quote to the customer is asking them: a draft or an
+		// estimate goes to waiting for their answer, through the state
+		// machine, so that their yes lands where "Mark it approved" is.
+		for _, step := range []State{StateEstimated, StateAwaitingApproval} {
+			if notAskedYet(state) {
+				if err := setStateTx(ctx, tx, jobID, step); err != nil {
+					return err
+				}
+				state = step
+			}
 		}
 		latest, err := latestQuoteTx(ctx, tx, jobID)
 		if err != nil {
@@ -425,6 +452,9 @@ func RecordQuoteAnswer(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		if settled(state) {
 			return fmt.Errorf("%w: a %s order is not quoted", ErrInvalid, state)
 		}
+		if notAskedYet(state) {
+			return ErrNotAskedYet
+		}
 		latest, err := latestQuoteTx(ctx, tx, jobID)
 		if err != nil {
 			return err
@@ -474,6 +504,11 @@ func QuoteAnswerFromLink(ctx context.Context, pool *pgxpool.Pool, shopID, token,
 		}
 		if settled(state) {
 			return ErrShareNotUsable
+		}
+		// A quote put forward and then taken back to an estimate is not
+		// shown on the link; a page opened before that still posts here.
+		if notAskedYet(state) {
+			return ErrNotAskedYet
 		}
 		latest, err := latestQuoteTx(ctx, tx, jobID)
 		if err != nil {

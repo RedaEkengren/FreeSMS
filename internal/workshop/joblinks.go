@@ -138,8 +138,9 @@ func JobStatus(ctx context.Context, pool *pgxpool.Pool, shopID, token string) (C
 		st.CarAway, st.ExpectedBack = !p.Here, p.ExpectedBack
 
 		// The newest version, while the job is still open for answering: a
-		// finished job is not asked anything.
-		if !settled(state) && state != StateReady {
+		// finished job is not asked anything, and neither is one the desk has
+		// taken back to a draft or an estimate -- its buttons would be refused.
+		if !settled(state) && state != StateReady && !notAskedYet(state) {
 			q, err := latestQuoteTx(ctx, tx, jobID)
 			if err != nil {
 				return err
