@@ -1,0 +1,107 @@
+<!doctype html>
+
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Siffror</title>
+<meta name="freesms-user" content="<id-1>">
+<link rel="stylesheet" href="/static/app.css?v=<version>">
+<script src="/static/htmx.min.js?v=<version>" defer></script>
+<script src="/static/keep.js?v=<version>" defer></script>
+<script src="/static/live.js?v=<version>" defer></script>
+</head>
+<body>
+
+<a class="skip" href="#main">Hoppa till innehållet</a>
+
+<header>
+  <nav>
+    <a class="brand" href="/">FreeSMS</a>
+    
+    <a href="/mine" class="nav" data-live-topics="board parts staff">Till mig <span id="mine-count" class="count"
+      hx-get="/mine/count" hx-trigger="load" hx-swap="outerHTML" hx-headers='{"X-FreeSMS-Live": "1"}'></span></a>
+    <a href="/parts" class="nav">Delar</a>
+    <a href="/supply" class="nav">Beställningar</a>
+    <a href="/stock" class="nav">Lager</a>
+    <a href="/scan" class="nav">Skanna</a>
+    <a href="/outsourced" class="nav">Hos leverantörer</a>
+    <a href="/shop" class="nav">Verkstaden</a>
+    <a href="/staff" class="nav">Personal</a>
+    <a href="/import" class="nav">Import</a>
+    <a href="/start" class="nav">Komma igång</a>
+    <a href="/customers" class="nav">Kunder</a>
+    <a href="/enquiries" class="nav">Förfrågningar</a>
+    <a href="/calendar" class="nav">Bokningar</a>
+    <a href="/figures" class="nav">Siffror</a>
+    <a href="/receivables" class="nav">Obetalt</a>
+    <a href="/day" class="nav">Dagen</a>
+    <a href="/accounting" class="nav">Bokföring</a>
+    <a href="/privacy" class="nav">Personuppgifter</a>
+    
+    <a href="/time" class="nav">Mina timmar</a>
+    <a href="/rota" class="nav">Schema</a>
+    <a href="/labour" class="nav">Arbetstider</a>
+    <a href="/help" class="nav">Hjälp</a>
+    <a href="/search" class="nav">Sök</a>
+  </nav>
+  <form class="m-0" method="post" action="/logout">
+    
+    <a href="/account" class="who">Ägare</a>
+    <button class="link" type="submit">Logga ut</button>
+  </form>
+</header>
+
+
+<div id="held" class="held" role="status" hidden
+     data-waiting-one="%d sak väntar på att skickas."
+     data-waiting-other="%d saker väntar på att skickas."
+     data-waiting-signin-one="%d sak väntar på att skickas – logga in igen för att skicka den."
+     data-waiting-signin-other="%d saker väntar på att skickas – logga in igen för att skicka dem."
+     data-refused-one="%d sak nekades av servern."
+     data-refused-other="%d saker nekades av servern."
+     data-show="Visa och avfärda"
+     data-refused-title="Nekat av servern:"
+     data-dismiss="Avfärda dessa?"
+     data-held="Ingen anslutning. Det här hålls och skickas när det finns en anslutning."
+     data-needs-connection="Det här kräver en anslutning. Ingenting har skickats och ingenting har sparats."
+     data-updated="Sidan uppdaterades."
+     data-full="Den här enheten har inte plats för mer osänt arbete. Hitta en anslutning innan du fortsätter."></div>
+
+<div id="announce" class="sr-only" role="status" aria-live="polite"></div>
+<main id="main" tabindex="-1">
+
+<h1>Siffror</h1>
+
+<form method="get" action="/figures">
+  <div class="pair">
+    <label><span>Från</span><input type="date" name="from" value="<date>"></label>
+    <label><span>Till</span><input type="date" name="to" value="<date>"></label>
+  </div>
+  <button type="submit" class="secondary">Visa</button>
+</form>
+
+<h2>Fakturerad</h2>
+<dl class="totals">
+  <dt>Utfärdade fakturor</dt><dd>2</dd>
+  <dt>Netto</dt><dd>2 237,50 kr</dd>
+  <dt>Snittorder</dt><dd>1 118,75 kr</dd>
+  <dt>Medianorder</dt><dd>1 118,75 kr</dd>
+</dl>
+<p class="waiting">Räknat på dagen fakturan utfärdades, inte dagen jobbet öppnades. Kreditfakturor räknas med som de negativa belopp de är. Både snittet och medianen står här, eftersom ett enda stort jobb flyttar snittet men inte medianen.</p>
+
+
+
+<h2>Timmar</h2>
+<dl class="totals">
+  <dt>Stämplat</dt><dd>0,0</dd>
+  <dt>Sålt</dt><dd>2,5</dd>
+</dl>
+
+
+
+
+
+</main>
+</body>
+</html>

@@ -1,0 +1,259 @@
+<!doctype html>
+
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>A-1</title>
+<meta name="freesms-user" content="<id-1>">
+<link rel="stylesheet" href="/static/app.css?v=<version>">
+<script src="/static/htmx.min.js?v=<version>" defer></script>
+<script src="/static/keep.js?v=<version>" defer></script>
+<script src="/static/live.js?v=<version>" defer></script>
+</head>
+<body>
+
+<a class="skip" href="#main">Hoppa till innehållet</a>
+
+<header>
+  <nav>
+    <a class="brand" href="/">FreeSMS</a>
+    
+    <a href="/mine" class="nav" data-live-topics="board parts staff">Till mig <span id="mine-count" class="count"
+      hx-get="/mine/count" hx-trigger="load" hx-swap="outerHTML" hx-headers='{"X-FreeSMS-Live": "1"}'></span></a>
+    <a href="/parts" class="nav">Delar</a>
+    <a href="/supply" class="nav">Beställningar</a>
+    <a href="/stock" class="nav">Lager</a>
+    <a href="/scan" class="nav">Skanna</a>
+    <a href="/outsourced" class="nav">Hos leverantörer</a>
+    <a href="/shop" class="nav">Verkstaden</a>
+    <a href="/staff" class="nav">Personal</a>
+    <a href="/import" class="nav">Import</a>
+    <a href="/start" class="nav">Komma igång</a>
+    <a href="/customers" class="nav">Kunder</a>
+    <a href="/enquiries" class="nav">Förfrågningar</a>
+    <a href="/calendar" class="nav">Bokningar</a>
+    <a href="/figures" class="nav">Siffror</a>
+    <a href="/receivables" class="nav">Obetalt</a>
+    <a href="/day" class="nav">Dagen</a>
+    <a href="/accounting" class="nav">Bokföring</a>
+    <a href="/privacy" class="nav">Personuppgifter</a>
+    
+    <a href="/time" class="nav">Mina timmar</a>
+    <a href="/rota" class="nav">Schema</a>
+    <a href="/labour" class="nav">Arbetstider</a>
+    <a href="/help" class="nav">Hjälp</a>
+    <a href="/search" class="nav">Sök</a>
+  </nav>
+  <form class="m-0" method="post" action="/logout">
+    
+    <a href="/account" class="who">Ägare</a>
+    <button class="link" type="submit">Logga ut</button>
+  </form>
+</header>
+
+
+<div id="held" class="held" role="status" hidden
+     data-waiting-one="%d sak väntar på att skickas."
+     data-waiting-other="%d saker väntar på att skickas."
+     data-waiting-signin-one="%d sak väntar på att skickas – logga in igen för att skicka den."
+     data-waiting-signin-other="%d saker väntar på att skickas – logga in igen för att skicka dem."
+     data-refused-one="%d sak nekades av servern."
+     data-refused-other="%d saker nekades av servern."
+     data-show="Visa och avfärda"
+     data-refused-title="Nekat av servern:"
+     data-dismiss="Avfärda dessa?"
+     data-held="Ingen anslutning. Det här hålls och skickas när det finns en anslutning."
+     data-needs-connection="Det här kräver en anslutning. Ingenting har skickats och ingenting har sparats."
+     data-updated="Sidan uppdaterades."
+     data-full="Den här enheten har inte plats för mer osänt arbete. Hitta en anslutning innan du fortsätter."></div>
+
+<div id="announce" class="sr-only" role="status" aria-live="polite"></div>
+<main id="main" tabindex="-1">
+
+
+
+
+
+<article class="document">
+  <div class="row">
+    <div>
+      <h1>Faktura A-1</h1>
+      
+      
+      
+      <div>Verkstaden</div>
+      <div class="waiting">Verkstadsgatan 1, 123 45 Stockholm</div>
+      <div class="waiting">Organisationsnummer 556677-8899</div>
+      <div class="waiting">Momsregistreringsnummer SE556677889901</div>
+      <div class="waiting">08-123 456 78 · verkstaden@example.test</div>
+      
+      
+    </div>
+    <div class="waiting">
+      <div><day></div>
+      <div>Förfaller <day></div>
+    </div>
+  </div>
+
+  
+  
+  <p class="waiting">Krediterad av A-2</p>
+
+  <h2>Faktureras till</h2>
+  <div>Reda Ekengren</div>
+  <div class="waiting">Verkstadsgatan 1, 123 45 Stockholm</div>
+  
+  
+  <div class="waiting">Er referens Reda</div>
+  <div class="waiting">Fordon ABC 12D</div>
+
+  <h2>Rader</h2>
+  <ul class="lines">
+    
+    <li>
+      <div class="row">
+        <span>Replace front brake pads and discs</span>
+        <span>2,5 &times; 895,00 kr = 2 237,50 kr</span>
+      </div>
+    </li>
+    
+    <li>
+      <div class="row">
+        <span>Brake pad set, front</span>
+        <span>1 &times; 749,00 kr = 749,00 kr</span>
+      </div>
+    </li>
+    
+  </ul>
+
+  <dl class="totals">
+    
+    <dt>Moms 25%</dt><dd>746,63 kr</dd>
+    
+    <dt>Netto</dt><dd>2 986,50 kr</dd>
+    <dt class="grand">Summa</dt><dd class="grand">3 733,13 kr</dd>
+  </dl>
+
+  
+  <p>Betalas till Bankgiro 123-4567, 30 dagar netto</p>
+  <p class="waiting">Godkänd för F-skatt</p>
+  
+  <p class="waiting">Utställd av Anna Lindqvist</p>
+</article>
+
+
+
+
+
+<section class="no-print mt-l">
+<h2>Betalt</h2>
+
+<dl>
+  <dt>Fakturerad</dt><dd>3 733,13 kr</dd>
+  <dt>Krediterat</dt><dd>-936,25 kr</dd>
+  <dt>Betalt</dt><dd>1 000,00 kr</dd>
+  <dt class="grand">Kvar att betala</dt>
+  <dd class="grand">1 796,88 kr
+    </dd>
+  <dt>Förfaller</dt><dd><day></dd>
+</dl>
+
+<ul class="lines">
+  
+  <li>
+    <div class="row">
+      <span>B-1 &middot; <day> &middot; Swish &middot; Swish 1</span>
+      <span>1 000,00 kr</span>
+    </div>
+    <div class="waiting">Registrerad av Anna Lindqvist, <day> <hh:mm></div>
+    
+    <form method="post" action="/payments/<id-2>/reverse">
+      <input type="hidden" name="invoice" value="/invoices/<id-3>">
+      <button type="submit" class="link">Felregistrerad: rätta den</button>
+    </form>
+    
+  </li>
+  
+</ul>
+
+
+<form method="post" action="/invoices/<id-3>/payments" data-keep="payment:<id-3>">
+  <div class="pair">
+    <label><span>Belopp</span>
+      <input name="amount" inputmode="decimal" placeholder="hela beloppet"></label>
+    <label><span>Betaldag</span>
+      <input type="date" name="paid_on" value="<date>" required></label>
+  </div>
+  <div class="pair">
+    <label><span>Hur</span>
+      <select name="method"><option value="bank">bank</option><option value="cash">kontant</option><option value="card">kort</option><option value="swish">Swish</option><option value="other">annat</option></select></label>
+    <label><span>Referens</span><input name="reference" placeholder="OCR"></label>
+  </div>
+  <label class="tick"><input type="checkbox" name="confirm_over" value="1"> <span>Kunden betalade verkligen mer än fakturan</span></label>
+  <p class="waiting">Lämnas beloppet tomt betalas det som är kvar; kontant avrundas det till hel krona och skillnaden hålls isär.</p>
+  <button type="submit">Registrera betalningen</button>
+</form>
+</section>
+
+
+<section class="no-print mt-l">
+<h2>E-faktura</h2>
+<p class="waiting">Dokumentet som en Peppol BIS Billing 3.0-fil, att skicka med en fakturatjänst som du väljer själv. FreeSMS skickar den inte.</p>
+<a class="button secondary" href="/invoices/<id-3>/einvoice.xml">Hämta e-fakturan</a>
+</section>
+
+
+<section class="no-print mt-l">
+<h2>Rätta den</h2>
+<p class="waiting">En utfärdad faktura ändras inte. En rättelse är ett annat dokument.</p>
+<a class="button secondary" href="/invoices/<id-3>/credit">Kreditera en del av den</a>
+<a class="button secondary" href="/invoices/<id-3>/rebill">Fel person fakturerades</a>
+</section>
+
+
+<section class="no-print mt-l">
+<h2>Vad som gjorts för att rätta den</h2>
+<ul class="lines">
+  
+  <li><div class="row">
+    <a href="/invoices/<id-4>">Kreditfaktura A-2</a>
+    <span class="waiting"><day> <hh:mm> &middot; Anna Lindqvist</span>
+  </div>
+  <div class="waiting">Fel belägg, byttes under garanti</div></li>
+  
+</ul>
+</section>
+
+
+
+<section class="no-print mt-l">
+<h2>Leverans</h2>
+<p class="waiting"><span class="tag warranty">inte levererad än</span></p>
+<ul class="lines">
+  
+</ul>
+
+<h3>Skicka en länk</h3>
+<p class="waiting">Sms och e-post är inte inställda här. Skriv ut den eller lämna över den och notera det nedan.</p>
+<h3>Överlämnad på annat sätt</h3>
+<form method="post" action="/invoices/<id-3>/handover">
+  <div class="pair">
+    <label><span>Given till</span><input name="recipient" value="Reda Ekengren" required maxlength="100"></label>
+    <label><span>Hur</span>
+      <select name="how"><option value="printed">utskriven i disken</option><option value="handed">överlämnad</option><option value="posted">postad</option></select></label>
+  </div>
+  <label><span>Anteckning</span><input name="note" maxlength="300"></label>
+  <button type="submit" class="secondary">Registrera</button>
+</form>
+</section>
+
+<div class="no-print">
+  <button type="button" class="secondary" data-print>Skriv ut</button>
+  <p class="mt-l"><a href="/jobs/<id-5>">Tillbaka till jobbet</a></p>
+</div>
+
+
+</main>
+</body>
+</html>

@@ -1,0 +1,35 @@
+#FLAGGA 0
+#PROGRAM "FreeSMS" "1"
+#FORMAT PC8
+#SIETYP 4
+#GEN <date>
+#FNAMN "Verkstaden"
+#RAR 0 <date> <date>
+#KONTO 1510 "Kundfordringar"
+#KONTO 1910 "Kassa"
+#KONTO 1930 "F”retagskonto"
+#KONTO 2611 "Utg†ende moms 25%"
+#KONTO 2621 "Utg†ende moms 12%"
+#KONTO 2631 "Utg†ende moms 6%"
+#KONTO 3010 "F”rs„ljning"
+#KONTO 3011 "F”rs„ljning, fr„mmande arbete"
+#KONTO 3540 "Faktureringsavgifter"
+#KONTO 3590 "™vriga fakturerade kostnader"
+#KONTO 3740 "™res- och kronutj„mning"
+#VER "A" "1" <date> "Faktura A-1 Reda Ekengren"
+{
+#TRANS 1510 {} 3733.13
+#TRANS 3010 {} -2986.50
+#TRANS 2611 {} -746.63
+}
+#VER "A" "2" <date> "Kreditfaktura A-2 Reda Ekengren"
+{
+#TRANS 1510 {} -936.25
+#TRANS 3010 {} 749.00
+#TRANS 2611 {} 187.25
+}
+#VER "B" "1" <date> "Betalning A-1 Reda Ekengren"
+{
+#TRANS 1930 {} 1000.00
+#TRANS 1510 {} -1000.00
+}

@@ -228,6 +228,16 @@ not exist.
   against the schema it leaves; the loader refuses one that does not say.
   Prefer safe -- split a rename across releases -- because restore means the
   pre-deploy dump and losing what was written since. See DEPLOY.md.
+- **A Core change that alters the workshop's golden output says why.** The
+  seeded shop's invoice, credit note, Peppol files, SIE export, board,
+  "waiting for you" list and figures are kept in
+  `internal/server/testdata/golden`, and `TestWorkshopGoldenOutput` and
+  `TestWorkshopGoldenOutputAfterAnUpgrade` (a database written by the release
+  before M6, migrated forward) compare against them. A diff is regenerated
+  with `-golden.update` in a commit of its own whose message says why a
+  workshop-only shop now sees something different -- never to turn a red
+  test green. `before-m6.sql` is never regenerated. See
+  [#142](https://github.com/RedaEkengren/FreeSMS/issues/142).
 - **Timestamps are `timestamptz` in UTC.** A technician clocking hours across
   the March DST change must not gain or lose an hour.
 
