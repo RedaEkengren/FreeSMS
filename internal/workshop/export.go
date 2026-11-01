@@ -41,6 +41,9 @@ var ExportTables = []string{
 	"supplier_orders", "supplier_order_lines", "supplier_line_etas", "supplier_receipts", "supplier_returns", "job_recommendations", "delivery_summaries", "invoice_deliveries", "invoice_corrections", "receivable_cases", "receivable_events", "day_settlements", "day_reviews", "comebacks", "comeback_claims", "comeback_events", "outsourced_work", "outsourced_events", "import_batches", "import_refs", "setup_steps", "shop_module_changes", "user_roles", "protocol_photo_removals", "parties", "party_roles", "resources", "resource_block_jobs", "resource_retirements", "audit_events", "deposits", "deposit_applications", "vehicle_lookups", "cash_invoices", "payment_flows", "payment_flow_checks", "cash_register_settings", "payouts", "bank_statement_lines", "payment_matches", "identity_retention_settings", "outbox", "outbox_events", "document_templates", "document_template_versions", "document_record_parties", "document_retention_settings",
 	// What technicians see (#225): the shop's decisions, with who and why.
 	"technician_view_changes", "technician_view_exceptions",
+	// Dealer: a car's cycles through stock, what was paid for it and the
+	// checks before the money left (#160-#162).
+	"stock_units", "vehicle_purchases", "stock_checks", "purchase_loans", "stock_check_overrides",
 }
 
 // exportQueries are tables exported with chosen columns, because one of
@@ -70,6 +73,13 @@ var exportQueries = map[string]string{
 		ended_at, ended_by, end_reason, value_removed_at FROM identity_records`,
 	"resource_block_changes": `SELECT id, shop_id, block_id, change, lower(old_period) AS old_starts_at, upper(old_period) AS old_ends_at,
 		lower(new_period) AS new_starts_at, upper(new_period) AS new_ends_at, by_user, at, reason FROM resource_block_changes`,
+	// Dealer: the evidence as document ids separated by spaces, and how long
+	// a check stands in seconds, which a spreadsheet reads (#161, #162).
+	"vat_eligibility": `SELECT id, shop_id, purchase_id, seller_type, eligible,
+		array_to_string(evidence_document_ids::text[], ' ') AS evidence_document_ids, note, supersedes_id, reason,
+		recorded_at, recorded_by FROM vat_eligibility`,
+	"stock_check_settings": `SELECT id, shop_id, seq, kind, required, extract(epoch FROM max_age)::bigint AS max_age_seconds,
+		changed_at, changed_by FROM stock_check_settings`,
 }
 
 // exportExcluded are the tables that do not go, and why.
