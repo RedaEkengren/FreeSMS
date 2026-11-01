@@ -268,7 +268,7 @@ func verifyShop(ctx context.Context, tx pgx.Tx, files Files, sr *ShopReport) err
 		add("invoice sources", Pass, "every credit note is of what it credits")
 	}
 
-		// What was charged was agreed. Not a reason to refuse a restore -- a line
+	// What was charged was agreed. Not a reason to refuse a restore -- a line
 	// can be put on an invoice marked as not agreed -- but a number to look at.
 	if n, err := count(`
 		SELECT count(*) FROM work_order_lines l JOIN work_orders w ON w.id = l.work_order_id

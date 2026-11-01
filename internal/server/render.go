@@ -85,7 +85,9 @@ type pageData struct {
 	ModuleChanges []workshop.ModuleChange
 	ModuleOpen    *workshop.OpenBusiness
 	ModuleReason  string
-	MyLocale      string
+	// What a checklist may be made for in this shop (#147).
+	Subjects []string
+	MyLocale string
 	// What is waiting for the person signed in, and the header's count of it.
 	Waiting      []workshop.WaitingItem
 	WaitingCount int
@@ -317,6 +319,9 @@ func (d pageData) AvailableModules() []access.Module { return workshop.Available
 // that belongs to it. Only presentation: the routes and the operations behind
 // them check for themselves (#143).
 func (d pageData) Runs(m string) bool { return d.Session.Scope.Uses(access.Module(m)) }
+
+// SubjectLabel is what a checklist is for, in words (#147).
+func (d pageData) SubjectLabel(s string) string { return workshop.SubjectLabel(s) }
 
 // MessageAbouts are what a message to a customer can be about, as the page
 // names them.

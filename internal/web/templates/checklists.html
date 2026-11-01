@@ -17,7 +17,7 @@
       <a href="/checklists/{{.ID}}">{{.Name}}</a>
       {{if not .Active}}<span class="tag">{{$.T "retired"}}</span>{{end}}
     </div>
-    <div class="waiting">{{$.N "%d checkpoint" (len .Checkpoints)}}{{if .Used}} &middot; {{$.N "used %d time" .Used}}{{end}}</div>
+    <div class="waiting">{{range .Subjects}}<span class="tag">{{$.T ($.SubjectLabel .)}}</span> {{end}}{{$.N "%d checkpoint" (len .Checkpoints)}}{{if .Used}} &middot; {{$.N "used %d time" .Used}}{{end}}</div>
     <form class="mt-s" method="post" action="/checklists/{{.ID}}/active">
       {{if .Active}}
       <input type="hidden" name="active" value="no">
@@ -53,6 +53,15 @@
   <button type="submit">{{if .Checklist.ID}}{{.T "Save the checklist"}}{{else}}{{.T "Make the checklist"}}{{end}}</button>
   {{if .Checklist.ID}}<p><a href="/checklists">{{.T "Make a new one instead"}}</a></p>{{end}}
 </form>
+{{/* What it is for (#147). Only what the shop's modules do is offered. */}}
+{{if and .Checklist.ID (gt (len .Subjects) 1)}}
+<form class="mt-l" method="post" action="/checklists/{{.Checklist.ID}}/subjects">
+  <fieldset><legend>{{.T "Used for"}}</legend>
+    {{range .Subjects}}<label class="tick"><input type="checkbox" name="subject" value="{{.}}"{{if $.Checklist.UsedFor .}} checked{{end}}> <span>{{$.T ($.SubjectLabel .)}}</span></label>{{end}}
+  </fieldset>
+  <button type="submit" class="secondary">{{.T "Save what it is for"}}</button>
+</form>
+{{end}}
 </div>
 
 </div>

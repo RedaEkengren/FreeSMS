@@ -87,7 +87,7 @@ func Templates(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]T
 	var out []Template
 	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
-			`SELECT id, name FROM inspection_templates WHERE active ORDER BY name`)
+			`SELECT id, name FROM inspection_templates WHERE active AND 'work_order' = ANY(subjects) ORDER BY name`)
 		if err != nil {
 			return fmt.Errorf("list templates: %w", err)
 		}
@@ -120,7 +120,7 @@ func StartInspection(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var name string
 		err := tx.QueryRow(ctx,
-			`SELECT name FROM inspection_templates WHERE id = $1 AND active`, templateID).Scan(&name)
+			`SELECT name FROM inspection_templates WHERE id = $1 AND active AND 'work_order' = ANY(subjects)`, templateID).Scan(&name)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
@@ -140,8 +140,8 @@ func StartInspection(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 		}
 
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO inspection_items (shop_id, inspection_id, position, label)
-			SELECT $1, $2, ti.position, ti.label
+			INSERT INTO inspection_items (shop_id, inspection_id, position, label, item_key)
+			SELECT $1, $2, ti.position, ti.label, ti.item_key
 			FROM inspection_template_items ti
 			WHERE ti.template_id = $3
 			ORDER BY ti.position`, scope.ShopID, id, templateID); err != nil {
@@ -171,7 +171,8 @@ func SetItem(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, itemID
 			s = status
 		}
 		tag, err := tx.Exec(ctx,
-			`UPDATE inspection_items SET status = coalesce($1, status), note = nullif($2, '') WHERE id = $3`,
+			`UPDATE inspection_items SET status = coalesce($1, status), note = nullif($2, '')
+			 WHERE id = $3 AND inspection_id IN (SELECT id FROM inspections WHERE subject = 'work_order')`,
 			s, strings.TrimSpace(note), itemID)
 		if err != nil {
 			return fmt.Errorf("set item: %w", err)
@@ -190,7 +191,8 @@ func AttachPhoto(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, it
 			INSERT INTO attachments
 			  (shop_id, inspection_item_id, storage_key, content_type, byte_size, original_name, uploaded_by)
 			SELECT $1, i.id, $2, $3, $4, nullif($5, ''), $6
-			FROM inspection_items i WHERE i.id = $7`,
+			FROM inspection_items i JOIN inspections n ON n.id = i.inspection_id AND n.subject = 'work_order'
+			WHERE i.id = $7`,
 			scope.ShopID, key, contentType, size, originalName, scope.UserID, itemID)
 		if err != nil {
 			return fmt.Errorf("attach photo: %w", err)
@@ -215,7 +217,7 @@ func CompleteInspection(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 			return err
 		}
 		tag, err := tx.Exec(ctx,
-			`UPDATE inspections SET completed_at = now() WHERE id = $1 AND completed_at IS NULL`,
+			`UPDATE inspections SET completed_at = now() WHERE id = $1 AND completed_at IS NULL AND subject = 'work_order'`,
 			inspectionID)
 		if err != nil {
 			return fmt.Errorf("complete inspection: %w", err)
@@ -364,7 +366,7 @@ func CreateShare(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in
 		tag, err := tx.Exec(ctx, `
 			INSERT INTO inspection_shares (shop_id, inspection_id, token_sha256, created_by, expires_at)
 			SELECT $1, i.id, $2, $3, now() + $4::interval
-			FROM inspections i WHERE i.id = $5`,
+			FROM inspections i WHERE i.id = $5 AND i.subject = 'work_order'`,
 			scope.ShopID, sum[:], scope.UserID, fmt.Sprintf("%d seconds", int(shareLifetime.Seconds())), inspectionID)
 		if err != nil {
 			return fmt.Errorf("create share: %w", err)

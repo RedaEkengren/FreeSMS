@@ -3,10 +3,12 @@ package workshop
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -28,10 +30,58 @@ type ChecklistTemplate struct {
 	Name        string
 	Active      bool
 	Checkpoints []string
+	// What it may be used for (#147): a workshop job, or a protocol of car
+	// sales or rental. Each names its module.
+	Subjects []string
 	// How many inspections have been made from it. Editing does not change
 	// those -- each copied its labels -- but the page says so.
 	Used int
 }
+
+// subjectLabels are the words for what a checklist is for, as catalogue keys.
+var subjectLabels = map[string]string{
+	SubjectWorkOrder: "Workshop jobs",
+	SubjectPurchase:  "Buying a car in",
+	SubjectDelivery:  "Handing a car over",
+	SubjectCheckOut:  "Handing a rental out",
+	SubjectCheckIn:   "Taking a rental back",
+}
+
+// SubjectLabel is a subject in words.
+func SubjectLabel(subject string) string {
+	if l, ok := subjectLabels[subject]; ok {
+		return l
+	}
+	return subject
+}
+
+// subjectModule is the module a subject belongs to.
+func subjectModule(subject string) access.Module {
+	switch subject {
+	case SubjectPurchase, SubjectDelivery:
+		return access.Dealer
+	case SubjectCheckOut, SubjectCheckIn:
+		return access.Rental
+	}
+	return access.Workshop
+}
+
+// SubjectsOffered is what a checklist may be made for in this shop: the
+// subjects of the modules it runs, in the order a form offers them. Read
+// from the scope's modules, not through scope.Uses, which the permission
+// contract takes for a gate: this only decides what to offer.
+func SubjectsOffered(scope access.Scope) []string {
+	var out []string
+	for _, s := range []string{SubjectWorkOrder, SubjectPurchase, SubjectDelivery, SubjectCheckOut, SubjectCheckIn} {
+		if slices.Contains(scope.Modules, subjectModule(s)) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// UsedFor reports whether the checklist may be used for subject.
+func (t ChecklistTemplate) UsedFor(subject string) bool { return slices.Contains(t.Subjects, subject) }
 
 // CheckpointText is the checkpoints as the edit form shows them.
 func (t ChecklistTemplate) CheckpointText() string { return strings.Join(t.Checkpoints, "\n") }
@@ -80,9 +130,10 @@ func ChecklistTemplateByID(ctx context.Context, pool *pgxpool.Pool, scope access
 
 func readChecklists(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id string) ([]ChecklistTemplate, error) {
 	var out []ChecklistTemplate
-	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	// Core (#147): the same checklists serve a job, a purchase, a check-out.
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
-			SELECT t.id, t.name, t.active,
+			SELECT t.id, t.name, t.active, t.subjects,
 			       coalesce((SELECT array_agg(i.label ORDER BY i.position)
 			                 FROM inspection_template_items i WHERE i.template_id = t.id), '{}'),
 			       (SELECT count(*) FROM inspections n WHERE n.template_id = t.id)
@@ -95,7 +146,7 @@ func readChecklists(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		defer rows.Close()
 		for rows.Next() {
 			var t ChecklistTemplate
-			if err := rows.Scan(&t.ID, &t.Name, &t.Active, &t.Checkpoints, &t.Used); err != nil {
+			if err := rows.Scan(&t.ID, &t.Name, &t.Active, &t.Subjects, &t.Checkpoints, &t.Used); err != nil {
 				return fmt.Errorf("scan checklist: %w", err)
 			}
 			out = append(out, t)
@@ -143,11 +194,18 @@ func SaveChecklistTemplate(ctx context.Context, pool *pgxpool.Pool, scope access
 		return "", ErrNotFound
 	}
 
-	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if id == "" {
+			// A new checklist is for the workshop's jobs where there is a
+			// workshop, as every checklist was; otherwise for what the
+			// shop's modules do. Changed with SetTemplateSubjects.
+			subjects := []string{SubjectWorkOrder}
+			if offered := SubjectsOffered(scope); len(offered) > 0 && offered[0] != SubjectWorkOrder {
+				subjects = offered
+			}
 			if err := tx.QueryRow(ctx,
-				`INSERT INTO inspection_templates (shop_id, name) VALUES ($1, $2) RETURNING id`,
-				scope.ShopID, name).Scan(&id); err != nil {
+				`INSERT INTO inspection_templates (shop_id, name, subjects) VALUES ($1, $2, $3) RETURNING id`,
+				scope.ShopID, name, subjects).Scan(&id); err != nil {
 				return fmt.Errorf("create checklist: %w", err)
 			}
 		} else {
@@ -166,8 +224,8 @@ func SaveChecklistTemplate(ctx context.Context, pool *pgxpool.Pool, scope access
 		}
 		for i, label := range checkpoints {
 			if _, err := tx.Exec(ctx, `
-				INSERT INTO inspection_template_items (shop_id, template_id, position, label)
-				VALUES ($1, $2, $3, $4)`, scope.ShopID, id, i+1, label); err != nil {
+				INSERT INTO inspection_template_items (shop_id, template_id, position, label, item_key)
+				VALUES ($1, $2, $3, $4, $5)`, scope.ShopID, id, i+1, label, strings.ToLower(label)); err != nil {
 				return fmt.Errorf("add checkpoint: %w", err)
 			}
 		}
@@ -190,7 +248,7 @@ func SetChecklistActive(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 	if !access.IsUUID(id) {
 		return ErrNotFound
 	}
-	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `UPDATE inspection_templates SET active = $1 WHERE id = $2`, active, id)
 		if err != nil {
 			return fmt.Errorf("set checklist active: %w", err)

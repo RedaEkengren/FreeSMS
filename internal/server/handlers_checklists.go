@@ -58,6 +58,24 @@ func (s *Server) handleChecklistActive(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/checklists", http.StatusSeeOther)
 }
 
+// handleChecklistSubjects says what a checklist is for (#147).
+func (s *Server) handleChecklistSubjects(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	if err := r.ParseForm(); err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "Not saved", "The form did not arrive whole.")
+		return
+	}
+	err := workshop.SetTemplateSubjects(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.Form["subject"])
+	if errors.Is(err, workshop.ErrInvalid) || errors.Is(err, access.ErrModuleOff) {
+		s.renderError(w, r, http.StatusBadRequest, "Not saved", trimInvalid(err))
+		return
+	}
+	if s.checklistError(w, r, err) {
+		return
+	}
+	http.Redirect(w, r, "/checklists/"+r.PathValue("id"), http.StatusSeeOther)
+}
+
 func (s *Server) renderChecklists(w http.ResponseWriter, r *http.Request, status int, editing workshop.ChecklistTemplate, problem string) {
 	session := sessionFrom(r.Context())
 	all, err := workshop.ChecklistTemplates(r.Context(), s.pool, session.Scope)
@@ -69,6 +87,7 @@ func (s *Server) renderChecklists(w http.ResponseWriter, r *http.Request, status
 		Session:    session,
 		Checklists: all,
 		Checklist:  editing,
+		Subjects:   workshop.SubjectsOffered(session.Scope),
 		Error:      problem,
 	})
 }

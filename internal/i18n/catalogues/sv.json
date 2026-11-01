@@ -6981,6 +6981,48 @@
     },
     "every line says what it is": {
       "other": "varje rad säger vad den är"
+    },
+    "%q is not a protocol's subject": {
+      "other": "%q är inte något ett protokoll kan gälla"
+    },
+    "a checklist is for at least one thing": {
+      "other": "en checklista gäller minst en sak"
+    },
+    "a protocol supersedes a finished one of the same thing and the same vehicle": {
+      "other": "ett protokoll ersätter ett avslutat protokoll om samma sak och samma fordon"
+    },
+    "say why it was left, in 300 characters or fewer": {
+      "other": "säg varför det lämnades, med högst 300 tecken"
+    },
+    "that checklist is not one for this": {
+      "other": "den checklistan är inte till för det här"
+    },
+    "the protocol is finished; start a new one that supersedes it": {
+      "other": "protokollet är avslutat; börja ett nytt som ersätter det"
+    },
+    "the request key is too long": {
+      "other": "förfrågans nyckel är för lång"
+    },
+    "Workshop jobs": {
+      "other": "Verkstadsjobb"
+    },
+    "Buying a car in": {
+      "other": "Inköp av bil"
+    },
+    "Handing a car over": {
+      "other": "Leverans av bil"
+    },
+    "Handing a rental out": {
+      "other": "Utlämning vid hyra"
+    },
+    "Taking a rental back": {
+      "other": "Återlämning vid hyra"
+    },
+    "Used for": {
+      "other": "Används till"
+    },
+    "Save what it is for": {
+      "other": "Spara vad den används till"
     }
   }
 }

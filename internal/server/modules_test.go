@@ -140,7 +140,7 @@ func TestASwitchedOffModulesRoutesAreNotThere(t *testing.T) {
 		if status != http.StatusOK {
 			t.Errorf("GET %s, workshop off: %d, want 200 -- Core and what the workshop recorded stay readable", path, status)
 		}
-		for _, link := range []string{`href="/calendar"`, `href="/enquiries"`, `href="/parts"`, `href="/labour"`, `href="/time"`, `href="/jobs/`, `href="/checklists"`} {
+		for _, link := range []string{`href="/calendar"`, `href="/enquiries"`, `href="/parts"`, `href="/labour"`, `href="/time"`, `href="/jobs/`} {
 			if strings.Contains(body, link) {
 				t.Errorf("GET %s, workshop off, still links to %s", path, link)
 			}

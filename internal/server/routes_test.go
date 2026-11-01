@@ -203,6 +203,7 @@ var swept = map[string]string{
 	"POST /stock/parts/{id}/active":               "sweep",
 	"POST /checklists/{id}":                       "sweep",
 	"POST /checklists/{id}/active":                "sweep",
+	"POST /checklists/{id}/subjects":              "sweep",
 }
 
 // fill substitutes shop B's identifiers into a pattern.
