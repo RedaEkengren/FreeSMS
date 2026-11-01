@@ -552,7 +552,20 @@ type lockedRental struct {
 
 func lockRentalTx(ctx context.Context, tx pgx.Tx, id string) (lockedRental, error) {
 	b := lockedRental{id: id}
-	err := tx.QueryRow(ctx, `
+	// The unit first, then the booking and its block: the one order every
+	// rental write takes, so two never wait on each other.
+	var resource string
+	err := tx.QueryRow(ctx, `SELECT k.resource_id FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id WHERE b.id = $1`, id).Scan(&resource)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return b, ErrNotFound
+	}
+	if err != nil {
+		return b, fmt.Errorf("read booking: %w", err)
+	}
+	if err := lockUnitResourceTx(ctx, tx, resource); err != nil {
+		return b, err
+	}
+	err = tx.QueryRow(ctx, `
 		SELECT b.unit_id, k.resource_id, b.block_id, `+rentalState+`, b.starts_at, b.ends_at, k.buffer_after, k.status
 		FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id
 		WHERE b.id = $1 FOR UPDATE OF b, k`, id).Scan(&b.unit, &b.resource, &b.block, &b.state, &b.starts, &b.ends, &b.buffer, &b.blockStatus)
@@ -562,7 +575,7 @@ func lockRentalTx(ctx context.Context, tx pgx.Tx, id string) (lockedRental, erro
 	if err != nil {
 		return b, fmt.Errorf("read booking: %w", err)
 	}
-	return b, lockUnitResourceTx(ctx, tx, b.resource)
+	return b, nil
 }
 
 // ConfirmRentalBooking makes a hold a booking: the deposit came, the

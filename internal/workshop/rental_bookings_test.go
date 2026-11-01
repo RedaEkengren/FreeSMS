@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -609,5 +610,39 @@ func TestAHoldIsNotMovedToStartBeforeItRunsOut(t *testing.T) {
 	from := time.Now().Add(24 * time.Hour)
 	if err := workshop.MoveRentalBooking(ctx, pool, rentalDesk(), id, from, from.Add(24*time.Hour), ""); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("a hold moved to start before it runs out: %v", err)
+	}
+}
+
+// Cancelling a hold that has run out while somebody books over its time
+// never deadlocks: both take the unit first (review 2 #1).
+func TestCancellingARunOutHoldBesideABookingDoesNotDeadlock(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	for i := 0; i < 6; i++ {
+		from := in2031(1+3*i, 9)
+		until := time.Now().Add(time.Hour)
+		held, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: v.unit, RenterID: v.renter,
+			From: from, To: from.Add(24 * time.Hour), HoldUntil: &until})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(ctx, `UPDATE resource_blocks SET expires_at = now() - interval '1 minute' WHERE source_id = $1`, held); err != nil {
+			t.Fatal(err)
+		}
+		var wg sync.WaitGroup
+		var cancelled, booked error
+		wg.Add(2)
+		go func() { defer wg.Done(); cancelled = workshop.CancelRentalBooking(ctx, pool, rentalDesk(), held, "Inget svar", false) }()
+		go func() { defer wg.Done(); _, booked = v.book(pool, from.Add(time.Hour), from.Add(5*time.Hour)) }()
+		wg.Wait()
+		for _, err := range []error{cancelled, booked} {
+			if err != nil && strings.Contains(err.Error(), "deadlock") {
+				t.Fatalf("round %d: %v", i, err)
+			}
+		}
+		if booked != nil {
+			t.Errorf("round %d: booking over a run-out hold: %v", i, booked)
+		}
 	}
 }
