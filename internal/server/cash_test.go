@@ -48,6 +48,10 @@ func TestAJobIsInvoicedAndPaidAtTheCounter(t *testing.T) {
 	if strings.Contains(doc, "Pay to ") {
 		t.Error("a cash invoice asks to be paid")
 	}
+	// Its payment stands with it: no reverse button, a credit note instead.
+	if strings.Contains(doc, "/reverse") || !strings.Contains(doc, "a mistake is corrected with a credit note") {
+		t.Error("a cash invoice's payment offers to be reversed, or does not say it is corrected with a credit note")
+	}
 
 	if status, _ := page(t, desk, ts.URL+"/payment-flows"); status != http.StatusForbidden {
 		t.Errorf("the front desk opened the payment flows: %d", status)

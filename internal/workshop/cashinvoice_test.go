@@ -178,3 +178,44 @@ func mustIssue(t *testing.T) string {
 	}
 	return inv.ID
 }
+
+// A cash invoice's payments stand with it: once issued, one is neither
+// reversed -- in Go or past it -- nor refunded on its own. A mistake is a
+// credit note, and only then does money go back.
+func TestACashInvoicesPaymentsStandWithIt(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	desk := advisor()
+	inv, err := workshop.IssueAndPay(ctx, pool, desk, readyToInvoice(t, pool), workshop.CashSale{Payments: []workshop.CashPayment{{Method: "card"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := workshop.BalanceFor(ctx, pool, desk, inv.ID)
+	if err != nil || len(b.Payments) != 1 || !b.Payments[0].PaidOnIssue {
+		t.Fatalf("the cash invoice's payment: %+v, %v; want one, paid on issue", b.Payments, err)
+	}
+	paid := b.Payments[0]
+	if err := workshop.ReversePayment(ctx, pool, desk, paid.ID, "Fel kort"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a cash invoice's payment reversed: %v, want refused", err)
+	}
+	if err := rawPaymentBy(t, pool, "card", "invoice_id, amount_minor, reverses_id, reason", 990, inv.ID, -paid.AmountMinor, paid.ID, "x"); err == nil {
+		t.Error("the database let a cash invoice's payment be reversed")
+	}
+	if _, err := workshop.RefundPayment(ctx, pool, desk, paid.ID, workshop.NewPayment{
+		AmountMinor: minor(paid.AmountMinor), Method: "card", PaidOn: time.Now()}, "Ångrade sig"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a cash invoice's payment refunded with no credit note: %v, want refused", err)
+	}
+	if b, _ := workshop.BalanceFor(ctx, pool, desk, inv.ID); !b.Settled() {
+		t.Errorf("after the refusals the cash invoice owes %d", b.OutstandingMinor())
+	}
+	if _, err := workshop.CreditNote(ctx, pool, desk, inv.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RefundPayment(ctx, pool, desk, paid.ID, workshop.NewPayment{
+		AmountMinor: minor(paid.AmountMinor), Method: "card", PaidOn: time.Now()}, "Krediterad"); err != nil {
+		t.Errorf("credited, the card payment refunded: %v", err)
+	}
+	if err := workshop.ReversePayment(ctx, pool, desk, paid.ID, "Fel kort"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a cash invoice's payment reversed after its credit note: %v, want refused", err)
+	}
+}

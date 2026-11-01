@@ -38,6 +38,9 @@ type Payment struct {
 	Reference     string
 	Reverses      string
 	Reversed      bool
+	// Listed on a cash invoice as how it was paid on issue: it stands as
+	// the document does, and is corrected with a credit note (0087).
+	PaidOnIssue bool
 	// What it is against: one of an invoice, a deposit and a payout (#152).
 	InvoiceID string
 	DepositID string
@@ -214,7 +217,9 @@ func balanceTx(ctx context.Context, tx pgx.Tx, invoiceID string, lock bool) (Bal
 		SELECT p.id, p.series, p.number, p.amount_minor, p.rounding_minor, p.method, p.paid_on,
 		       p.recorded_at, coalesce(pe.display_name, ''), coalesce(p.reference, ''),
 		       coalesce(p.reverses_id::text, ''),
-		       EXISTS (SELECT 1 FROM invoice_payments r WHERE r.reverses_id = p.id)
+		       EXISTS (SELECT 1 FROM invoice_payments r WHERE r.reverses_id = p.id),
+		       EXISTS (SELECT 1 FROM cash_invoices c WHERE c.invoice_id = p.invoice_id
+		               AND c.paid_with @> jsonb_build_array(jsonb_build_object('payment_id', p.id::text)))
 		FROM invoice_payments p
 		LEFT JOIN users u ON u.id = p.recorded_by
 		LEFT JOIN people pe ON pe.id = u.person_id
@@ -227,7 +232,7 @@ func balanceTx(ctx context.Context, tx pgx.Tx, invoiceID string, lock bool) (Bal
 	for rows.Next() {
 		var p Payment
 		if err := rows.Scan(&p.ID, &p.Series, &p.Number, &p.AmountMinor, &p.RoundingMinor, &p.Method,
-			&p.PaidOn, &p.RecordedAt, &p.RecordedBy, &p.Reference, &p.Reverses, &p.Reversed); err != nil {
+			&p.PaidOn, &p.RecordedAt, &p.RecordedBy, &p.Reference, &p.Reverses, &p.Reversed, &p.PaidOnIssue); err != nil {
 			return b, fmt.Errorf("scan payment: %w", err)
 		}
 		b.PaidMinor += p.Settles()
@@ -349,6 +354,10 @@ func RecordPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 // A deposit applied to an invoice is two rows and one fact: reversed from
 // either, both are, so the money is neither held and paid at once nor
 // gone (0082).
+//
+// A payment a cash invoice lists as how it was paid on issue is not
+// reversed: it is part of a document frozen as paid, and a mistake is a
+// credit note, with a new invoice if one is needed (0087).
 func ReversePayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, paymentID, reason string) error {
 	if !scope.Role.SeesCustomerPersonalData() && !scope.Role.SellsVehicles() && !scope.Role.HandsOverRentals() && !scope.Role.SeesPurchasePrice() {
 		return access.ErrForbidden
@@ -385,6 +394,18 @@ func ReversePayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		}
 		if orig.Reverses != "" {
 			return fmt.Errorf("%w: that is itself a reversal; record the payment again instead", ErrInvalid)
+		}
+		if orig.InvoiceID != "" {
+			var onIssue bool
+			if err := tx.QueryRow(ctx, `
+				SELECT EXISTS (SELECT 1 FROM cash_invoices c WHERE c.invoice_id = $1
+				               AND c.paid_with @> jsonb_build_array(jsonb_build_object('payment_id', $2::text)))`,
+				orig.InvoiceID, orig.ID).Scan(&onIssue); err != nil {
+				return fmt.Errorf("read the cash invoice: %w", err)
+			}
+			if onIssue {
+				return errCashInvoicePayment
+			}
 		}
 		if orig.RefundsID == "" {
 			var standing bool
@@ -570,6 +591,8 @@ func insertPayment(ctx context.Context, tx pgx.Tx, scope access.Scope, p *Paymen
 			return errDepositShort
 		case strings.Contains(pg.Message, "more given back on an invoice"):
 			return errGivenBackTooMuch
+		case strings.Contains(pg.Message, "cash invoice's payment is not reversed"):
+			return errCashInvoicePayment
 		}
 	}
 	return err

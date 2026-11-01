@@ -68,6 +68,8 @@ type PaidWith struct {
 var (
 	errCashMethod = fmt.Errorf("%w: a cash invoice is paid in cash, by card or by Swish at the counter", ErrInvalid)
 	errCashSplit  = fmt.Errorf("%w: the payments add up to more or less than the invoice; only the last may be the rest", ErrInvalid)
+	// errCashInvoicePayment is a cash invoice's payment reversed.
+	errCashInvoicePayment = fmt.Errorf("%w: that payment is how a cash invoice was paid on issue, and stands; correct the invoice with a credit note", ErrInvalid)
 )
 
 func checkCashSale(s CashSale) error {

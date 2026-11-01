@@ -30,7 +30,9 @@
       <span>{{$.Money .AmountMinor}}{{if .RoundingMinor}} + {{$.Money .RoundingMinor}} {{$.T "rounding"}}{{end}}</span>
     </div>
     <div class="waiting">{{$.T "Recorded by %s, %s" .RecordedBy ($.Date ($.Local .RecordedAt) "2 Jan 15:04")}}{{if .Reverses}} &middot; {{$.T "reverses a payment recorded in error"}}{{end}}</div>
-    {{if and (not .Reversed) (not .Reverses)}}
+    {{if .PaidOnIssue}}
+    <div class="waiting">{{$.T "Paid on issue: it stands with the invoice, and a mistake is corrected with a credit note."}}</div>
+    {{else if and (not .Reversed) (not .Reverses)}}
     <form method="post" action="/payments/{{.ID}}/reverse">
       <input type="hidden" name="invoice" value="/invoices/{{$.Balance.InvoiceID}}">
       <label><span>{{$.T "Why it is reversed"}}</span><input name="reason" maxlength="300" required></label>
