@@ -193,8 +193,11 @@ func PreviewCustomerMerge(ctx context.Context, pool *pgxpool.Pool, scope access.
 
 // MergeCustomers joins two customer records that are one. Jobs, ownership and
 // contacts move to the one kept; the other stays as a marked record. Issued
-// invoices carry the name they went out with and are not rewritten. Both
-// forms were opened against the versions given.
+// invoices carry the name they went out with and are not rewritten -- nor the
+// customer an invoice that is not a job's names, which its trigger keeps as
+// issued: those are read through the merge instead (customer_now, 0068), so
+// the kept card, the worklist and the person's export count them. Both forms
+// were opened against the versions given.
 func MergeCustomers(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, keepID, dropID string, keepRev, dropRev int, reason string) (MergePreview, error) {
 	if !scope.Role.SeesCustomerPersonalData() {
 		return MergePreview{}, access.ErrForbidden
@@ -270,7 +273,7 @@ func customerMergeTx(ctx context.Context, tx pgx.Tx, keepID, dropID string, lock
 	}
 	if err := tx.QueryRow(ctx, `
 		SELECT count(*) FROM invoices i LEFT JOIN work_orders w ON w.id = i.work_order_id
-		WHERE coalesce(i.customer_id, w.customer_id) = $1`, dropID).Scan(&p.Invoices); err != nil {
+		WHERE customer_now(coalesce(i.customer_id, w.customer_id)) = $1`, dropID).Scan(&p.Invoices); err != nil {
 		return p, fmt.Errorf("count invoices: %w", err)
 	}
 	fill := func(field, keepV, dropV string) {
@@ -478,6 +481,10 @@ func vehicleMergeTx(ctx context.Context, tx pgx.Tx, keepID, dropID string, lock 
 // MergeVehicles joins two vehicle records that are one car. Jobs, plates,
 // ownership and readings move to the one kept; a plate the other still carried
 // becomes a plate it used to carry. Refused when the periods would overlap.
+// A protocol -- a check-out, a check-in, a purchase -- keeps the vehicle it
+// was made of, frozen as it is once finished, and is read through the merge
+// instead (vehicle_now, 0068), so the kept car's protocols include the other
+// one's and a check-out and check-in still go side by side.
 func MergeVehicles(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, keepID, dropID string, keepRev, dropRev int, reason string) (VehicleMergePreview, error) {
 	if !scope.Role.SeesCustomerPersonalData() {
 		return VehicleMergePreview{}, access.ErrForbidden

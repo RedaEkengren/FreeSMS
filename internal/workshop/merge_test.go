@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
@@ -204,5 +205,95 @@ func TestTwoVehiclesThatAreTwoCarsAreNotMerged(t *testing.T) {
 	pv, err = workshop.PreviewVehicleMerge(ctx, pool, advisor(), vehicleA, third)
 	if err != nil || !strings.Contains(pv.Blocked, "owner at the same time") {
 		t.Errorf("two current owners: %+v, %v", pv, err)
+	}
+}
+
+// An invoice that is not a job's names its own customer, and keeps it: it
+// is immutable as issued, so a merge does not rewrite it. It is read through
+// the merge instead -- the kept card counts it, the worklist sees it as the
+// same customer's, the kept person's export lists it.
+func TestAMergedCustomersOwnInvoicesAreReadAsTheKeptOnes(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	keep := fixtureCustomer
+	dup, err := workshop.CreateCustomer(ctx, pool, advisor(), workshop.NewCustomer{Kind: "private", Name: "A. Customer", Email: "dup@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := []workshop.SourcedLine{{Description: "Vinterhjul", QuantityMilli: 1000, UnitPriceMinor: 100000, VATRateBasis: 2500}}
+	if _, err := workshop.IssueManual(ctx, pool, advisor(), workshop.ManualInvoice{CustomerID: keep, Lines: line}); err != nil {
+		t.Fatal(err)
+	}
+	theirs, err := workshop.IssueManual(ctx, pool, advisor(), workshop.ManualInvoice{CustomerID: dup, Lines: line})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := cardOf(t, pool, keep).Invoices
+
+	pv, err := workshop.PreviewCustomerMerge(ctx, pool, advisor(), keep, dup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pv.Invoices != 1 {
+		t.Errorf("the preview counts %d of the other's invoices, want 1", pv.Invoices)
+	}
+	if _, err := workshop.MergeCustomers(ctx, pool, advisor(), keep, dup, pv.KeepRevision, pv.DropRevision, "Same person"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, customer := sourceRow(t, pool, theirs.ID); customer != dup {
+		t.Errorf("the merge rewrote the issued invoice's customer to %s", customer)
+	}
+	if got := cardOf(t, pool, keep).Invoices; got != before+1 {
+		t.Errorf("the kept card counts %d invoices, want %d", got, before+1)
+	}
+	items, err := workshop.Worklist(ctx, pool, advisor(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range items {
+		if it.OtherOpen != 1 {
+			t.Errorf("%s: %d others open for the same customer, want 1", it.Reference, it.OtherOpen)
+		}
+	}
+	exp, err := workshop.ExportPerson(ctx, pool, advisor(), customerPersonID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(exp.Invoices) != 2 {
+		t.Errorf("the kept person's export lists %d invoices, want both", len(exp.Invoices))
+	}
+}
+
+// A finished protocol keeps the vehicle it was made of; merging that car
+// into another leaves it so, and the kept car's protocols include it.
+func TestAMergedVehiclesProtocolsAreReadAsTheKeptOnes(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	dup := newOtherVehicle(t, pool, "ABC 12O")
+	desk := otherRoles(access.Of(access.RoleRentalAgent))
+	id, err := workshop.StartProtocol(ctx, pool, desk, workshop.ProtocolSubject{Kind: workshop.SubjectCheckOut,
+		RefID: rentalA, VehicleID: dup}, rentalChecklist(t, pool), "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.CompleteProtocol(ctx, pool, desk, id); err != nil {
+		t.Fatal(err)
+	}
+	pv, err := workshop.PreviewVehicleMerge(ctx, pool, advisor(), vehicleA, dup)
+	if err != nil || pv.Blocked != "" {
+		t.Fatalf("preview = %+v, %v", pv, err)
+	}
+	if _, err := workshop.MergeVehicles(ctx, pool, advisor(), vehicleA, dup, pv.KeepRevision, pv.DropRevision, "Misread plate"); err != nil {
+		t.Fatalf("MergeVehicles with a finished protocol on the other: %v", err)
+	}
+	ps, err := workshop.ProtocolsForVehicle(ctx, pool, desk, vehicleA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ps) != 1 || ps[0].ID != id {
+		t.Fatalf("the kept car's protocols are %+v, want the other's check-out", ps)
+	}
+	if ps[0].VehicleID != dup || ps[0].Registration != "ABC 12D" {
+		t.Errorf("the protocol reads vehicle %s, plate %q; want the vehicle it was made of, under the kept car's plate", ps[0].VehicleID, ps[0].Registration)
 	}
 }

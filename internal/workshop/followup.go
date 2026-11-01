@@ -636,7 +636,9 @@ func Worklist(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, today
 			  SELECT i.id, i.series || '-' || i.number AS ref, i.customer_name, i.issued_at, coalesce(i.seller_payment_terms_days, 0) AS terms,
 			         -- Whom it is to: the job's customer for the workshop's, its
 			         -- own for any other source (#146).
-			         coalesce(i.customer_id, (SELECT w.customer_id FROM work_orders w WHERE w.id = i.work_order_id)) AS customer_id,
+			         -- Through any merge: a manual invoice keeps the customer it
+			         -- was issued to, which may since be merged into another.
+			         customer_now(coalesce(i.customer_id, (SELECT w.customer_id FROM work_orders w WHERE w.id = i.work_order_id))) AS customer_id,
 			         i.gross_minor
 			           + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = i.id), 0)
 			           - coalesce((SELECT sum(p.amount_minor + p.rounding_minor) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) AS owed

@@ -211,9 +211,11 @@ func ExportPerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 			FROM invoices i
 			LEFT JOIN work_orders w ON w.id = i.work_order_id
 			-- The job's customer, or the invoice's own when it is not a
-			-- job's (#146).
-			JOIN customers c   ON c.id = coalesce(i.customer_id, w.customer_id)
-			WHERE c.person_id = $1
+			-- job's (#146) -- that one, or the one it has been merged into,
+			-- since the invoice keeps the customer it was issued to.
+			WHERE EXISTS (SELECT 1 FROM customers c
+			              WHERE c.id IN (coalesce(i.customer_id, w.customer_id), customer_now(coalesce(i.customer_id, w.customer_id)))
+			                AND c.person_id = $1)
 			ORDER BY i.issued_at`, personID)
 		if err != nil {
 			return fmt.Errorf("read invoices: %w", err)
@@ -366,7 +368,8 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 		if _, err := tx.Exec(ctx, `
 			UPDATE invoice_deliveries SET recipient_name = $2
 			WHERE invoice_id IN (SELECT i.id FROM invoices i LEFT JOIN work_orders w ON w.id = i.work_order_id
-			                     JOIN customers c ON c.id = coalesce(i.customer_id, w.customer_id) WHERE c.person_id = $1)`, personID, ErasedName); err != nil {
+			                     JOIN customers c ON c.id IN (coalesce(i.customer_id, w.customer_id), customer_now(coalesce(i.customer_id, w.customer_id)))
+			                     WHERE c.person_id = $1)`, personID, ErasedName); err != nil {
 			return fmt.Errorf("clear the delivery log: %w", err)
 		}
 
