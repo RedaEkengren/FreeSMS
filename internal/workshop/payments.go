@@ -287,6 +287,12 @@ func RecordPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		if issued := b.IssuedAt.In(b.Today.Location()); p.PaidOn.Format("2006-01-02") < issued.AddDate(0, 0, -maxPaidBeforeInvoiceDays).Format("2006-01-02") {
 			return fmt.Errorf("%w: that is more than %d days before the invoice was issued, on %s", ErrInvalid, maxPaidBeforeInvoiceDays, issued.Format("2006-01-02"))
 		}
+		// Money given back here is an overpayment returned, and is at most
+		// what is owed back; a refund of a payment is RefundPayment. The
+		// database holds it too (0083).
+		if p.AmountMinor != nil && *p.AmountMinor < 0 && b.OutstandingMinor()-*p.AmountMinor > 0 {
+			return errGivenBackTooMuch
+		}
 		over := p.AmountMinor != nil && *p.AmountMinor > b.OutstandingMinor()+overpaymentMargin
 		var why string
 		switch {
@@ -556,6 +562,8 @@ func insertPayment(ctx context.Context, tx pgx.Tx, scope access.Scope, p *Paymen
 			return errRefundsStand
 		case strings.Contains(pg.Message, "more taken from a deposit"):
 			return errDepositShort
+		case strings.Contains(pg.Message, "more given back on an invoice"):
+			return errGivenBackTooMuch
 		}
 	}
 	return err

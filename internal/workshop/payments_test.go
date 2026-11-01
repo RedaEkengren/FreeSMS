@@ -198,3 +198,38 @@ func TestAPaymentIsBookedAgainstTheReceivable(t *testing.T) {
 		t.Errorf("no voucher B 1 dated today:\n%s", body)
 	}
 }
+
+// Money given back on an invoice that is not a refund of one payment --
+// an overpayment returned -- is at most what is owed back: never more than
+// the customer paid over, and nothing at all on an invoice that owes the
+// shop. The database holds it too.
+func TestMoneyGivenBackOnAnInvoiceIsAtMostWhatIsOwedBack(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	inv, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: amount(-1000), Method: "bank", PaidOn: time.Now()}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("money given back on an invoice nobody has paid: %v", err)
+	}
+	if err := rawPayment(t, pool, "invoice_id, amount_minor", 970, inv.ID, -1000); err == nil {
+		t.Error("the database let money be given back on an invoice that owes the shop")
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: amount(inv.GrossMinor + 5000), Method: "bank", PaidOn: time.Now(), ConfirmedOverpayment: true, OverpaymentReason: "Betalade för mycket"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: amount(-5001), Method: "bank", PaidOn: time.Now()}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("more given back than was paid over: %v", err)
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: amount(-5000), Method: "bank", PaidOn: time.Now()}); err != nil {
+		t.Errorf("the overpayment given back: %v", err)
+	}
+	if b, _ := workshop.BalanceFor(ctx, pool, advisor(), inv.ID); !b.Settled() {
+		t.Errorf("after the overpayment went back: %d outstanding", b.OutstandingMinor())
+	}
+}

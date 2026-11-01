@@ -118,14 +118,15 @@ var (
 )
 
 var (
-	errPurpose         = fmt.Errorf("%w: that is not what it can be for", ErrInvalid)
-	errExternalTwice   = fmt.Errorf("%w: that payment has already been recorded", ErrInvalid)
-	errKeyOtherPayment = fmt.Errorf("%w: that request was already used to record another payment", ErrInvalid)
-	errRefundTooMuch   = fmt.Errorf("%w: that is more than is left of the payment to give back", ErrInvalid)
-	errNotAPayment     = fmt.Errorf("%w: only money received is refunded", ErrInvalid)
-	errReversedRefund  = fmt.Errorf("%w: that payment has been reversed, so there is nothing of it to give back", ErrInvalid)
-	errRefundsStand    = fmt.Errorf("%w: that payment has refunds; reverse them first, then the payment", ErrInvalid)
-	errDepositShort    = fmt.Errorf("%w: that is more than the deposit still holds", ErrInvalid)
+	errPurpose          = fmt.Errorf("%w: that is not what it can be for", ErrInvalid)
+	errExternalTwice    = fmt.Errorf("%w: that payment has already been recorded", ErrInvalid)
+	errKeyOtherPayment  = fmt.Errorf("%w: that request was already used to record another payment", ErrInvalid)
+	errRefundTooMuch    = fmt.Errorf("%w: that is more than is left of the payment to give back", ErrInvalid)
+	errNotAPayment      = fmt.Errorf("%w: only money received is refunded", ErrInvalid)
+	errReversedRefund   = fmt.Errorf("%w: that payment has been reversed, so there is nothing of it to give back", ErrInvalid)
+	errRefundsStand     = fmt.Errorf("%w: that payment has refunds; reverse them first, then the payment", ErrInvalid)
+	errDepositShort     = fmt.Errorf("%w: that is more than the deposit still holds", ErrInvalid)
+	errGivenBackTooMuch = fmt.Errorf("%w: that is more than is owed back to the customer; to give back a payment, refund it", ErrInvalid)
 	// ErrReversalNoReason is reversing a payment without saying why.
 	ErrReversalNoReason = fmt.Errorf("%w: say why the payment is reversed, in 300 characters or fewer", ErrInvalid)
 	// ErrRefundNoReason is refunding a payment without saying why.

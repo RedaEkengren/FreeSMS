@@ -7462,6 +7462,9 @@
     },
     "that is a reversal of a deposit's application, or its other half cannot be found": {
       "other": "det är en återföring av en avräknad deposition, eller så går dess andra halva inte att hitta"
+    },
+    "that is more than is owed back to the customer; to give back a payment, refund it": {
+      "other": "det är mer än det kunden har tillgodo; för att betala tillbaka en betalning, återbetala den"
     }
   }
 }
