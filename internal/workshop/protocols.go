@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -495,6 +496,19 @@ func SetTemplateSubjects(ctx context.Context, pool *pgxpool.Pool, scope access.S
 		}
 	}
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// The shop's final check is started on every job from this
+		// checklist; taking jobs off it would leave no job able to be
+		// signed off. Choose another final check first.
+		if !slices.Contains(subjects, SubjectWorkOrder) {
+			var final bool
+			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM shops WHERE id = $1 AND final_check_template_id = $2)`,
+				scope.ShopID, templateID).Scan(&final); err != nil {
+				return fmt.Errorf("read the final check: %w", err)
+			}
+			if final {
+				return errFinalCheckForJobs
+			}
+		}
 		tag, err := tx.Exec(ctx, `UPDATE inspection_templates SET subjects = $2 WHERE id = $1`, templateID, subjects)
 		if err != nil {
 			return fmt.Errorf("set subjects: %w", err)

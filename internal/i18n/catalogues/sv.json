@@ -7041,6 +7041,9 @@
     },
     "that request was already used to start a protocol of something else": {
       "other": "den begäran har redan använts för att börja ett protokoll om något annat"
+    },
+    "the final check is done on a job, so its checklist must be one for jobs": {
+      "other": "slutkontrollen görs på ett jobb, så dess checklista måste vara en för jobb"
     }
   }
 }
