@@ -442,7 +442,8 @@ func RecordPayout(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 		}
 		// The same request again finds the payment it made, whatever the
 		// checks say now: the money left when they let it.
-		if key := strings.TrimSpace(out.Key); key != "" {
+		key := strings.TrimSpace(out.Key)
+		if key != "" {
 			if found, err := replayedPaymentTx(ctx, tx, key, &out); found || err != nil {
 				return err
 			}
@@ -457,7 +458,16 @@ func RecordPayout(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 				return err
 			}
 		}
-		_, err = insertPaymentOnce(ctx, tx, scope, &out)
+		// The key was looked for above, so this is insertPaymentOnce
+		// without asking again: only a request that took the key since
+		// is found here.
+		if key == "" {
+			return insertPayment(ctx, tx, scope, &out)
+		}
+		if err := insertKeyedTx(ctx, tx, scope, &out); !errors.Is(err, errKeyTaken) {
+			return err
+		}
+		_, err = replayedPaymentTx(ctx, tx, key, &out)
 		return err
 	})
 	return out, err
