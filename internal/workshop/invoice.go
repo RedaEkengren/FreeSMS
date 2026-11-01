@@ -11,6 +11,7 @@ import (
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
+	"github.com/RedaEkengren/FreeSMS/internal/payref"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -252,8 +253,12 @@ func issueTx(ctx context.Context, tx pgx.Tx, scope access.Scope, workOrderID str
 			   net_minor, vat_minor, gross_minor,
 			   ` + electronicColumns + `)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
-			        $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)
+			        $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34)
 			RETURNING id, issued_at`
+		ocr, err := paymentOCR(number)
+		if err != nil {
+			return err
+		}
 		args := append([]any{
 			scope.ShopID, DefaultSeries, number, workOrderID, scope.UserID,
 			*name, address, orgNumber, vatNumber,
@@ -261,7 +266,7 @@ func issueTx(ctx context.Context, tx pgx.Tx, scope access.Scope, workOrderID str
 			sold.Phone, sold.Email, sold.PaymentReference,
 			sold.PaymentTermsDays, sold.FTax,
 			totals.NetMinor, totals.VATMinor, totals.GrossMinor,
-		}, electronicArgs(sold, buyer)...)
+		}, electronicArgs(sold, buyer, ocr)...)
 		if err := tx.QueryRow(ctx, insert, args...).Scan(&inv.ID, &inv.IssuedAt); err != nil {
 			if dup := alreadyThere(err, ErrAlreadyInvoiced); errors.Is(dup, ErrAlreadyInvoiced) {
 				return dup
@@ -535,6 +540,9 @@ type Seller struct {
 	Country       string
 	EndpointID    string
 	PaymentScheme string
+
+	// The shop's Swish number, for the code a customer pays with (#234).
+	SwishNumber string
 }
 
 // Buyer is what an electronic invoice wants of the customer beyond the paper
@@ -546,13 +554,17 @@ type Buyer struct {
 }
 
 // electronicColumns are the columns of an invoice that exist for the
-// electronic invoice, in the order electronicArgs gives their values.
+// electronic invoice, and for paying it (#234), in the order electronicArgs
+// gives their values.
 const electronicColumns = `seller_street, seller_postal_code, seller_city, seller_country,
 			   seller_endpoint_id, seller_payment_scheme,
 			   customer_postal_code, customer_city, customer_country,
-			   customer_endpoint_id, customer_reference`
+			   customer_endpoint_id, customer_reference,
+			   seller_swish_number, payment_ocr`
 
-func electronicArgs(s Seller, b Buyer) []any {
+// electronicArgs are their values. ocr is the payment reference the
+// invoice is paid with, "" for a credit note, which nothing is paid to.
+func electronicArgs(s Seller, b Buyer, ocr string) []any {
 	blank := func(v string) *string {
 		if v = strings.TrimSpace(v); v == "" {
 			return nil
@@ -563,7 +575,17 @@ func electronicArgs(s Seller, b Buyer) []any {
 		blank(s.Street), blank(s.PostalCode), blank(s.City), blank(s.Country),
 		blank(s.EndpointID), blank(s.PaymentScheme),
 		b.PostalCode, b.City, b.Country, b.EndpointID, b.Reference,
+		blank(s.SwishNumber), blank(ocr),
 	}
+}
+
+// paymentOCR is an invoice number as its payment reference.
+func paymentOCR(number int64) (string, error) {
+	ocr, err := payref.OCR(number)
+	if err != nil {
+		return "", fmt.Errorf("make the payment reference: %w", err)
+	}
+	return ocr, nil
 }
 
 // unitCode is the UN/ECE Recommendation 20 code an electronic invoice needs on
@@ -603,15 +625,15 @@ func vatCategory(rateBasis int) string {
 // and that decision belongs where the shop's own details are entered.
 func readSeller(ctx context.Context, tx pgx.Tx, shopID string) (Seller, error) {
 	var s Seller
-	var line1, line2, postal, city, org, vat, phone, email, ref, country, endpoint, scheme *string
+	var line1, line2, postal, city, org, vat, phone, email, ref, country, endpoint, scheme, swish *string
 	err := tx.QueryRow(ctx, `
 		SELECT name, address_line1, address_line2, postal_code, city,
 		       org_number, vat_number, phone, email,
 		       payment_reference, payment_terms_days, f_tax,
-		       country, endpoint_id, payment_scheme
+		       country, endpoint_id, payment_scheme, swish_number
 		FROM shops WHERE id = $1`, shopID).
 		Scan(&s.Name, &line1, &line2, &postal, &city, &org, &vat, &phone, &email,
-			&ref, &s.PaymentTermsDays, &s.FTax, &country, &endpoint, &scheme)
+			&ref, &s.PaymentTermsDays, &s.FTax, &country, &endpoint, &scheme, &swish)
 	if err != nil {
 		return Seller{}, fmt.Errorf("read seller: %w", err)
 	}
@@ -632,6 +654,7 @@ func readSeller(ctx context.Context, tx pgx.Tx, shopID string) (Seller, error) {
 	s.Country, s.EndpointID, s.PaymentScheme = deref(country), deref(endpoint), deref(scheme)
 	s.OrgNumber, s.VATNumber = deref(org), deref(vat)
 	s.Phone, s.Email, s.PaymentReference = deref(phone), deref(email), deref(ref)
+	s.SwishNumber = deref(swish)
 	return s, nil
 }
 
@@ -698,6 +721,14 @@ type Document struct {
 	// Set on a cash invoice: paid when it was issued, and how (#156).
 	// Frozen with it.
 	PaidOnIssue *PaidOnIssue
+
+	// The payment reference frozen at issue (#234): the invoice number, a
+	// length digit and a check digit. Empty on a credit note and on an
+	// invoice issued before references were kept.
+	PaymentOCR string
+	// What is still owed on it as it is read: its total, less what credit
+	// notes took off and what was paid. The payment code asks for this.
+	OwedMinor int64
 }
 
 // Known reports whether this document carries a seller at all. Anything issued
@@ -778,7 +809,7 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 	// No join to shops. The seller is read from the document's own
 	// columns, which is the whole point of freezing them.
 	var sName, sAddr, sOrg, sVat, sPhone, sEmail, sRef *string
-	var sStreet, sPostal, sCity, sCountry, sEndpoint, sScheme *string
+	var sStreet, sPostal, sCity, sCountry, sEndpoint, sScheme, sSwish, ocr *string
 	var cPostal, cCity, cCountry, cEndpoint, cRef *string
 	var sTerms *int
 	var sFTax *bool
@@ -795,7 +826,11 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 		       i.seller_endpoint_id, i.seller_payment_scheme,
 		       i.customer_postal_code, i.customer_city, i.customer_country,
 		       i.customer_endpoint_id, i.customer_reference,
-		       p.display_name, coalesce(r.registration, '')
+		       p.display_name, coalesce(r.registration, ''),
+		       i.seller_swish_number, i.payment_ocr,
+		       i.gross_minor
+		         + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = i.id), 0)
+		         - coalesce((SELECT sum(pm.amount_minor + pm.rounding_minor) FROM invoice_payments pm WHERE pm.invoice_id = i.id), 0)
 		FROM invoices i
 		LEFT JOIN users u ON u.id = i.issued_by
 		LEFT JOIN people p ON p.id = u.person_id
@@ -809,7 +844,7 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 			&sName, &sAddr, &sOrg, &sVat, &sPhone, &sEmail, &sRef, &sTerms, &sFTax,
 			&sStreet, &sPostal, &sCity, &sCountry, &sEndpoint, &sScheme,
 			&cPostal, &cCity, &cCountry, &cEndpoint, &cRef,
-			&issuedBy, &d.Registration)
+			&issuedBy, &d.Registration, &sSwish, &ocr, &d.OwedMinor)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Not visible under this shop's policy is the same answer as not
 		// existing. A different answer tells the caller a document exists
@@ -834,7 +869,9 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 		Country:          deref(sCountry),
 		EndpointID:       deref(sEndpoint),
 		PaymentScheme:    deref(sScheme),
+		SwishNumber:      deref(sSwish),
 	}
+	d.PaymentOCR = deref(ocr)
 	if sTerms != nil {
 		d.Seller.PaymentTermsDays = *sTerms
 	}

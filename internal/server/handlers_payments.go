@@ -86,3 +86,19 @@ func (s *Server) paymentError(w http.ResponseWriter, r *http.Request, err error)
 	}
 	return s.handoverError(w, r, err)
 }
+
+// handleRecordPaymentByReference records a payment found by its payment
+// reference (#234) -- the OCR number off the bank's line -- on the invoice
+// the reference is for, as the invoice's own form would.
+func (s *Server) handleRecordPaymentByReference(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id, reference, err := workshop.InvoiceByPaymentReference(r.Context(), s.pool, session.Scope, r.FormValue("ocr"))
+	if s.paymentError(w, r, err) {
+		return
+	}
+	if r.FormValue("reference") == "" {
+		r.Form.Set("reference", reference)
+	}
+	r.SetPathValue("id", id)
+	s.handleRecordPayment(w, r)
+}

@@ -366,6 +366,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /invoices/{id}/einvoice.xml", s.requireSession(s.handleEInvoice))
 	mux.HandleFunc("POST /invoices/{id}/payments", s.requireSession(s.handleRecordPayment))
 	mux.HandleFunc("POST /payments/{id}/reverse", s.requireSession(s.handleReversePayment))
+	mux.HandleFunc("POST /payments/by-reference", s.requireSession(s.handleRecordPaymentByReference))
 	mux.HandleFunc("GET /receivables", s.requireSession(s.handleReceivables))
 
 	workshopMux.HandleFunc("POST /jobs/{id}/inspect", s.requireSession(s.handleStartInspection))

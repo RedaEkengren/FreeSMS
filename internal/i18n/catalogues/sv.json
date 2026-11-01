@@ -7813,6 +7813,39 @@
     },
     "Whether the job is invoiced and paid": {
       "other": "Om jobbet är fakturerat och betalt"
+    },
+    "Scan to pay": {
+      "other": "Skanna för att betala"
+    },
+    "a payment reference is 2 to 25 digits": {
+      "other": "en betalningsreferens är 2 till 25 siffror"
+    },
+    "no invoice has that payment reference": {
+      "other": "ingen faktura har den betalningsreferensen"
+    },
+    "that reference's check digit is wrong; check it against the invoice": {
+      "other": "referensens kontrollsiffra stämmer inte; jämför med fakturan"
+    },
+    "a Swish number is ten digits": {
+      "other": "ett Swishnummer är tio siffror"
+    },
+    "Scan to pay with %s": {
+      "other": "Skanna för att betala med %s"
+    },
+    "A payment, by its reference": {
+      "other": "En betalning, efter dess referens"
+    },
+    "Paid on": {
+      "other": "Betald den"
+    },
+    "Payment reference (OCR)": {
+      "other": "Betalningsreferens (OCR)"
+    },
+    "Swish number for invoices": {
+      "other": "Swishnummer för fakturor"
+    },
+    "Swish": {
+      "other": "Swish"
     }
   }
 }

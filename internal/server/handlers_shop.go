@@ -168,6 +168,7 @@ func (s *Server) handleSaveShop(w http.ResponseWriter, r *http.Request) {
 		Locale:           r.FormValue("locale"),
 		EndpointID:       r.FormValue("endpoint_id"),
 		PaymentScheme:    r.FormValue("payment_scheme"),
+		SwishNumber:      r.FormValue("swish_number"),
 	}
 
 	err := workshop.SaveDetails(r.Context(), s.pool, session.Scope, details)

@@ -425,7 +425,7 @@ func IssueCredit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in
 			   ` + electronicColumns + `,
 			   source, vehicle_sale_id, rental_id, customer_id)
 			SELECT $1,$2,$3,NULLIF($4, '')::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
-			       $23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,
+			       $23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,
 			       -- What it credits is what it is of (#146), read from the
 			       -- original rather than passed along, so it cannot differ.
 			       o.source, o.vehicle_sale_id, o.rental_id, o.customer_id
@@ -438,7 +438,7 @@ func IssueCredit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in
 			sold.Phone, sold.Email, sold.PaymentReference,
 			sold.PaymentTermsDays, sold.FTax,
 			net, vat, net + vat,
-		}, electronicArgs(sold, p.buyer)...)
+		}, electronicArgs(sold, p.buyer, "")...)
 		if err := tx.QueryRow(ctx, insert, args...).Scan(&note.ID, &note.IssuedAt); err != nil {
 			return fmt.Errorf("write credit note: %w", err)
 		}
@@ -608,9 +608,13 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 			   ` + electronicColumns + `,
 			   source, vehicle_sale_id, rental_id, customer_id)
 			VALUES ($1,$2,$3,NULLIF($4, '')::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
-			        $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,
-			        $33, $34::uuid, $35::uuid, $36::uuid)
+			        $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,
+			        $35, $36::uuid, $37::uuid, $38::uuid)
 			RETURNING id, issued_at`
+		ocr, err := paymentOCR(newNumber)
+		if err != nil {
+			return err
+		}
 		args := append([]any{
 			scope.ShopID, orig.Series, newNumber, jobID, scope.UserID,
 			*name, address, org, vat,
@@ -618,7 +622,7 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 			sold.Phone, sold.Email, sold.PaymentReference,
 			sold.PaymentTermsDays, sold.FTax,
 			orig.NetMinor, orig.VATMinor, orig.GrossMinor,
-		}, electronicArgs(sold, buyer)...)
+		}, electronicArgs(sold, buyer, ocr)...)
 		args = append(args, orig.Source, saleID, rentalID, newCustomer)
 		if err := tx.QueryRow(ctx, insert, args...).Scan(&out.ID, &out.IssuedAt); err != nil {
 			return fmt.Errorf("write replacement: %w", err)

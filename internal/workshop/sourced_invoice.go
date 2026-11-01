@@ -158,9 +158,13 @@ func issueSourcedTx(ctx context.Context, tx pgx.Tx, scope access.Scope, of sourc
 		   ` + electronicColumns + `,
 		   source, vehicle_sale_id, rental_id, customer_id)
 		VALUES ($1,$2,$3,NULLIF($4, '')::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-		        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,
-		        $32, NULLIF($33, '')::uuid, NULLIF($34, '')::uuid, $35::uuid)
+		        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,
+		        $34, NULLIF($35, '')::uuid, NULLIF($36, '')::uuid, $37::uuid)
 		RETURNING id, issued_at`
+	ocr, err := paymentOCR(number)
+	if err != nil {
+		return Invoice{}, err
+	}
 	args := append([]any{
 		scope.ShopID, DefaultSeries, number, scope.UserID,
 		b.name, b.address, b.org, b.vat,
@@ -168,7 +172,7 @@ func issueSourcedTx(ctx context.Context, tx pgx.Tx, scope access.Scope, of sourc
 		sold.Phone, sold.Email, sold.PaymentReference,
 		sold.PaymentTermsDays, sold.FTax,
 		totals.NetMinor, totals.VATMinor, totals.GrossMinor,
-	}, electronicArgs(sold, b.buyer)...)
+	}, electronicArgs(sold, b.buyer, ocr)...)
 	args = append(args, of.source, of.vehicleSaleID, of.rentalID, b.customerID)
 	inv := Invoice{Series: DefaultSeries, Number: number, Source: of.source, CustomerName: b.name,
 		NetMinor: totals.NetMinor, VATMinor: totals.VATMinor, GrossMinor: totals.GrossMinor}

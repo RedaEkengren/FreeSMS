@@ -53,6 +53,9 @@
       </select></label>
     <label><span>{{.T "Electronic invoice address"}}</span><input name="endpoint_id" value="{{.Shop.EndpointID}}" placeholder="0007:5566778899"></label>
   </div>
+  {{/* The code on every invoice (#234): Swish with a number here; otherwise
+       a bankgiro or plusgiro code when the payment details are one. */}}
+  <label><span>{{.T "Swish number for invoices"}}</span><input name="swish_number" value="{{.Shop.SwishNumber}}" inputmode="numeric" maxlength="13" placeholder="123 456 78 90"></label>
 
   <label class="tick">
     <input type="checkbox" name="f_tax" value="yes" {{if .Shop.FTax}}checked{{end}}>

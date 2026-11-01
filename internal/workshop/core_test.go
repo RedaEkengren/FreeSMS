@@ -56,7 +56,8 @@ var core = map[string]string{
 	"HandDocumentOver": "handing an issued document over", "RevokeDocumentLinks": "an issued document's links",
 	"UndeliveredDocuments": "documents not yet with the customer",
 	"BalanceFor":           "what is owed on a document", "Receivables": "what is owed",
-	"RecordPayment": "money received", "ReversePayment": "money received, taken back",
+	"InvoiceByPaymentReference": "the invoice a payment is for, by its reference",
+	"RecordPayment":             "money received", "ReversePayment": "money received, taken back",
 	// The payment journal (#152): money of every module's, recorded.
 	// Opening a deposit or a payout checks the module of its purpose.
 	"DepositBalanceFor": "money held, readable whatever is switched off", "ApplyDeposit": "money held, applied to what is owed",

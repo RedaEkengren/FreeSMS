@@ -110,7 +110,7 @@ func TestWorkshopGoldenOutput(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 	world := goldenScenario(t, pool)
-	compareGolden(t, pool, world)
+	compareGolden(t, pool, world, false)
 }
 
 // The release before M6 wrote a database; this release, migrated over it,
@@ -139,7 +139,9 @@ func TestWorkshopGoldenOutputAfterAnUpgrade(t *testing.T) {
 	).Scan(&world.invoice, &world.credit); err != nil {
 		t.Fatalf("the documents the release before issued: %v", err)
 	}
-	compareGolden(t, pool, world.withPeriod(t, pool))
+	// Its invoices were issued before 0091 and carry no payment reference,
+	// which is not backfilled (#234): the one thing they show differently.
+	compareGolden(t, pool, world.withPeriod(t, pool), true)
 }
 
 // Writes testdata/golden/before-m6.sql. Only with -golden.before-m6, and
@@ -416,7 +418,10 @@ func (w goldenWorld) withPeriod(t *testing.T, pool *pgxpool.Pool) goldenWorld {
 }
 
 // compareGolden renders every golden page and compares it with its file.
-func compareGolden(t *testing.T, pool *pgxpool.Pool, world goldenWorld) {
+// issuedBefore0091 compares documents issued before payment references
+// existed: the golden output's reference and code are left out of what is
+// expected, and must not be on the page.
+func compareGolden(t *testing.T, pool *pgxpool.Pool, world goldenWorld, issuedBefore0091 bool) {
 	t.Helper()
 	// The golden output is a workshop-only shop's, and is compared as one.
 	var runs []string
@@ -450,6 +455,12 @@ func compareGolden(t *testing.T, pool *pgxpool.Pool, world goldenWorld) {
 		if err != nil {
 			t.Errorf("%s: %v (write it with -golden.update)", p.file, err)
 			continue
+		}
+		if issuedBefore0091 {
+			want = goldenPaymentCode.ReplaceAll(want, nil)
+			if goldenPaymentCode.MatchString(got) {
+				t.Errorf("%s: a document issued before 0091 shows a payment reference", p.file)
+			}
 		}
 		if got != string(want) {
 			t.Errorf("%s differs from the workshop's golden output:\n%s", p.file, firstDifference(string(want), got))
@@ -536,6 +547,8 @@ var (
 		`jan|feb|mar|apr|maj|jun|jul|aug|sep|okt|nov|dec)\b( \d{4})?`)
 	goldenWeekday = regexp.MustCompile(`(^|[^\pL])(Mon|Tue|Wed|Thu|Fri|Sat|Sun|mån|tis|ons|tor|fre|lör|sön)( \d{1,2})?([^\pL]|$)`)
 	goldenAsset   = regexp.MustCompile(`\?v=[0-9a-f]+`)
+	// The payment reference and code on an invoice (#234), in Swedish.
+	goldenPaymentCode = regexp.MustCompile(`(?s)\n  <p>Betalningsreferens \(OCR\).*?</p>(\n  <figure class="paycode">.*?</figure>)?`)
 )
 
 // normaliseGolden replaces what varies between two runs of the same release

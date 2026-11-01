@@ -10,6 +10,7 @@ import (
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
+	"github.com/RedaEkengren/FreeSMS/internal/payref"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -673,4 +674,35 @@ func knownMethod(m string) bool {
 		}
 	}
 	return false
+}
+
+var (
+	errReferenceCheck   = fmt.Errorf("%w: that reference's check digit is wrong; check it against the invoice", ErrInvalid)
+	errReferenceShape   = fmt.Errorf("%w: a payment reference is 2 to 25 digits", ErrInvalid)
+	errReferenceUnknown = fmt.Errorf("%w: no invoice has that payment reference", ErrInvalid)
+)
+
+// InvoiceByPaymentReference is the invoice a payment reference is for, as
+// it was typed or as a bank sent it (#234): its check digit is checked
+// before anything is looked up, so a mistyped digit is refused for what it
+// is rather than paying somebody else's invoice. For whoever records
+// payments.
+func InvoiceByPaymentReference(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, typed string) (id, reference string, err error) {
+	if !scope.Role.SeesCustomerPersonalData() {
+		return "", "", access.ErrForbidden
+	}
+	reference, err = payref.CheckOCR(typed)
+	switch {
+	case errors.Is(err, payref.ErrCheckDigit):
+		return "", "", errReferenceCheck
+	case err != nil:
+		return "", "", errReferenceShape
+	}
+	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT id::text FROM invoices WHERE payment_ocr = $1`, reference).Scan(&id)
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", errReferenceUnknown
+	}
+	return id, reference, err
 }

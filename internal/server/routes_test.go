@@ -60,6 +60,8 @@ var swept = map[string]string{
 	"GET /jobs/new/lookup": "", "GET /jobs/new/customers": "", "GET /figures": "", "GET /accounting": "",
 	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/modules": "", "POST /shop/charges": "", "POST /shop/final-check": "",
 	"GET /payment-flows": "", "POST /payment-flows": "", "POST /payment-flows/threshold": "",
+	// An invoice by its payment reference (#234), read under the shop's row level security.
+	"POST /payments/by-reference": "",
 	// What technicians see (#225): a person is a form value, read under the
 	// shop's row level security like any other.
 	"GET /technicians": "", "POST /technicians/fields": "", "POST /technicians/exceptions": "", "POST /technicians/exceptions/end": "",
