@@ -18,6 +18,12 @@ import (
 var strictLiability = regexp.MustCompile(`(?i)regardless of (fault|negligence|cause)|irrespective of fault|whether or not .{0,40}(fault|negligen)|strict(ly)? liab|` +
 	`oavsett (vållande|fel|skuld|oaktsamhet|orsak)|strikt ansvar|vare sig .{0,40}(vållande|oaktsam)|även om .{0,40}inte .{0,20}(vållat|oaktsam)`)
 
+// reversedBurden is wording that makes a consumer renter prove they were
+// not negligent, which presumes negligence for any damage and works close
+// to the strict liability PMÖD 2019:11 held unfair (review #9).
+var reversedBurden = regexp.MustCompile(`(?i)(the )?renter (shows|proves|can show|must (show|prove))|unless the renter|` +
+	`hyrestagaren (visar|kan visa|bevisar|måste (visa|bevisa)|ska (visa|bevisa))|om inte hyrestagaren`)
+
 // The shipped consumer agreement holds the renter liable through
 // negligence only, says it needs legal review, and fails this the moment
 // a clause of strict liability is added to it.
@@ -34,13 +40,23 @@ func TestTheShippedConsumerAgreementHasNoStrictLiability(t *testing.T) {
 			if name == workshop.RentalTemplateConsumer && strictLiability.MatchString(body) {
 				t.Errorf("%s consumer template holds the renter strictly liable: %q", locale, strictLiability.FindString(body))
 			}
+			if name == workshop.RentalTemplateConsumer && reversedBurden.MatchString(body) {
+				t.Errorf("%s consumer template puts the burden of proof on the renter: %q", locale, reversedBurden.FindString(body))
+			}
 		}
 		consumer := workshop.ShippedRentalTemplate(locale, workshop.RentalTemplateConsumer)
 		if !strings.Contains(consumer, map[string]string{"en": "negligence", "sv": "oaktsamhet"}[locale]) {
 			t.Errorf("the %s consumer template does not tie liability to negligence", locale)
 		}
+		if !strings.Contains(consumer, map[string]string{"en": "for the lessor to show", "sv": "uthyraren som ska visa"}[locale]) {
+			t.Errorf("the %s consumer template does not put the burden of proof on the lessor", locale)
+		}
 	}
 	// The test itself catches the clause it is for.
+	if !reversedBurden.MatchString("The renter is not liable for damage the renter shows was not caused by negligence.") ||
+		!reversedBurden.MatchString("Hyrestagaren ansvarar inte om inte hyrestagaren visar att skadan inte orsakats av oaktsamhet.") {
+		t.Error("the pattern misses a reversed burden of proof")
+	}
 	if !strictLiability.MatchString("Hyrestagaren ansvarar för skada oavsett vållande.") ||
 		!strictLiability.MatchString("The renter is liable for all damage regardless of fault.") {
 		t.Error("the pattern misses a strict-liability clause")

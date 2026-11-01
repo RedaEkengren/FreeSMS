@@ -27,8 +27,10 @@ import (
 
 // The shipped templates, consumer and business, in the shop's language.
 // They are the shop's words once made: the shop edits them. Each is marked
-// as needing legal review, and the consumer one holds the renter liable for
-// damage only through negligence (PMÖD 2019:11), which a test keeps so.
+// as needing legal review (#221), and the consumer one holds the renter
+// liable for damage only through intent or negligence, which the lessor
+// shows (PMÖD 2019:11): a test fails on strict liability or on a burden of
+// proof put on the renter.
 const (
 	RentalTemplateConsumer = "Rental agreement, consumer (requires legal review)"
 	RentalTemplateBusiness = "Rental agreement, business (requires legal review)"
@@ -55,7 +57,7 @@ Deposit: {deposit}.
 
 CONDITION AND DAMAGE
 The unit is handed over in the condition the check-out protocol records, and is to be returned in the same condition apart from ordinary wear.
-The renter is liable for damage to or loss of the unit caused by the negligence of the renter or of a driver. The renter is not liable for damage the renter shows was not caused by such negligence.
+The renter is liable for damage to or loss of the unit that the renter or a driver caused intentionally or through negligence. It is for the lessor to show that the damage was caused so.
 Where the renter is liable, the renter pays at most the excess: ____.
 Damage found at the return is assessed by the lessor. Before anything is charged or set against the deposit, the renter is told what was found, the assessment and the amount, and how to object.
 
@@ -116,7 +118,7 @@ Deposition: {deposit}.
 
 SKICK OCH SKADOR
 Enheten lämnas ut i det skick som utlämningsprotokollet anger och ska lämnas tillbaka i samma skick, bortsett från normalt slitage.
-Hyrestagaren ansvarar för skada på eller förlust av enheten som orsakats av hyrestagarens eller en förares oaktsamhet. Hyrestagaren ansvarar inte för skada som hyrestagaren visar inte har orsakats av sådan oaktsamhet.
+Hyrestagaren ansvarar för skada på eller förlust av enheten som hyrestagaren eller en förare orsakat uppsåtligen eller genom oaktsamhet. Det är uthyraren som ska visa att skadan orsakats så.
 När hyrestagaren ansvarar betalar hyrestagaren högst självrisken: ____.
 Skador som upptäcks vid återlämningen bedöms av uthyraren. Innan något debiteras eller avräknas mot depositionen får hyrestagaren veta vad som hittats, bedömningen och beloppet, och hur man invänder.
 
