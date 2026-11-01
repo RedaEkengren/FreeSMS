@@ -73,12 +73,10 @@ func RolesOffered(scope access.Scope) []access.Role {
 	return out
 }
 
-// offered reports whether the shop may give r. Read from the scope's modules
-// rather than with scope.Uses, which the permission contract reads as a
-// gate: people are Core's whatever the shop runs, and this only decides
-// which roles there are to give.
+// offered reports whether the shop may give r. People are Core's whatever
+// the shop runs; this only decides which roles there are to give.
 func offered(scope access.Scope, r access.Role) bool {
-	return r.Valid() && (r.Module() == "" || slices.Contains(scope.Modules, r.Module()))
+	return r.Valid() && (r.Module() == "" || scope.Offers(r.Module()))
 }
 
 // errRoleNotOffered is a role whose module the shop does not run.

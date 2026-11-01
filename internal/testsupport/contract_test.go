@@ -105,3 +105,19 @@ func TestTheModuleCheckThroughACycleDoesNotDependOnOrder(t *testing.T) {
 		}
 	}
 }
+
+// scope.Offers decides what to offer and refuses nothing, so it is not a
+// module check: a Core operation may ask it and stay Core's, and an
+// operation that asks only it has not checked its module.
+func TestOffersIsNotAModuleCheck(t *testing.T) {
+	checks := moduleChecker(map[string]string{
+		"Offering": "if scope.Offers(access.Workshop) { list() }",
+		"Gated":    "scope.Uses(access.Workshop)",
+	})
+	if checks("Offering") {
+		t.Error("scope.Offers was taken for a module check")
+	}
+	if !checks("Gated") {
+		t.Error("scope.Uses is no longer seen as a module check")
+	}
+}

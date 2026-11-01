@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/mail"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -50,14 +49,13 @@ func ImportKindsFor(scope access.Scope) []string {
 	return out
 }
 
-// importable reports whether this shop may import kind. Read from the
-// scope's modules, not through scope.Uses, which the permission contract
-// takes for a gate: the import is Core's and works whatever the shop runs;
-// what it may bring in depends on the modules.
+// importable reports whether this shop may import kind. The import is
+// Core's and works whatever the shop runs; what it may bring in depends on
+// the modules.
 func importable(scope access.Scope, kind string) bool {
 	switch kind {
 	case "parts", "stock":
-		return slices.Contains(scope.Modules, access.Workshop)
+		return scope.Offers(access.Workshop)
 	}
 	return true
 }

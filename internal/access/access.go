@@ -338,6 +338,13 @@ func (s Scope) Uses(modules ...Module) bool {
 	return true
 }
 
+// Offers reports whether the shop runs m, for deciding what to offer --
+// which roles to give, which subjects a checklist may have, which tasks
+// Getting started lists, what an import may bring in. It refuses nothing,
+// so the permission contract does not take it for a gate (Uses and Require
+// it does): an operation that is Core's may ask it and stay Core's.
+func (s Scope) Offers(m Module) bool { return slices.Contains(s.Modules, m) }
+
 // Require is Uses as the error an operation returns: nil, or ErrModuleOff
 // naming the module that is off.
 func (s Scope) Require(modules ...Module) error {

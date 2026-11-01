@@ -84,3 +84,17 @@ func TestARoleBelongsToTheModuleItWorksIn(t *testing.T) {
 		}
 	}
 }
+
+// Offers answers what Uses answers for one module, for a caller deciding
+// what to offer rather than what to refuse; an empty scope offers nothing.
+func TestOffersIsWhatTheShopRuns(t *testing.T) {
+	s := Scope{Modules: []Module{Workshop, Rental}}
+	for _, m := range Modules {
+		if s.Offers(m) != s.Uses(m) {
+			t.Errorf("Offers(%s) = %v, Uses = %v", m, s.Offers(m), s.Uses(m))
+		}
+	}
+	if (Scope{}).Offers(Workshop) {
+		t.Error("a scope with no modules offers the workshop")
+	}
+}

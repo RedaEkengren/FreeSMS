@@ -67,13 +67,11 @@ func subjectModule(subject string) access.Module {
 }
 
 // SubjectsOffered is what a checklist may be made for in this shop: the
-// subjects of the modules it runs, in the order a form offers them. Read
-// from the scope's modules, not through scope.Uses, which the permission
-// contract takes for a gate: this only decides what to offer.
+// subjects of the modules it runs, in the order a form offers them.
 func SubjectsOffered(scope access.Scope) []string {
 	var out []string
 	for _, s := range []string{SubjectWorkOrder, SubjectPurchase, SubjectDelivery, SubjectCheckOut, SubjectCheckIn} {
-		if slices.Contains(scope.Modules, subjectModule(s)) {
+		if scope.Offers(subjectModule(s)) {
 			out = append(out, s)
 		}
 	}

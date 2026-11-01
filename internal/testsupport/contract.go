@@ -31,6 +31,8 @@ import (
 //     the workshop's inWorkshop. Followed into calls because the check
 //     belongs where the rows are read, which is usually a helper; or it is
 //     in the package's core map with the reason it belongs to no module.
+//     scope.Offers(m) is not one: it decides what to offer and refuses
+//     nothing, so a Core operation may ask it and stay Core's.
 //
 // Both maps are package-level map[string]string literals in the package's
 // own _test.go files, named everyRole and core. A package that takes scopes
