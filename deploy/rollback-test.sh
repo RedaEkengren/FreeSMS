@@ -203,9 +203,22 @@ for file in migrations/*.sql; do
     # newer ones: the last commit that changed it -- a fix to a migration
     # after it was added is what has to be safe, not the first draft of it
     # -- and this tree, unless that commit is what this tree already is.
-    added="$(git -C "$ROOT" log --diff-filter=A --format=%H -1 -- "$file" 2>/dev/null || true)"
+    #
+    # A migration brought by a module branch was renumbered when it was
+    # merged (0200 became 0094), so the commit that added its file under
+    # this number may have it under another number in its parent. A release
+    # holding the same migration under its old number is not the release
+    # before it -- it would apply it a second time, or call the versions
+    # between deleted -- so the walk goes back, along first parents, to
+    # the first release that holds none of it under any number.
+    added="$(git -C "$ROOT" log --no-renames --diff-filter=A --format=%H -- "$file" 2>/dev/null | tail -1 || true)"
     if [ -n "$added" ]; then
-        previous_commit="$added^"
+        previous_commit="$(git -C "$ROOT" rev-parse "$added^")"
+        suffix="${name#[0-9][0-9][0-9][0-9]_}"
+        while git -C "$ROOT" ls-tree --name-only "$previous_commit" migrations/ \
+                | grep -Eq "^migrations/[0-9]{4}_$(printf '%s' "$suffix" | sed 's/[.]/[.]/g')\$"; do
+            previous_commit="$(git -C "$ROOT" rev-parse "$previous_commit^")" || fail "no release before $name"
+        done
     else
         previous_commit="HEAD"
     fi
