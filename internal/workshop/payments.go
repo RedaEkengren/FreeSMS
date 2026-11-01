@@ -436,10 +436,16 @@ func reverseApplicationTx(ctx context.Context, tx pgx.Tx, scope access.Scope, de
 	if _, err := balanceTx(ctx, tx, halves[1].InvoiceID, true); err != nil {
 		return err
 	}
-	if halves[0].Reversed || halves[1].Reversed {
+	if halves[0].Reversed && halves[1].Reversed {
 		return fmt.Errorf("%w: that payment has already been reversed", ErrInvalid)
 	}
+	// Before 0082 either half could be reversed alone, and 0082 linked
+	// such pairs as they were: the half left is reversed alone now, which
+	// makes the application reversed whole.
 	for _, p := range halves {
+		if p.Reversed {
+			continue
+		}
 		undo := Payment{InvoiceID: p.InvoiceID, DepositID: p.DepositID, AmountMinor: -p.AmountMinor, RoundingMinor: -p.RoundingMinor,
 			Method: "deposit", PaidOn: time.Now(), Reverses: p.ID, Reason: reason}
 		if err := insertPayment(ctx, tx, scope, &undo); err != nil {

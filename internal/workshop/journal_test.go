@@ -592,3 +592,63 @@ func TestAHeldDepositIsRefundedWithRentalSwitchedOff(t *testing.T) {
 		t.Errorf("the deposit after both refunds: %+v, %v", d, err)
 	}
 }
+
+// An application one half of which was reversed alone before 0082 linked
+// the two -- the money then held by the deposit again and still paid on
+// the invoice, or neither -- is put right by reversing the half that is
+// left, from either half; after that it is reversed whole and refused
+// again.
+func TestAnApplicationHalfReversedBefore0082IsPutRight(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	desk := everything(advisor())
+	for i, side := range []string{"deposit", "invoice"} {
+		dep, _ := depositWith(t, pool, 500000)
+		inv, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := workshop.ApplyDeposit(ctx, pool, desk, dep, inv.ID, 200000, ""); err != nil {
+			t.Fatal(err)
+		}
+		out, in := applicationHalves(t, pool, dep, inv.ID)
+		// As the release before 0082 wrote it: one half reversed alone,
+		// with the checks that came later not there.
+		lone, target, amount := out, "deposit_id", int64(200000)
+		other := in
+		if side == "invoice" {
+			lone, target, amount, other = in, "invoice_id", -200000, out
+		}
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tx.Exec(ctx, `SET LOCAL session_replication_role = replica`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO invoice_payments (shop_id, series, number, method, paid_on, recorded_by, `+target+`, amount_minor, reverses_id, reason)
+			SELECT $1, 'B', $2, 'deposit', now(), $3, coalesce(invoice_id, deposit_id), $4, id, 'before 0082' FROM invoice_payments WHERE id = $5`,
+			shopID, 970+i, userID, amount, lone); err != nil {
+			t.Fatal(err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// From either half: the one reversed before, or the one left.
+		first, second := lone, other
+		if side == "invoice" {
+			first, second = other, lone
+		}
+		if err := workshop.ReversePayment(ctx, pool, desk, first, "Halva var redan återförd"); err != nil {
+			t.Errorf("%s half reversed before: reversing the rest: %v", side, err)
+		}
+		if err := workshop.ReversePayment(ctx, pool, desk, second, "Igen"); !errors.Is(err, workshop.ErrInvalid) {
+			t.Errorf("%s half reversed before: reversed again once whole: %v", side, err)
+		}
+		d, _ := workshop.DepositBalanceFor(ctx, pool, desk, dep)
+		b, _ := workshop.BalanceFor(ctx, pool, advisor(), inv.ID)
+		if d.Held() != 500000 || b.OutstandingMinor() != inv.GrossMinor {
+			t.Errorf("%s half reversed before: the deposit holds %d and the invoice owes %d; want 500000 and %d", side, d.Held(), b.OutstandingMinor(), inv.GrossMinor)
+		}
+	}
+}
