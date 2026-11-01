@@ -3,6 +3,7 @@ package workshop
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -178,7 +179,10 @@ func setupTx(ctx context.Context, tx pgx.Tx, scope access.Scope, env ReadinessEn
 	solo := acks["operating_model"].note == "solo"
 	// The list is Core's, and a shop with the workshop off is not asked to
 	// set up what only the workshop uses: its pages are not there (#143).
-	workshopOn := scope.Uses(access.Workshop)
+	// Read from the scope's modules rather than with scope.Uses, which the
+	// permission contract reads as a gate: this chooses what to list and
+	// refuses nothing, and ReadinessFor stays Core's.
+	workshopOn := slices.Contains(scope.Modules, access.Workshop)
 	var tasks []ReadinessTask
 	add := func(t ReadinessTask) {
 		if a, ok := acks[t.Key]; ok && t.State == "" {
