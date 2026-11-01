@@ -351,13 +351,36 @@ func BookResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, b
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("read what is booked: %w", err)
 		}
-		err = tx.QueryRow(ctx, `
+		// In a savepoint: the same request, replayed while the first is
+		// still in flight, waits here on the first's row, and is then
+		// refused -- by the key, or by the overlap with itself. Either way
+		// the first has committed by then, and its block is the answer.
+		sp, err := tx.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		err = sp.QueryRow(ctx, `
 			INSERT INTO resource_blocks (shop_id, resource_id, kind, status, period, buffer_before, buffer_after, expires_at,
 			                             source_kind, source_id, request_key, reason, created_by)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, nullif($9, ''), NULLIF($10, '')::uuid, nullif($11, ''), nullif($12, ''), NULLIF($13, '')::uuid)
 			RETURNING id`,
 			scope.ShopID, b.ResourceID, b.Kind, status, period, b.BufferBefore, b.BufferAfter, b.HoldUntil,
 			b.SourceKind, b.SourceID, key, reason, scope.UserID).Scan(&id)
+		if err == nil {
+			return sp.Commit(ctx)
+		}
+		var pg *pgconn.PgError
+		if key != "" && errors.As(err, &pg) && (pg.Code == "23505" || pg.Code == "23P01") {
+			if rerr := sp.Rollback(ctx); rerr != nil {
+				return rerr
+			}
+			switch ferr := tx.QueryRow(ctx, `SELECT id FROM resource_blocks WHERE request_key = $1`, key).Scan(&id); {
+			case ferr == nil:
+				return nil
+			case !errors.Is(ferr, pgx.ErrNoRows):
+				return fmt.Errorf("read the request: %w", ferr)
+			}
+		}
 		return blockConflict(err)
 	})
 	return id, err

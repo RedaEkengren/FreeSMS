@@ -377,3 +377,48 @@ func TestAResourceTakenOutOfUseCanComeBack(t *testing.T) {
 		t.Errorf("%d periods out of use recorded, want the one that ended", n)
 	}
 }
+
+// A phone retries a booking while its first request is still in flight:
+// the retry waits for the first and answers with the block it made, not
+// with a refusal of its own booking.
+func TestAReplayRacingTheFirstRequestFindsItsBlock(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	res := trailer(t, pool)
+	// The first request, written and not yet committed.
+	first, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.Rollback(ctx)
+	var id string
+	if err := first.QueryRow(ctx, `
+		SELECT set_config('app.current_shop', $1, true)`, shopID).Scan(new(string)); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.QueryRow(ctx, `
+		INSERT INTO resource_blocks (shop_id, resource_id, kind, status, period, request_key)
+		VALUES ($1, $2, 'rental', 'confirmed', tstzrange($3, $4), 'phone-race') RETURNING id::text`,
+		shopID, res, in2031(12, 9), in2031(12, 17)).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	type answer struct {
+		id  string
+		err error
+	}
+	replay := make(chan answer, 1)
+	go func() {
+		got, err := workshop.BookResource(ctx, pool, rentalDesk(), workshop.ResourceBooking{
+			ResourceID: res, Kind: workshop.BlockRental, From: in2031(12, 9), To: in2031(12, 17), Key: "phone-race"})
+		replay <- answer{got, err}
+	}()
+	// Long enough for the replay to reach the insert and wait on the first.
+	time.Sleep(300 * time.Millisecond)
+	if err := first.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	a := <-replay
+	if a.err != nil || a.id != id {
+		t.Errorf("the replay racing the first request: %s, %v; want %s", a.id, a.err, id)
+	}
+}
