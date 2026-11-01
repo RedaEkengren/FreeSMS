@@ -42,6 +42,9 @@ var (
 	ErrNotAReference = errors.New("payref: an OCR reference is 2 to 25 digits")
 	// ErrCheckDigit is a reference whose check digit is wrong: mistyped.
 	ErrCheckDigit = errors.New("payref: the reference's check digit is wrong")
+	// ErrLengthDigit is a reference whose length digit fits it with no
+	// leading 0 and with one: not copied whole.
+	ErrLengthDigit = errors.New("payref: the reference's length digit is wrong")
 )
 
 // CheckDigit is the modulus 10 check digit of digits, which must be digits.
@@ -121,6 +124,13 @@ func OCRFor(series string, number int64) (string, error) {
 // CheckOCR reads a reference as somebody typed or a bank sent it: spaces
 // and hyphens are dropped, and what is left must be 2 to 25 digits whose
 // last is the right check digit. It returns the reference as stored.
+//
+// Leading zeros are what a bank or a banking app may drop or add, and the
+// check digit cannot see them: the modulus 10 method ignores them. Every
+// reference FreeSMS issues has a length digit, and starts with no 0 (the
+// default series) or with exactly one (any other, OCRFor), so the length
+// digit says which of the two it was: the one whose length it gives. A
+// reference whose length digit fits neither was not copied whole.
 func CheckOCR(typed string) (string, error) {
 	s := strings.Map(func(r rune) rune {
 		if r == ' ' || r == '-' {
@@ -139,7 +149,13 @@ func CheckOCR(typed string) (string, error) {
 	if CheckDigit(s[:len(s)-1]) != s[len(s)-1] {
 		return "", ErrCheckDigit
 	}
-	return s, nil
+	bare := strings.TrimLeft(s, "0")
+	for _, ref := range []string{bare, "0" + bare} {
+		if len(ref) >= 3 && len(ref) <= MaxReference && int(ref[len(ref)-2]-'0') == len(ref)%10 {
+			return ref, nil
+		}
+	}
+	return "", ErrLengthDigit
 }
 
 // Swish's prefilled payment code. Swish documents a prefilled code through

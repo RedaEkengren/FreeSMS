@@ -184,3 +184,26 @@ func TestTheBankgiroCodeIsUsingQRs(t *testing.T) {
 		t.Error("made a code with no company number")
 	}
 }
+
+// A bank or a banking app may drop a reference's leading 0, or pad one
+// with more: the Luhn check cannot tell, since it ignores leading zeros.
+// The length digit can, so the reference is read back as it was issued;
+// one whose length digit fits neither form was not copied whole.
+func TestAReferenceIsReadWhateverLeadingZerosItArrivedWith(t *testing.T) {
+	a, _ := OCR(57)
+	for typed, want := range map[string]string{
+		"1105782":   "01105782",
+		"001105782": "01105782",
+		"01105782":  "01105782",
+		"00" + a:    a,
+		a:           a,
+	} {
+		if got, err := CheckOCR(typed); err != nil || got != want {
+			t.Errorf("CheckOCR(%q) = %q, %v; want %q", typed, got, err, want)
+		}
+	}
+	wrongLength := "12" + string(CheckDigit("12"))
+	if _, err := CheckOCR(wrongLength); !errors.Is(err, ErrLengthDigit) {
+		t.Errorf("CheckOCR(%q), whose length digit fits no form: %v, want ErrLengthDigit", wrongLength, err)
+	}
+}
