@@ -46,6 +46,12 @@ import (
 // or it is listed with the reason (usually "delegates to X, which checks").
 // An operation run by a background job with no person behind it says in its
 // reason how the job forms its scope.
+//
+// What it cannot see: that the module check guards the read that matters. A
+// call to a gated helper anywhere in the body counts, even if the main query
+// runs outside it. That is a judgement a reader of the code makes, and
+// TestTheRoleMatrix makes at run time for the operations it calls with the
+// module off; the walk only makes sure nobody forgot to make it.
 
 // ContractMaps are the names of the declarations the contract reads.
 const (
@@ -273,36 +279,46 @@ func mapLiteral(file *ast.File, name string) (map[string]string, bool) {
 }
 
 // moduleChecker answers whether a function checks a module, in its own body
-// or in a function of the package it calls.
+// or in any function of the package it calls, however deep.
+//
+// Worked out as a fixed point rather than by a memoised walk: a walk that
+// meets a function already on its path has to answer something for it, and
+// caching that answer -- "no check" -- for a function in a call cycle made
+// the result depend on the order the map was iterated in. Here a function
+// checks if its body does, or if it calls one that does; that is repeated
+// until nothing more is added, which ends because the set only grows.
 func moduleChecker(bodies map[string]string) func(string) bool {
-	memo := map[string]bool{}
-	visiting := map[string]bool{}
-	calls := map[string]*regexp.Regexp{}
+	called := map[string]*regexp.Regexp{}
 	for name := range bodies {
-		calls[name] = regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\(`)
+		called[name] = regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\(`)
 	}
-	var checks func(string) bool
-	checks = func(name string) bool {
-		if v, ok := memo[name]; ok {
-			return v
-		}
-		if visiting[name] {
-			return false
-		}
-		visiting[name] = true
-		body := bodies[name]
-		found := moduleCheck.MatchString(body)
-		for callee, re := range calls {
-			if found {
-				break
-			}
-			if callee != name && strings.Contains(body, callee+"(") && re.MatchString(body) && checks(callee) {
-				found = true
+	calls := map[string][]string{}
+	for name, body := range bodies {
+		for callee, re := range called {
+			if callee != name && strings.Contains(body, callee+"(") && re.MatchString(body) {
+				calls[name] = append(calls[name], callee)
 			}
 		}
-		visiting[name] = false
-		memo[name] = found
-		return found
 	}
-	return checks
+	checked := map[string]bool{}
+	for name, body := range bodies {
+		if moduleCheck.MatchString(body) {
+			checked[name] = true
+		}
+	}
+	for grew := true; grew; {
+		grew = false
+		for name, callees := range calls {
+			if checked[name] {
+				continue
+			}
+			for _, c := range callees {
+				if checked[c] {
+					checked[name], grew = true, true
+					break
+				}
+			}
+		}
+	}
+	return func(name string) bool { return checked[name] }
 }

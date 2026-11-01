@@ -81,3 +81,27 @@ func TestTheContractCatchesWhatItIsFor(t *testing.T) {
 		t.Errorf("good: %d operations checked, want 4 -- the generated one skipped", report.Checked["good"])
 	}
 }
+
+// A call cycle used to make the answer depend on map order: walking A, then
+// B, then back to A cached B as unchecked although B reaches the check
+// through A. Asked many times over, with fresh checkers, every answer is the
+// same.
+func TestTheModuleCheckThroughACycleDoesNotDependOnOrder(t *testing.T) {
+	bodies := map[string]string{
+		"A":      "B(scope) helper(scope)",
+		"B":      "A(scope)",
+		"helper": "scope.Require(access.Workshop)",
+		"Lone":   "nothing()",
+	}
+	for i := 0; i < 200; i++ {
+		checks := moduleChecker(bodies)
+		for _, name := range []string{"A", "B", "helper"} {
+			if !checks(name) {
+				t.Fatalf("run %d: %s reaches the check and was not seen to", i, name)
+			}
+		}
+		if checks("Lone") {
+			t.Fatalf("run %d: Lone checks nothing and was said to", i)
+		}
+	}
+}
