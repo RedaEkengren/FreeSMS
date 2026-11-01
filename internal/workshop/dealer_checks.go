@@ -65,14 +65,15 @@ const (
 const defaultCheckAge = 24 * time.Hour
 
 var (
-	errCheckKind     = fmt.Errorf("%w: that is not a check", ErrInvalid)
-	errCheckResult   = fmt.Errorf("%w: a check passed, failed or is not known", ErrInvalid)
-	errCheckNote     = fmt.Errorf("%w: a note is at most 500 characters", ErrInvalid)
-	errCheckAge      = fmt.Errorf("%w: a check stands for between an hour and 30 days", ErrInvalid)
-	errCheckEnded    = fmt.Errorf("%w: that car's cycle is over; check it again in a new one", ErrInvalid)
-	errLoanAmount    = fmt.Errorf("%w: say what is owed on the car, above nothing", ErrInvalid)
-	errLoanReference = fmt.Errorf("%w: say the reference the loan is settled with, in 100 characters or fewer", ErrInvalid)
-	errLoanTwice     = fmt.Errorf("%w: that lender's loan is already recorded on this purchase", ErrInvalid)
+	errCheckKind         = fmt.Errorf("%w: that is not a check", ErrInvalid)
+	errCheckResult       = fmt.Errorf("%w: a check passed, failed or is not known", ErrInvalid)
+	errCheckNote         = fmt.Errorf("%w: a note is at most 500 characters", ErrInvalid)
+	errCheckAge          = fmt.Errorf("%w: a check stands for between an hour and 30 days", ErrInvalid)
+	errCheckEnded        = fmt.Errorf("%w: that car's cycle is over; check it again in a new one", ErrInvalid)
+	errLoanAmount        = fmt.Errorf("%w: say what is owed on the car, above nothing", ErrInvalid)
+	errLoanReference     = fmt.Errorf("%w: say the reference the loan is settled with, in 100 characters or fewer", ErrInvalid)
+	errNothingToOverride = fmt.Errorf("%w: every check the shop requires has passed in time, so there is nothing to let through", ErrInvalid)
+	errLoanTwice         = fmt.Errorf("%w: that lender's loan is already recorded on this purchase", ErrInvalid)
 	// ErrChecksOutstanding is a purchase's payout refused because a check
 	// the shop requires has not passed, or passed too long ago.
 	ErrChecksOutstanding = fmt.Errorf("%w: not every check the shop requires has passed in time; check again, or have the owner let it through with a reason", ErrInvalid)
@@ -443,15 +444,26 @@ func checksOutstandingTx(ctx context.Context, tx pgx.Tx, unitID string) ([]strin
 	return out, nil
 }
 
-// overriddenTx reports whether an owner let the unit's money leave over
-// its checks as they stand now: an override made since the newest check.
-func overriddenTx(ctx context.Context, tx pgx.Tx, unitID string) (bool, error) {
-	var ok bool
-	err := tx.QueryRow(ctx, `
-		SELECT EXISTS (SELECT 1 FROM stock_check_overrides o WHERE o.stock_unit_id = $1
-		               AND o.upto_seq >= coalesce((SELECT max(seq) FROM stock_checks WHERE stock_unit_id = $1), 0))`,
-		unitID).Scan(&ok)
-	return ok, err
+// overriddenTx reports whether an owner's override lets the unit's money
+// leave over the kinds of check outstanding now: each must be one an
+// override was made over, no check of it made since, and the override no
+// older than a check of that kind may be.
+func overriddenTx(ctx context.Context, tx pgx.Tx, unitID string, outstanding []string, settings map[string]StockCheckSetting) (bool, error) {
+	for _, k := range outstanding {
+		var ok bool
+		if err := tx.QueryRow(ctx, `
+			SELECT EXISTS (SELECT 1 FROM stock_check_overrides o
+			               WHERE o.stock_unit_id = $1 AND $2 = ANY (o.kinds)
+			                 AND o.upto_seq >= coalesce((SELECT max(seq) FROM stock_checks WHERE stock_unit_id = $1 AND kind = $2), 0)
+			                 AND o.at > clock_timestamp() - make_interval(secs => $3))`,
+			unitID, k, settings[k].MaxAge.Seconds()).Scan(&ok); err != nil {
+			return false, fmt.Errorf("read overrides: %w", err)
+		}
+		if !ok {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 var (
@@ -508,9 +520,13 @@ func purchaseChecksClearTx(ctx context.Context, tx pgx.Tx, purchaseID string) er
 	if err != nil || len(outstanding) == 0 {
 		return err
 	}
-	ok, err := overriddenTx(ctx, tx, unitID)
+	settings, err := checkSettingsTx(ctx, tx)
 	if err != nil {
-		return fmt.Errorf("read overrides: %w", err)
+		return err
+	}
+	ok, err := overriddenTx(ctx, tx, unitID, outstanding, settings)
+	if err != nil {
+		return err
 	}
 	if !ok {
 		return ErrChecksOutstanding
@@ -539,7 +555,14 @@ func ChecksOutstanding(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		if kinds, err = checksOutstandingTx(ctx, tx, unitID); err != nil {
 			return err
 		}
-		overridden, err = overriddenTx(ctx, tx, unitID)
+		if len(kinds) == 0 {
+			return nil
+		}
+		settings, err := checkSettingsTx(ctx, tx)
+		if err != nil {
+			return err
+		}
+		overridden, err = overriddenTx(ctx, tx, unitID, kinds, settings)
 		return err
 	})
 	return kinds, overridden, err
@@ -547,8 +570,10 @@ func ChecksOutstanding(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 
 // OverrideStockChecks lets a unit's money leave although its checks have
 // not all passed in time: whoever runs the shop, with a reason, an audit
-// event. It covers the checks as they stand; a check made after it is new
-// information, and the override no longer covers it.
+// event. It covers the kinds of check outstanding as it is made, for as
+// long as such a check would stand; a check of the kind made after it is
+// new information, and the override no longer covers it. With nothing
+// outstanding there is nothing to override.
 func OverrideStockChecks(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, unitID, reason string) error {
 	if !scope.Role.RunsTheShop() {
 		return access.ErrForbidden
@@ -571,10 +596,13 @@ func OverrideStockChecks(ctx context.Context, pool *pgxpool.Pool, scope access.S
 		if err != nil {
 			return err
 		}
+		if len(outstanding) == 0 {
+			return errNothingToOverride
+		}
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO stock_check_overrides (shop_id, stock_unit_id, upto_seq, by_user, reason)
-			VALUES ($1, $2, coalesce((SELECT max(seq) FROM stock_checks WHERE stock_unit_id = $2), 0), $3, $4)`,
-			scope.ShopID, unitID, scope.UserID, reason); err != nil {
+			INSERT INTO stock_check_overrides (shop_id, stock_unit_id, upto_seq, kinds, by_user, reason)
+			VALUES ($1, $2, coalesce((SELECT max(seq) FROM stock_checks WHERE stock_unit_id = $2), 0), $3, $4, $5)`,
+			scope.ShopID, unitID, outstanding, scope.UserID, reason); err != nil {
 			return fmt.Errorf("record the override: %w", err)
 		}
 		return auditTx(ctx, tx, scope, unitID, "stock_checks.overridden", "", "", reason,

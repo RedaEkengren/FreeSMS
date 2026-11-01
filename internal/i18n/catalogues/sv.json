@@ -7980,6 +7980,7 @@
     "an hour's cost is from nothing up to a hundred thousand kronor": {"other": "kostnaden för en timme är från noll upp till hundra tusen kronor"},
     "say why the cost is reversed, in 300 characters or fewer": {"other": "säg varför kostnaden återförs, med högst 300 tecken"},
     "a payout for a car names the purchase it pays, and is to its seller or to a lender on it": {"other": "en utbetalning för en bil anger inköpet den betalar, och går till säljaren eller till en långivare på inköpet"},
-    "a consigned car's principal is paid under the consignment agreement, which this release does not keep yet": {"other": "uppdragsgivaren för en förmedlad bil får betalt enligt förmedlingsavtalet, som den här versionen ännu inte håller"}
+    "a consigned car's principal is paid under the consignment agreement, which this release does not keep yet": {"other": "uppdragsgivaren för en förmedlad bil får betalt enligt förmedlingsavtalet, som den här versionen ännu inte håller"},
+    "every check the shop requires has passed in time, so there is nothing to let through": {"other": "alla kontroller som verksamheten kräver är godkända i tid, så det finns inget att släppa igenom"}
   }
 }

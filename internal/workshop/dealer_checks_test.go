@@ -403,3 +403,54 @@ func TestAPayoutWaitsForACheckBeingRecorded(t *testing.T) {
 		t.Errorf("paid out over the check that failed meanwhile: %v", err)
 	}
 }
+
+// An override covers the checks that kept the money back when it was made,
+// for as long as such a check would stand, and nothing else: not one that
+// ages out later, not after its own day. With nothing outstanding there is
+// nothing to override.
+func TestAnOverrideCoversOnlyWhatWasOutstandingAndOnlyForAWhile(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	passEveryCheck(t, pool, p.StockUnitID)
+	all := everything(owner())
+	if err := workshop.OverrideStockChecks(ctx, pool, all, p.StockUnitID, "För säkerhets skull"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("overridden with nothing outstanding: %v", err)
+	}
+	payout, err := workshop.CreatePayout(ctx, pool, buyerScope(), workshop.NewHolding{PartyID: p.SellerPartyID, Purpose: "purchase",
+		SubjectKind: "purchase", SubjectID: p.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.RecordStockCheck(ctx, pool, buyerScope(), p.StockUnitID, workshop.NewStockCheck{
+		Kind: workshop.CheckCreditPurchase, Result: workshop.CheckFail}); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.OverrideStockChecks(ctx, pool, all, p.StockUnitID, "Lånet löses i dag"); err != nil {
+		t.Fatal(err)
+	}
+	if err := payOut(pool, buyerScope(), payout, 100); err != nil {
+		t.Fatalf("paid out over the overridden check: %v", err)
+	}
+	// Another check ages out since: the override did not cover it.
+	if _, err := pool.Exec(ctx, `UPDATE stock_checks SET checked_at = checked_at - interval '2 days' WHERE kind = 'inspection'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := payOut(pool, buyerScope(), payout, 100); !errors.Is(err, workshop.ErrChecksOutstanding) {
+		t.Errorf("paid out over a check the override did not cover: %v", err)
+	}
+	if err := workshop.RecordStockCheck(ctx, pool, buyerScope(), p.StockUnitID, workshop.NewStockCheck{
+		Kind: workshop.CheckInspection, Result: workshop.CheckPass}); err != nil {
+		t.Fatal(err)
+	}
+	if err := payOut(pool, buyerScope(), payout, 100); err != nil {
+		t.Errorf("paid out with the inspection checked again and the loan overridden: %v", err)
+	}
+	// The override itself ages out with the day a check would stand.
+	if _, err := pool.Exec(ctx, `UPDATE stock_check_overrides SET at = at - interval '2 days'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := payOut(pool, buyerScope(), payout, 100); !errors.Is(err, workshop.ErrChecksOutstanding) {
+		t.Errorf("paid out on an override two days old: %v", err)
+	}
+}

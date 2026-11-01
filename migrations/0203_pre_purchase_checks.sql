@@ -89,15 +89,18 @@ REVOKE ALL ON purchase_loans FROM freesms_app;
 GRANT SELECT, INSERT ON purchase_loans TO freesms_app;
 
 -- An owner letting money leave although a check stands failed, unknown or
--- too old: who, when and why, for the checks as they stood then. It lets
--- the payouts of the purchase through from then on; a check made after it
--- is not overridden by it.
+-- too old: who, when and why, and which kinds of check kept it back then.
+-- It covers those kinds alone, for as long as a check of each would stand
+-- from the moment it was made, and not past a check of the kind made
+-- after it -- that is new information.
 CREATE TABLE stock_check_overrides (
     id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id       uuid        NOT NULL REFERENCES shops(id) ON DELETE RESTRICT,
     stock_unit_id uuid        NOT NULL REFERENCES stock_units(id) ON DELETE RESTRICT,
     -- The newest check of the unit it was made over.
     upto_seq      bigint      NOT NULL,
+    -- The kinds of check outstanding when it was made: what it covers.
+    kinds         text[]      NOT NULL CHECK (cardinality(kinds) > 0),
     by_user       uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     at            timestamptz NOT NULL DEFAULT clock_timestamp(),
     reason        text        NOT NULL CHECK (length(btrim(reason)) BETWEEN 1 AND 300)
