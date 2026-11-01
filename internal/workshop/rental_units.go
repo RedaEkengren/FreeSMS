@@ -313,6 +313,11 @@ func EndFleetMembership(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		if err != nil {
 			return fmt.Errorf("read membership: %w", err)
 		}
+		// One at a time with a booking of the unit, which takes the same
+		// row: whichever is second sees what the first did.
+		if err := lockUnitResourceTx(ctx, tx, resource); err != nil {
+			return err
+		}
 		switch {
 		case left != nil:
 			return errLeftAlready

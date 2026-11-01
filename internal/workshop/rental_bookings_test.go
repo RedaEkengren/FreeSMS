@@ -478,3 +478,47 @@ func TestABookingAtRiskIsQueuedAsAtRisk(t *testing.T) {
 		t.Errorf("the booking after the overdue van is queued as %v", kinds)
 	}
 }
+
+// A booking and the end of the unit's time in the fleet, made at the same
+// moment, never both stand: a rental on a unit sold or returned from lease.
+// The cleaning buffer after a rental is time in the fleet too (review #3).
+func TestABookingAndTheFleetsEndDoNotBothStand(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	u, _ := workshop.RentalUnitByID(ctx, pool, rentalDesk(), v.unit)
+	membership := u.Memberships[0].ID
+	for i := 0; i < 8; i++ {
+		from := in2031(1+2*i, 9)
+		var wg sync.WaitGroup
+		var booked, ended error
+		wg.Add(2)
+		go func() { defer wg.Done(); _, booked = v.book(pool, from, from.Add(24*time.Hour)) }()
+		go func() {
+			defer wg.Done()
+			ended = workshop.EndFleetMembership(ctx, pool, rentalDesk(), membership, from.Add(-time.Hour), "sold", "")
+		}()
+		wg.Wait()
+		if booked == nil && ended == nil {
+			t.Fatalf("round %d: a rental and the van's sale both stood", i)
+		}
+		if ended == nil {
+			return // sold: the rounds are over
+		}
+	}
+}
+
+// A rental whose cleaning buffer runs past the unit's last day in the
+// fleet is refused.
+func TestABuffersTimeIsInTheFleet(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	u, _ := workshop.RentalUnitByID(ctx, pool, rentalDesk(), v.unit)
+	if err := workshop.EndFleetMembership(ctx, pool, rentalDesk(), u.Memberships[0].ID, in2031(11, 9).Add(30*time.Minute), "sold", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.book(pool, in2031(10, 9), in2031(11, 9)); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("an hour's cleaning after the van was sold: %v", err)
+	}
+}

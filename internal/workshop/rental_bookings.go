@@ -272,10 +272,24 @@ func rentalUnitForTx(ctx context.Context, tx pgx.Tx, unitID string, from, to tim
 	if err != nil {
 		return u, fmt.Errorf("read unit: %w", err)
 	}
-	if err := inFleetTx(ctx, tx, unitID, from, to); err != nil {
+	if err := lockUnitResourceTx(ctx, tx, u.resource); err != nil {
+		return u, err
+	}
+	if err := inFleetTx(ctx, tx, unitID, from, to.Add(u.buffer)); err != nil {
 		return u, err
 	}
 	return u, nil
+}
+
+// lockUnitResourceTx takes the unit's resource row, so that booking it,
+// moving or extending a booking on it, and ending its time in the fleet
+// happen one after another: each reads the fleet and the ledger as the one
+// before it left them.
+func lockUnitResourceTx(ctx context.Context, tx pgx.Tx, resource string) error {
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM resources WHERE id = $1 FOR UPDATE`, resource); err != nil {
+		return fmt.Errorf("lock the unit: %w", err)
+	}
+	return nil
 }
 
 // inFleetTx refuses a period the unit is not in the fleet for, all of it.
@@ -519,7 +533,7 @@ func lockRentalTx(ctx context.Context, tx pgx.Tx, id string) (lockedRental, erro
 	if err != nil {
 		return b, fmt.Errorf("read booking: %w", err)
 	}
-	return b, nil
+	return b, lockUnitResourceTx(ctx, tx, b.resource)
 }
 
 // ConfirmRentalBooking makes a hold a booking: the deposit came, the
@@ -621,7 +635,7 @@ func MoveRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		if to.Sub(from) != b.ends.Sub(b.starts) {
 			return errMoveLength
 		}
-		if err := inFleetTx(ctx, tx, b.unit, from, to); err != nil {
+		if err := inFleetTx(ctx, tx, b.unit, from, to.Add(b.buffer)); err != nil {
 			return err
 		}
 		if err := reblockTx(ctx, tx, b, from, to); err != nil {
@@ -673,7 +687,7 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 		if !to.After(b.ends) {
 			return errExtendLater
 		}
-		if err := inFleetTx(ctx, tx, b.unit, b.starts, to); err != nil {
+		if err := inFleetTx(ctx, tx, b.unit, b.starts, to.Add(b.buffer)); err != nil {
 			return err
 		}
 		var plan string
