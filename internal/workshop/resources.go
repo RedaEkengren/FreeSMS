@@ -22,7 +22,8 @@ import (
 // resource_blocks says when it is taken and by what. The database refuses an
 // overlap (migration 0070), so two bookings made at the same moment cannot
 // both stand. A job on a vehicle that is a resource blocks it for as long as
-// the job is open, by a trigger in the job's own transaction.
+// the job is open, by a trigger in the job's own transaction; the car's open
+// jobs share one block, which ends with the last of them (0073).
 
 // The kinds of block.
 const (

@@ -368,6 +368,8 @@ func TestTheApplicationCannotRewriteWhatIsKept(t *testing.T) {
 		`UPDATE resource_blocks SET kind = 'rental'`,
 		`UPDATE resource_block_changes SET reason = 'x'`,
 		`DELETE FROM resource_block_changes`,
+		`UPDATE resource_block_jobs SET joined_at = now()`,
+		`DELETE FROM resource_block_jobs`,
 	} {
 		err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
 			_, err := tx.Exec(ctx, stmt)

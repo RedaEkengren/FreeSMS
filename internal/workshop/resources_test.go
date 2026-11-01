@@ -294,3 +294,48 @@ func TestAResourceWithBookingsAheadIsNotRetired(t *testing.T) {
 		t.Errorf("a retired resource booked: %v", err)
 	}
 }
+
+// A car in the workshop may have several jobs open at once. They share one
+// block: the second job joins the first's, and the car is free again when
+// the last of them ends, not the first.
+func TestACarsOpenJobsShareOneWorkshopBlock(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	res, err := workshop.CreateResource(ctx, pool, rentalDesk(), workshop.NewResource{VehicleID: vehicleA})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := workshop.TakeIn(ctx, pool, advisor(), "ABC 12D", "Bromsar", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := workshop.TakeIn(ctx, pool, advisor(), "ABC 12D", "Avgasröret igen", nil)
+	if err != nil {
+		t.Fatalf("a second job on a car already in the workshop: %v", err)
+	}
+	active := `SELECT count(*) FROM resource_blocks WHERE resource_id = $1 AND kind = 'workshop' AND upper_inf(period)`
+	if n := countRows(t, pool, active, res); n != 1 {
+		t.Fatalf("%d open workshop blocks, want the one both jobs share", n)
+	}
+	if n := countRows(t, pool, `SELECT count(*) FROM resource_block_jobs WHERE work_order_id IN ($1, $2)`, first, second); n != 2 {
+		t.Errorf("%d jobs recorded as sharing the block, want 2", n)
+	}
+	if err := workshop.SetState(ctx, pool, advisor(), first, workshop.StateCancelled); err != nil {
+		t.Fatal(err)
+	}
+	if n := countRows(t, pool, active, res); n != 1 {
+		t.Error("the block ended with the first job, while the second still has the car")
+	}
+	if _, err := rent(pool, rentalDesk(), res, in2031(8, 9), in2031(8, 17)); !errors.Is(err, workshop.ErrResourceTaken) {
+		t.Errorf("rented while a job is still open on it: %v", err)
+	}
+	if err := workshop.SetState(ctx, pool, advisor(), second, workshop.StateCancelled); err != nil {
+		t.Fatal(err)
+	}
+	if n := countRows(t, pool, active, res); n != 0 {
+		t.Error("the block did not end with the last job")
+	}
+	if _, err := rent(pool, rentalDesk(), res, in2031(8, 9), in2031(8, 17)); err != nil {
+		t.Errorf("rented once every job has ended: %v", err)
+	}
+}
