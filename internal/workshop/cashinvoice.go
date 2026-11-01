@@ -512,16 +512,16 @@ func SetCashRegisterThreshold(ctx context.Context, pool *pgxpool.Pool, scope acc
 
 // uncheckedFlowsWaiting is the payment flows in use that nobody has had
 // checked, for the owner's list; nothing for anybody else.
-func uncheckedFlowsWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]WaitingItem, error) {
+func uncheckedFlowsWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ActionItem, error) {
 	if !scope.Role.RunsTheShop() {
 		return nil, nil
 	}
-	var out []WaitingItem
+	var out []ActionItem
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		flows, err := paymentFlowsTx(ctx, tx)
 		for _, f := range flows {
 			if f.Used > 0 && !f.Checked {
-				out = append(out, WaitingItem{Kind: "flow_unchecked", Text: f.Name})
+				out = append(out, ActionItem{Kind: "flow_unchecked", SubjectKind: "payment_flows", Text: f.Name, Urgency: UrgencySoon})
 			}
 		}
 		return err

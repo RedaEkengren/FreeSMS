@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/RedaEkengren/FreeSMS/internal/database"
@@ -12,15 +13,29 @@ import (
 // transaction so that the counter's half and the parts half are one moment.
 func (s *Server) handleMine(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
-	var items []workshop.WaitingItem
+	var items []workshop.ActionItem
 	var err error
 	database.Reading(r.Context(), s.pool, session.Scope, func(ctx context.Context) {
 		items, err = workshop.WaitingFor(ctx, s.pool, session.Scope)
 	})
-	if s.handoverError(w, r, err) {
+	incomplete := s.waitingIncomplete(err)
+	if !incomplete && s.handoverError(w, r, err) {
 		return
 	}
-	s.render(w, r, http.StatusOK, "mine", pageData{Title: "For me", Session: session, Waiting: items})
+	s.render(w, r, http.StatusOK, "mine", pageData{Title: "For me", Session: session, Waiting: items, WaitingIncomplete: incomplete})
+}
+
+// waitingIncomplete logs the queue's providers that failed and reports
+// whether any did: the rest of the list is shown, and says it is not all.
+func (s *Server) waitingIncomplete(err error) bool {
+	var incomplete *workshop.IncompleteError
+	if !errors.As(err, &incomplete) {
+		return false
+	}
+	for _, f := range incomplete.Failed {
+		s.log.Error("waiting for you", "error", f)
+	}
+	return true
 }
 
 // handleMineCount is the number in the header, asked for after the page has

@@ -90,8 +90,10 @@ type pageData struct {
 	Subjects []string
 	MyLocale string
 	// What is waiting for the person signed in, and the header's count of it.
-	Waiting      []workshop.WaitingItem
-	WaitingCount int
+	Waiting []workshop.ActionItem
+	// Some of the queue's providers failed: what is shown is not all.
+	WaitingIncomplete bool
+	WaitingCount      int
 	// Messages to the customer on a job, what there is to tell, and how.
 	Messages []workshop.OutboundMessage
 	Tell     []string

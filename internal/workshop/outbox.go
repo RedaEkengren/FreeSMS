@@ -636,3 +636,26 @@ func (e OutboxEntry) StateLabel() string {
 	}
 	return "Given up"
 }
+
+// outboxWaiting is the calls a person has to look at, for the queue (#158):
+// given up after their attempts, which is something gone wrong, and tasks
+// to do by hand. Whoever runs the shop; one item for each, with how many.
+func outboxWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ActionItem, error) {
+	if !scope.Role.RunsTheShop() {
+		return nil, nil
+	}
+	var givenUp, manual int
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `
+			SELECT count(*) FILTER (WHERE state = 'given_up'), count(*) FILTER (WHERE state = 'manual_task')
+			FROM outbox_state WHERE state IN ('given_up', 'manual_task')`).Scan(&givenUp, &manual)
+	})
+	var out []ActionItem
+	if givenUp > 0 {
+		out = append(out, ActionItem{Kind: "outbox_given_up", SubjectKind: "outbox", Count: givenUp, Urgency: UrgencyNow})
+	}
+	if manual > 0 {
+		out = append(out, ActionItem{Kind: "outbox_manual", SubjectKind: "outbox", Count: manual, Urgency: UrgencySoon})
+	}
+	return out, err
+}

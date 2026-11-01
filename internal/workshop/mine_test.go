@@ -16,14 +16,14 @@ import (
 // currentPool is the test's database, so a check reads as one line.
 var currentPool *pgxpool.Pool
 
-func waiting(t *testing.T, scope access.Scope, kind string) []workshop.WaitingItem {
+func waiting(t *testing.T, scope access.Scope, kind string) []workshop.ActionItem {
 	t.Helper()
 	pool := currentPool
 	items, err := workshop.WaitingFor(context.Background(), pool, scope)
 	if err != nil {
 		t.Fatalf("WaitingFor(%s): %v", scope.Role, err)
 	}
-	var out []workshop.WaitingItem
+	var out []workshop.ActionItem
 	for _, it := range items {
 		if it.Kind == kind {
 			out = append(out, it)
@@ -56,7 +56,7 @@ func TestAPartThatArrivedWaitsForTheTechnicianUntilTheyAreBackOnTheJob(t *testin
 		t.Errorf("an arrived part is still the parts desk's: %+v", got)
 	}
 	got := waiting(t, technician(), "part_arrived")
-	if len(got) != 1 || got[0].JobID != job || got[0].Text != "Styrled vänster" {
+	if len(got) != 1 || got[0].SubjectID != job || got[0].Text != "Styrled vänster" {
 		t.Fatalf("the technician's list: %+v", got)
 	}
 	// Somebody else's request is not theirs to be told about.
@@ -84,7 +84,7 @@ func TestAFindingWaitsForTheCounterUntilSomebodyDealsWithIt(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, s := range []access.Scope{advisor(), owner()} {
-		if got := waiting(t, s, "finding"); len(got) != 1 || got[0].Count != 1 || got[0].JobID != job {
+		if got := waiting(t, s, "finding"); len(got) != 1 || got[0].Count != 1 || got[0].SubjectID != job {
 			t.Errorf("%s's list: %+v", s.Role, got)
 		}
 	}
@@ -156,7 +156,7 @@ func TestACarBookedOnATechnicianWaitsForThemWhenItComesIn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := waiting(t, technician(), "booked_on_you"); len(got) != 1 || got[0].JobID != job {
+	if got := waiting(t, technician(), "booked_on_you"); len(got) != 1 || got[0].SubjectID != job {
 		t.Fatalf("the technician's list: %+v", got)
 	}
 	if err := workshop.ClockIn(ctx, pool, technician(), job); err != nil {

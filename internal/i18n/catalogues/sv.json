@@ -7625,6 +7625,20 @@
     "%d cash invoice issued through it": {
       "one": "%d kontantfaktura utfärdad genom det",
       "other": "%d kontantfakturor utfärdade genom det"
+    },
+    "Waiting for a signature: %s": {
+      "other": "Väntar på underskrift: %s"
+    },
+    "%d call to another service was given up": {
+      "one": "%d anrop till en annan tjänst har getts upp",
+      "other": "%d anrop till andra tjänster har getts upp"
+    },
+    "%d call to another service is a task to do by hand": {
+      "one": "%d anrop till en annan tjänst ska göras för hand",
+      "other": "%d anrop till andra tjänster ska göras för hand"
+    },
+    "Some items could not be loaded.": {
+      "other": "En del kunde inte hämtas."
     }
   }
 }

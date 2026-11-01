@@ -223,7 +223,7 @@ func TestAnOutageIsRetriedAndAGivenUpMessageIsInTheCountersQueueUntilTheyAct(t *
 	items, _ := workshop.WaitingFor(ctx, pool, advisor())
 	var queued bool
 	for _, it := range items {
-		if it.Kind == "booking_not_told" && it.BookingID == b2 {
+		if it.Kind == "booking_not_told" && it.SubjectKind == "booking" && it.SubjectID == b2 {
 			queued = true
 		}
 	}

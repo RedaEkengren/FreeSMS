@@ -1012,3 +1012,49 @@ func withoutNames(title string, names []string) string {
 	}
 	return out
 }
+
+// unsignedDocumentsWaiting is the documents waiting for a signature, for
+// the queue (#150, #158): in force -- not replaced, not erased -- with a
+// party yet to sign, of the kinds the caller makes, in a module the shop
+// runs. Said by the template's name, the shop's own words, never by the
+// title, which can carry a person's name.
+func unsignedDocumentsWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ActionItem, error) {
+	var kinds []string
+	for _, k := range []string{DocPurchaseAgreement, DocConsignmentAgreement, DocSalesContract, DocTestDriveAgreement, DocRentalAgreement} {
+		if mayDocument(scope.Role, scope, k, true) == nil {
+			kinds = append(kinds, k)
+		}
+	}
+	if len(kinds) == 0 {
+		return nil, nil
+	}
+	var out []ActionItem
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `
+			SELECT r.id::text, r.kind, t.name FROM document_records r
+			JOIN document_template_versions v ON v.id = r.template_version_id
+			JOIN document_templates t ON t.id = v.template_id
+			WHERE r.kind = ANY($1) AND r.erased_at IS NULL
+			  AND NOT EXISTS (SELECT 1 FROM document_records n WHERE n.supersedes_id = r.id)
+			  AND EXISTS (SELECT 1 FROM document_record_parties p WHERE p.document_id = r.id
+			              AND NOT EXISTS (SELECT 1 FROM document_signatures s WHERE s.document_party_id = p.id))
+			ORDER BY r.created_at, r.id`, kinds)
+		if err != nil {
+			return fmt.Errorf("read documents waiting for a signature: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			it := ActionItem{Kind: "unsigned", SubjectKind: "document", Module: access.Dealer, Urgency: UrgencySoon}
+			var kind string
+			if err := rows.Scan(&it.SubjectID, &kind, &it.Text); err != nil {
+				return err
+			}
+			if kind == DocRentalAgreement {
+				it.Module = access.Rental
+			}
+			out = append(out, it)
+		}
+		return rows.Err()
+	})
+	return out, err
+}
