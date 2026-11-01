@@ -186,6 +186,13 @@ type Giro struct {
 // GiroOf reads the account out of what a shop printed as its payment
 // details, for the scheme it said it is: the digits and the hyphen of the
 // first number in it. Zero for any other scheme, or no number.
+//
+// A space may group a number's digits -- a plusgiro is often written
+// "12 34 56-7" -- but does not join two numbers: once the hyphen before
+// the check part has been written, or ten digits, the most a giro has,
+// a space and more digits are something else, such as the telephone
+// number printed after it. Anything other than a digit, a hyphen or a
+// space ends the number too.
 func GiroOf(scheme, printed string) Giro {
 	var t string
 	switch scheme {
@@ -197,18 +204,31 @@ func GiroOf(scheme, printed string) Giro {
 		return Giro{}
 	}
 	var b strings.Builder
+	digits, hyphen, spaced := 0, false, false
 	for _, r := range printed {
 		switch {
-		case r >= '0' && r <= '9', r == '-' && b.Len() > 0:
+		case r >= '0' && r <= '9':
+			if spaced && (hyphen || digits >= 10) {
+				goto done
+			}
 			b.WriteRune(r)
-		case b.Len() > 0 && r != ' ':
+			digits++
+			spaced = false
+		case r == '-' && b.Len() > 0:
+			if hyphen {
+				goto done
+			}
+			b.WriteRune(r)
+			hyphen, spaced = true, false
+		case r == ' ' && b.Len() > 0:
+			spaced = true
+		case b.Len() > 0:
 			goto done
 		}
 	}
 done:
 	acc := strings.Trim(b.String(), "-")
-	digits := strings.ReplaceAll(acc, "-", "")
-	if len(digits) < 2 || len(digits) > 10 {
+	if n := len(strings.ReplaceAll(acc, "-", "")); n < 2 || n > 10 {
 		return Giro{}
 	}
 	return Giro{Type: t, Account: acc}

@@ -107,6 +107,19 @@ func TestTheBankgiroCodeIsUsingQRs(t *testing.T) {
 	if g := GiroOf("plusgiro", "PG 176099-0"); g != (Giro{Type: "PG", Account: "176099-0"}) {
 		t.Errorf("a plusgiro: %+v", g)
 	}
+	// A space groups a number's digits but does not join it to the next
+	// number: what follows a whole giro is something else.
+	for printed, want := range map[string]string{
+		"Bankgiro 5050-1055 08 123 45":      "5050-1055",
+		"Bankgiro 5050-1055, tel 08-123 45": "5050-1055",
+		"PG 17 60 99-0":                     "176099-0",
+		"BG 5050-1055-08":                   "5050-1055",
+		"1234567890 08 123 45":              "1234567890",
+	} {
+		if g := GiroOf("bankgiro", printed); g.Account != want {
+			t.Errorf("%q read as %q, want %q", printed, g.Account, want)
+		}
+	}
 	if _, err := UsingQR("A", "", "18", issued, issued, 100, giro); err == nil {
 		t.Error("made a code with no company number")
 	}

@@ -53,6 +53,7 @@
       </select></label>
     <label><span>{{.T "Electronic invoice address"}}</span><input name="endpoint_id" value="{{.Shop.EndpointID}}" placeholder="0007:5566778899"></label>
   </div>
+  {{if .GiroUnread}}<p class="error" role="alert">{{.T "The payment details do not read as a bankgiro or plusgiro number, so invoices get no bankgiro or plusgiro code to pay with and cannot be sent electronically. Write the number on its own, such as Bankgiro 123-4567."}}</p>{{end}}
   {{/* The code on every invoice (#234): Swish with a number here; otherwise
        a bankgiro or plusgiro code when the payment details are one. */}}
   <label><span>{{.T "Swish number for invoices"}}</span><input name="swish_number" value="{{.Shop.SwishNumber}}" inputmode="numeric" maxlength="13" placeholder="123 456 78 90"></label>

@@ -118,3 +118,27 @@ func TestAnInvoiceIsPaidByItsReference(t *testing.T) {
 		t.Errorf("a paid invoice still has a code to pay it with")
 	}
 }
+
+// Payment details that do not read as the giro they say they are -- the
+// number lost among the digits of a telephone number, or no number at
+// all -- are said on the shop's page, rather than found as an invoice
+// with no code. A telephone number after a whole giro is not read as part
+// of it.
+func TestThePaymentDetailsAreReadAsTheShopPageSays(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := signIn(t, ts, ownerEmail)
+	const warning = "do not read as a bankgiro or plusgiro number"
+	for details, unread := range map[string]bool{
+		"Bankgiro 5050-1055":           false,
+		"Bankgiro 5050-1055 08 123 45": false,
+		"Bankgiro 12345678901":         true,
+		"Ring oss":                     true,
+	} {
+		if _, err := pool.Exec(context.Background(), `UPDATE shops SET payment_reference = $2, payment_scheme = 'bankgiro' WHERE id = $1`, shopA, details); err != nil {
+			t.Fatal(err)
+		}
+		if page := visibleText(get(t, owner, ts.URL+"/shop", http.StatusOK)); strings.Contains(page, warning) != unread {
+			t.Errorf("%q: warned %v, want %v", details, !unread, unread)
+		}
+	}
+}

@@ -49,3 +49,13 @@ func (d pageData) PayCode(doc workshop.Document) *PayCode {
 	// The SVG is built from digits and escaped text only.
 	return &PayCode{Kind: kind, SVG: template.HTML(q.SVG(d.T("Scan to pay")))} //nolint:gosec
 }
+
+// GiroUnread reports whether the shop says its payment details are a
+// bankgiro or plusgiro and they do not read as one: its invoices get no
+// bankgiro code and cannot be sent electronically, which the shop page
+// says rather than leave to be found on an invoice.
+func (d pageData) GiroUnread() bool {
+	scheme := d.Shop.PaymentScheme
+	return (scheme == "bankgiro" || scheme == "plusgiro") &&
+		payref.GiroOf(scheme, d.Shop.PaymentReference) == (payref.Giro{})
+}
