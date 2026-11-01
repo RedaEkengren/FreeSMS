@@ -251,7 +251,7 @@ func TestMoneyOwedBackIsARefundTaskAndPayingItBackIsNotAReversal(t *testing.T) {
 			last = p.ID
 		}
 	}
-	if err := workshop.ReversePayment(ctx, pool, advisor(), last); err != nil {
+	if err := workshop.ReversePayment(ctx, pool, advisor(), last, "Registrerad av misstag"); err != nil {
 		t.Fatal(err)
 	}
 	if b, _ = workshop.BalanceFor(ctx, pool, advisor(), inv.ID); b.OutstandingMinor() >= 0 {

@@ -2395,6 +2395,84 @@
     "that is not something with a history": {
       "other": "det är inte något som har en historik"
     },
+    "Why it is reversed": {
+      "other": "Varför den rättas"
+    },
+    "A payment recorded here is a note that money arrived, not a cash-register receipt: FreeSMS is not a cash register.": {
+      "other": "En betalning som registreras här är en anteckning om att pengar har kommit in, inte ett kassakvitto: FreeSMS är inget kassaregister."
+    },
+    "Deposits and payouts: %d recorded, which go to the books once their accounts are decided.": {
+      "other": "Depositioner och utbetalningar: %d registrerade, som förs till bokföringen när deras konton är bestämda."
+    },
+    "deposit": {
+      "other": "deposition"
+    },
+    "payout": {
+      "other": "utbetalning"
+    },
+    "Bank reference": {
+      "other": "Bankreferens"
+    },
+    "Swish reference": {
+      "other": "Swish-referens"
+    },
+    "Terminal receipt number": {
+      "other": "Kvittonummer från terminalen"
+    },
+    "say why the payment is reversed, in 300 characters or fewer": {
+      "other": "säg varför betalningen rättas, med högst 300 tecken"
+    },
+    "say why the money is given back, in 300 characters or fewer": {
+      "other": "säg varför pengarna betalas tillbaka, med högst 300 tecken"
+    },
+    "that is not what it can be for": {
+      "other": "det är inte något den kan gälla"
+    },
+    "that payment has already been recorded": {
+      "other": "den betalningen är redan registrerad"
+    },
+    "that request was already used to record another payment": {
+      "other": "den begäran användes redan för att registrera en annan betalning"
+    },
+    "that is more than is left of the payment to give back": {
+      "other": "det är mer än det som återstår av betalningen att betala tillbaka"
+    },
+    "only money received is refunded": {
+      "other": "bara pengar som har tagits emot betalas tillbaka"
+    },
+    "say how much, above nothing": {
+      "other": "säg hur mycket, mer än noll"
+    },
+    "a provider's id needs the provider, and the other way round": {
+      "other": "ett id från en betaltjänst behöver betaltjänsten, och tvärtom"
+    },
+    "a reference is longer than it can be": {
+      "other": "en referens är längre än den får vara"
+    },
+    "that is more than the deposit holds": {
+      "other": "det är mer än depositionen rymmer"
+    },
+    "that is more than is owed on the invoice": {
+      "other": "det är mer än det som är skyldigt på fakturan"
+    },
+    "that is more than the deposit still holds": {
+      "other": "det är mer än det som finns kvar av depositionen"
+    },
+    "a statement line is typed or imported": {
+      "other": "en kontoutdragsrad skrivs in eller importeras"
+    },
+    "a statement line needs its day and an amount": {
+      "other": "en kontoutdragsrad behöver sin dag och ett belopp"
+    },
+    "cash and a deposit applied never reach the bank": {
+      "other": "kontanter och en tillämpad deposition når aldrig banken"
+    },
+    "the line is for a different amount": {
+      "other": "raden gäller ett annat belopp"
+    },
+    "that payment or that line is already matched": {
+      "other": "den betalningen eller den raden är redan avstämd"
+    },
     "They carry the same plate at the same time.": {
       "other": "De har samma skylt samtidigt."
     },

@@ -153,7 +153,11 @@ func ExportAccounting(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			       p.number, p.amount_minor, p.rounding_minor, p.paid_on,
 			       p.reverses_id IS NOT NULL, p.accounting_export_id IS NOT NULL
 			FROM invoice_payments p JOIN invoices i ON i.id = p.invoice_id
-			WHERE p.paid_on >= $1::date AND p.paid_on < $2::date
+			-- An invoice's payments only, and not a deposit applied to one:
+			-- which accounts a deposit received, applied, refunded or a
+			-- payout use is not decided (G2, #207, #221). Until it is they
+			-- are recorded and not exported, and the day says so.
+			WHERE p.paid_on >= $1::date AND p.paid_on < $2::date AND p.method <> 'deposit'
 			ORDER BY p.series, p.number
 			FOR UPDATE OF p`, from.Format("2006-01-02"), to.Format("2006-01-02"))
 		if err != nil {

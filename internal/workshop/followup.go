@@ -574,8 +574,8 @@ func RecordRefund(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 		if amount > back {
 			return fmt.Errorf("%w: that is more than is owed back", ErrInvalid)
 		}
-		out = Payment{AmountMinor: -amount, Method: in.Method, PaidOn: in.PaidOn, Reference: strings.TrimSpace(in.Reference)}
-		if err := insertPayment(ctx, tx, scope, id, &out, ""); err != nil {
+		out = Payment{InvoiceID: id, AmountMinor: -amount, Method: in.Method, PaidOn: in.PaidOn, Reference: strings.TrimSpace(in.Reference)}
+		if err := insertPayment(ctx, tx, scope, &out); err != nil {
 			return err
 		}
 		if err := caseTx(ctx, tx, scope, id); err != nil {

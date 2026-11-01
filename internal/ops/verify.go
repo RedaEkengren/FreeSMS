@@ -225,7 +225,8 @@ func verifyShop(ctx context.Context, tx pgx.Tx, files Files, sr *ShopReport) err
 	// A reversal reverses a payment on the same invoice, for the same money.
 	if n, err := count(`
 		SELECT count(*) FROM invoice_payments r JOIN invoice_payments p ON p.id = r.reverses_id
-		WHERE r.invoice_id <> p.invoice_id OR r.amount_minor <> -p.amount_minor`); err != nil {
+		WHERE r.invoice_id IS DISTINCT FROM p.invoice_id OR r.deposit_id IS DISTINCT FROM p.deposit_id
+		   OR r.payout_id IS DISTINCT FROM p.payout_id OR r.amount_minor <> -p.amount_minor`); err != nil {
 		return err
 	} else if n > 0 {
 		add("payment reversals", Fail, "%d reversals that do not undo the payment they point at", n)

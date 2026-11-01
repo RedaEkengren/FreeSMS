@@ -46,7 +46,7 @@ func (s *Server) handleRecordPayment(w http.ResponseWriter, r *http.Request) {
 // reverses it.
 func (s *Server) handleReversePayment(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
-	if err := workshop.ReversePayment(r.Context(), s.pool, session.Scope, r.PathValue("id")); s.paymentError(w, r, err) {
+	if err := workshop.ReversePayment(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("reason")); s.paymentError(w, r, err) {
 		return
 	}
 	back := r.FormValue("invoice")

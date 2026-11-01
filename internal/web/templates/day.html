@@ -39,7 +39,7 @@
   <div class="waiting">{{$.T "Received"}} {{$.Money .Received}}{{if .PaidOut}} &middot; {{$.T "paid out"}} {{$.Money .PaidOut}}{{end}}{{if .Reversed}} &middot; {{$.T "reversed"}} {{$.Money .Reversed}}{{end}}{{if .Rounding}} &middot; {{$.T "rounding"}} {{$.Money .Rounding}}{{end}}</div>
   <ul class="lines mt-s">
     {{range .Entries}}
-    <li><div class="row"><span><a href="/invoices/{{.InvoiceID}}">{{.Reference}} &middot; {{.Invoice}}</a> <span class="tag">{{$.T .Kind}}</span></span><span>{{$.Money .Amount}}</span></div></li>
+    <li><div class="row"><span>{{if .InvoiceID}}<a href="/invoices/{{.InvoiceID}}">{{.Reference}} &middot; {{.Invoice}}</a>{{else}}{{.Reference}} &middot; {{$.T .Target}}{{end}} <span class="tag">{{$.T .Kind}}</span></span><span>{{$.Money .Amount}}</span></div></li>
     {{end}}
   </ul>
 </div>
@@ -82,6 +82,7 @@
 
 <h2>{{$.T "Handed to the accountant"}}</h2>
 <p class="waiting">{{$.T "This day's documents: %d handed over, %d not yet. Payments and payouts: %d, %d." .Exports.DocsExported .Exports.DocsNot .Exports.EntriesExported .Exports.EntriesNot}}</p>
+{{if .Exports.EntriesUndecided}}<p class="waiting">{{$.T "Deposits and payouts: %d recorded, which go to the books once their accounts are decided." .Exports.EntriesUndecided}}</p>{{end}}
 {{if $.Exports}}
 <ul class="lines">
   {{range $.Exports}}

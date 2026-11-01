@@ -106,10 +106,10 @@ func TestAMistakeIsReversedNotDeleted(t *testing.T) {
 	inv, _ := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
 	wrong, _ := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
 		AmountMinor: amount(50000), Method: "card", PaidOn: time.Now()})
-	if err := workshop.ReversePayment(ctx, pool, advisor(), wrong.ID); err != nil {
+	if err := workshop.ReversePayment(ctx, pool, advisor(), wrong.ID, "Registrerad av misstag"); err != nil {
 		t.Fatalf("ReversePayment: %v", err)
 	}
-	if err := workshop.ReversePayment(ctx, pool, advisor(), wrong.ID); !errors.Is(err, workshop.ErrInvalid) {
+	if err := workshop.ReversePayment(ctx, pool, advisor(), wrong.ID, "Registrerad av misstag"); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("reversing twice: %v", err)
 	}
 	b, _ := workshop.BalanceFor(ctx, pool, advisor(), inv.ID)

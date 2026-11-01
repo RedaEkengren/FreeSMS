@@ -91,10 +91,54 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	made["payment.overpayment_confirmed"] = subject{"payment", over.ID}
-	if err := workshop.ReversePayment(ctx, pool, advisor(), over.ID); err != nil {
+	if err := workshop.ReversePayment(ctx, pool, advisor(), over.ID, "Registrerad av misstag"); err != nil {
 		t.Fatal(err)
 	}
 	made["payment.recorded"], made["payment.reversed"] = subject{"invoice", inv.ID}, subject{"invoice", inv.ID}
+
+	// A deposit received, applied and partly given back; a seller paid
+	// out; a payment matched to the bank's statement and the match undone.
+	dep, err := workshop.CreateDeposit(ctx, pool, everything, workshop.NewHolding{PartyID: partyOf(t, pool, fixtureCustomer), Purpose: "rental"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := workshop.RecordDepositPayment(ctx, pool, everything, dep, workshop.NewPayment{AmountMinor: minor(300000), Method: "swish", PaidOn: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ApplyDeposit(ctx, pool, everything, dep, other.ID, 1000, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RefundPayment(ctx, pool, everything, held.ID, workshop.NewPayment{AmountMinor: minor(1000), Method: "bank", PaidOn: time.Now()}, "Delvis tillbaka"); err != nil {
+		t.Fatal(err)
+	}
+	made["payment.applied"], made["payment.refunded"] = subject{"deposit", dep}, subject{"deposit", dep}
+	payout, err := workshop.CreatePayout(ctx, pool, everything, workshop.NewHolding{PartyID: theSeller(t, pool), Purpose: "purchase"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordPayout(ctx, pool, everything, payout, workshop.NewPayment{AmountMinor: minor(5000000), Method: "bank", PaidOn: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	made["payment.paid_out"] = subject{"payout", payout}
+	if _, err := workshop.AddStatementLines(ctx, pool, owner(), "typed", []workshop.StatementLine{{BookedOn: time.Now(), AmountMinor: 300000}}); err != nil {
+		t.Fatal(err)
+	}
+	r, err := workshop.Unreconciled(ctx, pool, owner())
+	if err != nil || len(r.Lines) != 1 {
+		t.Fatalf("unreconciled: %+v, %v", r, err)
+	}
+	if err := workshop.MatchPayment(ctx, pool, owner(), held.ID, r.Lines[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.UndoMatch(ctx, pool, owner(), held.ID); err != nil {
+		t.Fatal(err)
+	}
+	made["payment.matched"], made["payment.match_undone"] = subject{"payment", held.ID}, subject{"payment", held.ID}
 	made["job.state_changed"] = subject{"work_order", job}
 
 	// A customer's details put right.

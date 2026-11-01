@@ -112,7 +112,7 @@ func workshopWithBooks(t *testing.T) (*pgxpool.Pool, *storage.Store, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := workshop.ReversePayment(ctx, pool, advisor(), paid.ID); err != nil {
+	if err := workshop.ReversePayment(ctx, pool, advisor(), paid.ID, "Registrerad av misstag"); err != nil {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(t.TempDir(), "attachments")

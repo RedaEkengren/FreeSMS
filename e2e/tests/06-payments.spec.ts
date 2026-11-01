@@ -38,6 +38,7 @@ test.describe.serial('getting paid', () => {
     await page.locator('.card', { hasText: 'CHG001' }).click();
     await page.getByRole('link', { name: /A-\d+/ }).first().click();
 
+    await page.getByLabel('Why it is reversed').last().fill('Recorded twice');
     await page.getByRole('button', { name: 'Recorded in error: reverse it' }).last().click();
     await expect(page.getByText('reverses a payment recorded in error')).toBeVisible();
     await expect(page.locator('section dl')).toContainText('823.29');

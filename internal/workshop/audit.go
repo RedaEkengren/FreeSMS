@@ -46,7 +46,12 @@ var AuditedTransitions = []AuditTransition{
 	{"document.signed", "document", "document_signatures", false},
 	{"document.superseded", "document", "document_records", false},
 	{"payment.recorded", "invoice", "invoice_payments", false},
-	{"payment.reversed", "invoice", "invoice_payments", false},
+	{"payment.reversed", "invoice", "invoice_payments", true},
+	{"payment.refunded", "deposit", "invoice_payments", true},
+	{"payment.applied", "deposit", "invoice_payments", false},
+	{"payment.paid_out", "payout", "invoice_payments", false},
+	{"payment.matched", "payment", "payment_matches", false},
+	{"payment.match_undone", "payment", "payment_matches", false},
 	{"payment.overpayment_confirmed", "payment", "audit_events", true},
 	{"invoice.unagreed_lines_invoiced", "invoice", "audit_events", true},
 	{"job.state_changed", "work_order", "work_order_state_changes", false},
@@ -124,7 +129,8 @@ var detailSeen = map[string]func(access.Roles) bool{
 
 // AuditTrail is a subject's events, in the order they happened, for
 // whoever may read that subject: the shop's and its people's for those who
-// run it; a document's for those who may read its kind; money's, a
+// run it; a document's for those who may read its kind; a deposit's or a
+// payout's for those who may make one; money's, a
 // customer's, a vehicle's and a party's for those who see customers; a
 // job's for those who work on or follow jobs; a booked resource's for those
 // who book it, with why only for those who run the shop. What a role may not
@@ -159,12 +165,25 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 		if !scope.Role.SeesCustomerPersonalData() && !scope.Role.WorksInTheWorkshop() && !scope.Role.FollowsJobs() {
 			return nil, access.ErrForbidden
 		}
-	case "document":
+	case "document", "deposit", "payout":
 	default:
 		return nil, fmt.Errorf("%w: that is not something with a history", ErrInvalid)
 	}
 	var out []AuditEvent
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		if subjectKind == "deposit" || subjectKind == "payout" {
+			var purpose string
+			err := tx.QueryRow(ctx, `SELECT purpose FROM `+subjectKind+`s WHERE id = $1`, subjectID).Scan(&purpose)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrNotFound
+			}
+			if err != nil {
+				return fmt.Errorf("read %s: %w", subjectKind, err)
+			}
+			if err := mayReadHolding(scope.Role, subjectKind, purpose); err != nil {
+				return err
+			}
+		}
 		if subjectKind == "document" {
 			var kind string
 			err := tx.QueryRow(ctx, `SELECT kind FROM document_records WHERE id = $1`, subjectID).Scan(&kind)

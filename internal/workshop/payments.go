@@ -38,6 +38,19 @@ type Payment struct {
 	Reference     string
 	Reverses      string
 	Reversed      bool
+	// What it is against: one of an invoice, a deposit and a payout (#152).
+	InvoiceID string
+	DepositID string
+	PayoutID  string
+	// The payment it gives back part or all of, for a refund.
+	RefundsID string
+	// Who carried it, and their id for it.
+	Provider   string
+	ExternalID string
+	// Why it was reversed or refunded.
+	Reason string
+	// The request's own key: repeated, it finds this row.
+	Key string
 }
 
 // Settles is what the payment took off the balance: the money and the
@@ -93,6 +106,14 @@ type NewPayment struct {
 	// money that arrived; with it, the decision is its own event (#151).
 	ConfirmedOverpayment bool
 	OverpaymentReason    string
+
+	// Who carried it and their own id for it -- the bank's line, the Swish
+	// payment -- so the same one is recorded once.
+	Provider   string
+	ExternalID string
+	// The request's own key: repeated, it records nothing more and answers
+	// with the payment it made.
+	Key string
 }
 
 // overpaymentMargin is how far above what is owed a payment may go before
@@ -236,6 +257,9 @@ func RecordPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if p.AmountMinor != nil && *p.AmountMinor == 0 {
 		return Payment{}, fmt.Errorf("%w: a payment of nothing is not a payment", ErrInvalid)
 	}
+	if (p.Provider == "") != (p.ExternalID == "") {
+		return Payment{}, fmt.Errorf("%w: a provider's id needs the provider, and the other way round", ErrInvalid)
+	}
 	var out Payment
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		b, err := balanceTx(ctx, tx, invoiceID, true)
@@ -244,6 +268,14 @@ func RecordPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		}
 		if b.InvoiceID != invoiceID {
 			return fmt.Errorf("%w: that is a credit note; record the payment against %s", ErrInvalid, b.Reference)
+		}
+		// The same request again is answered with what it recorded, before
+		// anything is asked of a balance it has itself changed.
+		if strings.TrimSpace(p.Key) != "" {
+			out = Payment{InvoiceID: b.InvoiceID}
+			if found, err := replayedPaymentTx(ctx, tx, strings.TrimSpace(p.Key), &out); found || err != nil {
+				return err
+			}
 		}
 		// Money can arrive before the invoice is written -- paid at the
 		// counter on Friday, written up on Monday -- but not a month before.
@@ -262,7 +294,8 @@ func RecordPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 				return err
 			}
 		}
-		out = Payment{Method: p.Method, PaidOn: p.PaidOn, Reference: strings.TrimSpace(p.Reference)}
+		out = Payment{InvoiceID: b.InvoiceID, Method: p.Method, PaidOn: p.PaidOn, Reference: strings.TrimSpace(p.Reference),
+			Provider: p.Provider, ExternalID: p.ExternalID, Key: p.Key}
 		if p.AmountMinor != nil {
 			out.AmountMinor = *p.AmountMinor
 		} else {
@@ -278,7 +311,7 @@ func RecordPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 				out.RoundingMinor = owed - out.AmountMinor
 			}
 		}
-		if err := insertPayment(ctx, tx, scope, b.InvoiceID, &out, ""); err != nil {
+		if replayed, err := insertPaymentOnce(ctx, tx, scope, &out); err != nil || replayed {
 			return err
 		}
 		if over {
@@ -294,58 +327,117 @@ func RecordPayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 }
 
 // ReversePayment corrects a payment recorded in error with one that undoes
-// it, dated today. The first stays, with the reversal beside it: the ledger is
-// no easier to quietly rewrite than the invoice.
-func ReversePayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, paymentID string) error {
-	if !scope.Role.SeesCustomerPersonalData() {
+// it, dated today, and says why, which is required. The first stays, with
+// the reversal beside it: the ledger is no easier to quietly rewrite than
+// the invoice. Any payment -- into an invoice or a deposit, a payout, a
+// refund -- by whoever may move money on what it is against.
+func ReversePayment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, paymentID, reason string) error {
+	if !scope.Role.SeesCustomerPersonalData() && !scope.Role.SellsVehicles() && !scope.Role.HandsOverRentals() && !scope.Role.SeesPurchasePrice() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(paymentID) {
 		return ErrNotFound
 	}
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		var invoiceID, method string
-		var amount, rounding int64
-		var reverses *string
-		err := tx.QueryRow(ctx, `
-			SELECT invoice_id, amount_minor, rounding_minor, method, reverses_id
-			FROM invoice_payments WHERE id = $1`, paymentID).Scan(&invoiceID, &amount, &rounding, &method, &reverses)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNotFound
-		}
+	reason, err := checkReason(reason, ErrReversalNoReason)
+	if err != nil {
+		return err
+	}
+	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		orig, err := paymentTargetTx(ctx, tx, scope, paymentID)
 		if err != nil {
-			return fmt.Errorf("read payment: %w", err)
-		}
-		if reverses != nil {
-			return fmt.Errorf("%w: that is itself a reversal; record the payment again instead", ErrInvalid)
-		}
-		if _, err := balanceTx(ctx, tx, invoiceID, true); err != nil {
 			return err
 		}
-		undo := Payment{AmountMinor: -amount, RoundingMinor: -rounding, Method: method, PaidOn: time.Now()}
-		return insertPayment(ctx, tx, scope, invoiceID, &undo, paymentID)
+		if orig.Reverses != "" {
+			return fmt.Errorf("%w: that is itself a reversal; record the payment again instead", ErrInvalid)
+		}
+		undo := Payment{InvoiceID: orig.InvoiceID, DepositID: orig.DepositID, PayoutID: orig.PayoutID,
+			AmountMinor: -orig.AmountMinor, RoundingMinor: -orig.RoundingMinor, Method: orig.Method, PaidOn: time.Now(),
+			Reverses: paymentID, Reason: reason}
+		return insertPayment(ctx, tx, scope, &undo)
 	})
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "invoice_payments_reverses_id_key" {
 		return fmt.Errorf("%w: that payment has already been reversed", ErrInvalid)
 	}
 	return err
 }
 
-func insertPayment(ctx context.Context, tx pgx.Tx, scope access.Scope, invoiceID string, p *Payment, reverses string) error {
+// insertPaymentOnce is insertPayment for a request that may be repeated:
+// with a key already used, it reads that payment into p instead, and says
+// it did. The same key for a payment against something else is refused.
+// Repeated while the first is still in flight, it waits for the first, as
+// BookResource does.
+func insertPaymentOnce(ctx context.Context, tx pgx.Tx, scope access.Scope, p *Payment) (replayed bool, err error) {
+	key := strings.TrimSpace(p.Key)
+	if key == "" {
+		return false, insertPayment(ctx, tx, scope, p)
+	}
+	if found, err := replayedPaymentTx(ctx, tx, key, p); found || err != nil {
+		return found, err
+	}
+	sp, err := tx.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	if err := insertPayment(ctx, sp, scope, p); err != nil {
+		if !isUniqueViolation(err, "invoice_payments_request_idx") {
+			return false, err
+		}
+		if rerr := sp.Rollback(ctx); rerr != nil {
+			return false, rerr
+		}
+		return replayedPaymentTx(ctx, tx, key, p)
+	}
+	return false, sp.Commit(ctx)
+}
+
+func replayedPaymentTx(ctx context.Context, tx pgx.Tx, key string, p *Payment) (bool, error) {
+	var target string
+	var got Payment
+	err := tx.QueryRow(ctx, `
+		SELECT id, series, number, amount_minor, rounding_minor, recorded_at, coalesce(invoice_id, deposit_id, payout_id)::text
+		FROM invoice_payments WHERE request_key = $1`, key).Scan(&got.ID, &got.Series, &got.Number, &got.AmountMinor,
+		&got.RoundingMinor, &got.RecordedAt, &target)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read the request: %w", err)
+	}
+	if !strings.EqualFold(target, p.InvoiceID+p.DepositID+p.PayoutID) {
+		return false, errKeyOtherPayment
+	}
+	p.ID, p.Series, p.Number, p.AmountMinor, p.RoundingMinor, p.RecordedAt = got.ID, got.Series, got.Number, got.AmountMinor, got.RoundingMinor, got.RecordedAt
+	return true, nil
+}
+
+// insertPayment writes p as the next payment in the series, against
+// whichever one of an invoice, a deposit and a payout it names.
+func insertPayment(ctx context.Context, tx pgx.Tx, scope access.Scope, p *Payment) error {
 	number, err := nextNumber(ctx, tx, scope.ShopID, PaymentSeries)
 	if err != nil {
 		return err
 	}
 	p.Series, p.Number = PaymentSeries, number
-	return tx.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		INSERT INTO invoice_payments
-		  (shop_id, invoice_id, series, number, amount_minor, rounding_minor, method, paid_on,
-		   recorded_by, reference, reverses_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date, $9, nullif($10, ''), nullif($11, '')::uuid)
+		  (shop_id, invoice_id, deposit_id, payout_id, series, number, amount_minor, rounding_minor, method, paid_on,
+		   recorded_by, reference, reverses_id, refunds_id, provider, external_id, reason, request_key)
+		VALUES ($1, NULLIF($2, '')::uuid, NULLIF($3, '')::uuid, NULLIF($4, '')::uuid, $5, $6, $7, $8, $9, $10::date,
+		        $11, nullif($12, ''), nullif($13, '')::uuid, nullif($14, '')::uuid, nullif($15, ''), nullif($16, ''),
+		        nullif($17, ''), nullif($18, ''))
 		RETURNING id, recorded_at`,
-		scope.ShopID, invoiceID, p.Series, p.Number, p.AmountMinor, p.RoundingMinor, p.Method,
-		p.PaidOn.Format("2006-01-02"), scope.UserID, p.Reference, reverses).Scan(&p.ID, &p.RecordedAt)
+		scope.ShopID, p.InvoiceID, p.DepositID, p.PayoutID, p.Series, p.Number, p.AmountMinor, p.RoundingMinor, p.Method,
+		p.PaidOn.Format("2006-01-02"), scope.UserID, p.Reference, p.Reverses, p.RefundsID, p.Provider,
+		strings.TrimSpace(p.ExternalID), p.Reason, strings.TrimSpace(p.Key)).Scan(&p.ID, &p.RecordedAt)
+	if isUniqueViolation(err, "invoice_payments_external_idx") {
+		return errExternalTwice
+	}
+	var pg *pgconn.PgError
+	if errors.As(err, &pg) && pg.Code == "23514" && strings.Contains(pg.Message, "refund of more") {
+		return errRefundTooMuch
+	}
+	return err
 }
 
 // Receivables lists the invoices with something owed either way, overdue
