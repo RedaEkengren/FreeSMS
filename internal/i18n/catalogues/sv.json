@@ -2473,6 +2473,36 @@
     "that payment or that line is already matched": {
       "other": "den betalningen eller den raden är redan avstämd"
     },
+    "that is not a purpose an identity record can be held for": {
+      "other": "det är inte ett ändamål som en identitetsuppgift får sparas för"
+    },
+    "that purpose does not need that kind of record": {
+      "other": "det ändamålet behöver inte den sortens uppgift"
+    },
+    "for that purpose only a reference to the check is kept, not the value": {
+      "other": "för det ändamålet sparas bara en hänvisning till kontrollen, inte själva uppgiften"
+    },
+    "give either the value or a reference to the check, not both and not neither": {
+      "other": "ange antingen uppgiften eller en hänvisning till kontrollen, inte båda och inte ingen"
+    },
+    "that value has been removed; that the check was made is all that is kept": {
+      "other": "den uppgiften är borttagen; bara att kontrollen gjordes finns kvar"
+    },
+    "that purpose has already ended": {
+      "other": "det ändamålet har redan upphört"
+    },
+    "that record holds a reference to a check, not a value": {
+      "other": "den posten innehåller en hänvisning till en kontroll, inte en uppgift"
+    },
+    "say why the purpose has ended, in 300 characters or fewer": {
+      "other": "säg varför ändamålet har upphört, med högst 300 tecken"
+    },
+    "that is longer than it can be": {
+      "other": "det är längre än det får vara"
+    },
+    "between a day and ten years": {
+      "other": "mellan en dag och tio år"
+    },
     "They carry the same plate at the same time.": {
       "other": "De har samma skylt samtidigt."
     },
@@ -6311,8 +6341,8 @@
     "The shop's own times. The paid guides get these wrong often enough that shops keep their own anyway; this is that, written down.": {
       "other": "Verkstadens egna tider. De betalda tidböckerna har ofta fel, så verkstäder för ändå sina egna; det här är det, nedskrivet."
     },
-    "There is no national identity number and no driving licence field anywhere in this system. A field with no purpose does not exist.": {
-      "other": "Det finns inget personnummer och inget fält för körkort någonstans i det här systemet. Ett fält utan syfte finns inte."
+    "No person, customer or party carries a national identity number or a driving licence. Where car sales or rental must check one, it is kept apart: for one stated purpose, sealed with a key the database does not hold, every read logged, and removed when the purpose ends. A field with no purpose does not exist.": {
+      "other": "Ingen person, kund eller part har ett personnummer eller ett körkort i sina uppgifter. Där bilförsäljning eller uthyrning måste kontrollera ett hålls det för sig: för ett angivet ändamål, krypterat med en nyckel som databasen inte har, varje läsning loggad, och borttaget när ändamålet upphör. Ett fält utan ändamål finns inte."
     },
     "They exist to slow down guessing over minutes. Keeping them longer would be keeping a record of who tried to sign in, with no remaining purpose.": {
       "other": "De finns för att bromsa gissning under några minuter. Att spara dem längre vore att föra en förteckning över vem som försökte logga in, utan kvarvarande syfte."

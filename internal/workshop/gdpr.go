@@ -473,6 +473,14 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fi
 			"The technical history of vehicles, which belongs to the vehicle rather than to a person. " +
 			"Clocked hours, where the person was an employee, because they support payroll records."
 
+		// Their identity records (#153): a value the law has the shop keep
+		// stays until its expiry; the rest go now. That a check was made
+		// stays either way.
+		idRemoved, idKept, err := eraseIdentityTx(ctx, tx, personID)
+		if err != nil {
+			return err
+		}
+
 		// Why things were done about them, which can say who they are; that
 		// they were done stays (#151).
 		if err := eraseAuditReasonsTx(ctx, tx, personID); err != nil {
@@ -489,6 +497,12 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fi
 		clearedNow, keptNow := cleared, kept
 		if blanked > 0 {
 			clearedNow += fmt.Sprintf(" What %d contracts past their retention said, their naming of them and the scans of signed copies; that they existed, their hash and their signatures stay.", blanked)
+		}
+		if idRemoved > 0 {
+			clearedNow += fmt.Sprintf(" %d identity values held for a purpose that allowed it; that the checks were made stays.", idRemoved)
+		}
+		if idKept > 0 {
+			keptNow += fmt.Sprintf(" %d identity values a law has the shop keep for their purpose, until they expire.", idKept)
 		}
 		if keptDocs > 0 {
 			keptNow += fmt.Sprintf(" %d contracts still within the retention set for their kind, which they support.", keptDocs)
@@ -651,11 +665,13 @@ type SweepResult struct {
 	Shares         int64
 	JobLinks       int64
 	ImportPreviews int64
+	// Identity values past their expiry, removed; the records stay (#153).
+	IdentityValues int64
 }
 
 // Empty reports whether there was nothing to do.
 func (s SweepResult) Empty() bool {
-	return s.LoginAttempts == 0 && s.Shares == 0 && s.JobLinks == 0 && s.ImportPreviews == 0
+	return s.LoginAttempts == 0 && s.Shares == 0 && s.JobLinks == 0 && s.ImportPreviews == 0 && s.IdentityValues == 0
 }
 
 // Sweep applies the retention policy.
@@ -693,6 +709,14 @@ func Sweep(ctx context.Context, pool *pgxpool.Pool, shopID string) (SweepResult,
 		// a record. Keeping them is keeping a log of what somebody was typing.
 		// A file somebody uploaded and never applied holds what the file
 		// said, personal data among it. A week is time to come back to it.
+		// An identity value is held for its purpose's time and not a day
+		// longer; that a check was made stays.
+		step("identity values", func(ctx context.Context, tx pgx.Tx) error {
+			n, err := sweepIdentityTx(ctx, tx)
+			r.IdentityValues = n
+			return err
+		}),
+
 		step("import previews", func(ctx context.Context, tx pgx.Tx) error {
 			n, err := expireImportsTx(ctx, tx, importPreviewRetention)
 			r.ImportPreviews = n

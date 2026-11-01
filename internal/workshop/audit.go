@@ -54,6 +54,7 @@ var AuditedTransitions = []AuditTransition{
 	{"payment.match_undone", "payment", "payment_matches", false},
 	{"payment.overpayment_confirmed", "payment", "audit_events", true},
 	{"invoice.unagreed_lines_invoiced", "invoice", "audit_events", true},
+	{"identity.read", "identity_record", "audit_events", false},
 	{"job.state_changed", "work_order", "work_order_state_changes", false},
 	{"record.corrected", "customer", "record_changes", false},
 }
@@ -159,6 +160,10 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 		reasons = scope.Role.RunsTheShop()
 	case "invoice", "payment", "customer", "vehicle", "party":
 		if !scope.Role.SeesCustomerPersonalData() {
+			return nil, access.ErrForbidden
+		}
+	case "identity_record":
+		if !scope.Role.SeesIdentityRecords() {
 			return nil, access.ErrForbidden
 		}
 	case "work_order":

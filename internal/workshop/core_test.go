@@ -13,6 +13,11 @@ package workshop_test
 var core = map[string]string{
 	// Documents and money: issued whatever made them, corrected, paid and
 	// handed to the accountant as long as the books are kept.
+	// Identity records (#153): who a party is, read across modules.
+	// Recording one checks the module of its purpose.
+	"IdentityRecordsFor": "that a party's identity was checked", "ReadIdentityValue": "an identity value, read under its purpose",
+	"EndIdentityPurpose": "an identity value's purpose ended, which removes it", "SetIdentityRetention": "how long identity values are kept",
+	"RotateIdentityKeys": "the keys identity values are sealed with",
 	// Audit events (#151): the trail of every module's transitions.
 	"AuditTrail":   "who did what and why, whichever module it was in",
 	"DocumentByID": "an issued document", "CreditNote": "correcting an issued document",

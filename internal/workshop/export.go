@@ -38,7 +38,7 @@ var ExportTables = []string{
 	"stock_movements", "price_bands", "labour_times", "erasures", "shop_exports",
 	"bookings", "booking_events", "staff_absences", "shop_closures", "rotas", "rota_hours", "shift_changes", "outbound_messages", "message_events",
 	"work_order_state_changes", "quotes", "quote_lines", "quote_decisions", "enquiries", "enquiry_lines", "job_assignments", "job_plans", "work_order_line_revisions", "job_tasks", "job_task_events", "record_changes", "customer_people", "job_notes",
-	"supplier_orders", "supplier_order_lines", "supplier_line_etas", "supplier_receipts", "supplier_returns", "job_recommendations", "delivery_summaries", "invoice_deliveries", "invoice_corrections", "receivable_cases", "receivable_events", "day_settlements", "day_reviews", "comebacks", "comeback_claims", "comeback_events", "outsourced_work", "outsourced_events", "import_batches", "import_refs", "setup_steps", "shop_module_changes", "user_roles", "protocol_photo_removals", "parties", "party_roles", "resources", "resource_block_jobs", "resource_retirements", "audit_events", "deposits", "payouts", "bank_statement_lines", "payment_matches", "document_templates", "document_template_versions", "document_record_parties", "document_retention_settings",
+	"supplier_orders", "supplier_order_lines", "supplier_line_etas", "supplier_receipts", "supplier_returns", "job_recommendations", "delivery_summaries", "invoice_deliveries", "invoice_corrections", "receivable_cases", "receivable_events", "day_settlements", "day_reviews", "comebacks", "comeback_claims", "comeback_events", "outsourced_work", "outsourced_events", "import_batches", "import_refs", "setup_steps", "shop_module_changes", "user_roles", "protocol_photo_removals", "parties", "party_roles", "resources", "resource_block_jobs", "resource_retirements", "audit_events", "deposits", "payouts", "bank_statement_lines", "payment_matches", "identity_retention_settings", "document_templates", "document_template_versions", "document_record_parties", "document_retention_settings",
 }
 
 // exportQueries are tables exported with chosen columns, because one of
@@ -61,6 +61,11 @@ var exportQueries = map[string]string{
 		evidence_key, witnessed_by, encode(document_sha256, 'hex') AS document_sha256 FROM document_signatures`,
 	"document_record_links": `SELECT id, shop_id, document_id, created_by, created_at, expires_at, revoked_at, revoked_by,
 		first_opened_at, last_opened_at, opens FROM document_record_links`,
+	// Sealed as they are held, never opened: the export is not a way round
+	// the key (#153). README.txt says how to open them with it.
+	"identity_records": `SELECT id, shop_id, party_id, kind, purpose, legal_basis, recorded_by, recorded_at, expires_at,
+		key_id, encode(sealed, 'base64') AS sealed_base64, CASE WHEN verification_ref IS NULL THEN NULL ELSE 'held' END AS verification_ref,
+		ended_at, ended_by, end_reason, value_removed_at FROM identity_records`,
 	"resource_block_changes": `SELECT id, shop_id, block_id, change, lower(old_period) AS old_starts_at, upper(old_period) AS old_ends_at,
 		lower(new_period) AS new_starts_at, upper(new_period) AS new_ends_at, by_user, at, reason FROM resource_block_changes`,
 }
@@ -379,6 +384,13 @@ anonymised, with the erasure recorded in erasures.csv.
 
 Not included, by design: passwords, sign-in sessions, the tokens of
 customer links, failed sign-in attempts, half-typed drafts.
+
+Identity records (identity_records.csv) are exported sealed, never in
+the clear: sealed_base64 is the nonce (12 bytes) followed by the
+AES-256-GCM ciphertext, sealed with the shop's key named in key_id, and
+the associated data is shop_id/id/party_id/kind in lower case, separated
+by "/". Whoever holds the shop's key can open them; without it nobody
+can, which is the point. A reference to a check is shown only as held.
 
 manifest.json says when this was taken, by which release, and how many
 rows each file holds.

@@ -22,6 +22,7 @@ import (
 	"github.com/RedaEkengren/FreeSMS/internal/auth"
 	"github.com/RedaEkengren/FreeSMS/internal/config"
 	"github.com/RedaEkengren/FreeSMS/internal/i18n"
+	"github.com/RedaEkengren/FreeSMS/internal/identity"
 	"github.com/RedaEkengren/FreeSMS/internal/live"
 	"github.com/RedaEkengren/FreeSMS/internal/notify"
 	"github.com/RedaEkengren/FreeSMS/internal/storage"
@@ -45,7 +46,10 @@ type Server struct {
 	photos         *storage.Store
 	baseURL        string
 	vehicleLookup  vehicledata.Lookup
-	catalogues     *i18n.Catalogues
+	// The keys identity values are sealed with; nil or empty, none can be
+	// recorded or read (#153).
+	identityKeys *identity.Keyring
+	catalogues   *i18n.Catalogues
 
 	// Open screens, told when something they show has changed.
 	live          *live.Hub
@@ -244,6 +248,7 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 		photos:           photos,
 		exportDir:        cfg.ExportDir,
 		vehicleLookup:    newLookup(cfg),
+		identityKeys:     cfg.IdentityKeys,
 		catalogues:       catalogues,
 		baseURL:          strings.TrimRight(cfg.BaseURL, "/"),
 		templates:        templates,

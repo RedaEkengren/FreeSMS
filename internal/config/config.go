@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/RedaEkengren/FreeSMS/internal/identity"
 )
 
 // Config is the whole of the application's configuration. Every field
@@ -60,6 +62,12 @@ type Config struct {
 	// When messages may go, "08-20", in the shop's zone.
 	SendFrom, SendUntil int
 
+	// The keys identity values are sealed with (#153): IDENTITY_KEYS, or the
+	// file IDENTITY_KEY_FILE names, outside the database and its backups.
+	// None configured, identity values can be neither recorded nor read --
+	// never kept in the clear instead.
+	IdentityKeys *identity.Keyring
+
 	// Things worth telling the operator that are not reasons to refuse to
 	// start, logged once the logger exists.
 	Notices []string
@@ -104,6 +112,11 @@ func Load() (*Config, error) {
 	if cfg.DatabaseURL == "" {
 		problems = append(problems, "DATABASE_URL is required")
 	}
+	keys, err := identity.Load(os.Getenv("IDENTITY_KEYS"), os.Getenv("IDENTITY_KEY_FILE"))
+	if err != nil {
+		problems = append(problems, "IDENTITY_KEYS or IDENTITY_KEY_FILE: "+err.Error())
+	}
+	cfg.IdentityKeys = keys
 	if cfg.OpsToken != "" && len(cfg.OpsToken) < 24 {
 		problems = append(problems, "OPS_TOKEN must be at least 24 characters; make one with: openssl rand -hex 24")
 	}

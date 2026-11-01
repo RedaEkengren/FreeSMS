@@ -141,6 +141,22 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 	made["payment.matched"], made["payment.match_undone"] = subject{"payment", held.ID}, subject{"payment", held.ID}
 	made["job.state_changed"] = subject{"work_order", job}
 
+	// An identity number read under its purpose.
+	keys := identityKeys(t, "k1")
+	buyer := partyOf(t, pool, fixtureCustomer)
+	if err := workshop.StartPartyRole(ctx, pool, sales(), buyer, workshop.PartyBuyer, ""); err != nil {
+		t.Fatal(err)
+	}
+	record, err := workshop.RecordIdentity(ctx, pool, sales(), keys, workshop.NewIdentityRecord{PartyID: buyer,
+		Kind: workshop.IdentityNumber, Purpose: "ownership_change", Value: seededNumber})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.ReadIdentityValue(ctx, pool, sales(), keys, record, false); err != nil {
+		t.Fatal(err)
+	}
+	made["identity.read"] = subject{"identity_record", record}
+
 	// A customer's details put right.
 	c, err := workshop.CustomerByID(ctx, pool, advisor(), fixtureCustomer)
 	if err != nil {
