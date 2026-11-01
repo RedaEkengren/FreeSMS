@@ -27,8 +27,9 @@ import (
 var queryBudgets = map[string]int{
 	// The technician's screens, on the worst connection: these matter most.
 	// 11 to 19 (#157): the home page's cards and the top of the one queue,
-	// each read under the reader's scope, above the job list.
-	"tech GET /": 19,
+	// each read under the reader's scope, above the job list. 19 to 18: the
+	// workshop's job counts in one statement.
+	"tech GET /": 18,
 	// 23 to 24: the work list is one more read (two once a job has steps,
 	// which the budget's jobs do not). 24 to 25: whether the job is a return
 	// visit or has been come back to (#119), one read.
@@ -49,8 +50,9 @@ var queryBudgets = map[string]int{
 	// payment flows, documents, the outbox -- and two money cards besides.
 	// 35 to 20 and 43 to 28: the board, what is owed and the backlog read
 	// once, in the page's transaction, for the queue and the board alike.
-	"desk GET /":      20,
-	"owner GET /":     28,
+	// 20 to 17 and 28 to 24: the workshop's job counts in one statement.
+	"desk GET /":      17,
+	"owner GET /":     24,
 	"desk GET /board": 21,
 	// 35: the quote the customer was shown and what they answered to it
 	// (two statements), which the counter reads on every live refresh.

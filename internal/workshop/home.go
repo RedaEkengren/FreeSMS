@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -56,7 +57,12 @@ type CardSource struct {
 	Link   string
 	May    func(access.Roles) bool
 	Read   func(ctx context.Context, tx pgx.Tx, scope access.Scope) (count int, minor int64, err error)
-	Money  bool
+	// JobsWhere, instead of Read, is a count of the workshop's jobs where
+	// it holds, a condition on work_orders w. Every such card the caller
+	// may see is counted in one statement, one FILTER each: one round trip
+	// on the workshop's wifi, not one per card.
+	JobsWhere string
+	Money     bool
 }
 
 // cardSources are the home page's cards, in the order they come. The
@@ -67,27 +73,37 @@ type CardSource struct {
 // what they count.
 var cardSources = []CardSource{
 	{Module: access.Workshop, Kind: CardAction, Title: "%d car ready",
-		May: access.Roles.SeesCustomerPersonalData, Read: jobsIn(`w.state = 'ready'`)},
+		May: access.Roles.SeesCustomerPersonalData, JobsWhere: `w.state = 'ready'`},
 	{Module: access.Workshop, Kind: CardAction, Title: "%d job waiting for the customer's decision",
-		May: access.Roles.SeesCustomerPersonalData, Read: jobsIn(`w.state = 'awaiting_approval'`)},
+		May: access.Roles.SeesCustomerPersonalData, JobsWhere: `w.state = 'awaiting_approval'`},
 	{Module: access.Workshop, Kind: CardAction, Title: "%d job waiting for parts",
-		May: access.Roles.WorksInTheWorkshop, Read: jobsIn(`w.state = 'awaiting_parts'`)},
+		May: access.Roles.WorksInTheWorkshop, JobsWhere: `w.state = 'awaiting_parts'`},
 	{Module: access.Workshop, Kind: CardAction, Title: "%d job past its promised time",
-		May:  access.Roles.WorksInTheWorkshop,
-		Read: jobsIn(`w.promised_at < clock_timestamp() AND w.state NOT IN ('ready', 'invoiced', 'closed', 'cancelled')`)},
+		May:       access.Roles.WorksInTheWorkshop,
+		JobsWhere: `w.promised_at < clock_timestamp() AND w.state NOT IN ('ready', 'invoiced', 'closed', 'cancelled')`},
 	{Module: access.Workshop, Kind: CardInformation, Title: "%d job in progress",
-		May: access.Roles.RunsTheShop, Read: jobsIn(openJob)},
+		May: access.Roles.RunsTheShop, JobsWhere: openJob},
 	{Module: access.Workshop, Kind: CardInformation, Title: "Work ready to invoice, before VAT",
 		May: access.Roles.RunsTheShop, Read: readyToInvoiceMinor, Money: true},
 }
 
-// jobsIn counts the jobs where says, a condition on work_orders w.
-func jobsIn(where string) func(context.Context, pgx.Tx, access.Scope) (int, int64, error) {
-	return func(ctx context.Context, tx pgx.Tx, _ access.Scope) (int, int64, error) {
-		var n int
-		err := tx.QueryRow(ctx, `SELECT count(*) FROM work_orders w WHERE `+where).Scan(&n)
-		return n, 0, err
+// countJobs counts the workshop's jobs for every card that counts them, in
+// one statement: the counts in the cards' order.
+func countJobs(ctx context.Context, tx pgx.Tx, cards []CardSource) ([]int, error) {
+	if len(cards) == 0 {
+		return nil, nil
 	}
+	cols := make([]string, len(cards))
+	for i, c := range cards {
+		cols[i] = `count(*) FILTER (WHERE ` + c.JobsWhere + `)`
+	}
+	counts := make([]int, len(cards))
+	dest := make([]any, len(cards))
+	for i := range counts {
+		dest[i] = &counts[i]
+	}
+	err := tx.QueryRow(ctx, `SELECT `+strings.Join(cols, ", ")+` FROM work_orders w`).Scan(dest...)
+	return counts, err
 }
 
 // readyToInvoiceMinor is what the lines an invoice made now would carry on
@@ -139,20 +155,47 @@ const homeWaiting = 5
 func HomeFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (Home, []error) {
 	var h Home
 	var failed []error
+	var shown, counted []CardSource
 	for _, c := range cardSources {
 		if !scope.Uses(c.Module) || !c.May(scope.Role) {
 			continue
 		}
-		var n int
-		var minor int64
+		shown = append(shown, c)
+		if c.JobsWhere != "" {
+			counted = append(counted, c)
+		}
+	}
+	var jobs []int
+	if len(counted) > 0 {
 		err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 			var err error
-			n, minor, err = c.Read(ctx, tx, scope)
+			jobs, err = countJobs(ctx, tx, counted)
 			return err
 		})
 		if err != nil {
-			failed = append(failed, fmt.Errorf("card %q: %w", c.Title, err))
-			continue
+			jobs = nil
+			failed = append(failed, fmt.Errorf("the workshop's cards: %w", err))
+		}
+	}
+	for _, c := range shown {
+		var n int
+		var minor int64
+		if c.JobsWhere != "" {
+			// In the order counted, which is the order shown.
+			if len(jobs) == 0 {
+				continue
+			}
+			n, jobs = jobs[0], jobs[1:]
+		} else {
+			err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+				var err error
+				n, minor, err = c.Read(ctx, tx, scope)
+				return err
+			})
+			if err != nil {
+				failed = append(failed, fmt.Errorf("card %q: %w", c.Title, err))
+				continue
+			}
 		}
 		if n == 0 {
 			continue
