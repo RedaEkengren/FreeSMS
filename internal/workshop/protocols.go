@@ -229,7 +229,9 @@ func replayedProtocol(ctx context.Context, tx pgx.Tx, key string, subj ProtocolS
 		return "", false, nil
 	case err != nil:
 		return "", false, fmt.Errorf("read the request: %w", err)
-	case subject != subj.Kind || vehicle != subj.VehicleID || ref != subj.RefID:
+	// The database writes an identifier in lower case; one sent in capitals
+	// is the same identifier.
+	case subject != subj.Kind || !strings.EqualFold(vehicle, subj.VehicleID) || !strings.EqualFold(ref, subj.RefID):
 		return "", false, errKeyReused
 	}
 	return id, true, nil

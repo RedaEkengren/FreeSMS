@@ -135,6 +135,16 @@ func TestAReplayedProtocolKeyFindsOnlyTheSameRequest(t *testing.T) {
 	if again, err := start(rentalA, vehicleA, "phone-2"); err != nil || again != first {
 		t.Errorf("the same request again: %s, %v; want %s", again, err, first)
 	}
+	// An identifier is the same identifier in capitals, as the database
+	// reads it: the replay of a request sent so is the same request.
+	const upper = "6666AAAA-0000-0000-0000-00000000000B"
+	once, err := start(upper, vehicleA, "phone-caps")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again, err := start(upper, vehicleA, "phone-caps"); err != nil || again != once {
+		t.Errorf("the same request in capitals again: %s, %v; want %s", again, err, once)
+	}
 }
 
 // Completed, a protocol is frozen -- its items, answers and photographs --
