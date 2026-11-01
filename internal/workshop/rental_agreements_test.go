@@ -237,3 +237,43 @@ func mustHex(t *testing.T, s string) []byte {
 	}
 	return b
 }
+
+// A plan at 6 % VAT is 6 % everywhere: the price a person agrees including
+// VAT is stored net at that rate, and the agreement prints the kilometre
+// price at it (review #5).
+func TestAPlansVATRateIsUsedEverywhere(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := addUnit(t, pool, workshop.NewRentalUnit{Name: "Cykel", FleetNumber: "C1", Category: "Cykel"})
+	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), unit, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := workshop.CreateRatePlan(ctx, pool, rentalOwner(), workshop.NewRatePlan{Name: "Cykel", Category: "Cykel", VATRateBp: 600, SeasonRule: "at_start"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	km := 10
+	if _, err := workshop.AddRateSeason(ctx, pool, rentalOwner(), plan, workshop.RateSeason{ValidFrom: day("2020-01-01"), Day: kr(10000),
+		IncludedKmPerDay: &km, ExtraKmMinor: kr(1000)}); err != nil {
+		t.Fatal(err)
+	}
+	renter, _ := workshop.CreateParty(ctx, pool, rentalDesk(), workshop.NewParty{Kind: "private", Name: "Cyklist", Role: workshop.PartyRenter})
+	id, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: unit, RenterID: renter, From: in2031(10, 9), To: in2031(11, 9),
+		Overrides: []workshop.PriceOverride{{Position: 1, UnitGrossMinor: kr(10600), Reason: "Avtalat"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id)
+	if b.Lines[0].UnitPriceMinor != 10000 || b.Lines[0].VATRateBp != 600 {
+		t.Errorf("106 kr including 6 %% VAT stored as %+v", b.Lines[0])
+	}
+	templates, _ := workshop.RentalAgreementTemplates(ctx, pool, rentalDesk())
+	doc, err := workshop.ProduceRentalAgreement(ctx, pool, rentalDesk(), id, templates[0].VersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, _ := workshop.DocumentRecordByID(ctx, pool, rentalDesk(), doc)
+	if d.Data["extra_km"] != "10.60" {
+		t.Errorf("the extra kilometre at 6 %% VAT is printed %q", d.Data["extra_km"])
+	}
+}

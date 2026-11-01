@@ -547,13 +547,12 @@ func (s *Server) handleRentalBook(w http.ResponseWriter, r *http.Request) {
 		n.Extras = append(n.Extras, workshop.ExtraChoice{ExtraID: e, Count: 1})
 	}
 	if v := strings.TrimSpace(r.FormValue("rent_price")); v != "" {
-		rate, _ := strconv.Atoi(r.FormValue("rent_vat_bp"))
-		net, err := grossToNet(v, rate)
+		gross, err := parseMinorUnits(v)
 		if err != nil {
 			s.renderError(w, r, http.StatusBadRequest, "Not accepted", "Write prices as amounts and kilometres and minutes as whole numbers.")
 			return
 		}
-		n.Overrides = []workshop.PriceOverride{{Position: 1, UnitPriceMinor: *net, Reason: r.FormValue("rent_reason")}}
+		n.Overrides = []workshop.PriceOverride{{Position: 1, UnitGrossMinor: &gross, Reason: r.FormValue("rent_reason")}}
 	}
 	if n.RenterID == "" {
 		renter, err := workshop.CreateParty(r.Context(), s.pool, session.Scope, workshop.NewParty{Kind: "private",

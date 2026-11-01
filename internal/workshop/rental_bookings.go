@@ -123,6 +123,9 @@ type RentalBookingEvent struct {
 type PriceOverride struct {
 	Position       int
 	UnitPriceMinor int64
+	// The price including VAT, as a person agreed it: given, it is the
+	// override, made net at the line's own VAT rate.
+	UnitGrossMinor *int64
 	Reason         string
 }
 
@@ -190,7 +193,7 @@ func BookRental(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n N
 		return "", err
 	}
 	for i, o := range n.Overrides {
-		if o.UnitPriceMinor < 0 {
+		if o.UnitPriceMinor < 0 || (o.UnitGrossMinor != nil && *o.UnitGrossMinor < 0) {
 			return "", errExtraPrice
 		}
 		if n.Overrides[i].Reason, err = checkReason(o.Reason, errOverrideWhy); err != nil {
@@ -387,8 +390,11 @@ func overriddenLines(lines []QuotedLine, overrides []PriceOverride) ([]frozenLin
 			return nil, errOverrideLine
 		}
 		l := &out[o.Position-1]
-		priced := l.UnitPriceMinor
-		l.pricedMinor, l.reason, l.UnitPriceMinor = &priced, o.Reason, o.UnitPriceMinor
+		priced, net := l.UnitPriceMinor, o.UnitPriceMinor
+		if o.UnitGrossMinor != nil {
+			net = money.Scale(*o.UnitGrossMinor, 10000, int64(10000+l.VATRateBp))
+		}
+		l.pricedMinor, l.reason, l.UnitPriceMinor = &priced, o.Reason, net
 	}
 	return out, nil
 }
