@@ -241,12 +241,16 @@ func authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string,
 		// switching one off takes effect on the next click rather than at the
 		// next sign-in -- and an operation can check without asking again.
 		// The person's roles likewise: a role given or taken away counts
-		// from their next request (#145).
+		// from their next request (#145). And what is opened for them as a
+		// technician (#225): an exception past its end stops counting at
+		// the next request, with nothing to sweep it.
 		const lookup = `
 			SELECT s.id, s.user_id, u.role, s.expires_at, s.last_seen_at, u.active,
 			       coalesce(u.locale, sh.locale, 'en'), u.plans_staff, coalesce(u.theme, ''),
 			       ARRAY(SELECT m.module FROM shop_modules m WHERE m.shop_id = s.shop_id ORDER BY m.module),
-			       ARRAY(SELECT r.role FROM user_roles r WHERE r.user_id = s.user_id ORDER BY r.role)
+			       ARRAY(SELECT r.role FROM user_roles r WHERE r.user_id = s.user_id ORDER BY r.role),
+			       ARRAY(SELECT DISTINCT f.field FROM technician_fields_open f
+			              WHERE f.user_id IS NULL OR f.user_id = s.user_id ORDER BY f.field)
 			FROM sessions s
 			JOIN users u  ON u.id = s.user_id
 			JOIN shops sh ON sh.id = s.shop_id
@@ -254,9 +258,9 @@ func authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string,
 		var sessionID, userID, role, locale, theme string
 		var expires, lastSeen time.Time
 		var active, planner bool
-		var modules, others []string
+		var modules, others, opened []string
 
-		err := tx.QueryRow(ctx, lookup, sum[:]).Scan(&sessionID, &userID, &role, &expires, &lastSeen, &active, &locale, &planner, &theme, &modules, &others)
+		err := tx.QueryRow(ctx, lookup, sum[:]).Scan(&sessionID, &userID, &role, &expires, &lastSeen, &active, &locale, &planner, &theme, &modules, &others, &opened)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNoSession
 		}
@@ -281,7 +285,7 @@ func authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string,
 
 		s = Session{
 			Scope: access.Scope{ShopID: shopID, UserID: userID, Role: asRoles(role, others), Planner: planner,
-				Modules: asModules(modules)},
+				Modules: asModules(modules), Opened: opened},
 			ExpiresAt: expires,
 			Locale:    locale,
 			Theme:     theme,

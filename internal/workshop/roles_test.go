@@ -47,7 +47,8 @@ var everyRole = map[string]string{
 
 	// What the technician reports and the front desk acts on.
 	"ReportFinding": "a technician's report", "FindingsFor": "the reports on a job",
-	"RequestPart": "a technician's request", "PartRequestsFor": "the requests on a job",
+	"AskDeskToContact": "a technician's request that the desk ring the customer",
+	"RequestPart":      "a technician's request", "PartRequestsFor": "the requests on a job",
 	"RequestParts": "a technician's request, with how many",
 
 	// The inspection is done by whoever has the car. The customer's link,

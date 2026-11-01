@@ -395,6 +395,15 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 		}
 	}
 
+	// What the shop has opened for a technician (#225): nothing read when
+	// nothing is.
+	var techJob workshop.TechnicianJob
+	if session.Scope.OpenedForTechnician() {
+		if techJob, err = workshop.TechnicianJobFor(r.Context(), s.pool, session.Scope, id); err != nil {
+			s.log.Error("read what is opened for the technician", "error", err)
+		}
+	}
+
 	step := workshop.NextStep(workshop.StepFacts{
 		NothingDone:   !job.HasWork,
 		State:         workshop.State(job.State),
@@ -440,6 +449,7 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 		Suggestions:  suggestions,
 		Parts:        stocked,
 		LabourRate:   labourRate,
+		TechJob:      techJob,
 		Messages:     messages,
 		Tell:         tell,
 		CanText:      s.sms != nil,

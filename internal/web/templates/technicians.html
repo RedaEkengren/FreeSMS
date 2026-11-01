@@ -1,0 +1,59 @@
+{{define "content"}}
+<h1>{{.T "What technicians see"}}</h1>
+<p class="waiting">{{.T "A technician is always shown the work, the vehicle and its registration, the parts and the time. Anything else is shown only when you open it here: for every technician, or for one person. A personal identity number, an identity document, payment details, the customer register and the shop's finance are never shown to a technician, and cannot be opened."}}</p>
+
+{{with .TechView}}
+<h2>{{$.T "For every technician"}}</h2>
+<ul class="lines">
+  {{range .Profile}}
+  <li>
+    <div class="row"><span>{{$.T .Label}}</span>
+      <span class="tag{{if .Shown}} late{{end}}">{{if .Shown}}{{$.T "shown"}}{{else}}{{$.T "hidden"}}{{end}}</span></div>
+    {{if .At}}<div class="waiting">{{$.T "%s, %s: %s" .By ($.Date ($.Local .At) "2 Jan 2006 15:04") .Reason}}</div>{{end}}
+    {{if and .Shown .PersonalData}}<p class="waiting">{{$.T "The customer's details are shown to a technician for their own jobs only, and may be used only for the job."}}</p>{{end}}
+    <form method="post" action="/technicians/fields">
+      <input type="hidden" name="field" value="{{.Field}}">
+      <input type="hidden" name="shown" value="{{if .Shown}}no{{else}}yes{{end}}">
+      <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="300" required></label>
+      <button type="submit" class="secondary">{{if .Shown}}{{$.T "Hide it"}}{{else}}{{$.T "Show it"}}{{end}}</button>
+    </form>
+  </li>
+  {{end}}
+</ul>
+
+<h2>{{$.T "For one person"}}</h2>
+{{if .Exceptions}}
+<ul class="lines">
+  {{range .Exceptions}}
+  <li>
+    <div class="row"><span>{{.Person}} &middot; {{$.T .Label}}</span>
+      {{if .Until}}<span class="tag">{{$.T "until %s" ($.Date ($.Local .Until) "2 Jan 2006")}}</span>{{end}}</div>
+    <div class="waiting">{{$.T "%s, %s: %s" .By ($.Date ($.Local .At) "2 Jan 2006 15:04") .Reason}}</div>
+    <form method="post" action="/technicians/exceptions/end">
+      <input type="hidden" name="user_id" value="{{.UserID}}">
+      <input type="hidden" name="field" value="{{.Field}}">
+      <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="300" required></label>
+      <button type="submit" class="secondary">{{$.T "End it"}}</button>
+    </form>
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p>{{$.T "None in force."}}</p>
+{{end}}
+{{if .Technicians}}
+<form method="post" action="/technicians/exceptions">
+  <div class="pair">
+    <label><span>{{$.T "Technician"}}</span><select name="user_id">{{range .Technicians}}<option value="{{.Value}}">{{.Label}}</option>{{end}}</select></label>
+    <label><span>{{$.T "Shown"}}</span><select name="field">{{range .Profile}}<option value="{{.Field}}">{{$.T .Label}}</option>{{end}}</select></label>
+  </div>
+  <div class="pair">
+    <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="300" required></label>
+    <label><span>{{$.T "Until, if it ends"}}</span><input type="date" name="until"></label>
+  </div>
+  <p class="waiting">{{$.T "The customer's details are shown to a technician for their own jobs only, and may be used only for the job."}}</p>
+  <button type="submit">{{$.T "Open it for them"}}</button>
+</form>
+{{end}}
+{{end}}
+{{end}}

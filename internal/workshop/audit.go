@@ -57,6 +57,11 @@ var AuditedTransitions = []AuditTransition{
 	{"identity.read", "identity_record", "audit_events", false},
 	{"job.state_changed", "work_order", "work_order_state_changes", false},
 	{"record.corrected", "customer", "record_changes", false},
+	// What a technician sees (#225): the shop's profile, and one person's
+	// exceptions.
+	{"technician_view.changed", "shop", "technician_view_changes", true},
+	{"technician_view.granted", "user", "technician_view_exceptions", true},
+	{"technician_view.ended", "user", "technician_view_exceptions", true},
 }
 
 func auditTransition(event string) (AuditTransition, bool) {

@@ -7708,6 +7708,111 @@
     },
     "a search is at most %d characters, with no null character": {
       "other": "en sökning är högst %d tecken, utan nolltecken"
+    },
+    "What technicians see": {
+      "other": "Vad mekanikerna ser"
+    },
+    "say what the customer should be asked": {
+      "other": "skriv vad kunden ska tillfrågas om"
+    },
+    "an exception ends after today, or not at all": {
+      "other": "ett undantag upphör tidigast i morgon, eller inte alls"
+    },
+    "an exception is for one of the shop's technicians": {
+      "other": "ett undantag gäller en av verkstadens mekaniker"
+    },
+    "that is not something a technician can be shown": {
+      "other": "det är inget som kan visas för en mekaniker"
+    },
+    "Ask the front desk to contact the customer": {
+      "other": "Be disken kontakta kunden"
+    },
+    "Hourly rate": {
+      "other": "Timpris"
+    },
+    "May we replace the rear pads too?": {
+      "other": "Får vi byta bakre beläggen också?"
+    },
+    "The customer agreed to at most": {
+      "other": "Kunden har godkänt högst"
+    },
+    "The customer's details are shown to you for this job, and may be used only for it.": {
+      "other": "Kundens uppgifter visas för dig för det här jobbet och får bara användas för det."
+    },
+    "What the customer should be asked": {
+      "other": "Vad kunden ska tillfrågas om"
+    },
+    "before VAT": {
+      "other": "exklusive moms"
+    },
+    "contact the customer": {
+      "other": "kontakta kunden"
+    },
+    "%s, %s: %s": {
+      "other": "%s, %s: %s"
+    },
+    "A technician is always shown the work, the vehicle and its registration, the parts and the time. Anything else is shown only when you open it here: for every technician, or for one person. A personal identity number, an identity document, payment details, the customer register and the shop's finance are never shown to a technician, and cannot be opened.": {
+      "other": "En mekaniker ser alltid arbetet, fordonet och dess registreringsnummer, delarna och tiden. Allt annat visas bara när du öppnar det här: för alla mekaniker eller för en person. Personnummer, id-handlingar, betalningsuppgifter, kundregistret och verkstadens ekonomi visas aldrig för en mekaniker och kan inte öppnas."
+    },
+    "End it": {
+      "other": "Avsluta"
+    },
+    "For every technician": {
+      "other": "För alla mekaniker"
+    },
+    "For one person": {
+      "other": "För en person"
+    },
+    "Hide it": {
+      "other": "Dölj"
+    },
+    "None in force.": {
+      "other": "Inga gäller nu."
+    },
+    "Open it for them": {
+      "other": "Öppna för personen"
+    },
+    "Shown": {
+      "other": "Visas"
+    },
+    "The customer's details are shown to a technician for their own jobs only, and may be used only for the job.": {
+      "other": "Kundens uppgifter visas för en mekaniker bara på hens egna jobb och får bara användas för jobbet."
+    },
+    "Until, if it ends": {
+      "other": "Till och med, om det upphör"
+    },
+    "hidden": {
+      "other": "dolt"
+    },
+    "shown": {
+      "other": "visas"
+    },
+    "not invoiced": {
+      "other": "inte fakturerat"
+    },
+    "invoiced": {
+      "other": "fakturerat"
+    },
+    "paid": {
+      "other": "betalt"
+    },
+    "Cost the customer agreed to, at most": {
+      "other": "Det högsta belopp kunden har godkänt"
+    },
+    "Price of each line, and the total": {
+      "other": "Pris per rad, och summan"
+    },
+    "The shop's hourly rate": {
+      "other": "Verkstadens timpris"
+    },
+    "Customer's name, on their own jobs": {
+      "other": "Kundens namn, på egna jobb"
+    },
+    "Customer's telephone number, on their own jobs": {
+      "other": "Kundens telefonnummer, på egna jobb"
+    },
+    "Whether the job is invoiced and paid": {
+      "other": "Om jobbet är fakturerat och betalt"
     }
   }
 }

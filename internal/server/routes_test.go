@@ -60,6 +60,9 @@ var swept = map[string]string{
 	"GET /jobs/new/lookup": "", "GET /jobs/new/customers": "", "GET /figures": "", "GET /accounting": "",
 	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/modules": "", "POST /shop/charges": "", "POST /shop/final-check": "",
 	"GET /payment-flows": "", "POST /payment-flows": "", "POST /payment-flows/threshold": "",
+	// What technicians see (#225): a person is a form value, read under the
+	// shop's row level security like any other.
+	"GET /technicians": "", "POST /technicians/fields": "", "POST /technicians/exceptions": "", "POST /technicians/exceptions/end": "",
 	"GET /privacy": "", "GET /outbox": "", "GET /day": "", "POST /day/settlement": "", "POST /day/review": "", "POST /privacy/export": "", "GET /events": "", "GET /mine": "", "GET /rota": "", "POST /hooks/46elks/{secret}": "", "POST /rota": "", "GET /schedule": "", "GET /mine/count": "", "POST /account/alert": "", "POST /account/theme": "", "GET /calendar": "", "POST /calendar": "", "GET /enquiries": "", "POST /enquiries": "", "POST /calendar/capacity": "", "GET /labour": "", "POST /labour": "",
 	"POST /labour/rate": "", "GET /time": "", "POST /time/correct": "",
 	"POST /drafts": "", "GET /drafts": "", "DELETE /drafts": "",
@@ -114,6 +117,7 @@ var swept = map[string]string{
 	"GET /jobs/{id}/customer":                        "sweep",
 	"POST /jobs/{id}/customer":                       "sweep",
 	"POST /jobs/{id}/findings":                       "sweep",
+	"POST /jobs/{id}/contact-request":                "sweep",
 	"POST /jobs/{id}/findings/handled":               "sweep",
 	"GET /customers":                                 "",
 	"GET /customers/{id}":                            "sweep",

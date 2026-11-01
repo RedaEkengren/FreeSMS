@@ -190,6 +190,23 @@
 <p class="waiting">{{.T "No customer recorded yet"}}</p>
 <a class="button secondary" href="/jobs/{{.Job.ID}}/customer">{{.T "Say who is paying"}}</a>
 {{end}}
+{{/* What the shop has opened for a technician (#225), each fetched only
+     when opened; the customer only on a job of their own. */}}
+{{with .TechJob}}
+{{if .PersonalData}}
+<h2>{{$.T "Customer"}}</h2>
+{{if .CustomerName}}<div class="waiting">{{.CustomerName}}</div>{{end}}
+{{if .CustomerPhone}}<div><a href="tel:{{.CustomerPhone}}">{{.CustomerPhone}}</a></div>{{end}}
+<p class="waiting">{{$.T "The customer's details are shown to you for this job, and may be used only for it."}}</p>
+{{end}}
+{{if or .CeilingMinor .InvoiceStatus .HourlyRateMinor}}
+<dl>
+  {{if .CeilingMinor}}<dt>{{$.T "The customer agreed to at most"}}</dt><dd>{{$.MoneyOrBlank .CeilingMinor}} <span class="waiting">{{$.T "including VAT"}}</span></dd>{{end}}
+  {{if .HourlyRateMinor}}<dt>{{$.T "Hourly rate"}}</dt><dd>{{$.MoneyOrBlank .HourlyRateMinor}} <span class="waiting">{{$.T "before VAT"}}</span></dd>{{end}}
+  {{with .InvoiceStatus}}<dt>{{$.T "Invoice"}}</dt><dd>{{$.T .}}</dd>{{end}}
+</dl>
+{{end}}
+{{end}}
 </div>
 
 <div id="live-move" data-live="job:{{.Job.ID}}">
@@ -342,7 +359,8 @@
   <li>
     <div class="row">
       <span>{{.Note}}</span>
-      {{if not .Handled}}<span class="tag warranty">{{$.T "needs pricing"}}</span>{{end}}
+      {{if .AsksContact}}{{if not .Handled}}<span class="tag late">{{$.T "contact the customer"}}</span>{{end}}
+      {{else if not .Handled}}<span class="tag warranty">{{$.T "needs pricing"}}</span>{{end}}
     </div>
     <div class="waiting">{{.ReportedBy}}</div>
     {{if and (not .Handled) $.Session.Scope.Role.SeesCustomerPersonalData}}
@@ -470,7 +488,7 @@
 </div>
 
 <div id="live-totals" data-live="job:{{.Job.ID}}">
-{{if .Lines}}
+{{if and .Lines (.Session.Scope.SeesOnJob "line_prices")}}
 {{/* In the side rail rather than under the lines: the total is what the front
      desk is asked for on the telephone, and it used to scroll away with
      everything else. On a phone the rail is simply the top of the page, so it
@@ -510,8 +528,8 @@
     <tr>
       <th>{{.T "What"}}</th>
       <th class="num">{{.T "Quantity"}}</th>
-      <th class="num">{{.T "Unit price"}}</th>
-      <th class="num">{{.T "Amount"}}</th>
+      {{if .Session.Scope.SeesOnJob "line_prices"}}<th class="num">{{.T "Unit price"}}</th>
+      <th class="num">{{.T "Amount"}}</th>{{end}}
     </tr>
   </thead>
   <tbody>
@@ -533,11 +551,11 @@
         </form>
         {{end}}{{end}}
         {{if ne .CostBearer "customer"}}<span class="tag warranty">{{$.T "warranty: %s" .CostBearer}}</span>{{end}}
-        {{if .PriceChanged}}<span class="tag warranty">{{$.T "quoted %s" ($.MoneyOrBlank .EstimatedMinor)}}</span>{{end}}
+        {{if and .PriceChanged ($.Session.Scope.SeesOnJob "line_prices")}}<span class="tag warranty">{{$.T "quoted %s" ($.MoneyOrBlank .EstimatedMinor)}}</span>{{end}}
       </td>
       <td class="num" data-label="{{$.T "Quantity"}}">{{$.Num .Quantity}}</td>
-      <td class="num" data-label="{{$.T "Unit price"}}">{{$.Money .UnitPriceMinor}}</td>
-      <td class="num" data-label="{{$.T "Amount"}}">{{$.Money .NetMinor}}</td>
+      {{if $.Session.Scope.SeesOnJob "line_prices"}}<td class="num" data-label="{{$.T "Unit price"}}">{{$.Money .UnitPriceMinor}}</td>
+      <td class="num" data-label="{{$.T "Amount"}}">{{$.Money .NetMinor}}</td>{{end}}
     </tr>
   {{else}}
     <tr><td colspan="4" class="empty">{{.T "Nothing on this order yet."}}</td></tr>
@@ -831,6 +849,13 @@
     <input name="note" placeholder="Other track rod end is going too">
   </label>
   <button type="submit" class="secondary">{{.T "Tell the front desk"}}</button>
+</form>
+<form class="mt" method="post" action="/jobs/{{.Job.ID}}/contact-request" data-offline>
+  <label>
+    <span>{{.T "What the customer should be asked"}}</span>
+    <input name="why" maxlength="300" placeholder="{{.T "May we replace the rear pads too?"}}">
+  </label>
+  <button type="submit" class="secondary">{{.T "Ask the front desk to contact the customer"}}</button>
 </form>
 {{end}}
 

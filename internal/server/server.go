@@ -465,6 +465,10 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /exports/{id}", s.requireSession(s.handleShopExportFile))
 	mux.HandleFunc("POST /people/{id}/erase", s.requireSession(s.handleErasePerson))
 
+	workshopMux.HandleFunc("GET /technicians", s.requireSession(s.handleTechnicianView))
+	workshopMux.HandleFunc("POST /technicians/fields", s.requireSession(s.handleTechnicianViewAction("field")))
+	workshopMux.HandleFunc("POST /technicians/exceptions", s.requireSession(s.handleTechnicianViewAction("grant")))
+	workshopMux.HandleFunc("POST /technicians/exceptions/end", s.requireSession(s.handleTechnicianViewAction("end")))
 	workshopMux.HandleFunc("GET /labour", s.requireSession(s.handleLabour))
 	workshopMux.HandleFunc("POST /labour", s.requireSession(s.handleSaveLabour))
 	workshopMux.HandleFunc("POST /labour/rate", s.requireSession(s.handleSetLabourRate))
@@ -511,6 +515,7 @@ func (s *Server) routes() (http.Handler, error) {
 	workshopMux.HandleFunc("GET /jobs/{id}/parts", s.requireSession(s.handleJobParts))
 	workshopMux.HandleFunc("POST /jobs/{id}/parts", s.requireSession(s.handleRequestPart))
 	workshopMux.HandleFunc("POST /jobs/{id}/findings", s.requireSession(s.handleReportFinding))
+	workshopMux.HandleFunc("POST /jobs/{id}/contact-request", s.requireSession(s.handleContactRequest))
 	workshopMux.HandleFunc("POST /jobs/{id}/findings/handled", s.requireSession(s.handleHandleFinding))
 	workshopMux.HandleFunc("GET /supply", s.requireSession(s.handleSupply))
 	workshopMux.HandleFunc("POST /supply/orders", s.requireSession(s.handleRecordOrder))

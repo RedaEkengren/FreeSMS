@@ -333,6 +333,59 @@ type Scope struct {
 	// somebody forgot to fill in refuses every module's operations rather
 	// than allowing them.
 	Modules []Module
+	// The fields of a job opened for this person as a technician (#225), by
+	// the shop's profile or an exception of their own, read with the
+	// session on every request so a change -- or an exception's end --
+	// counts from the next click. Empty opens none.
+	Opened []string
+}
+
+// The fields of a job a technician is not shown unless whoever runs the
+// shop opens them (#225). A technician is always shown the work, the
+// vehicle and its registration, the parts and the time. Nothing that is a
+// person's identity, a payment detail, the customer register or the
+// shop's finance is a field here, so none of it can be opened.
+const (
+	// What the customer agreed the work may cost, at most.
+	FieldCostCeiling = "cost_ceiling"
+	// Each line's price and amount, and the job's total.
+	FieldLinePrices = "line_prices"
+	// The shop's hourly rate for labour.
+	FieldHourlyRate = "hourly_rate"
+	// The customer's name, on the jobs assigned to the technician.
+	FieldCustomerName = "customer_name"
+	// The customer's telephone number, on the jobs assigned to them.
+	FieldCustomerPhone = "customer_phone"
+	// Whether the job is invoiced and paid: not invoiced, invoiced or paid.
+	FieldInvoiceStatus = "invoice_status"
+)
+
+// TechnicianFields are the fields there are, in the order they are offered.
+var TechnicianFields = []string{FieldCostCeiling, FieldLinePrices, FieldHourlyRate,
+	FieldCustomerName, FieldCustomerPhone, FieldInvoiceStatus}
+
+// SeesOnJob reports whether the caller is shown field on a job: a role
+// that is shown it anyway -- the counter and the owner every field, the
+// parts desk the prices -- or a technician the field is opened for. A
+// technician's customer name and number are only ever on the jobs assigned
+// to them; the query that reads them checks that. Any role held answers,
+// and the screen being looked at does not widen it.
+func (s Scope) SeesOnJob(field string) bool {
+	if s.Role.SeesCustomerPersonalData() || (field == FieldLinePrices && s.Role.SeesParts()) {
+		return slices.Contains(TechnicianFields, field)
+	}
+	return s.Role.Has(RoleTechnician) && slices.Contains(TechnicianFields, field) && slices.Contains(s.Opened, field)
+}
+
+// OpenedForTechnician reports whether any field is opened for the caller
+// as a technician, beyond what another role of theirs shows them anyway.
+func (s Scope) OpenedForTechnician() bool {
+	for _, f := range TechnicianFields {
+		if s.SeesOnJob(f) && !s.Role.SeesCustomerPersonalData() {
+			return true
+		}
+	}
+	return false
 }
 
 // Uses reports whether the shop runs every one of these modules. A feature

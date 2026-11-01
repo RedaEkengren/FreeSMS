@@ -67,6 +67,9 @@ type Finding struct {
 	ReportedAt  time.Time
 	HandledAt   *time.Time
 	WorkOrderID string
+	// The technician asks the front desk to contact the customer (#225),
+	// without being shown who they are or their number.
+	AsksContact bool
 }
 
 // Handled reports whether the front desk has dealt with it.
@@ -335,14 +338,28 @@ func PartRequestsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 // fact for the front desk to turn into a quote; handing the technician the
 // pricing form asks the wrong person the wrong question.
 func ReportFinding(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID, note string) error {
+	return reportFinding(ctx, pool, scope, jobID, note, false)
+}
+
+// AskDeskToContact asks the front desk to contact a job's customer, saying
+// why: a technician who is not shown the customer's number still gets them
+// rung (#225). The desk sees it with the job's findings.
+func AskDeskToContact(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID, why string) error {
+	if strings.TrimSpace(why) == "" {
+		return fmt.Errorf("%w: say what the customer should be asked", ErrInvalid)
+	}
+	return reportFinding(ctx, pool, scope, jobID, why, true)
+}
+
+func reportFinding(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID, note string, contact bool) error {
 	if strings.TrimSpace(note) == "" {
 		return fmt.Errorf("%w: say what you found", ErrInvalid)
 	}
 	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `
-			INSERT INTO findings (shop_id, work_order_id, note, reported_by)
-			SELECT $1, w.id, $2, $3 FROM work_orders w WHERE w.id = $4`,
-			scope.ShopID, strings.TrimSpace(note), scope.UserID, jobID)
+			INSERT INTO findings (shop_id, work_order_id, note, reported_by, asks_contact)
+			SELECT $1, w.id, $2, $3, $5 FROM work_orders w WHERE w.id = $4`,
+			scope.ShopID, strings.TrimSpace(note), scope.UserID, jobID, contact)
 		if err != nil {
 			return fmt.Errorf("record the finding: %w", err)
 		}
@@ -358,7 +375,7 @@ func FindingsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 	var out []Finding
 	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
-			SELECT f.id, f.note, coalesce(p.display_name, ''), f.reported_at, f.handled_at, f.work_order_id
+			SELECT f.id, f.note, coalesce(p.display_name, ''), f.reported_at, f.handled_at, f.work_order_id, f.asks_contact
 			FROM findings f
 			LEFT JOIN users u  ON u.id = f.reported_by
 			LEFT JOIN people p ON p.id = u.person_id
@@ -370,7 +387,7 @@ func FindingsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		defer rows.Close()
 		for rows.Next() {
 			var f Finding
-			if err := rows.Scan(&f.ID, &f.Note, &f.ReportedBy, &f.ReportedAt, &f.HandledAt, &f.WorkOrderID); err != nil {
+			if err := rows.Scan(&f.ID, &f.Note, &f.ReportedBy, &f.ReportedAt, &f.HandledAt, &f.WorkOrderID, &f.AsksContact); err != nil {
 				return fmt.Errorf("scan finding: %w", err)
 			}
 			out = append(out, f)

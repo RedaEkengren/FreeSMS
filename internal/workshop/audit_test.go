@@ -168,6 +168,20 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 	}
 	made["record.corrected"] = subject{"customer", fixtureCustomer}
 
+	// What a technician sees (#225): the profile, and an exception given
+	// and ended.
+	if err := workshop.SetTechnicianField(ctx, pool, owner(), access.FieldLinePrices, true, "Ackordslön"); err != nil {
+		t.Fatal(err)
+	}
+	made["technician_view.changed"] = subject{"shop", shopID}
+	if err := workshop.GrantTechnicianField(ctx, pool, owner(), staff, access.FieldHourlyRate, "Arbetsledare", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.EndTechnicianGrant(ctx, pool, owner(), staff, access.FieldHourlyRate, "Tillbaka på golvet"); err != nil {
+		t.Fatal(err)
+	}
+	made["technician_view.granted"], made["technician_view.ended"] = subject{"user", staff}, subject{"user", staff}
+
 	for _, tr := range workshop.AuditedTransitions {
 		s, ok := made[tr.Event]
 		if !ok {

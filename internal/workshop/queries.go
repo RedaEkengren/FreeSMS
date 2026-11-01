@@ -324,9 +324,12 @@ func JobByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id str
 			       -- calculation the rest of this system avoids them in.
 			       (quantity * 1000)::bigint,
 			       cost_bearer, approved_at, declined_at, performed_at, customer_decision_id IS NOT NULL,
-			       unit_price_minor, estimated_unit_price_minor, vat_rate_bp,
+			       -- A line's price only for a caller shown it (#225): a
+			       -- technician is not, unless the shop opens it.
+			       CASE WHEN $2 THEN unit_price_minor ELSE 0 END,
+			       CASE WHEN $2 THEN estimated_unit_price_minor END, vat_rate_bp,
 			       revision, withdrawn_at, coalesce(withdrawn_reason, ''), coalesce(part_id::text, '')
-			FROM work_order_lines WHERE work_order_id = $1 ORDER BY position`, id)
+			FROM work_order_lines WHERE work_order_id = $1 ORDER BY position`, id, scope.SeesOnJob(access.FieldLinePrices))
 		if err != nil {
 			return fmt.Errorf("read lines: %w", err)
 		}
