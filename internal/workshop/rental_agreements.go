@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -248,15 +250,16 @@ type LicenceCheckResult struct {
 }
 
 var (
-	errDriverState   = fmt.Errorf("%w: drivers are changed before the unit is handed over, or added while it is out", ErrInvalid)
-	errDriverTwice   = fmt.Errorf("%w: that person is already a driver of this rental", ErrInvalid)
-	errDriverMain    = fmt.Errorf("%w: the rental already has a main driver", ErrInvalid)
-	errDriverWhy     = fmt.Errorf("%w: say why the driver is taken off, in 300 characters or fewer", ErrInvalid)
-	errDriverGone    = fmt.Errorf("%w: that driver has been taken off the rental", ErrInvalid)
-	errNoProfileNeed = fmt.Errorf("%w: this rental's profile needs no licence check", ErrInvalid)
-	errLicenceDate   = fmt.Errorf("%w: say until when the licence is valid", ErrInvalid)
-	errLicenceWhere  = fmt.Errorf("%w: say how the licence was checked", ErrInvalid)
-	errLicenceNote   = fmt.Errorf("%w: keep the note to 80 characters, with no licence or identity number in it", ErrInvalid)
+	errDriverState    = fmt.Errorf("%w: drivers are changed before the unit is handed over, or added while it is out", ErrInvalid)
+	errDriverTwice    = fmt.Errorf("%w: that person is already a driver of this rental", ErrInvalid)
+	errDriverMain     = fmt.Errorf("%w: the rental already has a main driver", ErrInvalid)
+	errDriverWhy      = fmt.Errorf("%w: say why the driver is taken off, in 300 characters or fewer", ErrInvalid)
+	errDriverGone     = fmt.Errorf("%w: that driver has been taken off the rental", ErrInvalid)
+	errNoProfileNeed  = fmt.Errorf("%w: this rental's profile needs no licence check", ErrInvalid)
+	errLicenceDate    = fmt.Errorf("%w: say until when the licence is valid", ErrInvalid)
+	errLicenceWhere   = fmt.Errorf("%w: say how the licence was checked", ErrInvalid)
+	errLicenceTooLong = fmt.Errorf("%w: that is more than a licence check can say; shorten the note", ErrInvalid)
+	errLicenceNote    = fmt.Errorf("%w: keep the note to 80 characters, with no licence or identity number in it", ErrInvalid)
 )
 
 // AddRentalDriver names a driver for a rental: a party with the renter
@@ -422,10 +425,51 @@ type LicenceShown struct {
 	Note       string
 }
 
-// anIdentifier is a run of six digits or more, spaces and dashes allowed
-// between them: a licence number, a personal identity number, a date of
-// birth.
-var anIdentifier = regexp.MustCompile(`\d(?:[\s-]?\d){5,}`)
+// holdsIdentifier reports whether a note looks as if it holds a licence
+// number, a personal identity number or a date of birth, however it is
+// written: six digits or more with only separators or spaces between them,
+// digits of any script counted; a word of letters and three digits or more;
+// or a date. A free note can never be made fully safe; this refuses what a
+// desk would plausibly type.
+func holdsIdentifier(note string) bool {
+	run := 0
+	for _, word := range strings.Fields(note) {
+		digits, letters := 0, 0
+		for _, r := range word {
+			switch {
+			case unicode.IsDigit(r):
+				digits++
+			case unicode.IsLetter(r):
+				letters++
+			}
+		}
+		if letters > 0 && digits >= 3 {
+			return true
+		}
+	}
+	for _, r := range note {
+		switch {
+		case unicode.IsDigit(r):
+			if run++; run >= 6 {
+				return true
+			}
+		case unicode.IsLetter(r):
+			run = 0
+		}
+	}
+	var ascii strings.Builder
+	for _, r := range note {
+		if unicode.IsDigit(r) {
+			r = '9'
+		}
+		ascii.WriteRune(r)
+	}
+	return aDate.MatchString(ascii.String())
+}
+
+// aDate is a day and a month, with or without the year, as people write
+// them: 1/1/85, 01.01.1985, 1985-01-01.
+var aDate = regexp.MustCompile(`\d{1,4}\s*[./-]\s*\d{1,2}(\s*[./-]\s*\d{1,4})?`)
 
 // Why a licence check did not pass, as catalogue keys.
 const (
@@ -452,7 +496,7 @@ func RecordLicenceCheck(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		return false, errLicenceDate
 	case !slices.Contains(LicenceMethods, l.Method):
 		return false, errLicenceWhere
-	case len([]rune(l.Note)) > 80 || anIdentifier.MatchString(l.Note):
+	case len([]rune(l.Note)) > 80 || holdsIdentifier(l.Note):
 		return false, errLicenceNote
 	}
 	cats := make([]string, 0, len(l.Categories))
@@ -464,7 +508,9 @@ func RecordLicenceCheck(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		if !slices.Contains(LicenceCategories, c) {
 			return false, errCategory
 		}
-		cats = append(cats, c)
+		if !slices.Contains(cats, c) {
+			cats = append(cats, c)
+		}
 	}
 	var passed bool
 	err := inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
@@ -514,6 +560,9 @@ func RecordLicenceCheck(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		}
 		if l.Note != "" {
 			ref += "; " + l.Note
+		}
+		if utf8.RuneCountInString(ref) > 200 {
+			return errLicenceTooLong
 		}
 		record, err := recordLicenceReferenceTx(ctx, tx, scope, party, ref)
 		if err != nil {

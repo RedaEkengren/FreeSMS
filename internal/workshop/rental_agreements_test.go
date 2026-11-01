@@ -401,3 +401,46 @@ func TestARentalOutIsNotExtendedPastADriversLicence(t *testing.T) {
 		t.Errorf("out, and extended within the licence: %v", err)
 	}
 }
+
+// The note refuses an identifier however it is written: digits split by
+// any separators or spaces, digits that are not ASCII, a licence number
+// of letters and digits, and a date. A free note can never be made fully
+// safe; this refuses what a desk would plausibly type (review 2 #7).
+// Categories sent twice count once, and nothing a form sends fails on the
+// reference's length (review 2 #10).
+func TestALicenceNoteRefusesIdentifiersHoweverWritten(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	id, err := v.book(pool, in2031(10, 9), in2031(12, 9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver, _ := workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, v.renter, true)
+	shown := func(note string, cats ...string) error {
+		if cats == nil {
+			cats = []string{"B"}
+		}
+		_, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true,
+			Categories: cats, ValidUntil: day("2035-01-01"), Method: workshop.LicenceForeignInspected, Note: note})
+		return err
+	}
+	for _, note := range []string{"DOB 01.01.1985", "no. B072RRE2I55", "85 01 01  1234", "nr ١٢٣٤٥٦٧٨", "född 1/1/85", "12.3.1990",
+		"8 5 0 1 0 1"} {
+		if err := shown(note); !errors.Is(err, workshop.ErrInvalid) {
+			t.Errorf("a note %q: %v", note, err)
+		}
+	}
+	for _, note := range []string{"Tyskt körkort, giltigt i Sverige", "Klass C1E på kortet", "Förnyat 2031"} {
+		if err := shown(note); err != nil {
+			t.Errorf("a note %q with no identifier: %v", note, err)
+		}
+	}
+	many := make([]string, 30)
+	for i := range many {
+		many[i] = "C1E"
+	}
+	if err := shown(strings.Repeat("x", 80), append(many, workshop.LicenceCategories...)...); err != nil && !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("thirty categories and a full note: %v", err)
+	}
+}
