@@ -130,7 +130,14 @@ func TestAJobOnAStockCarPostsItsCostOnce(t *testing.T) {
 	if err := workshop.MarkPerformed(ctx, pool, advisor(), job, 1, true); err != nil {
 		t.Fatal(err)
 	}
+	// Ready is not done: a ready job may go back on the lift for more.
 	move(t, pool, job, workshop.StateReady)
+	if _, err := workshop.PostJobCost(ctx, pool, buyerScope(), job); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a ready job's cost was posted: %v", err)
+	}
+	if _, err := workshop.Issue(ctx, pool, advisor(), job); err != nil {
+		t.Fatal(err)
+	}
 	posted, err := workshop.PostJobCost(ctx, pool, buyerScope(), job)
 	// 2,5 h at 400 kr and two kits at 1 500 kr: 4 000 kr.
 	if err != nil || posted.NetMinor != 400_000 || posted.Source != workshop.CostFromWorkOrder || posted.Kind != workshop.CostWorkshop ||

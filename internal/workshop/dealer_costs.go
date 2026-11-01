@@ -373,7 +373,7 @@ func internalRateTx(ctx context.Context, tx pgx.Tx, rate *int64) error {
 // once: the parts fitted at what they cost when they left the shelf, and
 // the job's labour hours at the internal rate -- not what a customer would
 // be charged. The job must have been opened while the car was in stock,
-// and be done: ready, invoiced, closed or declined.
+// and be done: invoiced, closed or declined.
 // Asked again, it returns the posting there is. For whoever buys cars, in a
 // shop that sells cars; the job's own invoice is the workshop's matter.
 func PostJobCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) (StockCost, error) {
@@ -421,16 +421,18 @@ func PostJobCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		if err != nil {
 			return fmt.Errorf("read the job's car: %w", err)
 		}
-		// Done: ready, invoiced, closed, or declined after work. An open job
-		// may yet take parts and hours, and a posting is what the job cost,
-		// not what it has cost so far; one that kept moving would change
-		// under the margin it is read into.
+		// Done: invoiced, closed, or declined after work. An open job may
+		// yet take parts and hours, and a posting is what the job cost, not
+		// what it has cost so far; one that kept moving would change under
+		// the margin it is read into. Ready is not done: a ready job may be
+		// handed back for more work. The state is read FOR SHARE, so a job
+		// cannot move back while its cost is posted.
 		var state State
-		if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1`, jobID).Scan(&state); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1 FOR SHARE`, jobID).Scan(&state); err != nil {
 			return fmt.Errorf("read the job: %w", err)
 		}
 		switch state {
-		case StateReady, StateInvoiced, StateClosed, StateDeclined:
+		case StateInvoiced, StateClosed, StateDeclined:
 		default:
 			return errJobOpen
 		}
