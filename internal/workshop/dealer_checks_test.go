@@ -359,3 +359,47 @@ func TestAPayoutPaysThePurchaseItNamesToThoseItOwes(t *testing.T) {
 		}
 	}
 }
+
+// A check being recorded and a payout made at the same moment: the payout
+// waits for the check, and a check that failed keeps the money back.
+func TestAPayoutWaitsForACheckBeingRecorded(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	passEveryCheck(t, pool, p.StockUnitID)
+	payout, err := workshop.CreatePayout(ctx, pool, buyerScope(), workshop.NewHolding{PartyID: p.SellerPartyID, Purpose: "purchase",
+		SubjectKind: "purchase", SubjectID: p.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A check being recorded holds the unit, as RecordStockCheck does,
+	// and has not committed.
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.current_shop', $1, true)`, shopID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM stock_units WHERE id = $1 FOR UPDATE`, p.StockUnitID); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- payOut(pool, buyerScope(), payout, 100) }()
+	select {
+	case err := <-done:
+		t.Fatalf("the payout did not wait for the check being recorded: %v", err)
+	case <-time.After(700 * time.Millisecond):
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO stock_checks (shop_id, stock_unit_id, kind, result, source) VALUES ($1, $2, 'credit_purchase', 'fail', 'manual')`,
+		shopID, p.StockUnitID); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; !errors.Is(err, workshop.ErrChecksOutstanding) {
+		t.Errorf("paid out over the check that failed meanwhile: %v", err)
+	}
+}

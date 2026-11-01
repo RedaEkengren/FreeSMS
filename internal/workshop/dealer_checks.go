@@ -491,8 +491,13 @@ func payoutSubjectTx(ctx context.Context, tx pgx.Tx, purpose, subjectKind, subje
 // required checks do not all stand passed in time, unless an owner let it
 // through. Called by RecordPayout, inside its transaction.
 func purchaseChecksClearTx(ctx context.Context, tx pgx.Tx, purchaseID string) error {
+	// The unit held for share: a check being recorded holds it for update
+	// (unitOpenTx), so the payout waits for that check and then reads it,
+	// rather than paying on the checks as they stood a moment before.
 	var unitID string
-	err := tx.QueryRow(ctx, `SELECT stock_unit_id FROM vehicle_purchases WHERE id = $1`, purchaseID).Scan(&unitID)
+	err := tx.QueryRow(ctx, `
+		SELECT u.id FROM vehicle_purchases p JOIN stock_units u ON u.id = p.stock_unit_id
+		WHERE p.id = $1 FOR SHARE OF u`, purchaseID).Scan(&unitID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
 	}
