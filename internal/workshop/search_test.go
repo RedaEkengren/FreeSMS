@@ -154,3 +154,25 @@ func TestAChassisNumberStoredWithALetterForADigitIsFoundAsStored(t *testing.T) {
 		}
 	}
 }
+
+// The exact plate is first however many cars match a part of it: the
+// ranking happens before the list is cut, not after.
+func TestTheExactPlateIsFoundAmongMoreMatchesThanAreShown(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	currentPool = pool
+	for _, q := range []string{
+		`INSERT INTO vehicles (shop_id, label) SELECT $1, 'XYZ99 spare ' || n FROM generate_series(1, 40) n`,
+		`INSERT INTO vehicles (id, shop_id) VALUES ('ffffffff-ffff-ffff-ffff-ffffffffffff', $1)`,
+		`INSERT INTO vehicle_registrations (shop_id, vehicle_id, registration, normalised)
+		 VALUES ($1, 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'XYZ 99', 'XYZ99')`,
+	} {
+		if _, err := pool.Exec(ctx, q, shopID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	found := must(workshop.SearchAll(ctx, pool, advisor(), "XYZ99"))
+	if len(found) == 0 || found[0].ID != "ffffffff-ffff-ffff-ffff-ffffffffffff" || found[0].MatchedOn != "registration" {
+		t.Errorf("the exact plate is not first among %d: %+v", len(found), found)
+	}
+}
