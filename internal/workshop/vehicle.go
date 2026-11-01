@@ -69,6 +69,11 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 		// previous number in front of them, and that is exactly the moment
 		// they need to find the car. What is *displayed* is the current plate,
 		// so the result is not confusing.
+		//
+		// A chassis number is compared as one can be, on both sides: one has
+		// no I, O or Q, so either may hold the digit they are mistaken for,
+		// and a number stored with the letter -- an old car's, not ISO 3779 --
+		// is found typed as stored as well as typed with the digit.
 		const q = `
 			SELECT DISTINCT ON (v.id)
 			       v.id, coalesce(cur.registration, ''), coalesce(v.vin, ''),
@@ -77,7 +82,7 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 			       CASE
 			         WHEN m.normalised = $1 AND m.valid_to IS NULL THEN 'registration'
 			         WHEN m.normalised = $1 THEN 'a plate it used to carry'
-			         WHEN $5 <> '' AND upper(coalesce(v.vin, '')) LIKE '%' || $5 || '%' THEN 'chassis number'
+			         WHEN $5 <> '' AND translate(upper(coalesce(v.vin, '')), 'OQI', '001') LIKE '%' || $5 || '%' THEN 'chassis number'
 			         WHEN v.label ILIKE '%' || $2 || '%' THEN 'description'
 			         ELSE 'owner'
 			       END,
@@ -91,7 +96,7 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 			LEFT JOIN customers c ON c.id = o.customer_id
 			LEFT JOIN people cp   ON cp.id = c.person_id
 			WHERE v.merged_into IS NULL AND (($1 <> '' AND m.normalised = $1)
-			   OR ($5 <> '' AND upper(coalesce(v.vin, '')) LIKE '%' || $5 || '%')
+			   OR ($5 <> '' AND translate(upper(coalesce(v.vin, '')), 'OQI', '001') LIKE '%' || $5 || '%')
 			   OR ($4 AND (cp.display_name ILIKE '%' || $2 || '%'
 			            OR c.company_name ILIKE '%' || $2 || '%'))
 			   OR ($2 <> '' AND v.label ILIKE '%' || $2 || '%'))
@@ -118,10 +123,10 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 	return out, err
 }
 
-// vinLike is a typed chassis number as a chassis number can be: one has
-// no I, O or Q, so a letter typed for a digit that looks like it -- O for
-// 0, I for 1 -- is read as the digit (#159). Q is read as 0, which it is
-// mistaken for as often.
+// vinLike is a chassis number as one can be: one has no I, O or Q, so a
+// letter for a digit that looks like it -- O for 0, I for 1 -- is read as
+// the digit (#159). Q is read as 0, which it is mistaken for as often. The
+// search reads the stored number the same way, in SQL.
 func vinLike(normalised string) string {
 	return strings.NewReplacer("O", "0", "Q", "0", "I", "1").Replace(normalised)
 }

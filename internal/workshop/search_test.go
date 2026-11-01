@@ -137,3 +137,20 @@ func digitsOnly(r rune) rune {
 	}
 	return -1
 }
+
+// A chassis number stored with an O, I or Q -- an old car's, not ISO 3779,
+// or one typed with a letter at intake -- is found by typing it as it was
+// stored, and by typing the digits it is mistaken for.
+func TestAChassisNumberStoredWithALetterForADigitIsFoundAsStored(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	currentPool = pool
+	if _, err := pool.Exec(ctx, `UPDATE vehicles SET vin = 'WOLQI58D023456789' WHERE id = $1`, vehicleA); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{"WOLQI58D023456789", "w0l0158d023456789", "OLQI58"} {
+		if got := foundKinds(t, technician(), q); len(got) != 1 || got[0] != "vehicle:chassis number" {
+			t.Errorf("%q: %v, want the car by its chassis number", q, got)
+		}
+	}
+}
