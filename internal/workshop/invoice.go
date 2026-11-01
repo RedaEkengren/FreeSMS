@@ -114,6 +114,21 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 
 	var inv Invoice
 	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		inv, err = issueTx(ctx, tx, scope, workOrderID, o)
+		return err
+	})
+	if err != nil {
+		return Invoice{}, err
+	}
+	return inv, nil
+}
+
+// issueTx is Issue inside the caller's transaction, which runs in the
+// workshop: a cash invoice issues and is paid in the same one (#156).
+func issueTx(ctx context.Context, tx pgx.Tx, scope access.Scope, workOrderID string, o issueOptions) (Invoice, error) {
+	var inv Invoice
+	err := func() error {
 		// The lock first, then the question.
 		//
 		// This used to ask whether an invoice existed and only afterwards take
@@ -275,7 +290,7 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 		inv.CustomerName = *name
 		inv.NetMinor, inv.VATMinor, inv.GrossMinor = totals.NetMinor, totals.VATMinor, totals.GrossMinor
 		return nil
-	})
+	}()
 	if err != nil {
 		return Invoice{}, err
 	}
@@ -679,6 +694,10 @@ type Document struct {
 	CreditedBy []string
 
 	Registration string
+
+	// Set on a cash invoice: paid when it was issued, and how (#156).
+	// Frozen with it.
+	PaidOnIssue *PaidOnIssue
 }
 
 // Known reports whether this document carries a seller at all. Anything issued
@@ -730,7 +749,12 @@ func DocumentByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 
 	var d Document
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		return documentTx(ctx, tx, id, &d)
+		if err := documentTx(ctx, tx, id, &d); err != nil {
+			return err
+		}
+		var err error
+		d.PaidOnIssue, err = paidOnIssueTx(ctx, tx, d.ID)
+		return err
 	})
 	if err != nil {
 		return Document{}, err

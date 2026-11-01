@@ -59,6 +59,7 @@ var swept = map[string]string{
 	"GET /board": "", "GET /jobs/new": "", "POST /jobs/new": "",
 	"GET /jobs/new/lookup": "", "GET /jobs/new/customers": "", "GET /figures": "", "GET /accounting": "",
 	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/modules": "", "POST /shop/charges": "", "POST /shop/final-check": "",
+	"GET /payment-flows": "", "POST /payment-flows": "", "POST /payment-flows/threshold": "",
 	"GET /privacy": "", "GET /outbox": "", "GET /day": "", "POST /day/settlement": "", "POST /day/review": "", "POST /privacy/export": "", "GET /events": "", "GET /mine": "", "GET /rota": "", "POST /hooks/46elks/{secret}": "", "POST /rota": "", "GET /schedule": "", "GET /mine/count": "", "POST /account/alert": "", "POST /account/theme": "", "GET /calendar": "", "POST /calendar": "", "GET /enquiries": "", "POST /enquiries": "", "POST /calendar/capacity": "", "GET /labour": "", "POST /labour": "",
 	"POST /labour/rate": "", "GET /time": "", "POST /time/correct": "",
 	"POST /drafts": "", "GET /drafts": "", "DELETE /drafts": "",
@@ -185,6 +186,8 @@ var swept = map[string]string{
 	"POST /bookings/{id}/contact":                 "sweep",
 	"POST /invoices/{id}/payments":                "sweep",
 	"POST /payments/{id}/reverse":                 "sweep",
+	"POST /payment-flows/{id}/check":              "sweep",
+	"POST /payment-flows/{id}/withdraw":           "sweep",
 	"POST /outbox/{id}/retry":                     "sweep",
 	"POST /outbox/{id}/done":                      "sweep",
 	"POST /outbox/{id}/cancel":                    "sweep",
@@ -241,11 +244,12 @@ func fill(pattern string) (method, path string) {
 		"/import/{id}":        "/import/" + batchB,
 		"/contracts/{id}":     "/contracts/" + contractB,
 		// No other shop's call is seeded: an id that is nobody's.
-		"/outbox/{id}": "/outbox/bbbbbbbb-0000-0000-0000-0000000000ee",
-		"{row}":        "bbbbbbbb-0000-0000-0000-0000000000ff",
-		"{version}":    "1",
-		"{quoteID}":    "cccccccc-0000-0000-0000-0000000000cc",
-		"{key}":        photoB,
+		"/outbox/{id}":        "/outbox/bbbbbbbb-0000-0000-0000-0000000000ee",
+		"/payment-flows/{id}": "/payment-flows/bbbbbbbb-0000-0000-0000-0000000000ed",
+		"{row}":               "bbbbbbbb-0000-0000-0000-0000000000ff",
+		"{version}":           "1",
+		"{quoteID}":           "cccccccc-0000-0000-0000-0000000000cc",
+		"{key}":               photoB,
 	} {
 		path = strings.ReplaceAll(path, from, to)
 	}

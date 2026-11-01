@@ -21,6 +21,7 @@
   <dt>{{$.T "Due"}}</dt><dd>{{$.Date ($.Local .Due) "2 Jan 2006"}}</dd>
 </dl>
 {{if .Payments}}
+<p class="waiting">{{$.T "These are notes that money arrived, not cash-register receipts: FreeSMS is not a cash register."}}</p>
 <ul class="lines">
   {{range .Payments}}
   <li>

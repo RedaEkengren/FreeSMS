@@ -24,6 +24,12 @@ var core = map[string]string{
 	// Vehicle lookup (#155): the log of every module's lookups. Looking up
 	// checks the module of its purpose.
 	"VehicleLookupLog": "who looked a registration up, in any module",
+	// Cash invoices (#156): a manual invoice paid on issue is Core's, as a
+	// manual invoice is; the register of payment flows and the figure
+	// against the cash register threshold are the business's money.
+	"IssueManualAndPay": "a sale entered by hand, paid at the counter", "PaymentFlows": "the ways money is taken in person",
+	"AddPaymentFlow": "the ways money is taken in person", "CheckPaymentFlow": "a payment flow checked by the shop's adviser",
+	"InPersonTurnoverFor": "money taken in person this financial year", "SetCashRegisterThreshold": "the cash register threshold",
 	// Audit events (#151): the trail of every module's transitions.
 	"AuditTrail":   "who did what and why, whichever module it was in",
 	"DocumentByID": "an issued document", "CreditNote": "correcting an issued document",

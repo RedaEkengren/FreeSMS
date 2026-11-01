@@ -792,6 +792,14 @@
     <label class="tick"><input type="checkbox" name="confirm_unagreed" value="1"> <span>{{.T "Invoice it with the lines nobody agreed to"}}</span></label>
     <label><span>{{.T "Why they are invoiced anyway"}}</span><input name="unagreed_reason" maxlength="300"></label>
     {{end}}
+    <details>
+      <summary>{{.T "Paid now, at the counter"}}</summary>
+      <div class="pair">
+        <label><span>{{.T "How"}}</span><select name="paid_now"><option value="">{{.T "Not paid now"}}</option>{{range .CashMethods}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+        <label><span>{{.T "Reference"}}</span><input name="paid_reference" maxlength="100"></label>
+      </div>
+      <p class="waiting">{{.T "Issued and paid in one step: the invoice says it was paid. A recorded payment is not a cash-register receipt, and FreeSMS is not a cash register."}}</p>
+    </details>
     <button type="submit">{{.T "Invoice it"}}</button>
   </form>
   {{end}}

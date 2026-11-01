@@ -270,9 +270,19 @@ not exist.
   with an open source project. The shop's own time library is the answer, and
   it is a feature rather than a consolation — shops report the paid guides are
   frequently wrong anyway.
-- No payment processing, no cash register. Invoiced sales
-  are exempt from the Swedish certified cash register requirement; a cash
-  drawer would pull the project into scope for it.
+- No payment processing, no cash register. FreeSMS records money that moved
+  in the shop's own channels and is not a cash register; every payment form
+  and list says so. It does **not** say a shop is exempt from the Swedish
+  certified cash register requirement: an invoice series does not exempt a
+  sale paid in person on its own, Swish counts as a card payment, and new
+  technical requirements apply from 2027 (#156). What it does is issue a
+  cash invoice -- an invoice paid on issue, in one step, frozen as paid --
+  keep the shop's register of the ways it takes money in person with whether
+  its adviser has checked each (unchecked ones in use are on the owner's
+  list), and show the owner what was taken in person this financial year
+  against a threshold the shop sets. Whether that is enough for a given flow
+  is gate G2 (#221), and until it has answered the software records and
+  warns. A cash drawer would pull the project into scope for the rules.
 - No parts supplier ordering. It needs agreements rather than code, it cannot
   ship with an open project, and the competitors are criticised for theirs. The
   request and the return -- the parts of the job a shop actually loses money on

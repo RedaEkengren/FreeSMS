@@ -117,7 +117,7 @@ func TestNoPageReadInSwedishShowsAnEnglishSentenceFromTheCatalogue(t *testing.T)
 		"/outsourced", "/supply", "/stock", "/scan", "/checklists", "/schedule"}
 	deskOnly = append(deskOnly, "/customers/"+customerID, "/invoices/"+invoiceID, "/invoices/"+invoiceID+"/followup",
 		"/invoices/"+invoiceID+"/credit", "/invoices/"+invoiceID+"/rebill", "/invoices/"+invoiceID+"/docview")
-	ownerOnly := []string{"/shop", "/staff", "/import", "/start", "/start/invoice", "/help/owner"}
+	ownerOnly := []string{"/shop", "/staff", "/import", "/start", "/start/invoice", "/help/owner", "/payment-flows"}
 
 	sentences := englishSentences(t)
 	if len(sentences) < 300 {

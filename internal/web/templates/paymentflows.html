@@ -1,0 +1,55 @@
+{{define "content"}}
+<h1>{{.T "Money taken in person"}}</h1>
+<p class="waiting">{{.T "FreeSMS records payments; it is not a cash register, and a recorded payment is not a cash-register receipt. Whether a way of taking money at the counter needs a certified cash register is a question for your adviser. Note each way you take money in person and when your adviser checked it."}}</p>
+
+{{with .Turnover}}
+<h2>{{$.T "This financial year"}}</h2>
+<dl>
+  <dt>{{$.T "Taken in cash, by card or by Swish since %s" ($.Date .Since "2 Jan 2006")}}</dt><dd>{{$.Money .TakenMinor}}</dd>
+  {{if .ThresholdMinor}}<dt>{{$.T "Your threshold"}}</dt><dd>{{$.Money .ThresholdMinor}}{{if .Over}} <span class="tag late">{{$.T "reached"}}</span>{{end}}</dd>{{end}}
+</dl>
+<form method="post" action="/payment-flows/threshold">
+  <div class="pair">
+    <label><span>{{$.T "Threshold, kr"}}</span><input name="threshold" inputmode="decimal" required{{if .ThresholdMinor}} value="{{$.Money .ThresholdMinor}}"{{end}}></label>
+    <label><span>{{$.T "The financial year starts in month"}}</span><input name="year_starts" inputmode="numeric" value="{{.YearStarts}}" required></label>
+  </div>
+  <p class="waiting">{{$.T "Four price base amounts in 2026 is 236 800 kr. The amount changes each year; set what your adviser tells you."}}</p>
+  <button type="submit" class="secondary">{{$.T "Save the threshold"}}</button>
+</form>
+{{end}}
+
+<h2>{{.T "Ways of taking money in person"}}</h2>
+{{if .PaymentFlows}}
+<ul class="lines">
+  {{range .PaymentFlows}}
+  <li>
+    <div class="row"><span>{{.Name}} &middot; {{$.T .Method}}</span>
+      <span class="tag{{if not .Checked}} late{{end}}">{{if .Checked}}{{$.T "checked"}}{{else}}{{$.T "not checked"}}{{end}}</span></div>
+    {{if .Checked}}<div class="waiting">{{$.T "Checked by %s on %s" .Adviser ($.Date .CheckedOn "2 Jan 2006")}}{{with .Note}} &middot; {{.}}{{end}}</div>{{end}}
+    {{if .Used}}<div class="waiting">{{$.N "%d cash invoice issued through it" .Used}}</div>{{end}}
+    {{if .Checked}}
+    <form method="post" action="/payment-flows/{{.ID}}/withdraw" class="inline"><button type="submit" class="link">{{$.T "Withdraw the check"}}</button></form>
+    {{else}}
+    <form method="post" action="/payment-flows/{{.ID}}/check">
+      <div class="pair">
+        <label><span>{{$.T "Checked by"}}</span><input name="adviser" maxlength="200" required></label>
+        <label><span>{{$.T "On"}}</span><input type="date" name="checked_on" value="{{$.Today}}" required></label>
+      </div>
+      <label><span>{{$.T "What they said"}}</span><input name="note" maxlength="1000"></label>
+      <button type="submit" class="link">{{$.T "Record the check"}}</button>
+    </form>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p>{{.T "None noted yet."}}</p>
+{{end}}
+<form method="post" action="/payment-flows">
+  <div class="pair">
+    <label><span>{{.T "Name"}}</span><input name="name" maxlength="100" required placeholder="{{.T "Card at the counter for rental extras"}}"></label>
+    <label><span>{{.T "How"}}</span><select name="method">{{range .CashMethodsAll}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+  </div>
+  <button type="submit">{{.T "Note it"}}</button>
+</form>
+{{end}}

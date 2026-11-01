@@ -2,6 +2,10 @@
   "locale": "en",
   "name": "English",
   "messages": {
+    "%d cash invoice issued through it": {
+      "one": "%d cash invoice issued through it",
+      "other": "%d cash invoices issued through it"
+    },
     "%d day net": {
       "one": "%d day net",
       "other": "%d days net"

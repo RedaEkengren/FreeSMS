@@ -224,7 +224,10 @@ type pageData struct {
 	LookupNote  string
 	// The answer a lookup gave, with its source and age, for the intake
 	// form to say; the VIN it gave when it differs from the one typed.
-	Looked             *workshop.VehicleLookup
+	Looked *workshop.VehicleLookup
+	// The ways money is taken in person, and the year's figure (#156).
+	PaymentFlows       []workshop.PaymentFlow
+	Turnover           workshop.InPersonTurnover
 	LookupConflict     string
 	LookupRegistration string
 
@@ -498,7 +501,7 @@ func (d pageData) Plural(key string, count int) string {
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "planclash", "lineedit", "enquiries", "enquiry", "proposal", "offer", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "einvoice", "shop", "customer", "day", "followup", "comeback", "outsourced", "outsourcedlist", "import", "importbatch", "start", "invoiceexample", "help", "credit", "rebill", "docview", "summary", "summarydoc", "supply", "order", "timeline", "duplicates", "merge", "customers", "customercard", "sell", "checklists", "part", "staff", "account", "mine", "rota", "schedule", "receivables", "setup", "contract", "outbox", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "planclash", "lineedit", "enquiries", "enquiry", "proposal", "offer", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "einvoice", "shop", "customer", "day", "followup", "comeback", "outsourced", "outsourcedlist", "import", "importbatch", "start", "invoiceexample", "help", "credit", "rebill", "docview", "summary", "summarydoc", "supply", "order", "timeline", "duplicates", "merge", "customers", "customercard", "sell", "checklists", "part", "staff", "account", "mine", "rota", "schedule", "receivables", "setup", "contract", "outbox", "paymentflows", "error"}
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).Funcs(templateFuncs).ParseFS(web.Templates,
@@ -652,4 +655,12 @@ func (d pageData) NotAgreedLines() int {
 		}
 	}
 	return n
+}
+
+// CashMethods are the ways a cash invoice is paid at the counter (#156).
+func (d pageData) CashMethods() []string { return workshop.CashMethods }
+
+// CashMethodsAll are the ways a payment flow takes money in person.
+func (d pageData) CashMethodsAll() []string {
+	return append(append([]string{}, workshop.CashMethods...), "other")
 }

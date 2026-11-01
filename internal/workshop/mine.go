@@ -62,6 +62,7 @@ var waitingSays = map[string]string{
 	"booking_not_told":   "The customer was not reached about a booking: %s",
 	"outsourced_overdue": "Due back from a supplier and not here: %s",
 	"outsourced_invoice": "A supplier invoice nobody has handed on: %s",
+	"flow_unchecked":     "A way of taking money in person is in use and not checked against the cash register rules: %s",
 }
 
 // Says is the item's catalogue key.
@@ -85,6 +86,8 @@ func (w WaitingItem) Link() string {
 		return "/parts"
 	case "schedule_changed":
 		return "/schedule"
+	case "flow_unchecked":
+		return "/payment-flows"
 	}
 	return "/jobs/" + w.JobID
 }
@@ -99,6 +102,11 @@ func WaitingFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]
 		return err
 	}
 	if err := add(scheduleChanged(ctx, pool, scope)); err != nil {
+		return nil, err
+	}
+	// Core's, whatever the shop runs: money taken in person (#156), for
+	// whoever runs the shop.
+	if err := add(uncheckedFlowsWaiting(ctx, pool, scope)); err != nil {
 		return nil, err
 	}
 	// One inbox for every module (#158); a module the shop has switched off

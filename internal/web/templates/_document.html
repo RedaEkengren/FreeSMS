@@ -58,8 +58,8 @@
     <dt class="grand">{{$.T "Total"}}</dt><dd class="grand">{{$.Money .GrossMinor}}</dd>
   </dl>
 
-  {{with .Seller}}
-  {{if .PaymentReference}}<p>{{$.T "Pay to %s" .PaymentReference}}{{if .PaymentTermsDays}}, {{$.N "%d day net" .PaymentTermsDays}}{{end}}</p>{{end}}
+  {{/* A cash invoice says it was paid, and how, frozen with it (#156); on this line, so any other document renders as it did. */}}{{$paid := .PaidOnIssue}}{{with .PaidOnIssue}}<p><strong>{{$.T "Paid"}}</strong> {{$.Date ($.Local .At) "2 Jan 2006 15:04"}}</p><ul class="plain">{{range .With}}<li>{{$.T .Method}} {{$.Money .AmountMinor}}{{if .RoundingMinor}} + {{$.Money .RoundingMinor}} {{$.T "rounding"}}{{end}}{{with .Reference}} &middot; {{.}}{{end}}</li>{{end}}</ul>{{end}}{{with .Seller}}
+  {{if and .PaymentReference (not $paid)}}<p>{{$.T "Pay to %s" .PaymentReference}}{{if .PaymentTermsDays}}, {{$.N "%d day net" .PaymentTermsDays}}{{end}}</p>{{end}}
   {{if .FTax}}<p class="waiting">{{$.T "Approved for F-tax"}}</p>{{end}}
   {{end}}
   {{if .IssuedBy}}<p class="waiting">{{$.T "Issued by %s" .IssuedBy}}</p>{{end}}

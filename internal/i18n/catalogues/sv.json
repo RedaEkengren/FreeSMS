@@ -7510,6 +7510,115 @@
     },
     "that is not a reason to look a registration up": {
       "other": "det är inget skäl att slå upp ett registreringsnummer"
+    },
+    "a cash invoice is paid in cash, by card or by Swish at the counter": {
+      "other": "en kontantfaktura betalas kontant, med kort eller med Swish i disken"
+    },
+    "a flow takes cash, card, Swish or something else": {
+      "other": "ett betalflöde tar emot kontanter, kort, Swish eller något annat"
+    },
+    "a threshold above nothing, and a month from 1 to 12": {
+      "other": "ett gränsbelopp över noll, och en månad från 1 till 12"
+    },
+    "keep the note to 1000 characters": {
+      "other": "håll anteckningen inom 1000 tecken"
+    },
+    "name the flow, in 100 characters or fewer": {
+      "other": "namnge betalflödet, med högst 100 tecken"
+    },
+    "say how it is paid, in up to five parts": {
+      "other": "säg hur det betalas, i högst fem delar"
+    },
+    "say when it was checked": {
+      "other": "säg när det kontrollerades"
+    },
+    "say who checked it": {
+      "other": "säg vem som kontrollerade det"
+    },
+    "the payments add up to more or less than the invoice; only the last may be the rest": {
+      "other": "betalningarna blir mer eller mindre än fakturan; bara den sista får vara resten"
+    },
+    "there is a flow by that name already": {
+      "other": "det finns redan ett betalflöde med det namnet"
+    },
+    "Money taken in person": {
+      "other": "Pengar som tas emot på plats"
+    },
+    "These are notes that money arrived, not cash-register receipts: FreeSMS is not a cash register.": {
+      "other": "Det här är anteckningar om att betalningar kom in, inte kassakvitton: FreeSMS är inget kassaregister."
+    },
+    "Issued and paid in one step: the invoice says it was paid. A recorded payment is not a cash-register receipt, and FreeSMS is not a cash register.": {
+      "other": "Utfärdad och betald i ett steg: fakturan säger att den är betald. En registrerad betalning är inget kassakvitto, och FreeSMS är inget kassaregister."
+    },
+    "Not paid now": {
+      "other": "Inte betald nu"
+    },
+    "Paid now, at the counter": {
+      "other": "Betald nu, i disken"
+    },
+    "Card at the counter for rental extras": {
+      "other": "Kort i disken för hyrtillägg"
+    },
+    "Checked by": {
+      "other": "Kontrollerat av"
+    },
+    "Checked by %s on %s": {
+      "other": "Kontrollerat av %s den %s"
+    },
+    "Four price base amounts in 2026 is 236 800 kr. The amount changes each year; set what your adviser tells you.": {
+      "other": "Fyra prisbasbelopp är 236 800 kr år 2026. Beloppet ändras varje år; ange det din rådgivare säger."
+    },
+    "FreeSMS records payments; it is not a cash register, and a recorded payment is not a cash-register receipt. Whether a way of taking money at the counter needs a certified cash register is a question for your adviser. Note each way you take money in person and when your adviser checked it.": {
+      "other": "FreeSMS registrerar betalningar; det är inget kassaregister, och en registrerad betalning är inget kassakvitto. Om ett sätt att ta betalt i disken kräver ett certifierat kassaregister är en fråga för din rådgivare. Anteckna varje sätt ni tar emot pengar på plats och när rådgivaren kontrollerade det."
+    },
+    "None noted yet.": {
+      "other": "Inga antecknade än."
+    },
+    "Note it": {
+      "other": "Anteckna det"
+    },
+    "Record the check": {
+      "other": "Registrera kontrollen"
+    },
+    "Save the threshold": {
+      "other": "Spara gränsbeloppet"
+    },
+    "Taken in cash, by card or by Swish since %s": {
+      "other": "Mottaget kontant, med kort eller med Swish sedan %s"
+    },
+    "The financial year starts in month": {
+      "other": "Räkenskapsåret börjar i månad"
+    },
+    "This financial year": {
+      "other": "Det här räkenskapsåret"
+    },
+    "Threshold, kr": {
+      "other": "Gränsbelopp, kr"
+    },
+    "Ways of taking money in person": {
+      "other": "Sätt att ta emot pengar på plats"
+    },
+    "What they said": {
+      "other": "Vad de sa"
+    },
+    "Withdraw the check": {
+      "other": "Dra tillbaka kontrollen"
+    },
+    "Your threshold": {
+      "other": "Ert gränsbelopp"
+    },
+    "checked": {
+      "other": "kontrollerat"
+    },
+    "reached": {
+      "other": "nått"
+    },
+    "A way of taking money in person is in use and not checked against the cash register rules: %s": {
+      "other": "Ett sätt att ta emot pengar på plats används och är inte kontrollerat mot reglerna om kassaregister: %s"
+    },
+    "%d cash invoice issued through it": {
+      "one": "%d kontantfaktura utfärdad genom det",
+      "other": "%d kontantfakturor utfärdade genom det"
     }
   }
 }
