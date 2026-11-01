@@ -117,3 +117,25 @@ func TestWithoutJavaScriptASceneIsOneMoment(t *testing.T) {
 		}
 	}
 }
+
+// The public page never says a shop is exempt from the certified cash
+// register requirement: an invoice paid on the spot in person may still
+// need one (#156), and the page says to check, in every language.
+func TestThePageNeverSaysAShopIsExemptFromTheCashRegisterRules(t *testing.T) {
+	exempt := regexp.MustCompile(`(?i)invoiced sales are not covered|fakturerad försäljning omfattas inte|not covered by the certified cash register|omfattas inte av kravet på certifierat kassaregister`)
+	check := map[string]string{"sv": "Skatteverket", "en": "Skatteverket"}
+	for _, p := range Pages {
+		for _, file := range []string{p.Source, p.Output} {
+			b, err := os.ReadFile(filepath.Join("../..", file))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if m := exempt.Find(b); m != nil {
+				t.Errorf("%s says a shop is exempt: %q", file, m)
+			}
+			if !bytes.Contains(b, []byte(check[p.Locale])) {
+				t.Errorf("%s does not say to check with %s", file, check[p.Locale])
+			}
+		}
+	}
+}
