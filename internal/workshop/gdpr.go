@@ -208,8 +208,10 @@ func ExportPerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 		invoices, err := tx.Query(ctx, `
 			SELECT i.series, i.number, i.issued_at, i.gross_minor
 			FROM invoices i
-			JOIN work_orders w ON w.id = i.work_order_id
-			JOIN customers c   ON c.id = w.customer_id
+			LEFT JOIN work_orders w ON w.id = i.work_order_id
+			-- The job's customer, or the invoice's own when it is not a
+			-- job's (#146).
+			JOIN customers c   ON c.id = coalesce(i.customer_id, w.customer_id)
 			WHERE c.person_id = $1
 			ORDER BY i.issued_at`, personID)
 		if err != nil {
@@ -362,8 +364,8 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 		// Who a document was meant for, where it was sent to somebody by name.
 		if _, err := tx.Exec(ctx, `
 			UPDATE invoice_deliveries SET recipient_name = $2
-			WHERE invoice_id IN (SELECT i.id FROM invoices i JOIN work_orders w ON w.id = i.work_order_id
-			                     JOIN customers c ON c.id = w.customer_id WHERE c.person_id = $1)`, personID, ErasedName); err != nil {
+			WHERE invoice_id IN (SELECT i.id FROM invoices i LEFT JOIN work_orders w ON w.id = i.work_order_id
+			                     JOIN customers c ON c.id = coalesce(i.customer_id, w.customer_id) WHERE c.person_id = $1)`, personID, ErasedName); err != nil {
 			return fmt.Errorf("clear the delivery log: %w", err)
 		}
 

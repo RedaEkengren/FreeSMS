@@ -17,6 +17,7 @@ var core = map[string]string{
 	"IssueCredit": "correcting an issued document", "PreviewCredit": "correcting an issued document",
 	"EligibleLines": "correcting an issued document", "CorrectionsFor": "correcting an issued document",
 	"RebillTo": "correcting an issued document", "EInvoice": "an issued document, electronically",
+	"IssueManual":   "a sale entered by hand, which no module records (#146)",
 	"DeliveriesFor": "how a document reached the customer", "SendDocument": "sending an issued document",
 	"HandDocumentOver": "handing an issued document over", "RevokeDocumentLinks": "an issued document's links",
 	"UndeliveredDocuments": "documents not yet with the customer",

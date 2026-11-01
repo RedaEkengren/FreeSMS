@@ -118,7 +118,7 @@ func newKey() string {
 // the transaction ends.
 func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRequest, lock bool) (creditPlan, error) {
 	var p creditPlan
-	q := `SELECT id, series, number, work_order_id, credit_of_id IS NOT NULL, customer_name,
+	q := `SELECT id, series, number, coalesce(work_order_id::text, ''), credit_of_id IS NOT NULL, customer_name,
 	             customer_address, customer_org_number, customer_vat_number,
 	             net_minor, vat_minor, gross_minor,
 	             customer_postal_code, customer_city, customer_country,
@@ -388,7 +388,7 @@ func IssueCredit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in
 		var existing *string
 		if err := tx.QueryRow(ctx, `SELECT credit_invoice_id::text FROM invoice_corrections WHERE original_invoice_id = $1 AND request_key = $2`,
 			invoiceID, req.Key).Scan(&existing); err == nil && existing != nil {
-			return tx.QueryRow(ctx, `SELECT id, series, number, work_order_id, customer_name, issued_at, net_minor, vat_minor, gross_minor, credit_of_id
+			return tx.QueryRow(ctx, `SELECT id, series, number, coalesce(work_order_id::text, ''), customer_name, issued_at, net_minor, vat_minor, gross_minor, credit_of_id
 				FROM invoices WHERE id = $1`, *existing).Scan(&note.ID, &note.Series, &note.Number, &note.WorkOrderID, &note.CustomerName,
 				&note.IssuedAt, &note.NetMinor, &note.VATMinor, &note.GrossMinor, &note.CreditOfID)
 		} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -422,9 +422,14 @@ func IssueCredit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in
 			   seller_phone, seller_email, seller_payment_reference,
 			   seller_payment_terms_days, seller_f_tax,
 			   net_minor, vat_minor, gross_minor,
-			   ` + electronicColumns + `)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
-			        $23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33)
+			   ` + electronicColumns + `,
+			   source, vehicle_sale_id, rental_id, customer_id)
+			SELECT $1,$2,$3,NULLIF($4, '')::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
+			       $23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,
+			       -- What it credits is what it is of (#146), read from the
+			       -- original rather than passed along, so it cannot differ.
+			       o.source, o.vehicle_sale_id, o.rental_id, o.customer_id
+			FROM invoices o WHERE o.id = $5
 			RETURNING id, issued_at`
 		args := append([]any{
 			scope.ShopID, p.original.Series, number, p.original.WorkOrderID, p.original.ID, scope.UserID,
@@ -496,10 +501,14 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 		var orig Invoice
 		var isCredit bool
 		var vehicleID string
+		var saleID, rentalID *string
 		if err := tx.QueryRow(ctx, `
-			SELECT i.id, i.series, i.number, i.work_order_id, i.credit_of_id IS NOT NULL, i.net_minor, i.vat_minor, i.gross_minor, w.vehicle_id::text
-			FROM invoices i JOIN work_orders w ON w.id = i.work_order_id WHERE i.id = $1 FOR UPDATE OF i`, invoiceID).Scan(
-			&orig.ID, &orig.Series, &orig.Number, &orig.WorkOrderID, &isCredit, &orig.NetMinor, &orig.VATMinor, &orig.GrossMinor, &vehicleID); err != nil {
+			SELECT i.id, i.series, i.number, coalesce(i.work_order_id::text, ''), i.credit_of_id IS NOT NULL,
+			       i.net_minor, i.vat_minor, i.gross_minor, coalesce(w.vehicle_id::text, ''),
+			       i.source, i.vehicle_sale_id::text, i.rental_id::text
+			FROM invoices i LEFT JOIN work_orders w ON w.id = i.work_order_id WHERE i.id = $1 FOR UPDATE OF i`, invoiceID).Scan(
+			&orig.ID, &orig.Series, &orig.Number, &orig.WorkOrderID, &isCredit, &orig.NetMinor, &orig.VATMinor, &orig.GrossMinor, &vehicleID,
+			&orig.Source, &saleID, &rentalID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrNotFound
 			}
@@ -510,7 +519,7 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 		}
 		var existing *string
 		if err := tx.QueryRow(ctx, `SELECT replacement_invoice_id::text FROM invoice_corrections WHERE original_invoice_id = $1 AND kind = 'rebill'`, invoiceID).Scan(&existing); err == nil && existing != nil {
-			if err := tx.QueryRow(ctx, `SELECT id, series, number, work_order_id, customer_name, issued_at, net_minor, vat_minor, gross_minor
+			if err := tx.QueryRow(ctx, `SELECT id, series, number, coalesce(work_order_id::text, ''), customer_name, issued_at, net_minor, vat_minor, gross_minor
 				FROM invoices WHERE id = $1`, *existing).Scan(&out.ID, &out.Series, &out.Number, &out.WorkOrderID, &out.CustomerName, &out.IssuedAt, &out.NetMinor, &out.VATMinor, &out.GrossMinor); err != nil {
 				return fmt.Errorf("read replacement: %w", err)
 			}
@@ -533,36 +542,31 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 			return fmt.Errorf("%w: credit the whole invoice first; a replacement is for an invoice that has been taken back", ErrInvalid)
 		}
 
-		var name, address, org, vat *string
-		var buyer Buyer
-		var customerID string
-		if err := tx.QueryRow(ctx, `
-			SELECT c.id::text, coalesce(CASE WHEN c.kind = 'company' THEN c.company_name END, p.display_name),
-			       nullif(concat_ws(', ', c.address_line1, c.address_line2, concat_ws(' ', c.postal_code, c.city)), ''),
-			       c.org_number, c.vat_number,
-			       c.postal_code, c.city, c.country, c.endpoint_id, c.buyer_reference
-			FROM customers c LEFT JOIN people p ON p.id = c.person_id
-			WHERE c.id = $1 AND c.merged_into IS NULL`, req.CustomerID).Scan(&customerID, &name, &address, &org, &vat,
-			&buyer.PostalCode, &buyer.City, &buyer.Country, &buyer.EndpointID, &buyer.Reference); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrNotFound
-			}
-			return fmt.Errorf("read buyer: %w", err)
+		b, err := buyerTx(ctx, tx, req.CustomerID)
+		if err != nil {
+			return err
 		}
-		if name == nil || *name == "" {
-			return ErrNoCustomer
-		}
+		customerID, name, address, org, vat, buyer := b.customerID, &b.name, b.address, b.org, b.vat, b.buyer
 
-		var number int64
-		if err := tx.QueryRow(ctx, `SELECT coalesce(max(number), 0) + 1 FROM work_orders`).Scan(&number); err != nil {
-			return fmt.Errorf("next order number: %w", err)
-		}
+		// A workshop invoice is rebilled through a correction job of its
+		// own, so the job's history says who paid in the end. Any other
+		// source keeps its sale or rental, and names the new customer
+		// (#146): the chain is invoice_corrections either way.
 		var jobID string
-		if err := tx.QueryRow(ctx, `
-			INSERT INTO work_orders (shop_id, number, vehicle_id, customer_id, complaint, state, created_by, corrects_work_order_id)
-			VALUES ($1, $2, $3, $4, $5, 'invoiced', $6, $7) RETURNING id`,
-			scope.ShopID, number, vehicleID, customerID, fmt.Sprintf("Correction of invoice %s-%d", orig.Series, orig.Number), scope.UserID, orig.WorkOrderID).Scan(&jobID); err != nil {
-			return fmt.Errorf("open the correction: %w", err)
+		var newCustomer *string
+		if orig.Source == SourceWorkshop {
+			var number int64
+			if err := tx.QueryRow(ctx, `SELECT coalesce(max(number), 0) + 1 FROM work_orders`).Scan(&number); err != nil {
+				return fmt.Errorf("next order number: %w", err)
+			}
+			if err := tx.QueryRow(ctx, `
+				INSERT INTO work_orders (shop_id, number, vehicle_id, customer_id, complaint, state, created_by, corrects_work_order_id)
+				VALUES ($1, $2, $3, $4, $5, 'invoiced', $6, $7) RETURNING id`,
+				scope.ShopID, number, vehicleID, customerID, fmt.Sprintf("Correction of invoice %s-%d", orig.Series, orig.Number), scope.UserID, orig.WorkOrderID).Scan(&jobID); err != nil {
+				return fmt.Errorf("open the correction: %w", err)
+			}
+		} else {
+			newCustomer = &customerID
 		}
 
 		rows, err := tx.Query(ctx, `
@@ -601,9 +605,11 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 			   seller_phone, seller_email, seller_payment_reference,
 			   seller_payment_terms_days, seller_f_tax,
 			   net_minor, vat_minor, gross_minor,
-			   ` + electronicColumns + `)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
-			        $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)
+			   ` + electronicColumns + `,
+			   source, vehicle_sale_id, rental_id, customer_id)
+			VALUES ($1,$2,$3,NULLIF($4, '')::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
+			        $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,
+			        $33, $34::uuid, $35::uuid, $36::uuid)
 			RETURNING id, issued_at`
 		args := append([]any{
 			scope.ShopID, orig.Series, newNumber, jobID, scope.UserID,
@@ -613,6 +619,7 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 			sold.PaymentTermsDays, sold.FTax,
 			orig.NetMinor, orig.VATMinor, orig.GrossMinor,
 		}, electronicArgs(sold, buyer)...)
+		args = append(args, orig.Source, saleID, rentalID, newCustomer)
 		if err := tx.QueryRow(ctx, insert, args...).Scan(&out.ID, &out.IssuedAt); err != nil {
 			return fmt.Errorf("write replacement: %w", err)
 		}
@@ -625,6 +632,7 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 			return fmt.Errorf("record the correction: %w", err)
 		}
 		out.Series, out.Number, out.WorkOrderID, out.CustomerName = orig.Series, newNumber, jobID, *name
+		out.Source = orig.Source
 		out.NetMinor, out.VATMinor, out.GrossMinor = orig.NetMinor, orig.VATMinor, orig.GrossMinor
 		return nil
 	})
@@ -632,6 +640,40 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 		return Invoice{}, err
 	}
 	return out, nil
+}
+
+// billedTo is a customer as they are now, to be copied onto a document.
+type billedTo struct {
+	customerID, name  string
+	address, org, vat *string
+	buyer             Buyer
+}
+
+// buyerTx reads a customer as an invoice is addressed to them: the name a
+// company or a person goes by, the address on one line, the numbers, and
+// the parts an electronic invoice takes apart. A merged customer is not
+// billed; the one they were merged into is.
+func buyerTx(ctx context.Context, tx pgx.Tx, customerID string) (billedTo, error) {
+	var b billedTo
+	var name *string
+	if err := tx.QueryRow(ctx, `
+		SELECT c.id::text, coalesce(CASE WHEN c.kind = 'company' THEN c.company_name END, p.display_name),
+		       nullif(concat_ws(', ', c.address_line1, c.address_line2, concat_ws(' ', c.postal_code, c.city)), ''),
+		       c.org_number, c.vat_number,
+		       c.postal_code, c.city, c.country, c.endpoint_id, c.buyer_reference
+		FROM customers c LEFT JOIN people p ON p.id = c.person_id
+		WHERE c.id = $1 AND c.merged_into IS NULL`, customerID).Scan(&b.customerID, &name, &b.address, &b.org, &b.vat,
+		&b.buyer.PostalCode, &b.buyer.City, &b.buyer.Country, &b.buyer.EndpointID, &b.buyer.Reference); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return billedTo{}, ErrNotFound
+		}
+		return billedTo{}, fmt.Errorf("read buyer: %w", err)
+	}
+	if name == nil || *name == "" {
+		return billedTo{}, ErrNoCustomer
+	}
+	b.name = *name
+	return b, nil
 }
 
 // Correction is a step in correcting a document.

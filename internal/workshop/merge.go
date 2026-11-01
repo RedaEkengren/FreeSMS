@@ -269,7 +269,8 @@ func customerMergeTx(ctx context.Context, tx pgx.Tx, keepID, dropID string, lock
 		return p, fmt.Errorf("count contacts: %w", err)
 	}
 	if err := tx.QueryRow(ctx, `
-		SELECT count(*) FROM invoices i JOIN work_orders w ON w.id = i.work_order_id WHERE w.customer_id = $1`, dropID).Scan(&p.Invoices); err != nil {
+		SELECT count(*) FROM invoices i LEFT JOIN work_orders w ON w.id = i.work_order_id
+		WHERE coalesce(i.customer_id, w.customer_id) = $1`, dropID).Scan(&p.Invoices); err != nil {
 		return p, fmt.Errorf("count invoices: %w", err)
 	}
 	fill := func(field, keepV, dropV string) {

@@ -151,7 +151,7 @@ func balanceTx(ctx context.Context, tx pgx.Tx, invoiceID string, lock bool) (Bal
 	if original != nil {
 		invoiceID = *original
 	}
-	q := `SELECT id, series || '-' || number, work_order_id, customer_name, issued_at, gross_minor,
+	q := `SELECT id, series || '-' || number, coalesce(work_order_id::text, ''), customer_name, issued_at, gross_minor,
 	             coalesce(seller_payment_terms_days, 0)
 	      FROM invoices WHERE id = $1`
 	if lock {

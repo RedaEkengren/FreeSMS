@@ -6963,6 +6963,24 @@
     },
     "Rental desk": {
       "other": "Hyresdisk"
+    },
+    "only a workshop invoice can be sent as a message yet; hand this one over and write down how": {
+      "other": "bara en verkstadsfaktura kan skickas som meddelande än; lämna över den här och skriv ner hur"
+    },
+    "%q is not a source this issues": {
+      "other": "%q är inte en källa som fakturerar här"
+    },
+    "a VAT rate is between 0 and 100 per cent": {
+      "other": "en momssats ligger mellan 0 och 100 procent"
+    },
+    "a line is labour, a part, sublet work, consumables or a fee": {
+      "other": "en rad är arbete, en del, köpt arbete, förbrukningsmaterial eller en avgift"
+    },
+    "a line is of more than nothing; a correction is a credit note": {
+      "other": "en rad gäller mer än ingenting; en rättelse är en kreditfaktura"
+    },
+    "every line says what it is": {
+      "other": "varje rad säger vad den är"
     }
   }
 }

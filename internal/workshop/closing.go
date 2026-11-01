@@ -22,6 +22,10 @@ import (
 // any other alone. Called from the moments that can finish one: money
 // arriving and the car being collected, in the same transaction.
 func closeIfFinishedTx(ctx context.Context, tx pgx.Tx, jobID string) error {
+	if jobID == "" {
+		// An invoice that is not a job's (#146) has no job to close.
+		return nil
+	}
 	var state State
 	if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1 FOR UPDATE`, jobID).Scan(&state); err != nil {
 		return fmt.Errorf("read order: %w", err)

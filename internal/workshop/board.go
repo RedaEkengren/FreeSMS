@@ -259,6 +259,11 @@ func ContactFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, job
 	if !scope.Role.SeesCustomerPersonalData() {
 		return Contact{}, access.ErrForbidden
 	}
+	// A document that is not a job's has no job to read a contact from
+	// (#146): nobody to ring from here, said as such.
+	if !looksLikeUUID(jobID) {
+		return Contact{}, nil
+	}
 
 	var c Contact
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {

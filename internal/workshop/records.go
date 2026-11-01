@@ -262,8 +262,8 @@ func customerCardTx(ctx context.Context, tx pgx.Tx, id string) (CustomerCard, er
 		return c, err
 	}
 	if err := tx.QueryRow(ctx, `
-		SELECT count(*) FROM invoices i JOIN work_orders w ON w.id = i.work_order_id
-		WHERE w.customer_id = $1`, id).Scan(&c.Invoices); err != nil {
+		SELECT count(*) FROM invoices i LEFT JOIN work_orders w ON w.id = i.work_order_id
+		WHERE coalesce(i.customer_id, w.customer_id) = $1`, id).Scan(&c.Invoices); err != nil {
 		return c, fmt.Errorf("count invoices: %w", err)
 	}
 

@@ -464,6 +464,10 @@ func QueueReminder(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		if disputed {
 			return fmt.Errorf("%w: the charge is disputed; lift the hold before sending a reminder", ErrInvalid)
 		}
+		// A message is a job's until the outbox for everything else (#156).
+		if b.WorkOrderID == "" {
+			return ErrNotAJobsDocument
+		}
 		var linkID string
 		if err := tx.QueryRow(ctx, `
 			INSERT INTO invoice_links (shop_id, invoice_id, token_sha256, created_by, expires_at)
@@ -629,7 +633,10 @@ func Worklist(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, today
 		}
 		rows, err := tx.Query(ctx, `
 			WITH open AS (
-			  SELECT i.id, i.series || '-' || i.number AS ref, i.customer_name, i.work_order_id, i.issued_at, coalesce(i.seller_payment_terms_days, 0) AS terms,
+			  SELECT i.id, i.series || '-' || i.number AS ref, i.customer_name, i.issued_at, coalesce(i.seller_payment_terms_days, 0) AS terms,
+			         -- Whom it is to: the job's customer for the workshop's, its
+			         -- own for any other source (#146).
+			         coalesce(i.customer_id, (SELECT w.customer_id FROM work_orders w WHERE w.id = i.work_order_id)) AS customer_id,
 			         i.gross_minor
 			           + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = i.id), 0)
 			           - coalesce((SELECT sum(p.amount_minor + p.rounding_minor) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) AS owed
@@ -644,8 +651,8 @@ func Worklist(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, today
 			                         OR (SELECT e.event FROM message_events e WHERE e.message_id = d.message_id ORDER BY e.at DESC, e.id DESC LIMIT 1) IN ('sent', 'delivered'))) THEN 'reached'
 			         WHEN EXISTS (SELECT 1 FROM invoice_deliveries d WHERE d.invoice_id = o.id) THEN 'tried'
 			         ELSE 'none' END,
-			       (SELECT count(*) FROM open x JOIN work_orders xw ON xw.id = x.work_order_id JOIN work_orders ow ON ow.id = o.work_order_id
-			         WHERE x.id <> o.id AND x.owed <> 0 AND xw.customer_id = ow.customer_id)::int,
+			       (SELECT count(*) FROM open x
+			         WHERE x.id <> o.id AND x.owed <> 0 AND x.customer_id = o.customer_id)::int,
 			       (SELECT count(*) FROM receivable_events e WHERE e.invoice_id = o.id AND e.kind = 'reminder')::int
 			FROM open o
 			LEFT JOIN receivable_cases c ON c.invoice_id = o.id

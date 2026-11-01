@@ -84,11 +84,17 @@ func SendDocument(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 	var id string
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var jobID string
-		if err := tx.QueryRow(ctx, `SELECT work_order_id::text FROM invoices WHERE id = $1`, invoiceID).Scan(&jobID); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT coalesce(work_order_id::text, '') FROM invoices WHERE id = $1`, invoiceID).Scan(&jobID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrNotFound
 			}
 			return fmt.Errorf("read invoice: %w", err)
+		}
+		// A message is a job's today (outbound_messages.work_order_id): the
+		// outbox that sends anything else comes with #156. Until then an
+		// invoice that is not the workshop's is handed over, and says so.
+		if jobID == "" {
+			return ErrNotAJobsDocument
 		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE invoice_links SET revoked_at = clock_timestamp(), revoked_by = $2

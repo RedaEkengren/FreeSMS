@@ -37,11 +37,26 @@ var ErrAlreadyCredited = fmt.Errorf("%w: this invoice has already been credited"
 // ErrNothingToInvoice is returned for an order with no chargeable lines.
 var ErrNothingToInvoice = errors.New("workshop: there is nothing on this order to charge for")
 
+// Invoice sources (#146): what an invoice was issued for. Every invoice
+// says, and a credit note says the same as what it credits.
+const (
+	SourceWorkshop    = "workshop"
+	SourceVehicleSale = "vehicle_sale"
+	SourceRental      = "rental"
+	SourceManual      = "manual"
+)
+
+// ErrNotAJobsDocument is a message about an invoice that is not a job's.
+var ErrNotAJobsDocument = fmt.Errorf("%w: only a workshop invoice can be sent as a message yet; hand this one over and write down how", ErrInvalid)
+
 // Invoice is an issued document.
 type Invoice struct {
-	ID           string
-	Series       string
-	Number       int64
+	ID     string
+	Series string
+	Number int64
+	// What it was issued for, and the job when that was the workshop's;
+	// empty for any other source.
+	Source       string
 	WorkOrderID  string
 	CreditOfID   *string
 	IssuedAt     time.Time
@@ -233,7 +248,7 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 			return err
 		}
 
-		inv.Series, inv.Number = DefaultSeries, number
+		inv.Series, inv.Number, inv.Source = DefaultSeries, number, SourceWorkshop
 		inv.WorkOrderID = workOrderID
 		inv.CustomerName = *name
 		inv.NetMinor, inv.VATMinor, inv.GrossMinor = totals.NetMinor, totals.VATMinor, totals.GrossMinor
@@ -265,7 +280,7 @@ func InvoicesFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, wo
 	var out []Invoice
 	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
-			SELECT id, series, number, work_order_id, credit_of_id, issued_at,
+			SELECT id, series, number, coalesce(work_order_id::text, ''), credit_of_id, issued_at,
 			       customer_name, net_minor, vat_minor, gross_minor
 			FROM invoices WHERE work_order_id = $1 ORDER BY issued_at, number`, workOrderID)
 		if err != nil {
@@ -722,7 +737,7 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 	var sTerms *int
 	var sFTax *bool
 	err := tx.QueryRow(ctx, `
-		SELECT i.id, i.series, i.number, i.work_order_id, i.credit_of_id, i.issued_at,
+		SELECT i.id, i.series, i.number, coalesce(i.work_order_id::text, ''), i.credit_of_id, i.issued_at, i.source,
 		       i.customer_name, i.customer_address, i.customer_org_number,
 		       i.customer_vat_number, i.currency,
 		       i.net_minor, i.vat_minor, i.gross_minor,
@@ -742,7 +757,7 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 		LEFT JOIN vehicle_registrations r
 		       ON r.vehicle_id = w.vehicle_id AND r.valid_to IS NULL
 		WHERE i.id = $1`, id).
-		Scan(&d.ID, &d.Series, &d.Number, &d.WorkOrderID, &creditOf, &d.IssuedAt,
+		Scan(&d.ID, &d.Series, &d.Number, &d.WorkOrderID, &creditOf, &d.IssuedAt, &d.Source,
 			&d.CustomerName, &address, &org, &vat, &d.Currency,
 			&d.NetMinor, &d.VATMinor, &d.GrossMinor,
 			&sName, &sAddr, &sOrg, &sVat, &sPhone, &sEmail, &sRef, &sTerms, &sFTax,

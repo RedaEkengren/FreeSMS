@@ -251,7 +251,24 @@ func verifyShop(ctx context.Context, tx pgx.Tx, files Files, sr *ShopReport) err
 		add("jobs and invoices", Pass, "every invoiced job has its invoice and the other way round")
 	}
 
-	// What was charged was agreed. Not a reason to refuse a restore -- a line
+	// A credit note is of the same thing as what it credits (#146): its
+	// source, its job, sale or rental, its customer. The trigger keeps it so
+	// on insert; a restore that bypassed triggers would not.
+	if n, err := count(`
+		SELECT count(*) FROM invoices c JOIN invoices o ON o.id = c.credit_of_id
+		WHERE c.source <> o.source
+		   OR c.work_order_id IS DISTINCT FROM o.work_order_id
+		   OR c.vehicle_sale_id IS DISTINCT FROM o.vehicle_sale_id
+		   OR c.rental_id IS DISTINCT FROM o.rental_id
+		   OR c.customer_id IS DISTINCT FROM o.customer_id`); err != nil {
+		return err
+	} else if n > 0 {
+		add("invoice sources", Fail, "%d credit notes are of something other than what they credit", n)
+	} else {
+		add("invoice sources", Pass, "every credit note is of what it credits")
+	}
+
+		// What was charged was agreed. Not a reason to refuse a restore -- a line
 	// can be put on an invoice marked as not agreed -- but a number to look at.
 	if n, err := count(`
 		SELECT count(*) FROM work_order_lines l JOIN work_orders w ON w.id = l.work_order_id
