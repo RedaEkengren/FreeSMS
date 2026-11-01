@@ -183,7 +183,7 @@ func priceWall(from, to time.Time, t RateTerms, weekend bool) ([]RentalLine, err
 			best, bestNet = lines, n
 		}
 	}
-	if weekend && p.Weekend != nil && inOneWeekend(from, to) {
+	if weekend && p.Weekend != nil && inOneWeekend(from, need) {
 		consider([]RentalLine{{Unit: UnitWeekend, Count: 1, UnitPrice: *p.Weekend}})
 	}
 	maxMonths := int64(0)

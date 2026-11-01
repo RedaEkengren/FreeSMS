@@ -136,3 +136,13 @@ func TestZeroPricesMinimumsAndNoPrice(t *testing.T) {
 		t.Errorf("a month: %+v", lines)
 	}
 }
+
+// Grace applies to a weekend as to any unit: Friday afternoon to Monday
+// 12:30 with an hour's grace is the weekend (review #6).
+func TestGraceKeepsTheWeekend(t *testing.T) {
+	terms := RateTerms{Prices: RatePrices{Day: price(50000), Weekend: price(90000)}, Grace: time.Hour}
+	lines, err := PriceRental(sthlm("2026-11-06 14:00"), sthlm("2026-11-09 12:30"), stockholm, terms)
+	if err != nil || len(lines) != 1 || lines[0].Unit != UnitWeekend {
+		t.Errorf("returned within grace of Monday noon: %+v, %v", lines, err)
+	}
+}
