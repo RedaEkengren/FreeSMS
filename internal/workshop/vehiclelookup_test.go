@@ -166,3 +166,21 @@ func TestAListOfLookupsIsQueuedNotHammered(t *testing.T) {
 		t.Errorf("%d lookups kept past a year", n)
 	}
 }
+
+// A registration typed with more than the twenty characters a lookup row
+// holds -- separators and a note around a short plate -- asks nobody and
+// is not found, at the counter and in a list: never an error that blocks
+// the form, and never a provider asked for a lookup that cannot be a row.
+func TestARegistrationTypedTooLongAsksNobody(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	f := &fakeLookup{v: vehicledata.Vehicle{Make: "Volvo"}}
+	long := "ABC 123 (utländsk skylt)"
+	got, err := workshop.LookUpVehicle(ctx, pool, advisor(), f, "Bilregistret", long, workshop.LookupIntake, "", false)
+	if err != nil || got.Outcome != workshop.LookupNotFound || f.calls != 0 {
+		t.Errorf("at the counter: %+v, %v, provider asked %d times; want not found and nobody asked", got, err, f.calls)
+	}
+	if n, err := workshop.QueueVehicleLookups(ctx, pool, buyerScope(), workshop.LookupPurchase, []string{long}); err != nil || n != 0 {
+		t.Errorf("in a list: %d queued, %v; want none", n, err)
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -154,8 +155,8 @@ func LookUpVehicle(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if err := mayLookUp(scope.Role, scope, purpose); err != nil {
 		return VehicleLookup{}, err
 	}
-	normalised := NormaliseRegistration(registration)
-	if normalised == "" || len(normalised) > 20 {
+	normalised, ok := lookupable(registration)
+	if !ok {
 		return VehicleLookup{Outcome: LookupNotFound}, nil
 	}
 	if l == nil || strings.TrimSpace(provider) == "" {
@@ -226,6 +227,16 @@ func askProvider(ctx context.Context, l vehicledata.Lookup, provider, registrati
 	return out, nil
 }
 
+// lookupable is a registration as a lookup row holds it, normalised, and
+// whether it can be one: as typed, at most twenty characters once trimmed,
+// as 0084 holds it, and normalised, one to twenty letters and digits. One
+// that cannot be a row is never asked about, so no lookup is made that is
+// not recorded.
+func lookupable(registration string) (string, bool) {
+	n := NormaliseRegistration(registration)
+	return n, n != "" && len(n) <= 20 && utf8.RuneCountInString(strings.TrimSpace(registration)) <= 20
+}
+
 func recordLookupTx(ctx context.Context, tx pgx.Tx, shopID, by, registration, normalised, provider, purpose, outcome string, facts map[string]any) error {
 	var raw any
 	if facts != nil {
@@ -271,8 +282,8 @@ func QueueVehicleLookups(ctx context.Context, pool *pgxpool.Pool, scope access.S
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		seen := map[string]bool{}
 		for _, r := range registrations {
-			n := NormaliseRegistration(r)
-			if n == "" || len(n) > 20 || seen[n] {
+			n, ok := lookupable(r)
+			if !ok || seen[n] {
 				continue
 			}
 			seen[n] = true
