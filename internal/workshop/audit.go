@@ -141,6 +141,14 @@ type AuditEvent struct {
 var detailSeen = map[string]func(access.Roles) bool{
 	"purchase_price_minor": access.Roles.SeesPurchasePrice,
 	"margin_minor":         access.Roles.SeesMargin,
+	// Dealer: the checks money was let leave over (#162).
+	"outstanding": access.Roles.SeesPurchasePrice,
+}
+
+// reasonSeen is which events' reasons need what: why money was let leave
+// for a car can say what it cost and what was owed on it (#162).
+var reasonSeen = map[string]func(access.Roles) bool{
+	"stock_checks.overridden": access.Roles.SeesPurchasePrice,
 }
 
 // AuditTrail is a subject's events, in the order they happened, for
@@ -243,7 +251,7 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 			if err := rows.Scan(&e.Event, &e.From, &e.To, &e.Actor, &e.At, &e.Reason, &e.ReasonErased, &e.Detail, &e.KeptIn); err != nil {
 				return fmt.Errorf("scan event: %w", err)
 			}
-			if !reasons {
+			if may, ok := reasonSeen[e.Event]; !reasons || (ok && !may(scope.Role)) {
 				e.Reason = ""
 			}
 			for k, may := range detailSeen {

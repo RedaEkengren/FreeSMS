@@ -454,3 +454,35 @@ func TestAnOverrideCoversOnlyWhatWasOutstandingAndOnlyForAWhile(t *testing.T) {
 		t.Errorf("paid out on an override two days old: %v", err)
 	}
 }
+
+// Why money was let leave for a car, and which checks it was let leave
+// over, can tell what the car cost and what was owed on it: the stock
+// unit's trail shows them to whoever may see that, and to a salesperson
+// only that it happened.
+func TestASalespersonIsNotShownWhyMoneyWasLetLeave(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	if err := workshop.OverrideStockChecks(ctx, pool, everything(owner()), p.StockUnitID, "Lån 85 000 kr löses ur priset"); err != nil {
+		t.Fatal(err)
+	}
+	find := func(s access.Scope) workshop.AuditEvent {
+		trail, err := workshop.AuditTrail(ctx, pool, s, "stock_unit", p.StockUnitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range trail {
+			if e.Event == "stock_checks.overridden" {
+				return e
+			}
+		}
+		t.Fatal("no override on the trail")
+		return workshop.AuditEvent{}
+	}
+	if e := find(buyerScope()); e.Reason == "" || e.Detail["outstanding"] == nil {
+		t.Errorf("the buyer's view of the override: %+v", e)
+	}
+	if e := find(sales()); e.Reason != "" || e.Detail["outstanding"] != nil || e.Actor == "" {
+		t.Errorf("a salesperson was shown why: %+v", e)
+	}
+}
