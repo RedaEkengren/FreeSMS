@@ -312,6 +312,7 @@ func MoveStockUnit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		if _, err := tx.Exec(ctx, `
 			UPDATE stock_units SET status = $2,
 			       first_for_sale_at = CASE WHEN $2 = 'for_sale' THEN coalesce(first_for_sale_at, clock_timestamp()) ELSE first_for_sale_at END,
+			       sold_at = CASE WHEN $2 = 'sold' THEN clock_timestamp() WHEN $2 = 'delivered' THEN sold_at END,
 			       closed_at = CASE WHEN $3 THEN clock_timestamp() END,
 			       closed_by = CASE WHEN $3 THEN NULLIF($4, '')::uuid END
 			WHERE id = $1`, id, string(to), to.Ended(), scope.UserID); err != nil {

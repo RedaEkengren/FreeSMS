@@ -245,28 +245,54 @@ func TestCostsByRoleAndModule(t *testing.T) {
 
 func refTo(n int64) *int64 { return &n }
 
-// After the sale is one rule, whoever posts the cost: a supplier's invoice
-// for work on a car sold and not yet delivered is after the sale, as a cost
-// entered by hand that day is.
-func TestAfterTheSaleIsOneRuleForEveryCost(t *testing.T) {
+// After the sale is one rule for every cost, and it is about what the cost
+// is for, not when it was posted: work on a job opened before the sale, or
+// a cost dated before the day of the sale, is before it however late its
+// invoice comes; a corrected invoice stays on its side; and a sale that
+// falls through was never a sale.
+func TestAfterTheSaleIsWhatTheCostIsFor(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
 	p := buy(t, pool, workshop.StockFromPurchase)
-	job, line := turboJob(t, pool)
-	out := sendOut(t, pool, job, line, time.Now().AddDate(0, 0, 3))
+	before, beforeLine := turboJob(t, pool)
+	early := sendOut(t, pool, before, beforeLine, time.Now().AddDate(0, 0, 3))
 	moveStock(t, pool, p.StockUnitID, workshop.StockForSale, workshop.StockReserved, workshop.StockSold)
-	record(t, pool, out, workshop.OutsourcedEventInput{Kind: "invoice", AmountMinor: pointerTo(int64(100_000)), InvoiceRef: "S-1"})
-	byHand, err := workshop.RecordStockCost(ctx, pool, buyerScope(), p.StockUnitID, cost(workshop.CostTransport, 50_000))
-	if err != nil {
+	after, afterLine := turboJob(t, pool)
+	late := sendOut(t, pool, after, afterLine, time.Now().AddDate(0, 0, 3))
+
+	record(t, pool, early, workshop.OutsourcedEventInput{Kind: "invoice", AmountMinor: pointerTo(int64(100_000)), InvoiceRef: "S-1"})
+	record(t, pool, late, workshop.OutsourcedEventInput{Kind: "invoice", AmountMinor: pointerTo(int64(30_000)), InvoiceRef: "S-2"})
+	earlier := cost(workshop.CostReconditioning, 70_000)
+	earlier.IncurredOn = time.Now().AddDate(0, 0, -2)
+	if _, err := workshop.RecordStockCost(ctx, pool, buyerScope(), p.StockUnitID, earlier); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordStockCost(ctx, pool, buyerScope(), p.StockUnitID, cost(workshop.CostTransport, 5_000)); err != nil {
 		t.Fatal(err)
 	}
 	costs, _ := workshop.CostsOfUnit(ctx, pool, buyerScope(), p.StockUnitID)
-	for _, c := range costs.Entries {
-		if !c.PostSale {
-			t.Errorf("a %s cost on a car sold, not delivered, is not after the sale: %+v", c.Source, c)
-		}
+	if costs.BeforeSale != 170_000 || costs.AfterSale != 35_000 {
+		t.Errorf("before the sale %d, after it %d; want the early job and the earlier cost before, the late job and today's after",
+			costs.BeforeSale, costs.AfterSale)
 	}
-	if !byHand.PostSale {
-		t.Error("the cost by hand is not after the sale")
+
+	// The early job's invoice corrected after the sale: reversed and
+	// replaced on the side the work was done.
+	record(t, pool, early, workshop.OutsourcedEventInput{Kind: "invoice", AmountMinor: pointerTo(int64(120_000)), InvoiceRef: "S-1b"})
+	costs, _ = workshop.CostsOfUnit(ctx, pool, buyerScope(), p.StockUnitID)
+	if costs.BeforeSale != 190_000 || costs.AfterSale != 35_000 {
+		t.Errorf("after the corrected invoice: before the sale %d, after it %d; want 190 000 and 35 000", costs.BeforeSale, costs.AfterSale)
+	}
+
+	// The buyer backs out: there was no sale, and nothing is after it.
+	moveStock(t, pool, p.StockUnitID, workshop.StockForSale)
+	costs, _ = workshop.CostsOfUnit(ctx, pool, buyerScope(), p.StockUnitID)
+	if costs.BeforeSale != 225_000 || costs.AfterSale != 0 {
+		t.Errorf("after the sale fell through: before %d, after %d; want everything before", costs.BeforeSale, costs.AfterSale)
+	}
+	for _, c := range costs.Entries {
+		if c.PostSale {
+			t.Errorf("a %s cost is after a sale that fell through: %+v", c.Source, c)
+		}
 	}
 }

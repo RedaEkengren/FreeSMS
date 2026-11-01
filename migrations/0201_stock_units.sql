@@ -34,6 +34,11 @@ CREATE TABLE stock_units (
     -- When the car was first offered for sale in this cycle: stock days
     -- for the salesperson count from here (#168). Set once.
     first_for_sale_at timestamptz,
+    -- When the sale that stands was made: set as the car is sold, kept
+    -- as it is delivered, and cleared if the sale falls through (sold back
+    -- to for sale), because a sale that fell through was never a sale.
+    -- Costs read which side of it they are on (0205).
+    sold_at           timestamptz,
     closed_at         timestamptz,
     closed_by         uuid        REFERENCES users(id) ON DELETE RESTRICT,
     -- The sale that ended it. vehicle_sales comes with M8; invoices
@@ -45,6 +50,7 @@ CREATE TABLE stock_units (
     -- A cycle is over exactly when it has reached an end.
     CHECK ((status IN ('delivered', 'closed', 'written_off')) = (closed_at IS NOT NULL)),
     CHECK (first_for_sale_at IS NULL OR first_for_sale_at >= opened_at),
+    CHECK ((status IN ('sold', 'delivered')) = (sold_at IS NOT NULL)),
     -- One open cycle per vehicle at a time, refused by the database: two
     -- buyers taking the same car in at the same moment cannot both succeed.
     CONSTRAINT stock_units_one_cycle_at_a_time EXCLUDE USING gist (
@@ -65,7 +71,7 @@ CREATE POLICY shop_isolation ON stock_units
 -- opened stay. Its status moves, and every move is an audit event.
 REVOKE ALL ON stock_units FROM freesms_app;
 GRANT SELECT, INSERT ON stock_units TO freesms_app;
-GRANT UPDATE (status, first_for_sale_at, closed_at, closed_by, vehicle_sale_id) ON stock_units TO freesms_app;
+GRANT UPDATE (status, first_for_sale_at, sold_at, closed_at, closed_by, vehicle_sale_id) ON stock_units TO freesms_app;
 
 -- Car sales and rental each widen this list on a branch of their own, so
 -- each adds its kinds to the list as it stands (widen_text_check, 0093)

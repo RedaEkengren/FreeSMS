@@ -111,9 +111,9 @@ var (
 	ErrCostNoReason = fmt.Errorf("%w: say why the cost is reversed, in 300 characters or fewer", ErrInvalid)
 )
 
-// RecordStockCost records a cost spent on a stock car. A unit whose car has
-// been sold takes it as after the sale: it changes the margin, never the
-// VAT. For whoever buys cars, in a shop that sells them.
+// RecordStockCost records a cost spent on a stock car. One dated after the
+// sale that stands is after it (stock_cost_post_sale, 0205): it changes
+// the margin, never the VAT. For whoever buys cars, in a shop that sells them.
 func RecordStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, unitID string, n NewStockCost) (StockCost, error) {
 	if !scope.Role.BuysVehicles() {
 		return StockCost{}, access.ErrForbidden
@@ -170,13 +170,11 @@ func RecordStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 	}
 	var out StockCost
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		// After the sale is stock_cost_post_sale's to say (0205), for every
-		// way a cost is posted.
-		var postSale *bool
-		if err := tx.QueryRow(ctx, `SELECT stock_cost_post_sale($1)`, unitID).Scan(&postSale); err != nil {
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM stock_units WHERE id = $1)`, unitID).Scan(&exists); err != nil {
 			return fmt.Errorf("read stock unit: %w", err)
 		}
-		if postSale == nil {
+		if !exists {
 			return ErrNotFound
 		}
 		if n.SupplierPartyID != "" {
@@ -187,14 +185,15 @@ func RecordStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 		var id string
 		if err := tx.QueryRow(ctx, `
 			INSERT INTO stock_cost_entries (shop_id, stock_unit_id, kind, net_minor, input_vat_minor, vat_rate_basis,
-			       supplier_party_id, external_ref, incurred_on, source, post_sale, currency, original_net_minor, rate_micro,
+			       supplier_party_id, external_ref, incurred_on, source, happened_at, currency, original_net_minor, rate_micro,
 			       rate_source, note, recorded_by)
-			VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $7 <> '' THEN party_now($7::uuid) END, nullif($8, ''), $9, $10, $11,
-			        nullif($12, ''), CASE WHEN $12 <> '' THEN $13::bigint END, CASE WHEN $12 <> '' THEN $14::bigint END,
-			        nullif(btrim($15), ''), nullif($16, ''), NULLIF($17, '')::uuid)
+			VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $7 <> '' THEN party_now($7::uuid) END, nullif($8, ''), $9, $10,
+			        stock_cost_dated($1, $9::date),
+			        nullif($11, ''), CASE WHEN $11 <> '' THEN $12::bigint END, CASE WHEN $11 <> '' THEN $13::bigint END,
+			        nullif(btrim($14), ''), nullif($15, ''), NULLIF($16, '')::uuid)
 			RETURNING id`,
 			scope.ShopID, unitID, n.Kind, n.NetMinor, vat, n.VATRateBasis, n.SupplierPartyID, n.ExternalRef,
-			n.IncurredOn.Format(time.DateOnly), source, *postSale, n.Currency, n.OriginalMinor, n.RateMicro, n.RateSource,
+			n.IncurredOn.Format(time.DateOnly), source, n.Currency, n.OriginalMinor, n.RateMicro, n.RateSource,
 			n.Note, scope.UserID).Scan(&id); err != nil {
 			return fmt.Errorf("record the cost: %w", err)
 		}
@@ -208,7 +207,7 @@ func RecordStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 const stockCostColumns = `
 	SELECT c.id, c.stock_unit_id, c.kind, c.net_minor, c.input_vat_minor, c.vat_rate_basis,
 	       coalesce(c.supplier_party_id::text, ''), coalesce(c.external_ref, ''), c.incurred_on, c.source,
-	       coalesce(c.work_order_id::text, ''), c.post_sale, coalesce(c.currency, ''), coalesce(c.original_net_minor, 0),
+	       coalesce(c.work_order_id::text, ''), stock_cost_post_sale(c.stock_unit_id, c.happened_at), coalesce(c.currency, ''), coalesce(c.original_net_minor, 0),
 	       coalesce(c.rate_micro, 0), coalesce(c.rate_source, ''), coalesce(c.note, ''), coalesce(c.reverses_id::text, ''),
 	       EXISTS (SELECT 1 FROM stock_cost_entries r WHERE r.reverses_id = c.id), c.recorded_at, coalesce(pe.display_name, '')
 	FROM stock_cost_entries c
@@ -266,15 +265,16 @@ func ReverseStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			return errCostReversal
 		}
 		// Taken back as the original was entered: from where it came, so
-		// a job's posting reversed may be posted again.
+		// a job's posting reversed may be posted again, and for the same
+		// moment, so on the same side of the sale.
 		var id string
 		if err := tx.QueryRow(ctx, `
 			INSERT INTO stock_cost_entries (shop_id, stock_unit_id, kind, net_minor, input_vat_minor, vat_rate_basis,
-			       supplier_party_id, external_ref, incurred_on, source, work_order_id, post_sale, currency,
+			       supplier_party_id, external_ref, incurred_on, source, work_order_id, happened_at, currency,
 			       original_net_minor, rate_micro, rate_source, note, reverses_id, recorded_by)
 			SELECT shop_id, stock_unit_id, kind, -net_minor, -input_vat_minor, vat_rate_basis, supplier_party_id, external_ref,
 			       (clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops WHERE id = shop_id))::date,
-			       CASE WHEN source = 'outsourced' THEN 'manual' ELSE source END, work_order_id, post_sale, currency,
+			       CASE WHEN source = 'outsourced' THEN 'manual' ELSE source END, work_order_id, happened_at, currency,
 			       -original_net_minor, rate_micro, rate_source, $2, id, NULLIF($3, '')::uuid
 			FROM stock_cost_entries WHERE id = $1 RETURNING id`, entryID, reason, scope.UserID).Scan(&id); err != nil {
 			return fmt.Errorf("reverse the cost: %w", err)
@@ -455,9 +455,9 @@ func PostJobCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		var id string
 		if err := tx.QueryRow(ctx, `
 			INSERT INTO stock_cost_entries (shop_id, stock_unit_id, kind, net_minor, input_vat_minor, vat_rate_basis,
-			       incurred_on, source, work_order_id, post_sale, note, recorded_by)
+			       incurred_on, source, work_order_id, happened_at, note, recorded_by)
 			VALUES ($1, $2, 'workshop', $3, 0, 0, (clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops WHERE id = $1))::date,
-			        'work_order', $4, stock_cost_post_sale($2), $5, NULLIF($6, '')::uuid)
+			        'work_order', $4, (SELECT opened_at FROM work_orders WHERE id = $4), $5, NULLIF($6, '')::uuid)
 			RETURNING id`, scope.ShopID, unit, net, jobID,
 			fmt.Sprintf("#%d", number), scope.UserID).Scan(&id); err != nil {
 			return fmt.Errorf("post the job's cost: %w", err)
