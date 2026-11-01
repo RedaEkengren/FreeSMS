@@ -670,3 +670,26 @@ func TestARepeatedBookingWithAnEmailFindsTheFirst(t *testing.T) {
 		}
 	}
 }
+
+// A booking agreed with no kilometre limit stays unlimited when it is
+// extended into a season that has one (review 2 #4).
+func TestAnUnlimitedBookingStaysUnlimitedWhenExtended(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	km := 100
+	if _, err := workshop.AddRateSeason(ctx, pool, rentalOwner(), v.plan, workshop.RateSeason{ValidFrom: day("2031-05-11"), Day: kr(40000),
+		IncludedKmPerDay: &km}); err != nil {
+		t.Fatal(err)
+	}
+	id, err := v.book(pool, in2031(9, 9), in2031(11, 9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, in2031(13, 9), ""); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id); b.IncludedKm != nil {
+		t.Errorf("an unlimited booking became one of %d km", *b.IncludedKm)
+	}
+}

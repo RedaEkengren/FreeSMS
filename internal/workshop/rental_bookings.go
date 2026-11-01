@@ -776,7 +776,7 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 			lines = append(lines, extras...)
 			if quote.IncludedKm != nil && quote.Days > 0 {
 				perDay := *quote.IncludedKm / int(quote.Days)
-				if _, err := tx.Exec(ctx, `UPDATE rental_bookings SET included_km = coalesce(included_km, 0) + $2 WHERE id = $1`,
+				if _, err := tx.Exec(ctx, `UPDATE rental_bookings SET included_km = included_km + $2 WHERE id = $1 AND included_km IS NOT NULL`,
 					id, perDay*int(added)); err != nil {
 					return fmt.Errorf("add the kilometres: %w", err)
 				}
