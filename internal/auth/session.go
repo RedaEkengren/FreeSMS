@@ -243,14 +243,28 @@ func authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string,
 		// The person's roles likewise: a role given or taken away counts
 		// from their next request (#145). And what is opened for them as a
 		// technician (#225): an exception past its end stops counting at
-		// the next request, with nothing to sweep it.
+		// the next request, with nothing to sweep it. That is
+		// technician_fields_open (0090) for one person, written out so that
+		// only their own exceptions are read -- the index is (user_id,
+		// field, seq) -- on every request and every live check, and not
+		// read at all for somebody who is not a technician, whose other
+		// role shows them each field anyway or none of them.
 		const lookup = `
 			SELECT s.id, s.user_id, u.role, s.expires_at, s.last_seen_at, u.active,
 			       coalesce(u.locale, sh.locale, 'en'), u.plans_staff, coalesce(u.theme, ''),
 			       ARRAY(SELECT m.module FROM shop_modules m WHERE m.shop_id = s.shop_id ORDER BY m.module),
 			       ARRAY(SELECT r.role FROM user_roles r WHERE r.user_id = s.user_id ORDER BY r.role),
-			       ARRAY(SELECT DISTINCT f.field FROM technician_fields_open f
-			              WHERE f.user_id IS NULL OR f.user_id = s.user_id ORDER BY f.field)
+			       CASE WHEN u.role = 'technician' OR EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = s.user_id AND r.role = 'technician')
+			       THEN ARRAY(
+			         SELECT p.field FROM (SELECT DISTINCT ON (c.field) c.field, c.shown FROM technician_view_changes c
+			                              WHERE c.shop_id = s.shop_id ORDER BY c.field, c.seq DESC) p
+			         WHERE p.shown
+			         UNION
+			         SELECT e.field FROM (SELECT DISTINCT ON (x.field) x.field, x.granted, x.until FROM technician_view_exceptions x
+			                              WHERE x.user_id = s.user_id ORDER BY x.field, x.seq DESC) e
+			         WHERE e.granted AND (e.until IS NULL OR e.until > clock_timestamp())
+			         ORDER BY 1)
+			       ELSE '{}' END
 			FROM sessions s
 			JOIN users u  ON u.id = s.user_id
 			JOIN shops sh ON sh.id = s.shop_id

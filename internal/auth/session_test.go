@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
@@ -394,5 +396,56 @@ func TestAResetDoesNotGuess(t *testing.T) {
 	}
 	if _, err := ResetPasswordByEmail(ctx, pool, email, "a long enough phrase"); !errors.Is(err, ErrNoSuchUser) {
 		t.Errorf("a deactivated account = %v", err)
+	}
+}
+
+// What is opened for a technician (#225) comes with their session: the
+// shop's profile and their own exceptions, not another person's and not
+// one past its end. Somebody who is not a technician is handed none of it,
+// and nothing of it is read for them.
+func TestASessionCarriesWhatIsOpenedForThisTechnicianAlone(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	const other = "44444444-4444-4444-4444-444444444444"
+	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		for _, q := range []string{
+			`INSERT INTO people (id, shop_id, display_name) VALUES ('55555555-5555-5555-5555-555555555555', $1, 'Another Technician')`,
+			`INSERT INTO users (id, shop_id, person_id, role, password_hash) VALUES ('` + other + `', $1, '55555555-5555-5555-5555-555555555555', 'technician', 'x')`,
+			`INSERT INTO technician_view_changes (shop_id, field, shown, reason, changed_by) VALUES ($1, 'line_prices', true, 'Ackord', '` + other + `')`,
+			`INSERT INTO technician_view_changes (shop_id, field, shown, reason, changed_by) VALUES ($1, 'hourly_rate', true, 'Ett tag', '` + other + `')`,
+			`INSERT INTO technician_view_changes (shop_id, field, shown, reason, changed_by) VALUES ($1, 'hourly_rate', false, 'Inte längre', '` + other + `')`,
+			`INSERT INTO technician_view_exceptions (shop_id, user_id, field, granted, reason, by_user) VALUES ($1, '` + userID + `', 'customer_name', true, 'Ringer själv', '` + other + `')`,
+			`INSERT INTO technician_view_exceptions (shop_id, user_id, field, granted, until, reason, by_user) VALUES ($1, '` + userID + `', 'invoice_status', true, clock_timestamp() - interval '1 hour', 'Förra veckan', '` + other + `')`,
+			`INSERT INTO technician_view_exceptions (shop_id, user_id, field, granted, reason, by_user) VALUES ($1, '` + other + `', 'customer_phone', true, 'Bara den andra', '` + other + `')`,
+		} {
+			if _, err := tx.Exec(ctx, q, shopID); err != nil {
+				return fmt.Errorf("%s: %w", q, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _, err := Login(ctx, pool, shopID, email, pass, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := Check(ctx, pool, shopID, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"customer_name", "line_prices"}; !slices.Equal(s.Scope.Opened, want) {
+		t.Errorf("opened for the technician: %v, want %v", s.Scope.Opened, want)
+	}
+
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE users SET role = 'service_advisor' WHERE id = $1`, userID)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if s, err := Check(ctx, pool, shopID, token); err != nil || len(s.Scope.Opened) != 0 {
+		t.Errorf("opened for somebody who is no longer a technician: %v, %v", s.Scope.Opened, err)
 	}
 }
