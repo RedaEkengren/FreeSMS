@@ -65,9 +65,13 @@ func (m routeMux) Handle(pattern string, h http.Handler) {
 	m.ServeMux.Handle(pattern, m.gate(h))
 }
 
+// HandleFunc registers h with the module gate outermost, ahead of the check
+// that an identifier is shaped like one: a switched-off module's /jobs/abc is
+// a path that does not exist, as its /jobs/<uuid> is, not the styled "not
+// found" the shape check gives a module that is on.
 func (m routeMux) HandleFunc(pattern string, h http.HandlerFunc) {
 	m.record(pattern)
-	m.handleFunc(pattern, m.gate(h).ServeHTTP)
+	m.ServeMux.Handle(pattern, m.gate(m.shapeChecked(pattern, h)))
 }
 
 func (m routeMux) record(pattern string) {
@@ -93,7 +97,7 @@ func (m routeMux) gate(h http.Handler) http.Handler {
 	})
 }
 
-func (m routeMux) handleFunc(pattern string, h http.HandlerFunc) {
+func (m routeMux) shapeChecked(pattern string, h http.HandlerFunc) http.Handler {
 	var names []string
 	for _, n := range uuidWildcards {
 		if strings.Contains(pattern, "{"+n+"}") {
@@ -101,10 +105,9 @@ func (m routeMux) handleFunc(pattern string, h http.HandlerFunc) {
 		}
 	}
 	if len(names) == 0 {
-		m.ServeMux.HandleFunc(pattern, h)
-		return
+		return h
 	}
-	m.ServeMux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		for _, n := range names {
 			if !uuidShape.MatchString(r.PathValue(n)) {
 				m.s.renderError(w, r, http.StatusNotFound, "Not found", "It is not there any more.")
@@ -113,6 +116,51 @@ func (m routeMux) handleFunc(pattern string, h http.HandlerFunc) {
 		}
 		h(w, r)
 	})
+}
+
+// ServeHTTP answers a method nobody registered on a path the way an
+// unknown path is answered when every route on that path belongs to a
+// module the shop does not run. Left to the ServeMux it is 405 with an Allow
+// header naming the methods that are there, which says the path is there to
+// be switched on. A module that runs, or a Core route on the path, keeps the
+// ServeMux's 405.
+func (m routeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if _, pattern := m.ServeMux.Handler(r); pattern == "" && m.onlySwitchedOff(r) {
+		http.NotFound(w, r)
+		return
+	}
+	m.ServeMux.ServeHTTP(w, r)
+}
+
+// onlySwitchedOff reports whether some other method has a route on this path
+// and every such route is a module's the shop does not run. Asked only of a
+// request nothing matched, so an ordinary request pays nothing.
+func (m routeMux) onlySwitchedOff(r *http.Request) bool {
+	if m.table == nil {
+		return false
+	}
+	found := false
+	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
+		if method == r.Method {
+			continue
+		}
+		other := *r
+		other.Method = method
+		_, pattern := m.ServeMux.Handler(&other)
+		if pattern == "" {
+			continue
+		}
+		for _, rt := range *m.table {
+			if rt.Pattern != pattern {
+				continue
+			}
+			found = true
+			if rt.Module == "" || m.s.runs(r, rt.Module) {
+				return false
+			}
+		}
+	}
+	return found
 }
 
 // refuseNUL answers 400 to a request with a NUL character (0x00) in a form

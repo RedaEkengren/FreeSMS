@@ -113,6 +113,18 @@ func TestASwitchedOffModulesRoutesAreNotThere(t *testing.T) {
 	if checked < 100 {
 		t.Errorf("only %d workshop routes checked", checked)
 	}
+	// Nor by a malformed identifier or a method nobody registered: the shape
+	// check and the ServeMux's 405 used to answer ahead of the gate.
+	for _, probe := range []struct{ method, path string }{
+		{http.MethodGet, "/jobs/not-a-uuid"}, {http.MethodPatch, "/jobs/" + job}, {http.MethodDelete, "/calendar"},
+	} {
+		for who, client := range map[string]*http.Client{"owner": owner, "nobody": anonymous} {
+			if status, body := missing(client, probe.method, probe.path); status != http.StatusNotFound || body != nothing {
+				t.Errorf("%s %s as %s, workshop off: %d %q; want the answer a path that does not exist gets",
+					probe.method, probe.path, who, status, body)
+			}
+		}
+	}
 
 	// Core, and the workshop's history through it.
 	for _, path := range []string{"/invoices/" + inv.ID, "/receivables", "/customers", "/customers/aaaaaaaa-0000-0000-0000-000000000004",
@@ -141,6 +153,9 @@ func TestASwitchedOffModulesRoutesAreNotThere(t *testing.T) {
 	readBody(t, resp)
 	if status, _ := missing(owner, http.MethodGet, "/jobs/"+job); status != http.StatusOK {
 		t.Errorf("the job after switching the workshop on again: %d", status)
+	}
+	if status, _ := missing(owner, http.MethodPatch, "/jobs/"+job); status != http.StatusMethodNotAllowed {
+		t.Errorf("PATCH on a job with the workshop on: %d, want 405 as before", status)
 	}
 	if status, body := missing(owner, http.MethodGet, "/shop"); status != http.StatusOK ||
 		!strings.Contains(body, "Closing the workshop") || !strings.Contains(body, "An Owner") {
