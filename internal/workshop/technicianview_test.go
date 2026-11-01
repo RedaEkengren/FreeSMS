@@ -278,3 +278,57 @@ func TestATechnicianShownThePricesSeesTheTotalTheInvoicePrints(t *testing.T) {
 	}
 }
 
+// Whether a job is invoiced is whether an invoice was issued for it and
+// stands, not whether it came to anything: a job invoiced at nothing --
+// a check done for free -- is invoiced, and with nothing owed, paid. An invoice taken back
+// whole by a credit note no longer stands.
+func TestAJobInvoicedAtNothingIsInvoiced(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	addTechnician(t, pool)
+	job := newJob(t, pool)
+	if err := workshop.AddLine(ctx, pool, advisor(), job, workshop.NewLine{Kind: "labour", Description: "Kontroll utan kostnad",
+		QuantityMilli: 1000, UnitPriceMinor: 0, VATRateBasis: 2500}); err != nil {
+		t.Fatal(err)
+	}
+	move(t, pool, job, workshop.StateEstimated, workshop.StateAwaitingApproval,
+		workshop.StateApproved, workshop.StateInProgress, workshop.StateReady)
+	if err := workshop.SetTechnicianField(ctx, pool, owner(), access.FieldInvoiceStatus, true, "Vet när bilen är klar"); err != nil {
+		t.Fatal(err)
+	}
+	status := func(job string) string {
+		t.Helper()
+		got, err := workshop.TechnicianJobFor(ctx, pool, techAs(t, pool, techUserID), job)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got.InvoiceStatus
+	}
+	if s := status(job); s != "not invoiced" {
+		t.Errorf("before the invoice: %q", s)
+	}
+	inv, err := workshop.Issue(ctx, pool, advisor(), job)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inv.GrossMinor != 0 {
+		t.Fatalf("the free check was invoiced at %d", inv.GrossMinor)
+	}
+	if s := status(job); s != "paid" {
+		t.Errorf("invoiced at nothing: %q, want paid", s)
+	}
+	other := readyToInvoice(t, pool)
+	paid, err := workshop.Issue(ctx, pool, advisor(), other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := status(other); s != "invoiced" {
+		t.Errorf("invoiced and owed: %q", s)
+	}
+	if _, err := workshop.CreditNote(ctx, pool, advisor(), paid.ID); err != nil {
+		t.Fatal(err)
+	}
+	if s := status(other); s != "not invoiced" {
+		t.Errorf("credited whole: %q, want not invoiced", s)
+	}
+}

@@ -296,8 +296,12 @@ func TechnicianJobFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			                          WHERE d.work_order_id = w.id AND d.decision = 'approved'
 			                          ORDER BY d.decided_at DESC LIMIT 1) END,
 			       CASE WHEN $6 THEN
+			         -- Invoiced is an invoice issued for the job and standing:
+			         -- not taken back by a credit note. What it came to does
+			         -- not say, as an invoice at nothing is still issued.
 			         CASE WHEN NOT EXISTS (SELECT 1 FROM invoices i WHERE i.work_order_id = w.id AND i.credit_of_id IS NULL
-			                                 AND i.gross_minor + coalesce((SELECT sum(cr.gross_minor) FROM invoices cr WHERE cr.credit_of_id = i.id), 0) <> 0)
+			                                 AND NOT EXISTS (SELECT 1 FROM invoices cr WHERE cr.credit_of_id = i.id
+			                                                 AND i.gross_minor + (SELECT sum(c2.gross_minor) FROM invoices c2 WHERE c2.credit_of_id = i.id) = 0))
 			              THEN 'not invoiced'
 			              WHEN EXISTS (SELECT 1 FROM invoices i WHERE i.work_order_id = w.id AND i.credit_of_id IS NULL
 			                             AND `+owedSQL("i")+` > 0)
