@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -648,7 +647,7 @@ func ProduceRentalAgreement(ctx context.Context, pool *pgxpool.Pool, scope acces
 		var text []string
 		for _, l := range lines {
 			gross := l.Net() + money.VAT(l.Net(), l.VATRateBp)
-			text = append(text, fmt.Sprintf("%s, %s x %s: %s", l.Description, strconv.FormatFloat(float64(l.QuantityMilli)/1000, 'f', -1, 64), l.Unit, money.Format(gross)))
+			text = append(text, fmt.Sprintf("%s, %s x %s: %s", l.Description, formatMilli(l.QuantityMilli), l.Unit, money.Format(gross)))
 		}
 		drivers, err := rentalDriversTx(ctx, tx, bookingID)
 		if err != nil {

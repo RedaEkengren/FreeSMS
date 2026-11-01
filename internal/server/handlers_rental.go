@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
@@ -66,7 +67,8 @@ func (rentalData) Count(milli int64) string {
 	if milli%1000 == 0 {
 		return strconv.FormatInt(milli/1000, 10)
 	}
-	return strconv.FormatFloat(float64(milli)/1000, 'f', -1, 64)
+	s := fmt.Sprintf("%d.%03d", milli/1000, milli%1000)
+	return strings.TrimSuffix(strings.TrimRight(s, "0"), ".")
 }
 
 // StateLabel is a booking's state, or what happened to it, as a catalogue
