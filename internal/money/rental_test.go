@@ -96,10 +96,10 @@ func TestASeasonBoundaryInsideARental(t *testing.T) {
 		t.Errorf("priced at the start: %+v, %v", at, err)
 	}
 	split, err := PriceRentalSeasons(from, to, stockholm, seasons, true)
-	// 30 May 10:00 to 1 June 00:00 is a day and 14 hours: two days low;
-	// 1 June 00:00 to 2 June 10:30 is a day and 10.5 hours, within an
-	// hour's grace of neither: two days high.
-	if err != nil || total(split) != 2*40000+2*70000 || len(split) != 2 {
+	// Three days and half an hour, within an hour's grace of three days:
+	// the days that start on 30 and 31 May are low, the one that starts on
+	// 1 June high. Splitting adds no unit the customer did not use.
+	if err != nil || total(split) != 2*40000+70000 || len(split) != 2 {
 		t.Errorf("split: %+v, %v", split, err)
 	}
 	if _, err := PriceRentalSeasons(from, to, stockholm, seasons[1:], true); !errors.Is(err, ErrNoPriceFor) {
@@ -144,5 +144,23 @@ func TestGraceKeepsTheWeekend(t *testing.T) {
 	lines, err := PriceRental(sthlm("2026-11-06 14:00"), sthlm("2026-11-09 12:30"), stockholm, terms)
 	if err != nil || len(lines) != 1 || lines[0].Unit != UnitWeekend {
 		t.Errorf("returned within grace of Monday noon: %+v, %v", lines, err)
+	}
+}
+
+// A day across the midnight a season starts is one day, of the season it
+// started in; a minimum is the whole rental's, not a part's (review #7).
+func TestSplittingAddsNoUnits(t *testing.T) {
+	low := RateTerms{Prices: RatePrices{Day: price(40000), Hour: price(10000)}, Minimum: 4 * time.Hour}
+	high := RateTerms{Prices: RatePrices{Day: price(70000), Hour: price(20000)}, Minimum: 4 * time.Hour}
+	seasons := []Season{{sthlm("2026-01-01 00:00"), low}, {sthlm("2026-06-01 00:00"), high}}
+	lines, err := PriceRentalSeasons(sthlm("2026-05-31 10:00"), sthlm("2026-06-01 10:00"), stockholm, seasons, true)
+	if err != nil || len(lines) != 1 || lines[0] != (RentalLine{Unit: UnitDay, Count: 1, UnitPrice: 40000}) {
+		t.Errorf("a day across the boundary: %+v, %v", lines, err)
+	}
+	lines, err = PriceRentalSeasons(sthlm("2026-05-31 22:00"), sthlm("2026-06-01 01:00"), stockholm, seasons, true)
+	// Three hours against a four-hour minimum: four hours, two before
+	// midnight and two after.
+	if err != nil || total(lines) != 2*10000+2*20000 {
+		t.Errorf("a minimum across the boundary: %+v, %v", lines, err)
 	}
 }

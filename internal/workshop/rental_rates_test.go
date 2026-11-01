@@ -109,7 +109,8 @@ func TestSeasonsAreRowsAndARentalAcrossThemFollowsThePlan(t *testing.T) {
 		t.Errorf("an overlapping season: %v", err)
 	}
 	q, err := workshop.QuoteRental(ctx, pool, rentalDesk(), workshop.QuoteRequest{UnitID: van, From: wallAt("2026-05-30 10:00"), To: wallAt("2026-06-02 10:00")})
-	if err != nil || q.Totals.NetMinor != 2*40000+2*70000 || len(q.Lines) != 2 || q.Lines[0].SeasonID == q.Lines[1].SeasonID {
+	// Three days: those starting 30 and 31 May low, 1 June high.
+	if err != nil || q.Totals.NetMinor != 2*40000+70000 || len(q.Lines) != 2 || q.Lines[0].SeasonID == q.Lines[1].SeasonID {
 		t.Errorf("split across the start of summer: %+v, %v", q, err)
 	}
 	plans, _ := workshop.RatePlans(ctx, pool, rentalDesk())

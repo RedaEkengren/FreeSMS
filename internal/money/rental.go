@@ -22,10 +22,13 @@ import (
 //     12:00. It is used when it is cheaper than rule 2; it is never
 //     combined with other units.
 //  6. A rental across the boundary of two seasons is priced, by the shop's
-//     setting, either wholly under the season it starts in, or split at
-//     midnight starting the new season, each part priced by rules 1-5 on
-//     its own -- the grace minutes and the minimum on the last part only,
-//     and a weekend only when it is not split.
+//     setting, either wholly under the season it starts in, or split: the
+//     units are those rules 2-4 choose for the whole rental under the
+//     season it starts in, and each unit, counted from the start, is
+//     priced by the season in force when that unit starts -- or, where
+//     that season does not price the unit, as the first one does. A split
+//     adds no unit the customer did not use. A weekend is a unit only when
+//     the rental is not split.
 //
 // Every line is a whole number of units at its unit price; the amounts are
 // LineNet of those, rounded per line then summed, as everywhere else.
@@ -134,30 +137,72 @@ func PriceRentalSeasons(from, to time.Time, loc *time.Location, seasons []Season
 		}
 		return lines, err
 	}
-	var out []RentalLine
+	// The units, chosen for the whole rental under the season it starts
+	// in; then each priced by the season it starts in.
+	start := wall(from, loc)
+	units, err := priceWall(start, wallEnd(from, to, loc), inside[0].Terms, false)
+	if err != nil {
+		return nil, err
+	}
+	starts := make([]time.Time, len(inside))
 	for i, s := range inside {
-		a, b := from, to
-		if i > 0 {
-			a = s.Starts
+		starts[i] = wall(s.Starts, loc)
+		if i == 0 {
+			starts[i] = start
 		}
-		last := i == len(inside)-1
-		if !last {
-			b = inside[i+1].Starts
+	}
+	var out []RentalLine
+	cursor := start
+	for _, u := range units {
+		for n := int64(0); n < u.Count; n++ {
+			i := 0
+			for j := range starts {
+				if !starts[j].After(cursor) {
+					i = j
+				}
+			}
+			price := u.UnitPrice
+			if p := unitPrice(inside[i].Terms.Prices, u.Unit); p != nil {
+				price = *p
+			}
+			if k := len(out) - 1; k >= 0 && out[k].Unit == u.Unit && out[k].Season == first+i && out[k].UnitPrice == price {
+				out[k].Count++
+			} else {
+				out = append(out, RentalLine{Unit: u.Unit, Count: 1, UnitPrice: price, Season: first + i})
+			}
+			cursor = advance(cursor, u.Unit)
 		}
-		terms := s.Terms
-		if !last {
-			terms.Minimum, terms.Grace = 0, 0
-		}
-		lines, err := priceWall(wallEnd(from, a, loc), wallEnd(from, b, loc), terms, false)
-		if err != nil {
-			return nil, err
-		}
-		for j := range lines {
-			lines[j].Season = first + i
-		}
-		out = append(out, lines...)
 	}
 	return out, nil
+}
+
+func unitPrice(p RatePrices, unit string) *int64 {
+	switch unit {
+	case UnitHour:
+		return p.Hour
+	case UnitDay:
+		return p.Day
+	case UnitWeekend:
+		return p.Weekend
+	case UnitWeek:
+		return p.Week
+	case UnitMonth:
+		return p.Month
+	}
+	return nil
+}
+
+// advance is a wall-clock moment one unit later.
+func advance(t time.Time, unit string) time.Time {
+	switch unit {
+	case UnitMonth:
+		return t.AddDate(0, 1, 0)
+	case UnitWeek:
+		return t.Add(7 * 24 * time.Hour)
+	case UnitDay:
+		return t.Add(24 * time.Hour)
+	}
+	return t.Add(time.Hour)
 }
 
 func priceWall(from, to time.Time, t RateTerms, weekend bool) ([]RentalLine, error) {
