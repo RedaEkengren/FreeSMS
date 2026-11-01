@@ -440,6 +440,13 @@ func RecordPayout(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 		if err := mayPayOut(scope.Role, scope, purpose); err != nil {
 			return err
 		}
+		// The same request again finds the payment it made, whatever the
+		// checks say now: the money left when they let it.
+		if key := strings.TrimSpace(out.Key); key != "" {
+			if found, err := replayedPaymentTx(ctx, tx, key, &out); found || err != nil {
+				return err
+			}
+		}
 		// Dealer: no money leaves for a car before its checks pass (#162),
 		// so a purchase's payout names the purchase it pays.
 		if err := payoutSubjectTx(ctx, tx, purpose, subjectKind, subjectID, partyID); err != nil {

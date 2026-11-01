@@ -486,3 +486,34 @@ func TestASalespersonIsNotShownWhyMoneyWasLetLeave(t *testing.T) {
 		t.Errorf("a salesperson was shown why: %+v", e)
 	}
 }
+
+// A payout's request replayed after the checks have aged -- a phone that
+// lost the answer and asked again a day later -- finds the payment it made,
+// rather than being told no money left.
+func TestAPayoutReplayedAfterTheChecksAgedFindsItsPayment(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	passEveryCheck(t, pool, p.StockUnitID)
+	payout, err := workshop.CreatePayout(ctx, pool, buyerScope(), workshop.NewHolding{PartyID: p.SellerPartyID, Purpose: "purchase",
+		SubjectKind: "purchase", SubjectID: p.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pay := workshop.NewPayment{AmountMinor: refTo(8_500_000), Method: "bank", PaidOn: time.Now(), Key: "utbetalning-1"}
+	first, err := workshop.RecordPayout(ctx, pool, buyerScope(), payout, pay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE stock_checks SET checked_at = checked_at - interval '2 days'`); err != nil {
+		t.Fatal(err)
+	}
+	again, err := workshop.RecordPayout(ctx, pool, buyerScope(), payout, pay)
+	if err != nil || again.ID != first.ID {
+		t.Errorf("replayed: %+v, %v; want payment %s", again, err, first.ID)
+	}
+	pay.Key = "utbetalning-2"
+	if _, err := workshop.RecordPayout(ctx, pool, buyerScope(), payout, pay); !errors.Is(err, workshop.ErrChecksOutstanding) {
+		t.Errorf("a new payout on aged checks: %v", err)
+	}
+}
