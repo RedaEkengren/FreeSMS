@@ -85,7 +85,10 @@ type NewOutboxItem struct {
 // back, it was never asked for. The same kind and key again is the call
 // already there -- or, when that one was cancelled, the same call asked for
 // again: queued anew on the same row, with its attempts starting again and
-// the cancellation kept in its history.
+// the cancellation kept in its history. The lease is left as it is: a
+// worker may still be sending the call it was cancelled under, and until
+// that worker has written what came of it, or its lease has run out, no
+// other worker takes the row.
 func enqueueTx(ctx context.Context, tx pgx.Tx, scope access.Scope, n NewOutboxItem) (string, error) {
 	if !outboxKinds[n.Kind] {
 		return "", fmt.Errorf("outbox: %q is not a kind of call", n.Kind)
@@ -117,9 +120,6 @@ func enqueueTx(ctx context.Context, tx pgx.Tx, scope access.Scope, n NewOutboxIt
 		state, err := outboxStateTx(ctx, tx, id)
 		if err != nil || state != "cancelled" {
 			return id, err
-		}
-		if _, err := tx.Exec(ctx, `UPDATE outbox SET claimed_until = NULL WHERE id = $1`, id); err != nil {
-			return "", err
 		}
 		return id, outboxEventTx(ctx, tx, scope.ShopID, id, "queued", nil, "asked for again", scope.UserID)
 	}
@@ -309,11 +309,18 @@ func sendOutbox(ctx context.Context, pool *pgxpool.Pool, shopID string, adapters
 			return err
 		}
 		if state != "attempted" {
-			// Cancelled while it was being sent. A failure is not retried;
-			// a call that went through did, and the record says so.
+			// Cancelled while it was being sent -- and perhaps asked for
+			// again since, queued anew. A failure is not retried by this
+			// worker: cancelled, it stays so; queued again, the next claim
+			// takes it. A call that went through did, and the record says
+			// so.
 			if sendErr == nil {
 				run.Sent++
-				return outboxEventTx(ctx, tx, shopID, it.ID, "succeeded", nil, "made before the cancellation reached it", "")
+				detail := "made before the cancellation reached it"
+				if state == "queued" {
+					detail = ""
+				}
+				return outboxEventTx(ctx, tx, shopID, it.ID, "succeeded", nil, detail, "")
 			}
 			return nil
 		}

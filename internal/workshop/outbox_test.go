@@ -458,3 +458,48 @@ func TestACancelledCallCanBeAskedForAgain(t *testing.T) {
 		t.Errorf("a call made, asked for again: %s", state)
 	}
 }
+
+// A call cancelled while a worker is sending it, and asked for again
+// before the send comes back, is not sent a second time by another worker:
+// the lease the first worker holds stands, and what came of its send is
+// written.
+func TestACallAskedForAgainWhileItIsSentIsNotSentTwice(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	tpl := purchaseTemplate(t, pool)
+	doc := purchaseAgreement(t, pool, tpl, "")
+	d, _ := workshop.DocumentRecordByID(ctx, pool, buyerScope(), doc)
+	id, err := workshop.QueueSignatureRequest(ctx, pool, buyerScope(), doc, d.Parties[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slow := newBlockingAdapter()
+	done := make(chan workshop.OutboxRun)
+	go func() {
+		run, err := workshop.RunOutbox(ctx, pool, shopID, map[string]workshop.OutboxAdapter{"signature_request": slow}, 1)
+		if err != nil {
+			t.Error(err)
+		}
+		done <- run
+	}()
+	if got := <-slow.started; got != id {
+		t.Fatalf("sending %s, want %s", got, id)
+	}
+	if err := workshop.CancelOutbox(ctx, pool, owner(), id, "Av misstag"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.QueueSignatureRequest(ctx, pool, buyerScope(), doc, d.Parties[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	other := &countingAdapter{}
+	if run, err := workshop.RunOutbox(ctx, pool, shopID, map[string]workshop.OutboxAdapter{"signature_request": other}, 10); err != nil || len(other.keys) != 0 {
+		t.Errorf("another worker sent the call while the first was sending it: %+v, %v, %v", run, err, other.keys)
+	}
+	slow.release <- nil
+	if run := <-done; run.Sent != 1 {
+		t.Errorf("the first worker's send: %+v, want it recorded as sent", run)
+	}
+	if state, _ := callState(t, id, pool); state != "succeeded" {
+		t.Errorf("after the first worker's send went through: %s, want succeeded", state)
+	}
+}
