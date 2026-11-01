@@ -1,0 +1,239 @@
+package workshop_test
+
+import (
+	"context"
+	"encoding/hex"
+	"errors"
+	"regexp"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
+)
+
+// strictLiability is wording that makes a consumer renter answer for damage
+// whatever their fault, which PMÖD 2019:11 held unfair: in either language.
+var strictLiability = regexp.MustCompile(`(?i)regardless of (fault|negligence|cause)|irrespective of fault|whether or not .{0,40}(fault|negligen)|strict(ly)? liab|` +
+	`oavsett (vållande|fel|skuld|oaktsamhet|orsak)|strikt ansvar|vare sig .{0,40}(vållande|oaktsam)|även om .{0,40}inte .{0,20}(vållat|oaktsam)`)
+
+// The shipped consumer agreement holds the renter liable through
+// negligence only, says it needs legal review, and fails this the moment
+// a clause of strict liability is added to it.
+func TestTheShippedConsumerAgreementHasNoStrictLiability(t *testing.T) {
+	for _, locale := range []string{"en", "sv"} {
+		for _, name := range []string{workshop.RentalTemplateConsumer, workshop.RentalTemplateBusiness} {
+			body := workshop.ShippedRentalTemplate(locale, name)
+			if body == "" {
+				t.Fatalf("no %s template %q", locale, name)
+			}
+			if !strings.Contains(strings.ToLower(body), map[string]string{"en": "requires legal review", "sv": "granskas juridiskt"}[locale]) {
+				t.Errorf("%s %q does not say it needs legal review", locale, name)
+			}
+			if name == workshop.RentalTemplateConsumer && strictLiability.MatchString(body) {
+				t.Errorf("%s consumer template holds the renter strictly liable: %q", locale, strictLiability.FindString(body))
+			}
+		}
+		consumer := workshop.ShippedRentalTemplate(locale, workshop.RentalTemplateConsumer)
+		if !strings.Contains(consumer, map[string]string{"en": "negligence", "sv": "oaktsamhet"}[locale]) {
+			t.Errorf("the %s consumer template does not tie liability to negligence", locale)
+		}
+	}
+	// The test itself catches the clause it is for.
+	if !strictLiability.MatchString("Hyrestagaren ansvarar för skada oavsett vållande.") ||
+		!strictLiability.MatchString("The renter is liable for all damage regardless of fault.") {
+		t.Error("the pattern misses a strict-liability clause")
+	}
+}
+
+// A car's rental is handed over only once every driver named has shown a
+// licence valid for it, in a category the profile accepts, for this rental:
+// a check from another rental does not count, and there is no override.
+func TestEveryDriverShowsALicenceForEachRental(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	if _, err := workshop.RecordRentalPermit(ctx, pool, rentalOwner(), workshop.NewRentalPermit{
+		Reference: "TSV 1", DecidedOn: day("2020-01-01"), Responsible: "Anna"}); err != nil {
+		t.Fatal(err)
+	}
+	id, err := v.book(pool, in2031(10, 9), in2031(12, 9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	codes := func(booking string) []string {
+		t.Helper()
+		gaps, err := workshop.RentalBookingGaps(ctx, pool, rentalDesk(), booking)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, g := range gaps {
+			if g.Overridable {
+				t.Errorf("%s can be overridden", g.Code)
+			}
+			out = append(out, g.Code+":"+g.Who)
+		}
+		return out
+	}
+	if got := codes(id); len(got) != 1 || got[0] != workshop.GapNoDriver+":" {
+		t.Errorf("nobody named to drive: %v", got)
+	}
+	main, err := workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, v.renter, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := codes(id); len(got) != 1 || got[0] != workshop.GapLicence+":Rita Hyrare" {
+		t.Errorf("a driver not checked: %v", got)
+	}
+	check := func(driver string, l workshop.LicenceShown) bool {
+		t.Helper()
+		ok, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, l)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ok
+	}
+	if check(main, workshop.LicenceShown{Shown: true, Categories: []string{"C"}, ValidUntil: day("2035-01-01"), How: "Kortet visat"}) {
+		t.Error("a C licence passed for a B car")
+	}
+	if check(main, workshop.LicenceShown{Shown: true, Categories: []string{"B"}, ValidUntil: in2031(11, 0), How: "Kortet visat"}) {
+		t.Error("a licence that runs out during the rental passed")
+	}
+	if !check(main, workshop.LicenceShown{Shown: true, Categories: []string{"am", "B"}, ValidUntil: day("2035-01-01"), How: "Kortet visat"}) {
+		t.Error("a valid B licence did not pass")
+	}
+	if got := codes(id); len(got) != 0 {
+		t.Errorf("everything shown: %v", got)
+	}
+	// An extra driver at the counter needs a check of their own.
+	extra, err := workshop.CreateParty(ctx, pool, rentalDesk(), workshop.NewParty{Kind: "private", Name: "Erik Extra", Role: workshop.PartyRenter})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, extra, true); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a second main driver: %v", err)
+	}
+	if _, err := workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, extra, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := codes(id); len(got) != 1 || got[0] != workshop.GapLicence+":Erik Extra" {
+		t.Errorf("an extra driver not checked: %v", got)
+	}
+	// The next rental checks again.
+	next, err := v.book(pool, in2031(20, 9), in2031(21, 9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.AddRentalDriver(ctx, pool, rentalDesk(), next, v.renter, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := codes(next); len(got) != 1 || got[0] != workshop.GapLicence+":Rita Hyrare" {
+		t.Errorf("a check carried from another rental: %v", got)
+	}
+	// What was shown is an identity record, a reference and no value.
+	records, err := workshop.IdentityRecordsFor(ctx, pool, rentalDesk(), v.renter)
+	if err != nil || len(records) != 3 || records[0].Kind != workshop.IdentityLicence || records[0].HasValue || records[0].Reference == "" {
+		t.Errorf("the identity records: %+v, %v", records, err)
+	}
+	for _, s := range []access.Scope{renting(access.RoleTechnician), advisor()} {
+		if _, err := workshop.RentalDrivers(ctx, pool, s, id); !errors.Is(err, access.ErrForbidden) && !errors.Is(err, access.ErrModuleOff) {
+			t.Errorf("%v reading the drivers: %v", s.Role, err)
+		}
+	}
+}
+
+// A trailer whose profile needs no licence check is not held up for one.
+func TestATrailerNeedsNoLicenceCheck(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	equipment := profileFor(t, pool, workshop.ProfileEquipment)
+	tent := addUnit(t, pool, workshop.NewRentalUnit{Name: "Tält", FleetNumber: "T1", Category: "Tent", ProfileID: equipment.ID})
+	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), tent, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
+		t.Fatal(err)
+	}
+	dayPlan(t, pool, "Tent", 10000, "at_start")
+	renter, _ := workshop.CreateParty(ctx, pool, rentalDesk(), workshop.NewParty{Kind: "private", Name: "Tina", Role: workshop.PartyRenter})
+	id, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: tent, RenterID: renter, From: in2031(10, 9), To: in2031(11, 9)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gaps, err := workshop.RentalBookingGaps(ctx, pool, rentalDesk(), id); err != nil || len(gaps) != 0 {
+		t.Errorf("a tent: %+v, %v", gaps, err)
+	}
+	d, _ := workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, renter, true)
+	if _, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), d, workshop.LicenceShown{Shown: true, Categories: []string{"B"},
+		ValidUntil: day("2035-01-01"), How: "x"}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a licence check nobody needs: %v", err)
+	}
+}
+
+// The agreement is frozen from the shipped template and the booking; a
+// change after is a new version that supersedes it, and the first stays
+// readable; acceptance is recorded by hand against what was shown.
+func TestTheRentalAgreementIsFrozenAndVersioned(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	id, err := v.book(pool, in2031(10, 9), in2031(12, 9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, v.renter, true); err != nil {
+		t.Fatal(err)
+	}
+	templates, err := workshop.RentalAgreementTemplates(ctx, pool, rentalDesk())
+	if err != nil || len(templates) != 2 {
+		t.Fatalf("the shipped templates: %+v, %v", templates, err)
+	}
+	var consumer workshop.DocumentTemplate
+	for _, tp := range templates {
+		if tp.Name == workshop.RentalTemplateConsumer {
+			consumer = tp
+		}
+	}
+	first, err := workshop.ProduceRentalAgreement(ctx, pool, rentalDesk(), id, consumer.VersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := workshop.DocumentRecordByID(ctx, pool, rentalDesk(), first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Rita Hyrare", "V1, ABC 12D", "1000.00", "negligence"} {
+		if !strings.Contains(doc.Body, want) {
+			t.Errorf("the agreement lacks %q:\n%s", want, doc.Body)
+		}
+	}
+	if len(doc.Parties) != 2 || doc.Parties[0].Role != "renter" || doc.Parties[1].Role != "driver" {
+		t.Errorf("the parties: %+v", doc.Parties)
+	}
+	if err := workshop.RecordSignature(ctx, pool, rentalDesk(), first, doc.Parties[0].ID, workshop.SignatureEvidence{
+		Method: workshop.SignedInPerson, Hash: hex.EncodeToString(mustHex(t, doc.Hash))}); err != nil {
+		t.Errorf("accepting in person: %v", err)
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, in2031(13, 9), "En dag till"); err != nil {
+		t.Fatal(err)
+	}
+	second, err := workshop.ProduceRentalAgreement(ctx, pool, rentalDesk(), id, consumer.VersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	all, err := workshop.RentalAgreements(ctx, pool, rentalDesk(), id)
+	if err != nil || len(all) != 2 || all[0].ID != second || all[0].SupersedesID != first || all[1].SupersededByID != second || all[1].Signing() != "partly signed" {
+		t.Errorf("two versions, the first kept: %+v, %v", all, err)
+	}
+	if !strings.Contains(all[0].Body, "1500.00") {
+		t.Errorf("the new version does not carry the extension:\n%s", all[0].Body)
+	}
+}
+
+func mustHex(t *testing.T, s string) []byte {
+	t.Helper()
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}

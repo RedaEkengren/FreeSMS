@@ -208,3 +208,87 @@ func TestTheRentalDeskBooksAUnit(t *testing.T) {
 		t.Errorf("a technician's view of a booking: %d", resp.StatusCode)
 	}
 }
+
+// From the booking page the rental desk names the renter as driver, sees
+// the licence check missing, records it, makes the agreement and records
+// that the renter accepted it.
+func TestTheBookingPageTakesTheDriverAndTheAgreement(t *testing.T) {
+	ts, pool := testServer(t)
+	seedRentalDesk(t, func(t *testing.T, stmts []string) { seedShop(t, pool, shopA, stmts) })
+	desk := signIn(t, ts, rentalEmail)
+	owner := signIn(t, ts, ownerEmail)
+	resp, _ := desk.Get(ts.URL + "/rental")
+	body := readBody(t, resp)
+	i := strings.Index(body, `name="profile"><option value="`)
+	profile := body[i+len(`name="profile"><option value="`):][:36]
+	resp = postModuleForm(t, desk, ts.URL, "/rental/units", url.Values{"registration": {"KLM 123"},
+		"fleet_number": {"V7"}, "category": {"Liten skåpbil"}, "profile": {profile}})
+	unit := resp.Header.Get("Location")
+	postModuleForm(t, desk, ts.URL, unit+"/fleet", url.Values{"at": {"2026-01-05T08:00"}, "how": {"bought"}})
+	postModuleForm(t, owner, ts.URL, "/rental/plans", url.Values{"name": {"Standard"}, "category": {"Liten skåpbil"},
+		"vat_percent": {"25"}, "season_rule": {"at_start"}})
+	var plan string
+	if err := pool.QueryRow(t.Context(), `SELECT id FROM rate_plans`).Scan(&plan); err != nil {
+		t.Fatal(err)
+	}
+	postModuleForm(t, owner, ts.URL, "/rental/plans/"+plan+"/seasons", url.Values{"vat_bp": {"2500"}, "valid_from": {"2026-01-01"}, "day": {"500"}})
+	resp = postModuleForm(t, desk, ts.URL, "/rental/bookings", url.Values{"unit": {strings.TrimPrefix(unit, "/rental/units/")},
+		"from": {"2031-05-10T09:00"}, "to": {"2031-05-12T09:00"}, "renter_name": {"Rita Hyrare"}})
+	booking := resp.Header.Get("Location")
+	var renter string
+	if err := pool.QueryRow(t.Context(), `SELECT renter_party_id FROM rental_bookings`).Scan(&renter); err != nil {
+		t.Fatal(err)
+	}
+	if resp := postModuleForm(t, desk, ts.URL, booking+"/drivers", url.Values{"party": {renter}, "main": {"1"}}); resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("adding the driver: %d %s", resp.StatusCode, readBody(t, resp))
+	}
+	resp, _ = desk.Get(ts.URL + booking)
+	body = readBody(t, resp)
+	if !strings.Contains(body, "Rita Hyrare has not shown a valid licence for this rental.") {
+		t.Error("the page does not say the licence check is missing")
+	}
+	var driver string
+	if err := pool.QueryRow(t.Context(), `SELECT id FROM rental_drivers`).Scan(&driver); err != nil {
+		t.Fatal(err)
+	}
+	resp = postModuleForm(t, desk, ts.URL, "/rental/drivers/"+driver+"/check", url.Values{"booking": {strings.TrimPrefix(booking, "/rental/bookings/")},
+		"shown": {"1"}, "categories": {"B"}, "valid_until": {"2035-01-01"}, "how": {"Kortet visat"}})
+	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != booking {
+		t.Fatalf("checking the licence: %d %s", resp.StatusCode, readBody(t, resp))
+	}
+	resp, _ = desk.Get(ts.URL + booking)
+	body = readBody(t, resp)
+	if strings.Contains(body, "has not shown a valid licence") || !strings.Contains(body, "licence checked") {
+		t.Error("the page still asks for the licence check")
+	}
+	i = strings.Index(body, `name="template"><option value="`)
+	if i < 0 {
+		t.Fatal("no template to make the agreement from")
+	}
+	template := body[i+len(`name="template"><option value="`):][:36]
+	resp = postModuleForm(t, desk, ts.URL, booking+"/agreement", url.Values{"template": {template}})
+	if resp.StatusCode != http.StatusSeeOther || !strings.HasPrefix(resp.Header.Get("Location"), "/contracts/") {
+		t.Fatalf("making the agreement: %d %s", resp.StatusCode, readBody(t, resp))
+	}
+	resp, _ = desk.Get(ts.URL + booking)
+	body = readBody(t, resp)
+	j := strings.Index(body, `action="/rental/agreements/`)
+	if j < 0 {
+		t.Fatal("no way to record the acceptance")
+	}
+	accept := body[j+len(`action="`):]
+	accept = accept[:strings.Index(accept, `"`)]
+	form := url.Values{"booking": {strings.TrimPrefix(booking, "/rental/bookings/")}, "method": {"in_person_click"}}
+	for _, name := range []string{"party", "hash"} {
+		k := strings.Index(body, `name="`+name+`" value="`)
+		v := body[k+len(`name="`+name+`" value="`):]
+		form.Set(name, v[:strings.Index(v, `"`)])
+	}
+	if resp := postModuleForm(t, desk, ts.URL, accept, form); resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("recording the acceptance: %d %s", resp.StatusCode, readBody(t, resp))
+	}
+	var signed int
+	if err := pool.QueryRow(t.Context(), `SELECT count(*) FROM document_signatures`).Scan(&signed); err != nil || signed != 1 {
+		t.Errorf("signatures: %d, %v", signed, err)
+	}
+}

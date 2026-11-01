@@ -27,13 +27,17 @@ type rentalData struct {
 	Units      []workshop.RentalUnit
 	Unit       workshop.RentalUnit
 	// Rentals booked after the end asked for, refused.
-	InTheWay []workshop.Block
-	Plans    []workshop.RatePlan
-	Extras   []workshop.RentalExtra
-	Day      []workshop.ActionItem
-	Bookings []workshop.RentalBooking
-	Booking  workshop.RentalBooking
-	Renters  []workshop.Renter
+	InTheWay   []workshop.Block
+	Plans      []workshop.RatePlan
+	Extras     []workshop.RentalExtra
+	Day        []workshop.ActionItem
+	Bookings   []workshop.RentalBooking
+	Booking    workshop.RentalBooking
+	Renters    []workshop.Renter
+	Drivers    []workshop.RentalDriver
+	Gaps       []workshop.HandoverGap
+	Agreements []workshop.DocumentRecord
+	Templates  []workshop.DocumentTemplate
 	// A booking form's own key: sent twice, one booking.
 	Key string
 	Now time.Time
@@ -160,6 +164,9 @@ func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("POST /rental/bookings", s.requireSession(s.handleRentalBook))
 	m.HandleFunc("GET /rental/bookings/{id}", s.requireSession(s.handleRentalBooking))
 	m.HandleFunc("POST /rental/bookings/{id}/{action}", s.requireSession(s.handleRentalBookingAction))
+	m.HandleFunc("POST /rental/drivers/{id}/check", s.requireSession(s.handleLicenceCheck))
+	m.HandleFunc("POST /rental/drivers/{id}/remove", s.requireSession(s.handleDriverRemove))
+	m.HandleFunc("POST /rental/agreements/{id}/accepted", s.requireSession(s.handleAgreementAccepted))
 	m.HandleFunc("POST /rental/plans", s.requireSession(s.handleRatePlanAdd))
 	m.HandleFunc("POST /rental/plans/{id}/seasons", s.requireSession(s.handleRateSeasonAdd))
 	m.HandleFunc("POST /rental/plans/{id}/archive", s.requireSession(s.handleRatePlanArchive))
@@ -567,12 +574,30 @@ func (s *Server) handleRentalBook(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleRentalBooking(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
-	b, err := workshop.RentalBookingByID(r.Context(), s.pool, session.Scope, r.PathValue("id"))
-	if s.handoverError(w, r, err) {
+	d := rentalData{Now: time.Now()}
+	var err error
+	if d.Booking, err = workshop.RentalBookingByID(r.Context(), s.pool, session.Scope, r.PathValue("id")); s.handoverError(w, r, err) {
 		return
 	}
-	s.render(w, r, http.StatusOK, "rentalbooking", pageData{Title: "Rental booking", Session: session,
-		Rental: rentalData{Booking: b, Now: time.Now()}})
+	if d.Drivers, err = workshop.RentalDrivers(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
+		return
+	}
+	if d.Booking.Open() {
+		if d.Gaps, err = workshop.RentalBookingGaps(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
+			return
+		}
+		if d.Renters, err = workshop.Renters(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+			return
+		}
+		if d.Templates, err = workshop.RentalAgreementTemplates(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+			return
+		}
+	}
+	if d.Agreements, err = workshop.RentalAgreements(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "rentalbooking", pageData{Title: "Rental booking", Session: session, Rental: d,
+		Today: time.Now().In(s.shopLocation(r)).Format("2006-01-02")})
 }
 
 func (s *Server) handleRentalBookingAction(w http.ResponseWriter, r *http.Request) {
@@ -599,6 +624,22 @@ func (s *Server) handleRentalBookingAction(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		err = workshop.ExtendRentalBooking(r.Context(), s.pool, session.Scope, id, to, r.FormValue("reason"))
+	case "drivers":
+		party := r.FormValue("party")
+		if party == "" {
+			party, err = workshop.CreateParty(r.Context(), s.pool, session.Scope, workshop.NewParty{Kind: "private",
+				Name: r.FormValue("name"), Phone: r.FormValue("phone"), Role: workshop.PartyRenter})
+		}
+		if err == nil {
+			_, err = workshop.AddRentalDriver(r.Context(), s.pool, session.Scope, id, party, r.FormValue("main") != "")
+		}
+	case "agreement":
+		var doc string
+		if doc, err = workshop.ProduceRentalAgreement(r.Context(), s.pool, session.Scope, id, r.FormValue("template")); err == nil {
+			s.submitted(w, r)
+			http.Redirect(w, r, "/contracts/"+doc, http.StatusSeeOther)
+			return
+		}
 	default:
 		http.NotFound(w, r)
 		return
@@ -608,4 +649,62 @@ func (s *Server) handleRentalBookingAction(w http.ResponseWriter, r *http.Reques
 	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/rental/bookings/"+id, http.StatusSeeOther)
+}
+
+// backToBooking is where a driver's or an agreement's form returns: the
+// booking it came from, named by the form.
+func backToBooking(r *http.Request) string {
+	if b := r.FormValue("booking"); access.IsUUID(b) {
+		return "/rental/bookings/" + b
+	}
+	return "/rental"
+}
+
+func (s *Server) handleLicenceCheck(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	if err := r.ParseForm(); err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "Not accepted", "")
+		return
+	}
+	l := workshop.LicenceShown{Shown: r.FormValue("shown") != "", Categories: r.Form["categories"], How: r.FormValue("how")}
+	if until, ok := s.formDate(r, "valid_until"); !ok {
+		s.renderError(w, r, http.StatusBadRequest, "That date did not parse", "Use the picker.")
+		return
+	} else if until != nil {
+		l.ValidUntil = *until
+	}
+	_, err := workshop.RecordLicenceCheck(r.Context(), s.pool, session.Scope, r.PathValue("id"), l)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, backToBooking(r), http.StatusSeeOther)
+}
+
+func (s *Server) handleDriverRemove(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	err := workshop.RemoveRentalDriver(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("reason"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, backToBooking(r), http.StatusSeeOther)
+}
+
+// handleAgreementAccepted records that a party accepted the agreement as
+// it was shown -- in person, or on paper with who saw it signed. A signing
+// service, when there is one, is #214's.
+func (s *Server) handleAgreementAccepted(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	method := workshop.SignedInPerson
+	if r.FormValue("method") == workshop.SignedOnPaper {
+		method = workshop.SignedOnPaper
+	}
+	err := workshop.RecordSignature(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("party"),
+		workshop.SignatureEvidence{Method: method, Hash: r.FormValue("hash"), WitnessedBy: r.FormValue("witnessed_by")})
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, backToBooking(r), http.StatusSeeOther)
 }

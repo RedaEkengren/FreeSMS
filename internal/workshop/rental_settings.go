@@ -661,6 +661,8 @@ type HandoverGap struct {
 	Code        string
 	Sentence    string
 	Overridable bool
+	// Whom it is about, where the sentence names somebody (%s): a driver.
+	Who string
 }
 
 // The gaps there are.

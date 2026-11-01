@@ -25,6 +25,97 @@
 </dl>
 
 {{if .Open}}
+<h2>{{$.T "Before handover"}}</h2>
+{{if $.Rental.Gaps}}
+<ul class="lines">
+  {{range $.Rental.Gaps}}<li><span class="tag late">{{$.T "missing"}}</span> {{if .Who}}{{$.T .Sentence .Who}}{{else}}{{$.T .Sentence}}{{end}}</li>{{end}}
+</ul>
+{{else}}
+<p>{{$.T "Nothing is missing for the handover."}}</p>
+{{end}}
+{{end}}
+
+<h2>{{$.T "Drivers"}}</h2>
+{{if $.Rental.Drivers}}
+<ul class="lines">
+  {{range $.Rental.Drivers}}
+  <li>
+    <div class="row"><span>{{.Name}}{{if .Main}} &middot; {{$.T "main driver"}}{{end}}</span>
+      <span class="tag{{if not (and .Check .Check.Passed)}} late{{end}}">{{if .Removed}}{{$.T "taken off"}}{{else if not .Check}}{{$.T "licence not checked"}}{{else if .Check.Passed}}{{$.T "licence checked"}}{{else}}{{$.T "licence check failed"}}{{end}}</span></div>
+    {{with .Check}}<div class="waiting">{{$.Date ($.Local .CheckedAt) "2 Jan 15:04"}} &middot; {{.CheckedBy}}{{with .Failure}} &middot; {{$.T .}}{{end}}</div>{{end}}
+    {{if and $.Rental.Booking.Open (not .Removed)}}
+    <details><summary>{{$.T "Check the licence"}}</summary>
+    <form method="post" action="/rental/drivers/{{.ID}}/check">
+      <input type="hidden" name="booking" value="{{$.Rental.Booking.ID}}">
+      <label class="check"><input type="checkbox" name="shown" value="1" checked> {{$.T "A licence was shown"}}</label>
+      <div class="choices"><span>{{$.T "Categories it holds"}}</span>
+        {{range $.Rental.LicenceCategories}}<label class="check"><input type="checkbox" name="categories" value="{{.}}"> {{.}}</label> {{end}}</div>
+      <div class="pair">
+        <label><span>{{$.T "Valid until"}}</span><input type="date" name="valid_until"></label>
+        <label><span>{{$.T "How it was checked"}}</span><input name="how" maxlength="200" required placeholder="{{$.T "Card shown at the counter"}}"></label>
+      </div>
+      <p class="waiting">{{$.T "No licence number and no picture are kept: only what is asked here, for as long as the licence check's purpose allows."}}</p>
+      <button type="submit" class="secondary">{{$.T "Record the check"}}</button>
+    </form>
+    </details>
+    {{if ne $.Rental.Booking.State "checked_out"}}
+    <details><summary>{{$.T "Take off the rental"}}</summary>
+    <form method="post" action="/rental/drivers/{{.ID}}/remove">
+      <input type="hidden" name="booking" value="{{$.Rental.Booking.ID}}">
+      <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="300" required></label>
+      <button type="submit" class="link">{{$.T "Take off the rental"}}</button>
+    </form>
+    </details>
+    {{end}}
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p>{{$.T "Nobody is named to drive yet."}}</p>
+{{end}}
+{{if .Open}}
+<details><summary>{{$.T "Add a driver"}}</summary>
+<form method="post" action="/rental/bookings/{{.ID}}/drivers">
+  <label><span>{{$.T "Driver"}}</span><select name="party"><option value="">{{$.T "Someone new, below"}}</option>{{range $.Rental.Renters}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></label>
+  <div class="pair">
+    <label><span>{{$.T "New driver's name"}}</span><input name="name" maxlength="200"></label>
+    <label><span>{{$.T "Telephone"}}</span><input name="phone" type="tel" maxlength="40"></label>
+  </div>
+  <label class="check"><input type="checkbox" name="main" value="1"> {{$.T "Main driver"}}</label>
+  <button type="submit" class="secondary">{{$.T "Add the driver"}}</button>
+</form>
+</details>
+{{end}}
+
+<h2>{{$.T "Agreement"}}</h2>
+{{range $.Rental.Agreements}}
+{{$doc := .}}
+<div class="row"><a href="/contracts/{{.ID}}">{{.Title}} &middot; {{$.T "version of %s" ($.Date ($.Local .CreatedAt) "2 Jan 15:04")}}</a>
+  <span class="tag{{if .SupersededByID}}{{else if ne .Signing "fully signed"}} late{{end}}">{{if .SupersededByID}}{{$.T "replaced"}}{{else}}{{$.T .SigningLabel}}{{end}}</span></div>
+{{if not .SupersededByID}}
+{{range .Parties}}{{if not .Signature}}
+<form method="post" action="/rental/agreements/{{$doc.ID}}/accepted">
+  <input type="hidden" name="booking" value="{{$.Rental.Booking.ID}}"><input type="hidden" name="party" value="{{.ID}}"><input type="hidden" name="hash" value="{{$doc.Hash}}">
+  <div class="pair">
+    <label><span>{{$.T "How %s accepted it" .Name}}</span><select name="method"><option value="in_person_click">{{$.T "In person, here"}}</option><option value="paper">{{$.T "Signed on paper"}}</option></select></label>
+    <label><span>{{$.T "Who saw it signed, on paper"}}</span><input name="witnessed_by" maxlength="120"></label>
+  </div>
+  <button type="submit" class="secondary">{{$.T "Record that it was accepted"}}</button>
+</form>
+{{end}}{{end}}
+{{end}}
+{{else}}
+<p>{{$.T "No agreement made yet. The handover can go ahead without one being signed; accepting is recorded here."}}</p>
+{{end}}
+{{if and .Open $.Rental.Templates}}
+<form method="post" action="/rental/bookings/{{.ID}}/agreement">
+  <label><span>{{$.T "From the template"}}</span><select name="template">{{range $.Rental.Templates}}<option value="{{.VersionID}}">{{.Name}}</option>{{end}}</select></label>
+  <button type="submit" class="secondary">{{if $.Rental.Agreements}}{{$.T "Make a new version"}}{{else}}{{$.T "Make the agreement"}}{{end}}</button>
+</form>
+{{end}}
+
+{{if .Open}}
 <h2>{{$.T "Change the booking"}}</h2>
 {{if eq .State "held"}}<form method="post" action="/rental/bookings/{{.ID}}/confirm" class="inline"><button type="submit">{{$.T "Confirm the booking"}}</button></form>{{end}}
 {{if ne .State "checked_out"}}
