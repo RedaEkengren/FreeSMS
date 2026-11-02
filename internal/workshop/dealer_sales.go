@@ -144,8 +144,12 @@ type Deal struct {
 	ContractID      string
 	ContractTermsID string
 	ContractSigned  bool
-	// The terms the deal was last completed on, if it was.
-	ContractedTermsID string
+	// The terms the deal was last completed on, if it was, and the
+	// contract it was completed with.
+	ContractedTermsID    string
+	ContractedDocumentID string
+	// What the newest contract was made from (Basis, as it stood then).
+	ContractBasis string
 	// The car may be sold under the margin scheme (vat_eligibility).
 	MarginSchemeEligible bool
 	// The eligibility assessment the margin scheme relied on, when the
@@ -162,10 +166,22 @@ func (d Deal) TotalMinor() int64 {
 	return t
 }
 
-// Completed reports whether the deal's contract was completed on the terms
-// as they stand. Revised since, it is completed again from a new contract.
+// Basis is what a contract states, as the deal stands: its terms version
+// and its known defects. A contract made from another basis is out of date
+// -- the terms were revised, or a defect was found -- and a new one is made
+// and signed, with the defect accepted, before the deal is complete again.
+func (d Deal) Basis() string {
+	ids := make([]string, len(d.Defects))
+	for i, f := range d.Defects {
+		ids[i] = f.ID
+	}
+	return d.TermsID + ":" + strings.Join(ids, ",")
+}
+
+// Completed reports whether the deal's contract was completed, and still
+// states everything: the terms as they stand and every known defect.
 func (d Deal) Completed() bool {
-	return d.State == DealContracted && d.ContractedTermsID == d.TermsID
+	return d.State == DealContracted && d.ContractedDocumentID == d.ContractID && d.ContractBasis == d.Basis()
 }
 
 // Missing is what stands between the deal and a completed contract, as
@@ -178,7 +194,7 @@ func (d Deal) Missing() []string {
 	if d.Terms.TaxTreatment == "" {
 		out = append(out, "Choose how the sale is taxed.")
 	}
-	if d.ContractID == "" || d.ContractTermsID != d.TermsID {
+	if d.ContractID == "" || d.ContractBasis != d.Basis() {
 		out = append(out, "Make the contract from the terms as they stand.")
 	} else if !d.ContractSigned {
 		out = append(out, "Every buyer signs the contract.")
@@ -213,6 +229,7 @@ var (
 	errDealDefect     = fmt.Errorf("%w: describe the defect in 1000 characters or fewer", ErrInvalid)
 	errDealAnswer     = fmt.Errorf("%w: a defect is answered by one of the deal's buyers, on paper with the scan, in person, or electronically", ErrInvalid)
 	errDealTemplate   = fmt.Errorf("%w: that is not a sales contract template", ErrInvalid)
+	errDealComplete   = fmt.Errorf("%w: the contract is complete and states everything; change the terms or state a defect first", ErrInvalid)
 	errDealIncomplete = fmt.Errorf("%w: the contract cannot be completed yet", ErrInvalid)
 	// ErrDealNoReason is a deal cancelled without saying why.
 	ErrDealNoReason = fmt.Errorf("%w: say why the deal is cancelled, in 300 characters or fewer", ErrInvalid)
@@ -854,18 +871,21 @@ func dealTx(ctx context.Context, tx pgx.Tx, id string) (Deal, error) {
 	// The newest contract, which terms it was made from (its data says),
 	// and whether every party it names has signed.
 	err = tx.QueryRow(ctx, `
-		SELECT r.id, coalesce(r.data->>'terms_id', ''),
+		SELECT r.id, coalesce(r.data->>'terms_id', ''), coalesce(r.data->>'basis', ''),
 		       NOT EXISTS (SELECT 1 FROM document_record_parties dp WHERE dp.document_id = r.id
 		                   AND NOT EXISTS (SELECT 1 FROM document_signatures sg WHERE sg.document_party_id = dp.id))
 		FROM document_records r
 		WHERE r.kind = 'sales_contract' AND r.subject_kind = 'sale' AND r.subject_id = $1
 		  AND NOT EXISTS (SELECT 1 FROM document_records n WHERE n.supersedes_id = r.id)
-		ORDER BY r.created_at DESC LIMIT 1`, id).Scan(&d.ContractID, &d.ContractTermsID, &d.ContractSigned)
+		ORDER BY r.created_at DESC LIMIT 1`, id).Scan(&d.ContractID, &d.ContractTermsID, &d.ContractBasis, &d.ContractSigned)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return Deal{}, fmt.Errorf("read the contract: %w", err)
 	}
-	if err := tx.QueryRow(ctx, `SELECT coalesce((SELECT terms_id::text FROM vehicle_sale_events WHERE sale_id = $1 AND kind = 'contracted'
-		ORDER BY seq DESC LIMIT 1), '')`, id).Scan(&d.ContractedTermsID); err != nil {
+	if err := tx.QueryRow(ctx, `
+		SELECT coalesce(e.terms_id::text, ''), coalesce(e.document_id::text, '')
+		FROM (SELECT 1) one LEFT JOIN LATERAL (SELECT terms_id, document_id FROM vehicle_sale_events
+		                                       WHERE sale_id = $1 AND kind = 'contracted' ORDER BY seq DESC LIMIT 1) e ON true`,
+		id).Scan(&d.ContractedTermsID, &d.ContractedDocumentID); err != nil {
 		return Deal{}, err
 	}
 	if d.MarginSchemeEligible, err = eligibleForSchemeTx(ctx, tx, d.StockUnitID); err != nil {
@@ -1051,6 +1071,9 @@ func ProduceSalesContract(ctx context.Context, pool *pgxpool.Pool, scope access.
 		if d.ContractID != replacing {
 			return ErrMadeMeanwhile
 		}
+		if d.Completed() {
+			return errDealComplete
+		}
 		var body, kind string
 		if err := tx.QueryRow(ctx, `SELECT v.body, t.kind FROM document_template_versions v JOIN document_templates t ON t.id = v.template_id
 			WHERE v.id = $1`, templateVersionID).Scan(&body, &kind); err != nil || kind != DocSalesContract {
@@ -1105,7 +1128,7 @@ func ProduceSalesContract(ctx context.Context, pool *pgxpool.Pool, scope access.
 				"price": money.Format(d.Terms.PriceMinor), "lines": dash(strings.Join(lines, "\n")), "total": money.Format(d.TotalMinor()),
 				"payment_terms": dash(d.Terms.PaymentTerms), "delivery": delivery, "warranty": dash(d.Terms.Warranty),
 				"defects": dash(strings.Join(defects, "\n")), "dispute": clauses[d.Terms.BuyerKind], "note": d.Terms.Note,
-				"terms_id": d.TermsID}})
+				"terms_id": d.TermsID, "basis": d.Basis()}})
 		return err
 	})
 	return doc, warnings, err

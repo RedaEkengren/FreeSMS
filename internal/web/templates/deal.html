@@ -107,7 +107,7 @@
 
 <h2>{{.T "Contract"}}</h2>
 {{with $x.ContractID}}<p><a href="/contracts/{{.}}">{{$.T "Read the contract"}}</a>
-  {{if ne $x.ContractTermsID $x.TermsID}} &middot; {{$.T "made from earlier terms"}}{{end}}</p>
+  {{if ne $x.ContractBasis $x.Basis}} &middot; {{$.T "out of date: the terms or the known defects have changed since"}}{{end}}</p>
   {{range $x.Buyers}}
   <div class="row"><span>{{.Name}}</span><span>{{if $d.Signed .PartyID}}{{$.T "Signed"}}{{else}}
     <form method="post" action="/cars/deals/{{$x.ID}}/signed" class="inline">

@@ -436,3 +436,86 @@ func TestTheDatabaseRefusesTheMarginSchemeForACarNotEligible(t *testing.T) {
 		t.Error("the margin scheme was written for a car not eligible")
 	}
 }
+
+// completedDeal is a consumer's deal on a car of its own, contracted with
+// one defect accepted.
+func completedDeal(t *testing.T, pool *pgxpool.Pool) workshop.Deal {
+	t.Helper()
+	ctx := context.Background()
+	p := boughtCar(t, pool)
+	moveStock(t, pool, p.StockUnitID, workshop.StockForSale)
+	kim := driver(t, pool)
+	terms := consumerTerms(kim)
+	terms.TaxTreatment = workshop.TaxOrdinary
+	d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: p.StockUnitID, Terms: terms})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defect, err := workshop.AddDefect(ctx, pool, sales(), d.ID, "Repa i lacken", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.AnswerDefect(ctx, pool, sales(), defect, kim, true, "in_person", ""); err != nil {
+		t.Fatal(err)
+	}
+	doc, _, err := workshop.ProduceSalesContract(ctx, pool, sales(), d.ID, contractTemplate(t, pool), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	signAll(t, pool, doc)
+	done, err := workshop.CompleteDeal(ctx, pool, sales(), d.ID)
+	if err != nil || !done.Completed() {
+		t.Fatalf("completed: %+v, %v", done, err)
+	}
+	return done
+}
+
+// A completed contract is not replaced while it still states everything:
+// making it again is refused, and the signed one stays the contract.
+func TestACompletedContractIsNotReplaced(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	d := completedDeal(t, pool)
+	if _, _, err := workshop.ProduceSalesContract(ctx, pool, sales(), d.ID, contractTemplate(t, pool), d.ContractID); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a completed contract made again: %v", err)
+	}
+	if got, _ := workshop.DealByID(ctx, pool, sales(), d.ID); got.ContractID != d.ContractID || !got.Completed() {
+		t.Errorf("the deal after: %+v", got)
+	}
+}
+
+// A defect found after the contract was made makes it out of date: the
+// signed contract does not state it, so the deal needs a new contract,
+// signed, with the defect accepted, before it is complete again.
+func TestADefectAddedAfterTheContractMakesItOutOfDate(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	d := completedDeal(t, pool)
+	kim := d.Buyers[0].PartyID
+	late, err := workshop.AddDefect(ctx, pool, sales(), d.ID, "Stenskott i vindrutan", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := workshop.DealByID(ctx, pool, sales(), d.ID)
+	if got.Completed() || len(got.Missing()) == 0 {
+		t.Fatalf("the deal with a defect its contract does not state: completed %v, missing %v", got.Completed(), got.Missing())
+	}
+	second, _, err := workshop.ProduceSalesContract(ctx, pool, sales(), d.ID, contractTemplate(t, pool), d.ContractID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, _ := workshop.DocumentRecordByID(ctx, pool, sales(), second)
+	if !strings.Contains(doc.Body, "Stenskott i vindrutan") {
+		t.Errorf("the new contract does not state the defect:\n%s", doc.Body)
+	}
+	signAll(t, pool, second)
+	if _, err := workshop.CompleteDeal(ctx, pool, sales(), d.ID); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("completed with the new defect not accepted: %v", err)
+	}
+	if err := workshop.AnswerDefect(ctx, pool, sales(), late, kim, true, "in_person", ""); err != nil {
+		t.Fatal(err)
+	}
+	if again, err := workshop.CompleteDeal(ctx, pool, sales(), d.ID); err != nil || !again.Completed() || again.ContractID != second {
+		t.Errorf("completed again: %+v, %v", again, err)
+	}
+}

@@ -8619,6 +8619,8 @@
     "Each extra needs a quantity, a price in kronor and a VAT rate in per cent.": {"other": "Varje tillval behöver ett antal, ett pris i kronor och en momssats i procent."},
     "Sales contract (draft, needs legal review)": {"other": "Köpeavtal (utkast, behöver juridisk granskning)"},
     "The deal": {"other": "Affären"},
-    "Open a deal": {"other": "Öppna en affär"}
+    "Open a deal": {"other": "Öppna en affär"},
+    "out of date: the terms or the known defects have changed since": {"other": "inaktuellt: villkoren eller de kända felen har ändrats sedan dess"},
+    "the contract is complete and states everything; change the terms or state a defect first": {"other": "avtalet är klart och anger allt; ändra villkoren eller ange ett fel först"}
   }
 }
