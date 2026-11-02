@@ -1,6 +1,5 @@
 -- rollback: safe
--- Three new tables, written and read only by this release, and a profile
--- rule with a default the previous release's inserts take. The previous
+-- Three new tables, written and read only by this release. The previous
 -- release neither writes nor reads them, and refuses no handover for what
 -- they say: rolled back, a car not reported into rental use, or not
 -- insured for it, can be handed over again, as it could before this.
@@ -41,9 +40,8 @@ CREATE TABLE fleet_insurances (
 );
 CREATE INDEX fleet_insurances_membership_idx ON fleet_insurances (membership_id, valid_from);
 
--- A handover gap a person with the right let go, and why: for the rental
--- as it was then, its booked start and end. Moved or extended, it is asked
--- again. The permit and the licence check are never let go (refused by
+-- A handover gap a person with the right let go, and why: one per booking
+-- and gap. The permit and the licence check are never let go (refused by
 -- the CHECK as well as the code).
 CREATE TABLE rental_gap_overrides (
     id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -53,18 +51,8 @@ CREATE TABLE rental_gap_overrides (
     reason     text        NOT NULL CHECK (length(btrim(reason)) BETWEEN 1 AND 300),
     by_user    uuid        REFERENCES users(id) ON DELETE RESTRICT,
     at         timestamptz NOT NULL DEFAULT clock_timestamp(),
-    starts_at  timestamptz NOT NULL,
-    ends_at    timestamptz NOT NULL,
-    UNIQUE (booking_id, code, starts_at, ends_at)
+    UNIQUE (booking_id, code)
 );
-
--- Whether a profile requires the insurance: a rule of its own, as the
--- report is. A version the previous release writes does not name it and
--- requires it -- the safe reading; the shipped equipment profile's
--- versions do not, as a tent is no vehicle.
-ALTER TABLE rental_profile_versions ADD COLUMN insurance_required boolean NOT NULL DEFAULT true;
-UPDATE rental_profile_versions v SET insurance_required = false
-FROM rental_profiles p WHERE p.id = v.profile_id AND p.base = 'equipment';
 
 DO $$
 DECLARE
