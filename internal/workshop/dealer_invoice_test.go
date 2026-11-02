@@ -299,3 +299,27 @@ func TestAMarginSchemeCreditAndRebillKeepTheSchemesVAT(t *testing.T) {
 		t.Errorf("the replacement: VAT %d, statement %q; want 8 000 kr and the statement", vat, statement)
 	}
 }
+
+// A sale that comes to nothing is not invoiced: a 0 kr invoice could never
+// be credited, and would stand for ever or not at all.
+func TestASaleOfNothingIsNotInvoiced(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	kim := driver(t, pool)
+	terms := workshop.SaleTerms{Buyers: []string{kim}, BuyerKind: workshop.BuyerBusiness, PriceMinor: 0, TaxTreatment: workshop.TaxOrdinary}
+	d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: carForSale(t, pool), Terms: terms})
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, _, err := workshop.ProduceSalesContract(ctx, pool, sales(), d.ID, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	signAll(t, pool, doc)
+	if _, err := workshop.CompleteDeal(ctx, pool, sales(), d.ID); err != nil {
+		t.Fatal(err)
+	}
+	if inv, err := workshop.IssueDealInvoice(ctx, pool, sales(), d.ID); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a sale of nothing invoiced: %+v, %v", inv, err)
+	}
+}

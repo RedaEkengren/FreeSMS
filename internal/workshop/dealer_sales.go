@@ -1316,6 +1316,8 @@ const partyNameJoins = `JOIN parties pa ON pa.id = b.party_id LEFT JOIN customer
 
 var errDealInvoiced = fmt.Errorf("%w: the sale has been invoiced, so its terms are frozen; credit the invoice first", ErrInvalid)
 
+var errDealNothing = fmt.Errorf("%w: the sale comes to nothing, so there is nothing to invoice", ErrInvalid)
+
 var errDealNotComplete = fmt.Errorf("%w: the contract is not complete; a deal is invoiced once it is", ErrInvalid)
 
 // IssueDealInvoice invoices a completed deal (#177), from the shop's one
@@ -1392,6 +1394,11 @@ func IssueDealInvoice(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 				GrossMinor: d.Terms.PriceMinor, VATRateBasis: saleVATRate})
 		default:
 			return errDealIncomplete
+		}
+		// A sale of nothing is not invoiced: a 0 kr invoice could never be
+		// credited, and its deal would be frozen for good.
+		if d.TotalMinor() <= 0 {
+			return errDealNothing
 		}
 		for _, l := range d.Terms.Lines {
 			lines = append(lines, SourcedLine{Kind: "part", Description: l.Description, QuantityMilli: l.QuantityMilli,

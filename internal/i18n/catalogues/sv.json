@@ -8635,6 +8635,7 @@
     "a car sale in this period cannot be exported yet: how it is posted waits on the accountant": {"other": "en bilförsäljning i perioden kan inte exporteras ännu: hur den bokförs väntar på revisorn"},
     "What you typed, not saved": {"other": "Det du skrev, inte sparat"},
     "Somebody saved the terms while you were changing them. The form below holds theirs; carry over what you still want.": {"other": "Någon sparade villkoren medan du ändrade dem. Formuläret nedan har deras; för över det du fortfarande vill ha."},
-    "a line priced with its VAT is one of it": {"other": "en rad prissatt med moms är en av den"}
+    "a line priced with its VAT is one of it": {"other": "en rad prissatt med moms är en av den"},
+    "the sale comes to nothing, so there is nothing to invoice": {"other": "försäljningen uppgår till ingenting, så det finns inget att fakturera"}
   }
 }
