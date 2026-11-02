@@ -218,6 +218,17 @@ func TestTheRegisterIsReadInRoundTripsThatDoNotGrow(t *testing.T) {
 		return counter.n.Load() - before
 	}
 	rent(10)
+	// A check-in recorded at the check-out's moment, or before it -- a
+	// clock set wrong -- still has the rental in the register (review r7, #4).
+	for _, shift := range []string{"0", "-1 minute"} {
+		if _, err := pool.Exec(ctx, `UPDATE rental_handovers i SET at = o.at + $1::interval FROM rental_handovers o
+			WHERE i.kind = 'check_in' AND o.kind = 'check_out' AND o.booking_id = i.booking_id`, shift); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := workshop.RentalRegister(ctx, pool, rentalOwner(), workshop.RegisterFilter{From: time.Now().AddDate(0, 0, -1), To: in2031(31, 0)}, "Tillsyn"); err != nil || len(got) != 1 {
+			t.Errorf("back %s after it went out: %d rentals, %v", shift, len(got), err)
+		}
+	}
 	one := read(1)
 	rent(11)
 	rent(12)

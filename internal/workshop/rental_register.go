@@ -75,6 +75,11 @@ const registerColumns = `
 	` + rentalState + `, b.starts_at, b.ends_at, ho.at, hi.at,
 	coalesce(ag.id::text, ''), coalesce(ag.title, ''), ag.created_at`
 
+// registerOut is the time a rental was out, from check-out to check-in
+// or still, both ends counted: a check-in at the check-out's moment, or
+// recorded before it by a clock set wrong, is still a rental that went out.
+const registerOut = `tstzrange(least(ho.at, coalesce(hi.at, 'infinity')), greatest(ho.at, coalesce(hi.at, 'infinity')), '[]')`
+
 const registerFrom = `
 	FROM rental_bookings b
 	JOIN resource_blocks k ON k.id = b.block_id
@@ -160,10 +165,10 @@ func RentalRegister(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		out, err = registerTx(ctx, tx, scope, `
-			ho.at IS NOT NULL AND tstzrange(ho.at, coalesce(hi.at, 'infinity')) && tstzrange($1, $2)
+			ho.at IS NOT NULL AND `+registerOut+` && tstzrange($1, $2)
 			AND ($3 = '' OR b.unit_id::text = $3)
 			AND ($4 = '' OR EXISTS (SELECT 1 FROM vehicle_registrations g WHERE g.vehicle_id = r.vehicle_id AND g.normalised = $4
-			                         AND tstzrange(g.valid_from, g.valid_to) && tstzrange(ho.at, coalesce(hi.at, 'infinity'))))`,
+			                         AND tstzrange(g.valid_from, g.valid_to) && `+registerOut+`))`,
 			[]any{f.From, f.To, f.UnitID, reg}, purpose,
 			map[string]any{"from": f.From, "to": f.To, "unit_id": f.UnitID, "registration": reg})
 		return err
