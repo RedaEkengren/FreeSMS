@@ -438,11 +438,11 @@ type LicenceShown struct {
 // written: six digits or more with only separators or spaces between them,
 // digits of any script counted; a word of letters and three digits or more;
 // or a date, in figures or with the month's name, Swedish or English. A
-// clock time after "kl" and a range such as "3-4" are not dates. A free
+// clock time after "kl", a range such as "3-4", a fraction such as "3/4"
+// and a month with its year such as "12/2031" are not dates. A free
 // note can never be made fully safe; this refuses what a desk would
 // plausibly type.
 func holdsIdentifier(note string) bool {
-	run := 0
 	for _, word := range strings.Fields(note) {
 		digits, letters := 0, 0
 		for _, r := range word {
@@ -455,16 +455,6 @@ func holdsIdentifier(note string) bool {
 		}
 		if letters > 0 && digits >= 3 {
 			return true
-		}
-	}
-	for _, r := range note {
-		switch {
-		case unicode.IsDigit(r):
-			if run++; run >= 6 {
-				return true
-			}
-		case unicode.IsLetter(r):
-			run = 0
 		}
 	}
 	// Digits of any script read as the ASCII digit of the same value, so
@@ -480,20 +470,52 @@ func holdsIdentifier(note string) bool {
 	if aDayAndMonthName.MatchString(s) || aMonthNameAndDay.MatchString(s) {
 		return true
 	}
+	// A month with its year and a fraction are not dates, and are not
+	// counted towards a run of digits either: 12/2031 is six figures.
+	masked := []byte(s)
 	for _, m := range aDate.FindAllStringSubmatchIndex(s, -1) {
-		if m[8] >= 0 {
-			return true // a day, a month and a year
-		}
 		first, _ := strconv.Atoi(s[m[2]:m[3]])
 		second, _ := strconv.Atoi(s[m[6]:m[7]])
+		firstYear, secondYear := m[3]-m[2] == 4, m[7]-m[6] == 4
+		sep := s[m[4]:m[5]]
+		if m[8] >= 0 {
+			// Three figures: a date with its year, if two of them are a day
+			// and a month -- 1985-01-01, 01.01.85, 1/12/1990.
+			third, _ := strconv.Atoi(strings.TrimLeft(s[m[8]:m[9]], " ./-"))
+			if firstYear && dayAndMonth(third, second) || !firstYear && (dayAndMonth(first, second) || dayAndMonth(second, first)) {
+				return true
+			}
+			continue
+		}
+		monthYear := first >= 1 && first <= 12 && (secondYear || m[7]-m[6] == 2 && second > 12) ||
+			firstYear && second >= 1 && second <= 12
+		fraction := sep == "/" && first >= 1 && first < second && (second == 2 || second == 3 || second == 4 || second == 8)
 		switch {
-		case s[m[4]:m[5]] == "-":
+		case monthYear || fraction:
+			// 12/2031, 12/31, 2019-04: a month and a year, which is not a
+			// date of birth -- the year's shape is read before a day's.
+			// tank 3/4: a fraction.
+			for i := m[0]; i < m[1]; i++ {
+				masked[i] = 'x'
+			}
+		case sep == "-":
 			// 3-4: a range. A date without its year is written with a dot
 			// or a slash.
 		case aClock.MatchString(s[:m[0]]):
 			// kl 14.30
 		case dayAndMonth(first, second) || dayAndMonth(second, first):
 			return true
+		}
+	}
+	run := 0
+	for _, r := range string(masked) {
+		switch {
+		case unicode.IsDigit(r):
+			if run++; run >= 6 {
+				return true
+			}
+		case unicode.IsLetter(r):
+			run = 0
 		}
 	}
 	return false
@@ -511,10 +533,12 @@ func digitValue(r rune) rune {
 
 func dayAndMonth(day, month int) bool { return day >= 1 && day <= 31 && month >= 1 && month <= 12 }
 
-// aDate is a day and a month, with or without the year, as people write
-// them in figures: 1/1/85, 01.01.1985, 1985-01-01, 12.3. The groups are
-// the first number, the separator, the second number and the year.
-var aDate = regexp.MustCompile(`(\d{1,4})\s*([./-])\s*(\d{1,2})(\s*[./-]\s*\d{1,4})?`)
+// aDate is two or three figures joined as a date is written: 1/1/85,
+// 01.01.1985, 1985-01-01, 12.3 -- and as a month and a year or a fraction
+// are, which holdsIdentifier tells apart. The groups are the first number,
+// the separator, the second number and the third. Whole numbers only, so
+// 12/2031 is not read as 12/20.
+var aDate = regexp.MustCompile(`\b(\d{1,4})\s*([./-])\s*(\d{1,4})(\s*[./-]\s*\d{1,4})?\b`)
 
 // aClock is what a clock time is written after: kl 14.30, klockan 9.05.
 var aClock = regexp.MustCompile(`(?i)\b(?:kl\.?|klockan)\s*$`)
@@ -523,12 +547,12 @@ var aClock = regexp.MustCompile(`(?i)\b(?:kl\.?|klockan)\s*$`)
 const monthNames = `(?:jan(?:uari|uary)?|feb(?:ruari|ruary)?|mar(?:s|ch)?|apr(?:il)?|maj|may|jun[ie]?|jul[iy]?|aug(?:usti|ust)?|` +
 	`sep(?:t(?:ember)?)?|okt(?:ober)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)`
 
-// aDayAndMonthName is 12 mars, 1:a januari, 12th of March, 3 dec.
-var aDayAndMonthName = regexp.MustCompile(`(?i)\b(?:[1-9]|[12][0-9]|3[01])(?::?[ae]|st|nd|rd|th)?\.?\s*(?:of\s+)?` + monthNames + `\b`)
+// aDayAndMonthName is 12 mars, 05 mars, 1:a januari, 12th of March, 3 dec.
+var aDayAndMonthName = regexp.MustCompile(`(?i)\b(?:0?[1-9]|[12][0-9]|3[01])(?::?[ae]|st|nd|rd|th)?\.?\s*(?:of\s+)?` + monthNames + `\b`)
 
 // aMonthNameAndDay is March 12, sept 9 -- and not mars 2031, a month and a
 // year, which is not a date of birth.
-var aMonthNameAndDay = regexp.MustCompile(`(?i)\b` + monthNames + `\.?\s*(?:[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?\b`)
+var aMonthNameAndDay = regexp.MustCompile(`(?i)\b` + monthNames + `\.?\s*(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?\b`)
 
 // Why a licence check did not pass, as catalogue keys.
 const (

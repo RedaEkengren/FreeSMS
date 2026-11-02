@@ -426,12 +426,15 @@ func TestALicenceNoteRefusesIdentifiersHoweverWritten(t *testing.T) {
 		return err
 	}
 	for _, note := range []string{"DOB 01.01.1985", "no. B072RRE2I55", "85 01 01  1234", "nr ١٢٣٤٥٦٧٨", "född 1/1/85", "12.3.1990",
-		"8 5 0 1 0 1"} {
+		"8 5 0 1 0 1", "född 05 mars 1990", "DOB March 05, 1990", "01 jan 1985", "född 5/3", "12.3", "DOB 3/12/1990",
+		"1990-03-05", "född 05 mars"} {
 		if err := shown(note); !errors.Is(err, workshop.ErrInvalid) {
 			t.Errorf("a note %q: %v", note, err)
 		}
 	}
-	for _, note := range []string{"Tyskt körkort, giltigt i Sverige", "Klass C1E på kortet", "Förnyat 2031"} {
+	for _, note := range []string{"Tyskt körkort, giltigt i Sverige", "Klass C1E på kortet", "Förnyat 2031",
+		"tank 3/4", "tank 1/2", "giltigt till 12/2031", "giltigt till 12/31", "giltigt till mars 2031", "utfärdat 2019-04",
+		"kl 14.30", "3-4 dagar"} {
 		if err := shown(note); err != nil {
 			t.Errorf("a note %q with no identifier: %v", note, err)
 		}
