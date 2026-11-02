@@ -18,7 +18,7 @@ import (
 // does not exist; the operations check the role and the module again.
 
 // rentalPages are the templates Rental adds.
-var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "rentalprices", "rentalbooking"}
+var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "rentalprices", "rentalbooking", "rentalhandover"}
 
 // rentalData is what Rental's pages are given.
 type rentalData struct {
@@ -39,6 +39,9 @@ type rentalData struct {
 	Gaps       []workshop.HandoverGap
 	Agreements []workshop.DocumentRecord
 	Templates  []workshop.DocumentTemplate
+	// A booking's handovers, and the protocol on the handover page.
+	Handovers workshop.RentalHandoverView
+	Protocol  workshop.Protocol
 	// A booking form's own key: sent twice, one booking.
 	Key string
 	Now time.Time
@@ -192,6 +195,7 @@ func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("POST /rental/permits/{id}/revoke", s.requireSession(s.handleRentalPermitRevoke))
 	m.HandleFunc("POST /rental/profiles", s.requireSession(s.handleRentalProfileAdd))
 	m.HandleFunc("POST /rental/profiles/{id}", s.requireSession(s.handleRentalProfileSave))
+	s.rentalHandoverRoutes(m)
 }
 
 // handleRentalSettings shows the permit and the rule profiles: the rental
@@ -603,6 +607,9 @@ func (s *Server) handleRentalBooking(w http.ResponseWriter, r *http.Request) {
 	if d.Agreements, err = workshop.RentalAgreements(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
 		return
 	}
+	if d.Handovers, err = workshop.RentalHandovers(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
+		return
+	}
 	s.render(w, r, http.StatusOK, "rentalbooking", pageData{Title: "Rental booking", Session: session, Rental: d,
 		Today: time.Now().In(s.shopLocation(r)).Format("2006-01-02")})
 }
@@ -612,6 +619,12 @@ func (s *Server) handleRentalBookingAction(w http.ResponseWriter, r *http.Reques
 	id, loc := r.PathValue("id"), s.shopLocation(r)
 	var err error
 	switch r.PathValue("action") {
+	case "check-out":
+		s.handleRentalHandoverStart(w, r, workshop.HandoverOut)
+		return
+	case "check-in":
+		s.handleRentalHandoverStart(w, r, workshop.HandoverIn)
+		return
 	case "confirm":
 		err = workshop.ConfirmRentalBooking(r.Context(), s.pool, session.Scope, id)
 	case "cancel", "no-show":

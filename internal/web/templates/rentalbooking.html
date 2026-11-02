@@ -35,6 +35,36 @@
 {{end}}
 {{end}}
 
+<h2>{{$.T "Handover"}}</h2>
+{{with $.Rental.Handovers}}
+{{range $h := $.Rental.HandoverEnds}}{{with $h}}
+<div class="row"><span>{{if eq .Kind "check_out"}}{{$.T "Checked out"}}{{else}}{{$.T "Checked in"}}{{end}} &middot; {{$.Date ($.Local .At) "Mon 2 Jan 15:04"}}{{with .By}} &middot; {{.}}{{end}}</span>
+  <a href="/rental/handovers/{{.ProtocolID}}">{{$.T "the protocol"}}</a></div>
+<p class="waiting">{{if .OdometerKm}}{{$.Num .Km}} km{{if $h.Decreasing}} &middot; <span class="tag late">{{$.T "lower than before"}}</span>{{end}} &middot; {{end}}{{if ge .Fuel 0}}{{$.T "fuel or charge %d/8" .Fuel}} &middot; {{end}}{{if .RenterPresent}}{{if .RenterAccepted}}{{$.T "the renter accepted the protocol"}}{{else}}{{$.T "the renter was there"}}{{end}}{{else}}{{$.T "the renter was not there"}}{{end}}{{with .Note}} &middot; {{.}}{{end}}</p>
+{{end}}{{end}}
+{{with .UnderWay}}<p><a class="button" href="/rental/handovers/{{.ID}}">{{if eq .Subject "check_in"}}{{$.T "Carry on with the check-in"}}{{else}}{{$.T "Carry on with the check-out"}}{{end}}</a></p>{{end}}
+{{if .Proposed}}
+<h3>{{$.T "The return suggests"}}</h3>
+<p class="waiting">{{$.T "Nothing here is charged until a person confirms it."}}</p>
+<ul class="lines">
+  {{range .Proposed}}<li><div class="row"><span>{{$.T ($.Rental.ChargeLabel .Kind) ($.Num .Quantity)}}</span>{{if .UnitPriceMinor}}<span>{{$.T "%s each, net" ($.Money .Price)}}</span>{{end}}</div></li>{{end}}
+</ul>
+{{end}}
+{{if .Damage}}
+<h3>{{$.T "Damage on the unit"}}</h3>
+<ul class="lines">
+  {{range .Damage}}<li><div class="row"><span>{{.Description}}</span><span class="tag">{{$.T "observed"}}</span></div></li>{{end}}
+</ul>
+{{end}}
+{{if not .UnderWay}}
+{{if eq $.Rental.Booking.State "confirmed"}}
+<form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/check-out"><button type="submit"{{if $.Rental.Gaps}} disabled{{end}}>{{$.T "Check it out"}}</button></form>
+{{else if eq $.Rental.Booking.State "checked_out"}}
+<form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/check-in"><button type="submit">{{$.T "Check it in"}}</button></form>
+{{end}}
+{{end}}
+{{end}}
+
 <h2>{{$.T "Drivers"}}</h2>
 {{if $.Rental.Drivers}}
 <ul class="lines">

@@ -96,7 +96,6 @@ func itemID(p workshop.Protocol, label string) string {
 	return ""
 }
 
-
 // The acceptance test: a van goes out with a dent the desk records, comes
 // back with that dent and a new scratch, and only the scratch becomes a
 // damage case -- observed, and no charge. The handover times are stored,

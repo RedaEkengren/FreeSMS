@@ -8462,8 +8462,8 @@
     "known damage": {"other": "känd skada"},
     "left unfinished": {"other": "lämnad oavslutad"},
     "new since the check-out": {"other": "nytt sedan utlämningen"},
-    "%d km over the allowance": {"other": "%d km över det som ingår"},
-    "%d eighths of fuel or charge short": {"other": "%d åttondelar bränsle eller laddning saknas"},
-    "%d minutes late": {"other": "%d minuter sent"}
+    "%s km over the allowance": {"other": "%s km över det som ingår"},
+    "%s eighths of fuel or charge short": {"other": "%s åttondelar bränsle eller laddning saknas"},
+    "%s minutes late": {"other": "%s minuter sent"}
   }
 }
