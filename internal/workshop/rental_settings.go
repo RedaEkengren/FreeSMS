@@ -675,8 +675,10 @@ func rentalHandoverGapsTx(ctx context.Context, tx pgx.Tx, profile RentalProfile,
 		return nil, nil
 	}
 	if to.IsZero() {
-		// Open-ended: it has to stand for as long as can be said.
-		to = from.AddDate(1, 0, 0)
+		// Open-ended: it has to stand for as long as can be said, a year,
+		// that day included -- the period's last day is the day before
+		// its end, so the end is a moment into the day after.
+		to = from.AddDate(1, 0, 0).Add(time.Microsecond)
 	}
 	var missing bool
 	if err := tx.QueryRow(ctx, `
