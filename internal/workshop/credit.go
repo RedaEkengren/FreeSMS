@@ -415,6 +415,10 @@ func IssueCredit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in
 			net += l.NetMinor
 			vat += l.VATMinor
 		}
+		statement, schemeVAT, err := creditedSchemeTx(ctx, tx, invoiceID, p.lines)
+		if err != nil {
+			return err
+		}
 		const insert = `
 			INSERT INTO invoices
 			  (shop_id, series, number, work_order_id, credit_of_id, issued_by,
@@ -424,12 +428,12 @@ func IssueCredit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in
 			   seller_payment_terms_days, seller_f_tax,
 			   net_minor, vat_minor, gross_minor,
 			   ` + electronicColumns + `,
-			   source, vehicle_sale_id, rental_id, customer_id)
+			   source, vehicle_sale_id, rental_id, customer_id, margin_scheme_statement, margin_scheme_vat_minor)
 			SELECT $1,$2,$3,NULLIF($4, '')::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
 			       $23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,
 			       -- What it credits is what it is of (#146), read from the
 			       -- original rather than passed along, so it cannot differ.
-			       o.source, o.vehicle_sale_id, o.rental_id, o.customer_id
+			       o.source, o.vehicle_sale_id, o.rental_id, o.customer_id, $36, $37
 			FROM invoices o WHERE o.id = $5
 			RETURNING id, issued_at`
 		args := append([]any{
@@ -440,6 +444,7 @@ func IssueCredit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in
 			sold.PaymentTermsDays, sold.FTax,
 			net, vat, net + vat,
 		}, electronicArgs(sold, p.buyer, "")...)
+		args = append(args, statement, schemeVAT)
 		if err := tx.QueryRow(ctx, insert, args...).Scan(&note.ID, &note.IssuedAt); err != nil {
 			return fmt.Errorf("write credit note: %w", err)
 		}
@@ -607,10 +612,14 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 			   seller_payment_terms_days, seller_f_tax,
 			   net_minor, vat_minor, gross_minor,
 			   ` + electronicColumns + `,
-			   source, vehicle_sale_id, rental_id, customer_id)
+			   source, vehicle_sale_id, rental_id, customer_id, margin_scheme_statement, margin_scheme_vat_minor)
 			VALUES ($1,$2,$3,NULLIF($4, '')::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
 			        $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,
-			        $35, $36::uuid, $37::uuid, $38::uuid)
+			        $35, $36::uuid, $37::uuid, $38::uuid,
+			        -- The same sale billed again: what the original kept for
+			        -- the books under the margin scheme (#177).
+			        (SELECT margin_scheme_statement FROM invoices WHERE id = $39),
+			        (SELECT margin_scheme_vat_minor FROM invoices WHERE id = $39))
 			RETURNING id, issued_at`
 		ocr, err := paymentOCR(orig.Series, newNumber)
 		if err != nil {
@@ -624,7 +633,7 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 			sold.PaymentTermsDays, sold.FTax,
 			orig.NetMinor, orig.VATMinor, orig.GrossMinor,
 		}, electronicArgs(sold, buyer, ocr)...)
-		args = append(args, orig.Source, saleID, rentalID, newCustomer)
+		args = append(args, orig.Source, saleID, rentalID, newCustomer, invoiceID)
 		if err := tx.QueryRow(ctx, insert, args...).Scan(&out.ID, &out.IssuedAt); err != nil {
 			return fmt.Errorf("write replacement: %w", err)
 		}
@@ -748,4 +757,42 @@ func CorrectionsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		return more.Err()
 	})
 	return out, err
+}
+
+// creditedSchemeTx is what a credit note of invoiceID keeps for the books
+// under the margin scheme (#177): the original's statement, and its scheme
+// VAT taken back in proportion to the margin-scheme car credited -- the
+// whole of what is left when the credit takes the rest of the car, so the
+// credits together take back exactly what the invoice kept. Nothing when
+// the credit takes back no margin-scheme line.
+func creditedSchemeTx(ctx context.Context, tx pgx.Tx, invoiceID string, lines []invoiceLine) (statement, schemeVAT any, err error) {
+	var credited int64
+	for _, l := range lines {
+		if l.MarginScheme {
+			credited -= l.NetMinor
+		}
+	}
+	if credited == 0 {
+		return nil, nil, nil
+	}
+	var text *string
+	var origVAT *int64
+	var origNet, prevNet, prevVAT int64
+	if err := tx.QueryRow(ctx, `
+		SELECT o.margin_scheme_statement, o.margin_scheme_vat_minor,
+		       coalesce((SELECT sum(l.net_minor) FROM invoice_lines l WHERE l.invoice_id = o.id AND l.margin_scheme), 0),
+		       coalesce((SELECT -sum(c.net_minor) FROM invoice_lines c JOIN invoice_lines l ON l.id = c.credits_line_id
+		                 WHERE l.invoice_id = o.id AND l.margin_scheme), 0),
+		       coalesce((SELECT sum(n.margin_scheme_vat_minor) FROM invoices n WHERE n.credit_of_id = o.id), 0)
+		FROM invoices o WHERE o.id = $1`, invoiceID).Scan(&text, &origVAT, &origNet, &prevNet, &prevVAT); err != nil {
+		return nil, nil, fmt.Errorf("read the margin scheme: %w", err)
+	}
+	if origVAT == nil || origNet == 0 {
+		return text, nil, nil
+	}
+	back := money.Scale(*origVAT, credited, origNet)
+	if credited == origNet-prevNet {
+		back = *origVAT + prevVAT
+	}
+	return text, -back, nil
 }

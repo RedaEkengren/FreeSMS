@@ -230,3 +230,72 @@ func TestAnOrdinaryCarIsInvoicedAtExactlyItsPrice(t *testing.T) {
 		}
 	}
 }
+
+// schemeOf is what an invoice keeps for the books: its margin-scheme VAT
+// and its statement.
+func schemeOf(t *testing.T, pool *pgxpool.Pool, id string) (int64, string) {
+	t.Helper()
+	var vat *int64
+	var statement *string
+	if err := pool.QueryRow(context.Background(), `SELECT margin_scheme_vat_minor, margin_scheme_statement FROM invoices WHERE id = $1`,
+		id).Scan(&vat, &statement); err != nil {
+		t.Fatal(err)
+	}
+	var v int64
+	var s string
+	if vat != nil {
+		v = *vat
+	}
+	if statement != nil {
+		s = *statement
+	}
+	return v, s
+}
+
+// A margin-scheme sale credited takes its VAT back with it, in proportion
+// to the car credited and to the öre over every credit, and says how it is
+// taxed; credited in full and billed again to the right buyer, the new
+// invoice keeps the VAT and the statement.
+func TestAMarginSchemeCreditAndRebillKeepTheSchemesVAT(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	d := completedDealOn(t, pool, eligibleCar(t, pool), workshop.TaxMarginScheme)
+	inv, err := workshop.IssueDealInvoice(ctx, pool, sales(), d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Half the car credited, then the rest: 8 000 kr back in two parts.
+	half, err := workshop.IssueCredit(ctx, pool, everything(owner()), inv.ID, workshop.CreditRequest{
+		Lines: []workshop.CreditLine{{Position: 1, QuantityMilli: 500}}, Reason: "Halva priset tillbaka"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vat, statement := schemeOf(t, pool, half.ID); vat != -400_000 || statement != workshop.MarginSchemeStatement {
+		t.Errorf("half the car credited: VAT %d, statement %q; want -4 000 kr and the statement", vat, statement)
+	}
+	rest, err := workshop.IssueCredit(ctx, pool, everything(owner()), inv.ID, workshop.CreditRequest{Reason: "Resten"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vat, _ := schemeOf(t, pool, rest.ID); vat != -400_000 {
+		t.Errorf("the rest credited: VAT %d; want -4 000 kr, all of it back over both", vat)
+	}
+
+	// Billed again to another buyer: the same VAT and statement.
+	other, err := workshop.CreateParty(ctx, pool, everything(owner()), workshop.NewParty{Kind: "private", Name: "Lo Letare",
+		Phone: "0731234567", Role: workshop.PartyBuyer})
+	if err != nil {
+		t.Fatal(err)
+	}
+	customer, err := workshop.CustomerForParty(ctx, pool, everything(owner()), other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := workshop.RebillTo(ctx, pool, everything(owner()), inv.ID, workshop.RebillRequest{CustomerID: customer, Reason: "Fel köpare"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vat, statement := schemeOf(t, pool, again.ID); vat != 800_000 || statement != workshop.MarginSchemeStatement {
+		t.Errorf("the replacement: VAT %d, statement %q; want 8 000 kr and the statement", vat, statement)
+	}
+}
