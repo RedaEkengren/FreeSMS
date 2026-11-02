@@ -96,3 +96,44 @@ func TestAPayoutNamingWhatItIsNotForDoesNotStopTheDeploy(t *testing.T) {
 		t.Errorf("the constraint is not validated (%v)", err)
 	}
 }
+
+// A shop with its own template under the shipped template's name -- and
+// the shipped one besides -- migrates, and only the oldest of each kind is
+// marked as the shipped one.
+func TestTheShippedTemplateBackfillMarksOnePerKind(t *testing.T) {
+	pool := testsupport.FreshPool(t)
+	ctx := context.Background()
+	if err := database.Migrate(ctx, pool, migrationsBefore(t, "document_templates_shipped_idx")); err != nil {
+		t.Fatalf("migrate to the release before: %v", err)
+	}
+	const shop = "11111111-1111-1111-1111-111111111111"
+	for _, q := range []string{
+		`INSERT INTO shops (id, name) VALUES ('` + shop + `', 'Verkstaden')`,
+		`INSERT INTO document_templates (id, shop_id, kind, name, created_at) VALUES
+		 ('aaaaaaaa-0000-0000-0000-000000000002', '` + shop + `', 'sales_contract', 'Köpeavtal (utkast, behöver juridisk granskning)', now()),
+		 ('ffffffff-0000-0000-0000-000000000001', '` + shop + `', 'sales_contract', 'Köpeavtal (utkast, behöver juridisk granskning)', now() - interval '1 day'),
+		 ('bbbbbbbb-0000-0000-0000-000000000003', '` + shop + `', 'sales_contract', 'Sales contract (draft, needs legal review)', now())`,
+	} {
+		if _, err := pool.Exec(ctx, q); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+	if err := database.Migrate(ctx, pool, migrations.FS); err != nil {
+		t.Fatalf("the deploy stopped on templates with the shipped name: %v", err)
+	}
+	var marked []string
+	rows, err := pool.Query(ctx, `SELECT id::text FROM document_templates WHERE shipped IS NOT NULL ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		marked = append(marked, id)
+	}
+	if len(marked) != 1 || marked[0] != "ffffffff-0000-0000-0000-000000000001" {
+		t.Errorf("marked as shipped: %v; want the oldest alone", marked)
+	}
+}
