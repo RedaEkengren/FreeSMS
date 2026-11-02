@@ -143,8 +143,14 @@ func (s *Server) handleRentalRegisterCSV(w http.ResponseWriter, r *http.Request)
 			if dr.Name != "" {
 				main, off = strconv.FormatBool(dr.Main), strconv.FormatBool(dr.Removed)
 			}
-			_ = out.Write([]string{e.Reference, e.Unit, e.Registration, e.Renter, e.State, at(&starts), at(&ends), at(e.Out), at(e.In),
-				dr.Name, main, off, checked, passed, until, e.AgreementTitle, at(e.AgreementAt)})
+			row := []string{e.Reference, e.Unit, e.Registration, e.Renter, e.State, at(&starts), at(&ends), at(e.Out), at(e.In),
+				dr.Name, main, off, checked, passed, until, e.AgreementTitle, at(e.AgreementAt)}
+			// A name or a title is somebody's typing: never a formula
+			// in the authority's spreadsheet.
+			for i := range row {
+				row[i] = workshop.SpreadsheetCell(row[i])
+			}
+			_ = out.Write(row)
 		}
 	}
 	out.Flush()

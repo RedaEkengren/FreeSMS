@@ -14,7 +14,8 @@ import (
 // The owner reads the rental register, as a page and as a CSV, saying
 // why; the rental desk does not; and with Rental switched off the
 // register is still there. The settings say its retention is missing
-// until the owner decides it (#200).
+// until the owner decides it (#200). A name a spreadsheet would run as a
+// formula is written so that it does not (review r6, #4).
 func TestTheOwnerReadsTheRentalRegister(t *testing.T) {
 	ts, pool := testServer(t)
 	seedRentalDesk(t, func(t *testing.T, stmts []string) { seedShop(t, pool, shopA, stmts) })
@@ -31,7 +32,7 @@ func TestTheOwnerReadsTheRentalRegister(t *testing.T) {
 	plan, _ := workshop.CreateRatePlan(ctx, pool, owner, workshop.NewRatePlan{Name: "Bil", Category: "Bil", VATRateBp: 2500, SeasonRule: "at_start"})
 	price := int64(40000)
 	workshop.AddRateSeason(ctx, pool, owner, plan, workshop.RateSeason{ValidFrom: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), Day: &price})
-	renter, _ := workshop.CreateParty(ctx, pool, owner, workshop.NewParty{Kind: "private", Name: "Rita Hyrare", Role: workshop.PartyRenter})
+	renter, _ := workshop.CreateParty(ctx, pool, owner, workshop.NewParty{Kind: "private", Name: "=HYPERLINK(\"x\") Rita Hyrare", Role: workshop.PartyRenter})
 	if _, err := workshop.BookRental(ctx, pool, owner, workshop.NewRentalBooking{UnitID: unit, RenterID: renter,
 		From: time.Date(2031, 5, 10, 9, 0, 0, 0, time.UTC), To: time.Date(2031, 5, 12, 9, 0, 0, 0, time.UTC)}); err != nil {
 		t.Fatal(err)
@@ -48,7 +49,7 @@ func TestTheOwnerReadsTheRentalRegister(t *testing.T) {
 	}
 	resp, _ = client.Get(ts.URL + "/rental/register.csv?" + q.Encode())
 	body := readBody(t, resp)
-	if resp.StatusCode != http.StatusOK || !strings.HasPrefix(body, "booking,unit,registration") || !strings.Contains(body, "R-1,V9,REG 123,Rita Hyrare") {
+	if resp.StatusCode != http.StatusOK || !strings.HasPrefix(body, "booking,unit,registration") || !strings.Contains(body, `R-1,V9,REG 123,"'=HYPERLINK(""x"") Rita Hyrare"`) {
 		t.Errorf("the register's CSV: %d %s", resp.StatusCode, body)
 	}
 	desk := signIn(t, ts, rentalEmail)

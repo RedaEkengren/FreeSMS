@@ -307,6 +307,18 @@ func looksLikeFormula(s string) bool {
 	return false
 }
 
+// SpreadsheetCell is a value as it may be written into a file a
+// spreadsheet opens: one it would run as a formula is led by an
+// apostrophe, which the spreadsheet shows as text and does not run. The
+// same test as an import refuses (looksLikeFormula), applied on the way
+// out.
+func SpreadsheetCell(s string) string {
+	if looksLikeFormula(s) {
+		return "'" + s
+	}
+	return s
+}
+
 // parseScaledDecimal reads a number written the Swedish way or the English
 // way into an integer of thousandths, hundredths and so on, refusing digits
 // beyond the scale instead of rounding them away.
