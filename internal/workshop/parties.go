@@ -688,10 +688,7 @@ func customerForPartyTx(ctx context.Context, tx pgx.Tx, scope access.Scope, part
 		scope.ShopID, kind, person, company, org, line1, line2, postal, city, country).Scan(&made); err != nil {
 		return "", fmt.Errorf("make the party's customer: %w", err)
 	}
-	if _, err := tx.Exec(ctx, `
-		UPDATE parties SET customer_id = $2, person_id = NULL, company_name = NULL, org_number = NULL, address_line1 = NULL,
-		       address_line2 = NULL, postal_code = NULL, city = NULL, country = NULL, revision = revision + 1
-		WHERE id = $1`, id, made); err != nil {
+	if _, err := tx.Exec(ctx, `SELECT party_becomes_customer($1, $2)`, id, made); err != nil {
 		return "", fmt.Errorf("tie the party to its customer: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `SELECT set_config('app.party_becoming_customer', '', true)`); err != nil {
