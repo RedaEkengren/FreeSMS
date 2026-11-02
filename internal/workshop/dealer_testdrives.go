@@ -113,19 +113,20 @@ type NewTestDrive struct {
 }
 
 var (
-	errDriveTime     = fmt.Errorf("%w: a test drive ends after it starts, within a day, and does not start in the past", ErrInvalid)
-	errDriveText     = fmt.Errorf("%w: say where they may drive in 300 characters or fewer", ErrInvalid)
-	errDriveCar      = fmt.Errorf("%w: that car is not in stock to be driven", ErrInvalid)
-	errDriveKey      = fmt.Errorf("%w: that request was already used for another test drive", ErrInvalid)
-	errDriveState    = fmt.Errorf("%w: the test drive is not where that can be done", ErrInvalid)
-	errDriveLicence  = fmt.Errorf("%w: the driver's identity, licence and age have not been checked and found good for today", ErrInvalid)
-	errDriveUnsigned = fmt.Errorf("%w: the agreement is not signed; whoever runs the shop may let the drive start with a note why", ErrInvalid)
-	errDriveOdometer = fmt.Errorf("%w: say what the odometer shows, in whole kilometres", ErrInvalid)
-	errDriveLess     = fmt.Errorf("%w: the odometer cannot show less on return than when the drive started", ErrInvalid)
-	errDriveMethod   = fmt.Errorf("%w: say how the licence was checked, and what it allows in categories such as B", ErrInvalid)
-	errDriveNote     = fmt.Errorf("%w: a note is at most 300 characters on a check and 500 on a drive", ErrInvalid)
-	errDriveAge      = fmt.Errorf("%w: the youngest driver is from 16 to 99", ErrInvalid)
-	errDriveDriver   = fmt.Errorf("%w: say who drives: a name of up to 200 characters and a phone number", ErrInvalid)
+	errDriveTime           = fmt.Errorf("%w: a test drive ends after it starts, within a day, and does not start in the past", ErrInvalid)
+	errDriveText           = fmt.Errorf("%w: say where they may drive in 300 characters or fewer", ErrInvalid)
+	errDriveCar            = fmt.Errorf("%w: that car is not in stock to be driven", ErrInvalid)
+	errDriveKey            = fmt.Errorf("%w: that request was already used for another test drive", ErrInvalid)
+	errDriveState          = fmt.Errorf("%w: the test drive is not where that can be done", ErrInvalid)
+	errDriveLicence        = fmt.Errorf("%w: the driver's identity, licence and age have not been checked and found good for today", ErrInvalid)
+	errDriveUnsigned       = fmt.Errorf("%w: the agreement is not signed; whoever runs the shop may let the drive start with a note why", ErrInvalid)
+	errDriveOdometer       = fmt.Errorf("%w: say what the odometer shows, in whole kilometres", ErrInvalid)
+	errDriveLess           = fmt.Errorf("%w: the odometer cannot show less on return than when the drive started", ErrInvalid)
+	errDriveMethod         = fmt.Errorf("%w: say how the licence was checked, and what it allows in categories such as B", ErrInvalid)
+	errDriveNote           = fmt.Errorf("%w: a note is at most 300 characters on a check and 500 on a drive", ErrInvalid)
+	errDriveAge            = fmt.Errorf("%w: the youngest driver is from 16 to 99", ErrInvalid)
+	errDriveChooseTemplate = fmt.Errorf("%w: say which of the shop's agreement templates to use", ErrInvalid)
+	errDriveDriver         = fmt.Errorf("%w: say who drives: a name of up to 200 characters and a phone number", ErrInvalid)
 	// ErrMadeMeanwhile is a contract or agreement made again from a page that
 	// did not show the newest one: somebody made one meanwhile.
 	ErrMadeMeanwhile = fmt.Errorf("%w: somebody made a new one meanwhile; read it again before making another", ErrInvalid)
@@ -757,15 +758,19 @@ var shippedTestDriveNames = map[string]string{"sv": "Provkörningsavtal (behöve
 // ShippedTestDriveTemplate is the shipped agreement's text in a language.
 func ShippedTestDriveTemplate(locale string) string { return shippedTestDriveTemplates[locale] }
 
-func ensureTestDriveTemplateTx(ctx context.Context, tx pgx.Tx, shopID string) error {
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('test_drive_templates:' || $1::text, 0))`, shopID); err != nil {
-		return fmt.Errorf("lock templates: %w", err)
+// ensureTestDriveTemplateTx is the shipped agreement template's newest version: the
+// one named as shipped in the shop's language, made the first time when
+// the shop has none of the kind. A shop with only its own templates is
+// asked which to use, never handed one of them unasked.
+func ensureTestDriveTemplateTx(ctx context.Context, tx pgx.Tx, shopID string) (string, error) {
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('shipped:test_drive_agreement:' || $1::text, 0))`, shopID); err != nil {
+		return "", fmt.Errorf("lock templates: %w", err)
 	}
-	var some bool
 	var locale string
-	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM document_templates WHERE kind = 'test_drive_agreement'), (SELECT locale FROM shops)`).
-		Scan(&some, &locale); err != nil || some {
-		return err
+	var some bool
+	if err := tx.QueryRow(ctx, `SELECT (SELECT locale FROM shops), EXISTS (SELECT 1 FROM document_templates WHERE kind = 'test_drive_agreement')`).
+		Scan(&locale, &some); err != nil {
+		return "", err
 	}
 	text, ok := shippedTestDriveTemplates[locale]
 	if !ok {
@@ -775,30 +780,27 @@ func ensureTestDriveTemplateTx(ctx context.Context, tx pgx.Tx, shopID string) er
 	if n, ok := shippedTestDriveNames[locale]; ok {
 		name = n
 	}
+	var version string
+	err := tx.QueryRow(ctx, `
+		SELECT v.id FROM document_templates t JOIN document_template_versions v ON v.template_id = t.id
+		WHERE t.kind = 'test_drive_agreement' AND t.name = $1 ORDER BY v.version DESC LIMIT 1`, name).Scan(&version)
+	switch {
+	case err == nil:
+		return version, nil
+	case !errors.Is(err, pgx.ErrNoRows):
+		return "", fmt.Errorf("read the shipped template: %w", err)
+	case some:
+		// The shop has its own and not the shipped one: it chooses.
+		return "", errDriveChooseTemplate
+	}
 	var id string
 	if err := tx.QueryRow(ctx, `INSERT INTO document_templates (shop_id, kind, name) VALUES ($1, 'test_drive_agreement', $2) RETURNING id`,
 		shopID, name).Scan(&id); err != nil {
-		return fmt.Errorf("make the shipped template: %w", err)
+		return "", fmt.Errorf("make the shipped template: %w", err)
 	}
-	_, err := tx.Exec(ctx, `INSERT INTO document_template_versions (shop_id, template_id, version, body) VALUES ($1, $2, 1, $3)`, shopID, id, text)
-	return err
-}
-
-// TestDriveTemplates lists the test-drive agreement templates, making the
-// shipped one the first time. For whoever sells cars.
-func TestDriveTemplates(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]DocumentTemplate, error) {
-	if !scope.Role.SellsVehicles() {
-		return nil, access.ErrForbidden
-	}
-	if err := scope.Require(access.Dealer); err != nil {
-		return nil, err
-	}
-	if err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		return ensureTestDriveTemplateTx(ctx, tx, scope.ShopID)
-	}); err != nil {
-		return nil, err
-	}
-	return DocumentTemplates(ctx, pool, scope, DocTestDriveAgreement)
+	err = tx.QueryRow(ctx, `INSERT INTO document_template_versions (shop_id, template_id, version, body) VALUES ($1, $2, 1, $3) RETURNING id`,
+		shopID, id, text).Scan(&version)
+	return version, err
 }
 
 // ProduceTestDriveAgreement freezes the agreement for a drive from a
@@ -838,13 +840,8 @@ func ProduceTestDriveAgreement(ctx context.Context, pool *pgxpool.Pool, scope ac
 		// None chosen: the shipped agreement, made here the first time --
 		// in a write, never when a page is read.
 		if templateVersionID == "" {
-			if err := ensureTestDriveTemplateTx(ctx, tx, scope.ShopID); err != nil {
+			if templateVersionID, err = ensureTestDriveTemplateTx(ctx, tx, scope.ShopID); err != nil {
 				return err
-			}
-			if err := tx.QueryRow(ctx, `
-				SELECT v.id FROM document_templates t JOIN document_template_versions v ON v.template_id = t.id
-				WHERE t.kind = 'test_drive_agreement' ORDER BY t.created_at, t.id, v.version DESC LIMIT 1`).Scan(&templateVersionID); err != nil {
-				return fmt.Errorf("read the shipped agreement: %w", err)
 			}
 		}
 		var shop, org string

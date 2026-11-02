@@ -214,24 +214,25 @@ func (d Deal) Missing() []string {
 }
 
 var (
-	errDealBuyers     = fmt.Errorf("%w: a deal has one to four buyers, each named once", ErrInvalid)
-	errDealKind       = fmt.Errorf("%w: say whether the buyer is a consumer or a business", ErrInvalid)
-	errDealPrice      = fmt.Errorf("%w: a price is from nothing up to a billion kronor", ErrInvalid)
-	errDealTax        = fmt.Errorf("%w: that is not a way a sale is taxed", ErrInvalid)
-	errDealScheme     = fmt.Errorf("%w: this car may not be sold under the margin scheme: its purchase does not make it eligible", ErrInvalid)
-	errDealText       = fmt.Errorf("%w: a warranty and a note are at most 1000 characters, a place 300 and payment terms 500", ErrInvalid)
-	errDealOdometer   = fmt.Errorf("%w: an odometer reading is a whole number of kilometres, under ten million", ErrInvalid)
-	errDealLine       = fmt.Errorf("%w: an extra has a description, a quantity, a price and a VAT rate", ErrInvalid)
-	errDealCar        = fmt.Errorf("%w: that car is not in stock to be sold", ErrInvalid)
-	errDealOpen       = fmt.Errorf("%w: the car already has a deal being agreed or contracted; cancel that first", ErrInvalid)
-	errDealKey        = fmt.Errorf("%w: that request was already used for another deal", ErrInvalid)
-	errDealMoved      = fmt.Errorf("%w: the deal was changed by somebody else meanwhile; read it again", ErrInvalid)
-	errDealState      = fmt.Errorf("%w: the deal is not where that can be done", ErrInvalid)
-	errDealDefect     = fmt.Errorf("%w: describe the defect in 1000 characters or fewer", ErrInvalid)
-	errDealAnswer     = fmt.Errorf("%w: a defect is answered by one of the deal's buyers, on paper with the scan, in person, or electronically", ErrInvalid)
-	errDealTemplate   = fmt.Errorf("%w: that is not a sales contract template", ErrInvalid)
-	errDealComplete   = fmt.Errorf("%w: the contract is complete and states everything; change the terms or state a defect first", ErrInvalid)
-	errDealIncomplete = fmt.Errorf("%w: the contract cannot be completed yet", ErrInvalid)
+	errDealBuyers         = fmt.Errorf("%w: a deal has one to four buyers, each named once", ErrInvalid)
+	errDealKind           = fmt.Errorf("%w: say whether the buyer is a consumer or a business", ErrInvalid)
+	errDealPrice          = fmt.Errorf("%w: a price is from nothing up to a billion kronor", ErrInvalid)
+	errDealTax            = fmt.Errorf("%w: that is not a way a sale is taxed", ErrInvalid)
+	errDealScheme         = fmt.Errorf("%w: this car may not be sold under the margin scheme: its purchase does not make it eligible", ErrInvalid)
+	errDealText           = fmt.Errorf("%w: a warranty and a note are at most 1000 characters, a place 300 and payment terms 500", ErrInvalid)
+	errDealOdometer       = fmt.Errorf("%w: an odometer reading is a whole number of kilometres, under ten million", ErrInvalid)
+	errDealLine           = fmt.Errorf("%w: an extra has a description, a quantity, a price and a VAT rate", ErrInvalid)
+	errDealCar            = fmt.Errorf("%w: that car is not in stock to be sold", ErrInvalid)
+	errDealOpen           = fmt.Errorf("%w: the car already has a deal being agreed or contracted; cancel that first", ErrInvalid)
+	errDealKey            = fmt.Errorf("%w: that request was already used for another deal", ErrInvalid)
+	errDealMoved          = fmt.Errorf("%w: the deal was changed by somebody else meanwhile; read it again", ErrInvalid)
+	errDealState          = fmt.Errorf("%w: the deal is not where that can be done", ErrInvalid)
+	errDealDefect         = fmt.Errorf("%w: describe the defect in 1000 characters or fewer", ErrInvalid)
+	errDealAnswer         = fmt.Errorf("%w: a defect is answered by one of the deal's buyers, on paper with the scan, in person, or electronically", ErrInvalid)
+	errDealTemplate       = fmt.Errorf("%w: that is not a sales contract template", ErrInvalid)
+	errDealChooseTemplate = fmt.Errorf("%w: say which of the shop's contract templates to use", ErrInvalid)
+	errDealComplete       = fmt.Errorf("%w: the contract is complete and states everything; change the terms or state a defect first", ErrInvalid)
+	errDealIncomplete     = fmt.Errorf("%w: the contract cannot be completed yet", ErrInvalid)
 	// ErrDealNoReason is a deal cancelled without saying why.
 	ErrDealNoReason = fmt.Errorf("%w: say why the deal is cancelled, in 300 characters or fewer", ErrInvalid)
 )
@@ -1092,15 +1093,19 @@ var disputeClauses = map[string]map[string]string{
 // ShippedSalesContract is the shipped contract's text in a language.
 func ShippedSalesContract(locale string) string { return shippedSalesContracts[locale] }
 
-func ensureSalesContractTemplateTx(ctx context.Context, tx pgx.Tx, shopID string) error {
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('sales_templates:' || $1::text, 0))`, shopID); err != nil {
-		return fmt.Errorf("lock templates: %w", err)
+// ensureSalesContractTemplateTx is the shipped contract template's newest version: the
+// one named as shipped in the shop's language, made the first time when
+// the shop has none of the kind. A shop with only its own templates is
+// asked which to use, never handed one of them unasked.
+func ensureSalesContractTemplateTx(ctx context.Context, tx pgx.Tx, shopID string) (string, error) {
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('shipped:sales_contract:' || $1::text, 0))`, shopID); err != nil {
+		return "", fmt.Errorf("lock templates: %w", err)
 	}
-	var some bool
 	var locale string
-	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM document_templates WHERE kind = 'sales_contract'), (SELECT locale FROM shops)`).
-		Scan(&some, &locale); err != nil || some {
-		return err
+	var some bool
+	if err := tx.QueryRow(ctx, `SELECT (SELECT locale FROM shops), EXISTS (SELECT 1 FROM document_templates WHERE kind = 'sales_contract')`).
+		Scan(&locale, &some); err != nil {
+		return "", err
 	}
 	text, ok := shippedSalesContracts[locale]
 	if !ok {
@@ -1110,34 +1115,32 @@ func ensureSalesContractTemplateTx(ctx context.Context, tx pgx.Tx, shopID string
 	if n, ok := shippedSalesContractNames[locale]; ok {
 		name = n
 	}
+	var version string
+	err := tx.QueryRow(ctx, `
+		SELECT v.id FROM document_templates t JOIN document_template_versions v ON v.template_id = t.id
+		WHERE t.kind = 'sales_contract' AND t.name = $1 ORDER BY v.version DESC LIMIT 1`, name).Scan(&version)
+	switch {
+	case err == nil:
+		return version, nil
+	case !errors.Is(err, pgx.ErrNoRows):
+		return "", fmt.Errorf("read the shipped template: %w", err)
+	case some:
+		// The shop has its own and not the shipped one: it chooses.
+		return "", errDealChooseTemplate
+	}
 	var id string
 	if err := tx.QueryRow(ctx, `INSERT INTO document_templates (shop_id, kind, name) VALUES ($1, 'sales_contract', $2) RETURNING id`,
 		shopID, name).Scan(&id); err != nil {
-		return fmt.Errorf("make the shipped template: %w", err)
+		return "", fmt.Errorf("make the shipped template: %w", err)
 	}
-	_, err := tx.Exec(ctx, `INSERT INTO document_template_versions (shop_id, template_id, version, body) VALUES ($1, $2, 1, $3)`, shopID, id, text)
-	return err
-}
-
-// SalesContractTemplates lists the sales contract templates, making the
-// shipped one the first time. For whoever sells cars.
-func SalesContractTemplates(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]DocumentTemplate, error) {
-	if !scope.Role.SellsVehicles() {
-		return nil, access.ErrForbidden
-	}
-	if err := scope.Require(access.Dealer); err != nil {
-		return nil, err
-	}
-	if err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		return ensureSalesContractTemplateTx(ctx, tx, scope.ShopID)
-	}); err != nil {
-		return nil, err
-	}
-	return DocumentTemplates(ctx, pool, scope, DocSalesContract)
+	err = tx.QueryRow(ctx, `INSERT INTO document_template_versions (shop_id, template_id, version, body) VALUES ($1, $2, 1, $3) RETURNING id`,
+		shopID, id, text).Scan(&version)
+	return version, err
 }
 
 // ProduceSalesContract freezes the contract for a deal's terms as they
-// stand from a template version -- the shipped one when none is given -- with its buyers as parties, in one
+// stand from a template version -- the shipped one when none is given --
+// with its buyers as parties, in one
 // transaction with the deal locked. replacing is the contract the caller
 // saw, or empty for none: made again, the new one supersedes it; when the
 // deal's contract has moved on meanwhile, nothing is made
@@ -1180,13 +1183,8 @@ func ProduceSalesContract(ctx context.Context, pool *pgxpool.Pool, scope access.
 		// None chosen: the shipped contract, made here the first time --
 		// in a write, never when a page is read.
 		if templateVersionID == "" {
-			if err := ensureSalesContractTemplateTx(ctx, tx, scope.ShopID); err != nil {
+			if templateVersionID, err = ensureSalesContractTemplateTx(ctx, tx, scope.ShopID); err != nil {
 				return err
-			}
-			if err := tx.QueryRow(ctx, `
-				SELECT v.id FROM document_templates t JOIN document_template_versions v ON v.template_id = t.id
-				WHERE t.kind = 'sales_contract' ORDER BY t.created_at, t.id, v.version DESC LIMIT 1`).Scan(&templateVersionID); err != nil {
-				return fmt.Errorf("read the shipped contract: %w", err)
 			}
 		}
 		var body, kind string

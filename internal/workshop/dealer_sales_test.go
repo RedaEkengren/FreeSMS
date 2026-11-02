@@ -46,11 +46,8 @@ func signAll(t *testing.T, pool *pgxpool.Pool, doc string) {
 
 func contractTemplate(t *testing.T, pool *pgxpool.Pool) string {
 	t.Helper()
-	tpls, err := workshop.SalesContractTemplates(context.Background(), pool, sales())
-	if err != nil || len(tpls) != 1 {
-		t.Fatalf("the shipped contract: %+v, %v", tpls, err)
-	}
-	return tpls[0].VersionID
+	// None chosen: the shipped contract, made with the first contract.
+	return ""
 }
 
 // A consumer's deal goes from terms to a completed contract: how the sale
@@ -741,5 +738,23 @@ func TestAContractWithoutItsBasisIsReadAsMadeFromItsTime(t *testing.T) {
 	}
 	if got, _ := workshop.DealByID(ctx, pool, sales(), d.ID); got.Completed() {
 		t.Error("a defect found after the old contract does not make it out of date")
+	}
+}
+
+// With no template chosen the contract is the shipped one, never another
+// of the shop's: a shop with only its own template is asked which.
+func TestNoTemplateChosenIsTheShippedOneOrAQuestion(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	if _, err := workshop.SaveDocumentTemplate(ctx, pool, everything(owner()), "", workshop.DocSalesContract, "Eget avtal",
+		"Eget avtal för {buyers}."); err != nil {
+		t.Fatal(err)
+	}
+	d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: carForSale(t, pool), Terms: consumerTerms(driver(t, pool))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := workshop.ProduceSalesContract(ctx, pool, sales(), d.ID, "", ""); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("no template chosen, with only the shop's own: %v; want asked which", err)
 	}
 }

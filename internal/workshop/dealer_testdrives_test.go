@@ -408,10 +408,8 @@ func TestAnAgreementMadeTwiceAtOnceIsOne(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tpls, err := workshop.TestDriveTemplates(ctx, pool, sales())
-	if err != nil || len(tpls) != 1 {
-		t.Fatalf("the shipped template: %+v, %v", tpls, err)
-	}
+	// None chosen: the shipped agreement, made with the first.
+	tpls := []workshop.DocumentTemplate{{}}
 	var wg sync.WaitGroup
 	ids := make([]string, 4)
 	errs := make([]error, 4)
