@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -436,8 +437,10 @@ type LicenceShown struct {
 // number, a personal identity number or a date of birth, however it is
 // written: six digits or more with only separators or spaces between them,
 // digits of any script counted; a word of letters and three digits or more;
-// or a date. A free note can never be made fully safe; this refuses what a
-// desk would plausibly type.
+// or a date, in figures or with the month's name, Swedish or English. A
+// clock time after "kl" and a range such as "3-4" are not dates. A free
+// note can never be made fully safe; this refuses what a desk would
+// plausibly type.
 func holdsIdentifier(note string) bool {
 	run := 0
 	for _, word := range strings.Fields(note) {
@@ -464,19 +467,68 @@ func holdsIdentifier(note string) bool {
 			run = 0
 		}
 	}
+	// Digits of any script read as the ASCII digit of the same value, so
+	// that a day and a month can be told from a clock time.
 	var ascii strings.Builder
 	for _, r := range note {
 		if unicode.IsDigit(r) {
-			r = '9'
+			r = '0' + digitValue(r)
 		}
 		ascii.WriteRune(r)
 	}
-	return aDate.MatchString(ascii.String())
+	s := ascii.String()
+	if aDayAndMonthName.MatchString(s) || aMonthNameAndDay.MatchString(s) {
+		return true
+	}
+	for _, m := range aDate.FindAllStringSubmatchIndex(s, -1) {
+		if m[8] >= 0 {
+			return true // a day, a month and a year
+		}
+		first, _ := strconv.Atoi(s[m[2]:m[3]])
+		second, _ := strconv.Atoi(s[m[6]:m[7]])
+		switch {
+		case s[m[4]:m[5]] == "-":
+			// 3-4: a range. A date without its year is written with a dot
+			// or a slash.
+		case aClock.MatchString(s[:m[0]]):
+			// kl 14.30
+		case dayAndMonth(first, second) || dayAndMonth(second, first):
+			return true
+		}
+	}
+	return false
 }
 
+// digitValue is the value of a decimal digit of any script: its distance
+// from the zero its run of digits starts at.
+func digitValue(r rune) rune {
+	zero := r
+	for unicode.IsDigit(zero - 1) {
+		zero--
+	}
+	return (r - zero) % 10
+}
+
+func dayAndMonth(day, month int) bool { return day >= 1 && day <= 31 && month >= 1 && month <= 12 }
+
 // aDate is a day and a month, with or without the year, as people write
-// them: 1/1/85, 01.01.1985, 1985-01-01.
-var aDate = regexp.MustCompile(`\d{1,4}\s*[./-]\s*\d{1,2}(\s*[./-]\s*\d{1,4})?`)
+// them in figures: 1/1/85, 01.01.1985, 1985-01-01, 12.3. The groups are
+// the first number, the separator, the second number and the year.
+var aDate = regexp.MustCompile(`(\d{1,4})\s*([./-])\s*(\d{1,2})(\s*[./-]\s*\d{1,4})?`)
+
+// aClock is what a clock time is written after: kl 14.30, klockan 9.05.
+var aClock = regexp.MustCompile(`(?i)\b(?:kl\.?|klockan)\s*$`)
+
+// The months by name and short name, Swedish and English.
+const monthNames = `(?:jan(?:uari|uary)?|feb(?:ruari|ruary)?|mar(?:s|ch)?|apr(?:il)?|maj|may|jun[ie]?|jul[iy]?|aug(?:usti|ust)?|` +
+	`sep(?:t(?:ember)?)?|okt(?:ober)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)`
+
+// aDayAndMonthName is 12 mars, 1:a januari, 12th of March, 3 dec.
+var aDayAndMonthName = regexp.MustCompile(`(?i)\b(?:[1-9]|[12][0-9]|3[01])(?::?[ae]|st|nd|rd|th)?\.?\s*(?:of\s+)?` + monthNames + `\b`)
+
+// aMonthNameAndDay is March 12, sept 9 -- and not mars 2031, a month and a
+// year, which is not a date of birth.
+var aMonthNameAndDay = regexp.MustCompile(`(?i)\b` + monthNames + `\.?\s*(?:[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?\b`)
 
 // Why a licence check did not pass, as catalogue keys.
 const (
