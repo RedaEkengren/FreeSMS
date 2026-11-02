@@ -264,21 +264,22 @@ func TestAMarginSchemeCreditAndRebillKeepTheSchemesVAT(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Half the car credited, then the rest: 8 000 kr back in two parts.
-	half, err := workshop.IssueCredit(ctx, pool, everything(owner()), inv.ID, workshop.CreditRequest{
-		Lines: []workshop.CreditLine{{Position: 1, QuantityMilli: 500}}, Reason: "Halva priset tillbaka"})
+	// 125 000 kr against 85 000: 8 000 kr of VAT in a 40 000 kr margin.
+	// 10 000 kr off the price takes 10 000 off the margin: 2 000 kr back.
+	part, err := workshop.IssueCredit(ctx, pool, everything(owner()), inv.ID, workshop.CreditRequest{
+		Lines: []workshop.CreditLine{{Position: 1, QuantityMilli: 80}}, Reason: "Prisavdrag 10 000 kr"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if vat, statement := schemeOf(t, pool, half.ID); vat != -400_000 || statement != workshop.MarginSchemeStatement {
-		t.Errorf("half the car credited: VAT %d, statement %q; want -4 000 kr and the statement", vat, statement)
+	if vat, statement := schemeOf(t, pool, part.ID); vat != -200_000 || statement != workshop.MarginSchemeStatement {
+		t.Errorf("10 000 kr off the car: VAT %d, statement %q; want -2 000 kr and the statement", vat, statement)
 	}
 	rest, err := workshop.IssueCredit(ctx, pool, everything(owner()), inv.ID, workshop.CreditRequest{Reason: "Resten"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if vat, _ := schemeOf(t, pool, rest.ID); vat != -400_000 {
-		t.Errorf("the rest credited: VAT %d; want -4 000 kr, all of it back over both", vat)
+	if vat, _ := schemeOf(t, pool, rest.ID); vat != -600_000 {
+		t.Errorf("the rest credited: VAT %d; want -6 000 kr, so 8 000 kr back over both", vat)
 	}
 
 	// Billed again to another buyer: the same VAT and statement.
@@ -321,5 +322,26 @@ func TestASaleOfNothingIsNotInvoiced(t *testing.T) {
 	}
 	if inv, err := workshop.IssueDealInvoice(ctx, pool, sales(), d.ID); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("a sale of nothing invoiced: %+v, %v", inv, err)
+	}
+}
+
+// A credit that takes the price below what the car was bought for takes
+// back all of its margin-scheme VAT: there is no margin left.
+func TestACreditBelowThePurchasePriceTakesBackAllTheSchemesVAT(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	d := completedDealOn(t, pool, eligibleCar(t, pool), workshop.TaxMarginScheme)
+	inv, err := workshop.IssueDealInvoice(ctx, pool, sales(), d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 70 000 kr off a 125 000 kr car bought for 85 000: no margin left.
+	c, err := workshop.IssueCredit(ctx, pool, everything(owner()), inv.ID, workshop.CreditRequest{
+		Lines: []workshop.CreditLine{{Position: 1, QuantityMilli: 560}}, Reason: "Stort prisavdrag"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vat, _ := schemeOf(t, pool, c.ID); vat != -800_000 {
+		t.Errorf("70 000 kr off: VAT %d; want all 8 000 kr back", vat)
 	}
 }

@@ -760,11 +760,15 @@ func CorrectionsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 }
 
 // creditedSchemeTx is what a credit note of invoiceID keeps for the books
-// under the margin scheme (#177): the original's statement, and its scheme
-// VAT taken back in proportion to the margin-scheme car credited -- the
-// whole of what is left when the credit takes the rest of the car, so the
-// credits together take back exactly what the invoice kept. Nothing when
-// the credit takes back no margin-scheme line.
+// under the margin scheme (#177): the original's statement, and the scheme
+// VAT it takes back. Under the scheme the VAT is a fifth of the margin, and
+// a credit off the car's price comes off the margin whole, so the VAT is
+// worked out again rather than taken back in proportion: what is still due
+// on the price left after every credit, this one included, against the
+// tax purchase price of the car's purchase (money.MarginScheme); the credit
+// takes back the rest of what the invoice kept. 10 000 kr off a 40 000 kr
+// margin takes back 2 000 kr; a price below the purchase price leaves none
+// due. Nothing when the credit takes back no margin-scheme line.
 func creditedSchemeTx(ctx context.Context, tx pgx.Tx, invoiceID string, lines []invoiceLine) (statement, schemeVAT any, err error) {
 	var credited int64
 	for _, l := range lines {
@@ -776,23 +780,32 @@ func creditedSchemeTx(ctx context.Context, tx pgx.Tx, invoiceID string, lines []
 		return nil, nil, nil
 	}
 	var text *string
-	var origVAT *int64
+	var origVAT, purchase *int64
 	var origNet, prevNet, prevVAT int64
 	if err := tx.QueryRow(ctx, `
 		SELECT o.margin_scheme_statement, o.margin_scheme_vat_minor,
+		       (SELECT p.tax_purchase_price_minor FROM vehicle_sales s JOIN vehicle_purchases p ON p.stock_unit_id = s.stock_unit_id
+		         WHERE s.id = o.vehicle_sale_id),
 		       coalesce((SELECT sum(l.net_minor) FROM invoice_lines l WHERE l.invoice_id = o.id AND l.margin_scheme), 0),
 		       coalesce((SELECT -sum(c.net_minor) FROM invoice_lines c JOIN invoice_lines l ON l.id = c.credits_line_id
 		                 WHERE l.invoice_id = o.id AND l.margin_scheme), 0),
 		       coalesce((SELECT sum(n.margin_scheme_vat_minor) FROM invoices n WHERE n.credit_of_id = o.id), 0)
-		FROM invoices o WHERE o.id = $1`, invoiceID).Scan(&text, &origVAT, &origNet, &prevNet, &prevVAT); err != nil {
+		FROM invoices o WHERE o.id = $1`, invoiceID).Scan(&text, &origVAT, &purchase, &origNet, &prevNet, &prevVAT); err != nil {
 		return nil, nil, fmt.Errorf("read the margin scheme: %w", err)
 	}
-	if origVAT == nil || origNet == 0 {
+	if origVAT == nil || purchase == nil {
 		return text, nil, nil
 	}
-	back := money.Scale(*origVAT, credited, origNet)
-	if credited == origNet-prevNet {
-		back = *origVAT + prevVAT
+	left := origNet - prevNet - credited
+	if left < 0 {
+		left = 0
 	}
+	due, err := money.MarginScheme(left, *purchase, 2500)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: %v", ErrInvalid, err)
+	}
+	// What the invoice kept, less what earlier credits took back (prevVAT
+	// is below nothing), less what is still due.
+	back := *origVAT + prevVAT - due.VATMinor
 	return text, -back, nil
 }
