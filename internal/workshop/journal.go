@@ -441,33 +441,19 @@ func RecordPayout(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 			return err
 		}
 		// The same request again finds the payment it made, whatever the
-		// checks say now: the money left when they let it.
-		key := strings.TrimSpace(out.Key)
-		if key != "" {
-			if found, err := replayedPaymentTx(ctx, tx, key, &out); found || err != nil {
+		// checks say now: the money left when they let it. So the checks
+		// are the gate, asked only of a payment not made yet.
+		_, err = insertPaymentOnceGated(ctx, tx, scope, &out, func() error {
+			// Dealer: no money leaves for a car before its checks pass
+			// (#162), so a purchase's payout names the purchase it pays.
+			if err := payoutSubjectTx(ctx, tx, purpose, subjectKind, subjectID, partyID); err != nil {
 				return err
 			}
-		}
-		// Dealer: no money leaves for a car before its checks pass (#162),
-		// so a purchase's payout names the purchase it pays.
-		if err := payoutSubjectTx(ctx, tx, purpose, subjectKind, subjectID, partyID); err != nil {
-			return err
-		}
-		if purpose == "purchase" {
-			if err := purchaseChecksClearTx(ctx, tx, subjectID); err != nil {
-				return err
+			if purpose == "purchase" {
+				return purchaseChecksClearTx(ctx, tx, subjectID)
 			}
-		}
-		// The key was looked for above, so this is insertPaymentOnce
-		// without asking again: only a request that took the key since
-		// is found here.
-		if key == "" {
-			return insertPayment(ctx, tx, scope, &out)
-		}
-		if err := insertKeyedTx(ctx, tx, scope, &out); !errors.Is(err, errKeyTaken) {
-			return err
-		}
-		_, err = replayedPaymentTx(ctx, tx, key, &out)
+			return nil
+		})
 		return err
 	})
 	return out, err

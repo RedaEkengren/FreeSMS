@@ -496,12 +496,29 @@ func reverseApplicationTx(ctx context.Context, tx pgx.Tx, scope access.Scope, de
 // Repeated while the first is still in flight, it waits for the first, as
 // BookResource does.
 func insertPaymentOnce(ctx context.Context, tx pgx.Tx, scope access.Scope, p *Payment) (replayed bool, err error) {
+	return insertPaymentOnceGated(ctx, tx, scope, p, nil)
+}
+
+// insertPaymentOnceGated is insertPaymentOnce with a gate: checks that a
+// new payment must pass and a replay must not be asked again -- the same
+// request finds the payment it made whatever the gate would say now,
+// because the money moved when it let it. A nil gate lets everything by.
+func insertPaymentOnceGated(ctx context.Context, tx pgx.Tx, scope access.Scope, p *Payment, gate func() error) (replayed bool, err error) {
+	if gate == nil {
+		gate = func() error { return nil }
+	}
 	key := strings.TrimSpace(p.Key)
 	if key == "" {
+		if err := gate(); err != nil {
+			return false, err
+		}
 		return false, insertPayment(ctx, tx, scope, p)
 	}
 	if found, err := replayedPaymentTx(ctx, tx, key, p); found || err != nil {
 		return found, err
+	}
+	if err := gate(); err != nil {
+		return false, err
 	}
 	if err := insertKeyedTx(ctx, tx, scope, p); err != nil {
 		if errors.Is(err, errKeyTaken) {
