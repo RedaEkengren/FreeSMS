@@ -281,7 +281,7 @@ func BookTestDrive(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 				return fmt.Errorf("read the request: %w", err)
 			}
 		}
-		if err := driveCarFreeTx(ctx, tx, status, ended, n.DespiteReservation); err != nil {
+		if err := driveCarFreeTx(ctx, tx, n.StockUnitID, n.DriverPartyID, status, ended, n.DespiteReservation); err != nil {
 			return err
 		}
 		if n.NewDriver != nil {
@@ -340,16 +340,24 @@ func BookTestDrive(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	return out, err
 }
 
-// driveCarFreeTx says whether a car in stock may be driven: not once its
-// cycle has ended or it is sold, and, reserved for somebody else, only
-// knowing it (despite), and never where the shop blocks a reserved car.
-// Asked as a drive is booked and again as its keys are handed over: the
-// car may have been reserved or sold in between.
-func driveCarFreeTx(ctx context.Context, tx pgx.Tx, status StockStatus, ended, despite bool) error {
+// driveCarFreeTx says whether a car in stock may be driven by driver: not
+// once its cycle has ended or it is sold, and, reserved for somebody else,
+// only knowing it (despite), and never where the shop blocks a reserved
+// car. Reserved for the driver themselves, it is theirs to drive. Asked as
+// a drive is booked and again as its keys are handed over: the car may
+// have been reserved or sold in between.
+func driveCarFreeTx(ctx context.Context, tx pgx.Tx, unitID, driver string, status StockStatus, ended, despite bool) error {
 	if ended || status == StockSold || status == StockDelivered {
 		return errDriveCar
 	}
 	if status != StockReserved {
+		return nil
+	}
+	holder, err := reservedForTx(ctx, tx, unitID)
+	if err != nil {
+		return err
+	}
+	if holder != "" && holder == driver {
 		return nil
 	}
 	_, blocks, err := testDriveSettingsTx(ctx, tx)
@@ -362,6 +370,15 @@ func driveCarFreeTx(ctx context.Context, tx pgx.Tx, status StockStatus, ended, d
 		return ErrDriveReserved
 	}
 	return nil
+}
+
+// reservedForTx is the party a reserved car is held for, or "" when that
+// is not known. A seam for #174: a reservation and who holds it are not
+// built yet (the design is with the owner), so the status says only that
+// the car is reserved; when they are, this reads the active reservation
+// and its holder drives their own reserved car whatever the shop's block.
+func reservedForTx(ctx context.Context, tx pgx.Tx, unitID string) (string, error) {
+	return "", nil
 }
 
 // workDriveTx reads a drive to change, its car's resource locked first,
@@ -490,7 +507,7 @@ func StartTestDrive(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 			Scan(&status, &ended); err != nil {
 			return fmt.Errorf("read the car: %w", err)
 		}
-		if err := driveCarFreeTx(ctx, tx, status, ended, true); err != nil {
+		if err := driveCarFreeTx(ctx, tx, d.StockUnitID, d.DriverID, status, ended, true); err != nil {
 			return err
 		}
 		var today time.Time
