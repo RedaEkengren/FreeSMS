@@ -394,3 +394,48 @@ func TestADriveDoesNotStartOnACarSoldSinceItWasBooked(t *testing.T) {
 		t.Errorf("the drive after the refusals: %s", got.State)
 	}
 }
+
+// "Make the agreement" pressed twice at once, or again on a page that
+// showed no agreement yet, makes one: the second finds the first's.
+func TestAnAgreementMadeTwiceAtOnceIsOne(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := carForSale(t, pool)
+	d, err := workshop.BookTestDrive(ctx, pool, sales(), workshop.NewTestDrive{StockUnitID: unit, DriverPartyID: driver(t, pool),
+		From: time.Now(), To: time.Now().Add(time.Hour)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tpls, err := workshop.TestDriveTemplates(ctx, pool, sales())
+	if err != nil || len(tpls) != 1 {
+		t.Fatalf("the shipped template: %+v, %v", tpls, err)
+	}
+	var wg sync.WaitGroup
+	ids := make([]string, 4)
+	errs := make([]error, 4)
+	for i := range ids {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ids[i], errs[i] = workshop.ProduceTestDriveAgreement(ctx, pool, sales(), d.ID, tpls[0].VersionID, "")
+		}()
+	}
+	wg.Wait()
+	for i := range ids {
+		if errs[i] != nil || ids[i] != ids[0] {
+			t.Errorf("press %d: %s, %v; want the one agreement", i, ids[i], errs[i])
+		}
+	}
+	var docs int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM document_records WHERE subject_id = $1`, d.ID).Scan(&docs); err != nil || docs != 1 {
+		t.Errorf("%d agreements made (%v)", docs, err)
+	}
+	// Made again from the page that showed it: a new version superseding it.
+	again, err := workshop.ProduceTestDriveAgreement(ctx, pool, sales(), d.ID, tpls[0].VersionID, ids[0])
+	if err != nil || again == ids[0] {
+		t.Errorf("made again: %s, %v", again, err)
+	}
+	if got, _ := workshop.TestDriveByID(ctx, pool, sales(), d.ID); got.AgreementID != again {
+		t.Errorf("the drive's agreement: %s, want %s", got.AgreementID, again)
+	}
+}

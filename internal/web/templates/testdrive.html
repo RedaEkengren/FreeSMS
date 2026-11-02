@@ -66,6 +66,7 @@
 <details><summary>{{.T "Agreement"}}</summary>
 {{if $d.Templates}}
 <form method="post" action="/cars/test-drives/{{$t.ID}}/agreement">
+  <input type="hidden" name="replacing" value="{{$t.AgreementID}}">
   <label><span>{{.T "Template"}}</span><select name="template">{{range $d.Templates}}<option value="{{.VersionID}}">{{.Name}}</option>{{end}}</select></label>
   <button type="submit" class="secondary">{{if $t.AgreementID}}{{.T "Make it again"}}{{else}}{{.T "Make the agreement"}}{{end}}</button>
 </form>

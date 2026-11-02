@@ -107,20 +107,19 @@ type NewTestDrive struct {
 }
 
 var (
-	errDriveTime      = fmt.Errorf("%w: a test drive ends after it starts, within a day, and does not start in the past", ErrInvalid)
-	errDriveText      = fmt.Errorf("%w: say where they may drive in 300 characters or fewer", ErrInvalid)
-	errDriveCar       = fmt.Errorf("%w: that car is not in stock to be driven", ErrInvalid)
-	errDriveKey       = fmt.Errorf("%w: that request was already used for another test drive", ErrInvalid)
-	errDriveState     = fmt.Errorf("%w: the test drive is not where that can be done", ErrInvalid)
-	errDriveLicence   = fmt.Errorf("%w: the driver's identity, licence and age have not been checked and found good for today", ErrInvalid)
-	errDriveUnsigned  = fmt.Errorf("%w: the agreement is not signed; whoever runs the shop may let the drive start with a note why", ErrInvalid)
-	errDriveOdometer  = fmt.Errorf("%w: say what the odometer shows, in whole kilometres", ErrInvalid)
-	errDriveLess      = fmt.Errorf("%w: the odometer cannot show less on return than when the drive started", ErrInvalid)
-	errDriveMethod    = fmt.Errorf("%w: say how the licence was checked, and what it allows in categories such as B", ErrInvalid)
-	errDriveNote      = fmt.Errorf("%w: a note is at most 300 characters on a check and 500 on a drive", ErrInvalid)
-	errDriveAge       = fmt.Errorf("%w: the youngest driver is from 16 to 99", ErrInvalid)
-	errDriveAgreement = fmt.Errorf("%w: that is not this drive's agreement", ErrInvalid)
-	errDriveDriver    = fmt.Errorf("%w: say who drives: a name of up to 200 characters and a phone number", ErrInvalid)
+	errDriveTime     = fmt.Errorf("%w: a test drive ends after it starts, within a day, and does not start in the past", ErrInvalid)
+	errDriveText     = fmt.Errorf("%w: say where they may drive in 300 characters or fewer", ErrInvalid)
+	errDriveCar      = fmt.Errorf("%w: that car is not in stock to be driven", ErrInvalid)
+	errDriveKey      = fmt.Errorf("%w: that request was already used for another test drive", ErrInvalid)
+	errDriveState    = fmt.Errorf("%w: the test drive is not where that can be done", ErrInvalid)
+	errDriveLicence  = fmt.Errorf("%w: the driver's identity, licence and age have not been checked and found good for today", ErrInvalid)
+	errDriveUnsigned = fmt.Errorf("%w: the agreement is not signed; whoever runs the shop may let the drive start with a note why", ErrInvalid)
+	errDriveOdometer = fmt.Errorf("%w: say what the odometer shows, in whole kilometres", ErrInvalid)
+	errDriveLess     = fmt.Errorf("%w: the odometer cannot show less on return than when the drive started", ErrInvalid)
+	errDriveMethod   = fmt.Errorf("%w: say how the licence was checked, and what it allows in categories such as B", ErrInvalid)
+	errDriveNote     = fmt.Errorf("%w: a note is at most 300 characters on a check and 500 on a drive", ErrInvalid)
+	errDriveAge      = fmt.Errorf("%w: the youngest driver is from 16 to 99", ErrInvalid)
+	errDriveDriver   = fmt.Errorf("%w: say who drives: a name of up to 200 characters and a phone number", ErrInvalid)
 	// ErrDriveReserved is a car reserved for somebody else: booked again
 	// with DespiteReservation it is let through, unless the shop blocks it.
 	ErrDriveReserved = fmt.Errorf("%w: the car is reserved for another customer", ErrInvalid)
@@ -429,39 +428,6 @@ func CheckDriverLicence(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 			INSERT INTO test_drive_licence_checks (shop_id, test_drive_id, id_checked, method, categories, valid_until, age_ok, note, checked_by)
 			VALUES ($1, $2, $3, $4, $5, $6::date, $7, nullif($8, ''), NULLIF($9, '')::uuid)`,
 			scope.ShopID, d.ID, in.IDChecked, in.Method, cats, until, in.AgeOK, in.Note, scope.UserID)
-		return err
-	})
-}
-
-// AttachDriveAgreement records the agreement produced for a drive (#150):
-// a document of the test-drive kind, about this drive.
-func AttachDriveAgreement(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, driveID, documentID string) error {
-	if !scope.Role.SellsVehicles() {
-		return access.ErrForbidden
-	}
-	if err := scope.Require(access.Dealer); err != nil {
-		return err
-	}
-	if !looksLikeUUID(documentID) {
-		return ErrNotFound
-	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		d, err := workDriveTx(ctx, tx, driveID)
-		if err != nil {
-			return err
-		}
-		if d.State != DriveBooked {
-			return errDriveState
-		}
-		var ok bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM document_records WHERE id = $1 AND kind = $2
-			AND subject_kind = 'test_drive' AND subject_id = $3)`, documentID, DocTestDriveAgreement, d.ID).Scan(&ok); err != nil {
-			return err
-		}
-		if !ok {
-			return errDriveAgreement
-		}
-		_, err = tx.Exec(ctx, `UPDATE test_drives SET agreement_id = $2 WHERE id = $1`, d.ID, documentID)
 		return err
 	})
 }
@@ -807,27 +773,38 @@ func TestDriveTemplates(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 
 // ProduceTestDriveAgreement freezes the agreement for a drive from a
 // template version, with the driver as its party, and ties it to the
-// drive. Produced again, the new one supersedes the last. The driver signs
-// it on paper or in person (RecordSignature); a signing service that is
-// down leaves it unsigned and the drive still bookable.
-func ProduceTestDriveAgreement(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, driveID, templateVersionID string) (string, error) {
+// drive, in one transaction with the drive's car locked. replacing is the
+// agreement the caller saw, or empty for none: made again, the new one
+// supersedes it; when the drive's agreement is no longer that one --
+// "make it" pressed twice, two people at once -- the agreement made
+// meanwhile is the answer and nothing more is made. The driver signs it on
+// paper or in person (RecordSignature); a signing service that is down
+// leaves it unsigned and the drive still bookable.
+func ProduceTestDriveAgreement(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, driveID, templateVersionID, replacing string) (string, error) {
 	if !scope.Role.SellsVehicles() {
 		return "", access.ErrForbidden
 	}
 	if err := scope.Require(access.Dealer); err != nil {
 		return "", err
 	}
-	if !looksLikeUUID(driveID) || !looksLikeUUID(templateVersionID) {
+	if err := mayDocument(scope.Role, scope, DocTestDriveAgreement, true); err != nil {
+		return "", err
+	}
+	if !looksLikeUUID(driveID) || !looksLikeUUID(templateVersionID) || (replacing != "" && !looksLikeUUID(replacing)) {
 		return "", ErrNotFound
 	}
-	n := NewDocumentRecord{Kind: DocTestDriveAgreement, SubjectKind: "test_drive", SubjectID: driveID, TemplateVersionID: templateVersionID}
+	var doc string
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		d, err := testDriveTx(ctx, tx, driveID)
+		d, err := workDriveTx(ctx, tx, driveID)
 		if err != nil {
 			return err
 		}
 		if d.State != DriveBooked {
 			return errDriveState
+		}
+		if d.AgreementID != replacing {
+			doc = d.AgreementID
+			return nil
 		}
 		var shop, org string
 		if err := tx.QueryRow(ctx, `SELECT name, coalesce(org_number, '') FROM shops`).Scan(&shop, &org); err != nil {
@@ -841,19 +818,17 @@ func ProduceTestDriveAgreement(ctx context.Context, pool *pgxpool.Pool, scope ac
 		if area == "" {
 			area = "-"
 		}
-		n.Title = d.Car + " " + d.StartsAt.In(loc).Format("2006-01-02 15:04")
-		n.Parties = []DocumentPartyRole{{PartyID: d.DriverID, Role: "driver"}}
-		n.Data = map[string]string{"shop": shop, "shop_org": org, "driver": d.Driver, "car": d.Car, "area": area,
-			"from": d.StartsAt.In(loc).Format("2006-01-02 15:04"), "to": d.EndsAt.In(loc).Format("2006-01-02 15:04")}
-		n.Supersedes = d.AgreementID
-		return nil
+		doc, err = produceDocumentTx(ctx, tx, scope, NewDocumentRecord{Kind: DocTestDriveAgreement, SubjectKind: "test_drive",
+			SubjectID: driveID, TemplateVersionID: templateVersionID, Supersedes: d.AgreementID,
+			Title:   d.Car + " " + d.StartsAt.In(loc).Format("2006-01-02 15:04"),
+			Parties: []DocumentPartyRole{{PartyID: d.DriverID, Role: "driver"}},
+			Data: map[string]string{"shop": shop, "shop_org": org, "driver": d.Driver, "car": d.Car, "area": area,
+				"from": d.StartsAt.In(loc).Format("2006-01-02 15:04"), "to": d.EndsAt.In(loc).Format("2006-01-02 15:04")}})
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `UPDATE test_drives SET agreement_id = $2 WHERE id = $1`, d.ID, doc)
+		return err
 	})
-	if err != nil {
-		return "", err
-	}
-	doc, err := ProduceDocument(ctx, pool, scope, n)
-	if err != nil {
-		return "", err
-	}
-	return doc, AttachDriveAgreement(ctx, pool, scope, driveID, doc)
+	return doc, err
 }

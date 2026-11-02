@@ -430,6 +430,19 @@ func ProduceDocument(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 	if err := mayDocument(scope.Role, scope, n.Kind, true); err != nil {
 		return "", err
 	}
+	var id string
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		id, err = produceDocumentTx(ctx, tx, scope, n)
+		return err
+	})
+	return id, err
+}
+
+// produceDocumentTx is ProduceDocument in the caller's transaction, for a
+// module that must produce a document and tie it to its subject in one
+// step. The caller has checked the role (mayDocument).
+func produceDocumentTx(ctx context.Context, tx pgx.Tx, scope access.Scope, n NewDocumentRecord) (string, error) {
 	n.Title = strings.TrimSpace(n.Title)
 	switch {
 	case !slices.Contains(documentSubjects, n.SubjectKind):
@@ -453,7 +466,7 @@ func ProduceDocument(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 		n.Data = map[string]string{}
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := func() error {
 		tpl, err := templateBodyTx(ctx, tx, n.TemplateVersionID, n.Kind)
 		if err != nil {
 			return err
@@ -523,7 +536,7 @@ func ProduceDocument(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 			}
 		}
 		return nil
-	})
+	}()
 	return id, err
 }
 

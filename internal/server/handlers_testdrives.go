@@ -200,7 +200,8 @@ func (s *Server) handleTestDriveLicence(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handleTestDriveAgreement(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
-	_, err := workshop.ProduceTestDriveAgreement(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("template"))
+	_, err := workshop.ProduceTestDriveAgreement(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("template"),
+		r.FormValue("replacing"))
 	s.backToDrive(w, r, err)
 }
 
