@@ -528,13 +528,14 @@ func ReviseDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sal
 		if d.State == DealCancelled {
 			return errDealState
 		}
-		if d.Version != fromVersion {
-			return ErrDealMoved
-		}
 		// Invoiced, how the sale is taxed is frozen (0207): no new terms
-		// until the invoice is credited.
+		// until the invoice is credited -- said before anything about the
+		// version, as carrying a change over would not help.
 		if d.InvoiceID != "" {
 			return errDealInvoiced
+		}
+		if d.Version != fromVersion {
+			return ErrDealMoved
 		}
 		if err := insertTermsTx(ctx, tx, scope, saleID, d.StockUnitID, d.Version+1, t); err != nil {
 			return err
@@ -733,7 +734,7 @@ func CancelDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sal
 		// An invoice that stands is credited first: otherwise the car is on
 		// sale again with a live invoice, and could be invoiced twice.
 		if d.InvoiceID != "" {
-			return errDealInvoiced
+			return errDealCancelInvoiced
 		}
 		var status StockStatus
 		if err := tx.QueryRow(ctx, `SELECT status FROM stock_units WHERE id = $1`, d.StockUnitID).Scan(&status); err != nil {
@@ -1313,6 +1314,8 @@ const partyNameSQL = `coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.com
 // people, for partyNameSQL.
 const partyNameJoins = `JOIN parties pa ON pa.id = b.party_id LEFT JOIN customers c ON c.id = pa.customer_id
 	LEFT JOIN people cp ON cp.id = c.person_id LEFT JOIN people pp ON pp.id = pa.person_id`
+
+var errDealCancelInvoiced = fmt.Errorf("%w: the sale has been invoiced; credit the invoice before cancelling the deal", ErrInvalid)
 
 var errDealInvoiced = fmt.Errorf("%w: the sale has been invoiced, so its terms are frozen; credit the invoice first", ErrInvalid)
 

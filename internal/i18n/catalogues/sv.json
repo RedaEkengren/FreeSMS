@@ -8638,6 +8638,7 @@
     "a line priced with its VAT is one of it": {"other": "en rad prissatt med moms är en av den"},
     "the sale comes to nothing, so there is nothing to invoice": {"other": "försäljningen uppgår till ingenting, så det finns inget att fakturera"},
     "a car sold under the margin scheme is reduced by crediting its line, not by an adjustment": {"other": "en bil som sålts med vinstmarginalbeskattning sätts ned genom att dess rad krediteras, inte genom en justering"},
-    "a car sale is invoiced again through its deal, whose terms say who buys": {"other": "en bilförsäljning faktureras på nytt genom sin affär, vars villkor säger vem som köper"}
+    "a car sale is invoiced again through its deal, whose terms say who buys": {"other": "en bilförsäljning faktureras på nytt genom sin affär, vars villkor säger vem som köper"},
+    "the sale has been invoiced; credit the invoice before cancelling the deal": {"other": "försäljningen har fakturerats; kreditera fakturan innan affären avbryts"}
   }
 }

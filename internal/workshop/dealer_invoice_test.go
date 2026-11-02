@@ -186,8 +186,17 @@ func TestAnInvoicedDealIsNotCancelledUntilCredited(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := workshop.CancelDeal(ctx, pool, sales(), d.ID, "Köparen ångrade sig"); !errors.Is(err, workshop.ErrInvalid) {
+	if err := workshop.CancelDeal(ctx, pool, sales(), d.ID, "Köparen ångrade sig"); !errors.Is(err, workshop.ErrInvalid) ||
+		!strings.Contains(err.Error(), "before cancelling") {
 		t.Errorf("an invoiced deal cancelled: %v", err)
+	}
+	// Revised from an old version while invoiced: told it is invoiced, not
+	// that somebody revised it -- carrying the change over would not help.
+	stale := consumerTerms(d.Buyers[0].PartyID)
+	stale.TaxTreatment = workshop.TaxOrdinary
+	if _, err := workshop.ReviseDeal(ctx, pool, sales(), d.ID, d.Version-1, stale); errors.Is(err, workshop.ErrDealMoved) ||
+		!errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("an invoiced deal revised from an old version: %v; want told it is invoiced", err)
 	}
 	if u, _ := workshop.StockUnitByID(ctx, pool, sales(), d.StockUnitID); u.Status != workshop.StockSold {
 		t.Errorf("the car after the refused cancel: %s", u.Status)
