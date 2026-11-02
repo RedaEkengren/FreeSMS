@@ -198,6 +198,8 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	made["stock_checks.overridden"] = subject{"stock_unit", bought.StockUnitID}
+	// A test drive let go before its agreement was signed (#173).
+	made["test_drive.started_unsigned"] = subject{"test_drive", unsignedDrive(t, pool)}
 	// Rental
 	rentalAudited(t, pool, func(event, kind, id string) { made[event] = subject{kind, id} })
 

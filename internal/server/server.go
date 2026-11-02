@@ -586,6 +586,7 @@ func (s *Server) routes() (http.Handler, error) {
 
 	// Dealer
 	s.leadRoutes(dealerMux)
+	s.testDriveRoutes(dealerMux)
 	dealerMux.HandleFunc("GET /cars/calculations/new", s.requireSession(s.handleCalculationForm))
 	dealerMux.HandleFunc("POST /cars/calculations", s.requireSession(s.handleSaveCalculation))
 	dealerMux.HandleFunc("GET /cars/calculations/{id}", s.requireSession(s.handleCalculation))

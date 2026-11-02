@@ -1,0 +1,103 @@
+{{define "content"}}
+{{$d := .Drives}}{{$t := $d.Drive}}
+{{if not $t.ID}}
+<h1>{{.T "Book a test drive"}}</h1>
+{{if .Error}}<p class="error" role="alert">{{.Sentence .Error}}</p>{{end}}
+<form method="post" action="/cars/test-drives">
+  <input type="hidden" name="key" value="{{$d.Key}}">
+  {{if $d.Reserved}}<input type="hidden" name="despite" value="1">{{end}}
+  {{with $d.Lead.ID}}<input type="hidden" name="lead" value="{{.}}">{{end}}
+  {{with index $d.Form "driver"}}<input type="hidden" name="driver" value="{{.}}">{{end}}
+  {{if $d.Lead.ID}}
+    <p class="waiting">{{.T "For the lead from %s" $d.Lead.Contact}}</p>
+  {{end}}
+  {{if not $d.Lead.PartyID}}
+  <div class="pair">
+    <label><span>{{.T "Driver's name"}}</span><input name="name" maxlength="200" value="{{or (index $d.Form "name") $d.Lead.Name}}"></label>
+    <label><span>{{.T "Phone"}}</span><input name="phone" type="tel" maxlength="40" value="{{or (index $d.Form "phone") $d.Lead.Phone}}"></label>
+  </div>
+  {{end}}
+  <label><span>{{.T "Car"}}</span>
+    <select name="unit" required>
+      {{range $d.Cars}}<option value="{{.UnitID}}"{{if or (eq .UnitID (index $d.Form "unit")) (eq .UnitID $d.Lead.StockUnitID)}} selected{{end}}>{{.Car}} &middot; {{$.T .StatusLabel}}</option>{{end}}
+    </select></label>
+  <div class="pair">
+    <label><span>{{.T "Starts"}}</span><input type="datetime-local" name="from" value="{{or (index $d.Form "from") $d.Now}}" required></label>
+    <label><span>{{.T "Minutes"}}</span><input type="number" name="minutes" min="5" max="1440" value="{{or (index $d.Form "minutes") "60"}}" required></label>
+  </div>
+  <label><span>{{.T "Where they may drive"}}</span><input name="area" maxlength="300" value="{{index $d.Form "area"}}"></label>
+  <button type="submit">{{if $d.Reserved}}{{.T "Book it anyway"}}{{else}}{{.T "Book the test drive"}}{{end}}</button>
+</form>
+{{else}}
+<h1>{{.T "Test drive"}}: {{$t.Car}}</h1>
+<p class="waiting"><span class="tag{{if $t.Overdue $d.At}} late{{end}}">{{.T ($d.Word $t.State)}}</span>
+  &middot; {{$t.Driver}} &middot; {{.Date (.Local $t.StartsAt) "2 Jan 15:04"}}&ndash;{{.Date (.Local $t.EndsAt) "15:04"}}
+  {{with $t.Area}}&middot; {{.}}{{end}}
+  {{with $t.LeadID}}&middot; <a href="/cars/leads/{{.}}">{{$.T "Lead"}}</a>{{end}}</p>
+<ul class="lines">
+  <li><div class="row"><span>{{.T "Licence"}}</span>
+    <span>{{with $t.Licence}}{{if .Passes $d.At}}{{$.T "Checked"}}{{else}}{{$.T "Not good for today"}}{{end}}{{else}}{{.T "Not checked"}}{{end}}</span></div>
+    {{with $t.Licence}}<div class="waiting">{{$.T ($d.Word .Method)}} &middot; {{range $i, $c := .Categories}}{{if $i}}, {{end}}{{$c}}{{end}}
+      {{with .ValidUntil}}&middot; {{$.T "valid until %s" ($.Date . "2 Jan 2006")}}{{end}} &middot; {{.CheckedBy}}, {{$.Date ($.Local .CheckedAt) "2 Jan 15:04"}}</div>{{end}}</li>
+  <li><div class="row"><span>{{.T "Agreement"}}</span>
+    <span>{{if $t.Signed}}{{.T "Signed"}}{{else if $t.AgreementID}}{{.T "Not signed"}}{{else}}{{.T "Not made"}}{{end}}</span></div>
+    {{with $t.AgreementID}}<div class="waiting"><a href="/contracts/{{.}}">{{$.T "Read the agreement"}}</a></div>{{end}}</li>
+  {{with $t.StartKm}}<li><div class="row"><span>{{$.T "Odometer out"}}</span><span>{{.}} km</span></div></li>{{end}}
+  {{with $t.ReturnKm}}<li><div class="row"><span>{{$.T "Odometer back"}}</span><span>{{.}} km</span></div></li>{{end}}
+  {{range $t.Notes}}<li><div class="waiting">{{.}}</div></li>{{end}}
+</ul>
+
+{{if eq $t.State "booked"}}
+<details{{if not $t.Licence}} open{{end}}><summary>{{.T "Check the licence"}}</summary>
+<form method="post" action="/cars/test-drives/{{$t.ID}}/licence">
+  <label class="check"><input type="checkbox" name="id_checked" value="1"> {{.T "Their identity has been seen"}}</label>
+  <label><span>{{.T "How"}}</span><select name="method">{{range $d.Methods}}<option value="{{.}}">{{$.T ($d.Word .)}}</option>{{end}}</select></label>
+  <div class="pair">
+    <label><span>{{.T "Categories"}}</span><input name="categories" value="B" maxlength="60"></label>
+    <label><span>{{.T "Valid until"}}</span><input type="date" name="valid_until"></label>
+  </div>
+  <label class="check"><input type="checkbox" name="age_ok" value="1"> {{.T "Old enough to drive our cars"}}</label>
+  <label><span>{{.T "Note, with no licence or identity number"}}</span><input name="note" maxlength="300"></label>
+  <button type="submit" class="secondary">{{.T "Record the check"}}</button>
+</form>
+</details>
+
+{{if not $t.Signed}}
+<details><summary>{{.T "Agreement"}}</summary>
+{{if $d.Templates}}
+<form method="post" action="/cars/test-drives/{{$t.ID}}/agreement">
+  <label><span>{{.T "Template"}}</span><select name="template">{{range $d.Templates}}<option value="{{.VersionID}}">{{.Name}}</option>{{end}}</select></label>
+  <button type="submit" class="secondary">{{if $t.AgreementID}}{{.T "Make it again"}}{{else}}{{.T "Make the agreement"}}{{end}}</button>
+</form>
+{{end}}
+{{with $d.DriverPartyID}}
+<form method="post" action="/cars/test-drives/{{$t.ID}}/signed">
+  <input type="hidden" name="party" value="{{.}}">
+  <input type="hidden" name="hash" value="{{$d.Agreement.Hash}}">
+  <label><span>{{$.T "Signed"}}</span><select name="method"><option value="paper">{{$.T "Signed on paper"}}</option><option value="in_person_click">{{$.T "Signed here, in person"}}</option></select></label>
+  <button type="submit" class="secondary">{{$.T "Record the signature"}}</button>
+</form>
+{{end}}
+</details>
+{{end}}
+
+<form method="post" action="/cars/test-drives/{{$t.ID}}/start">
+  <label><span>{{.T "Odometer, km"}}</span><input name="km" inputmode="numeric" required></label>
+  {{if and (not $t.Signed) .Session.Scope.Role.RunsTheShop}}<label><span>{{.T "Why it goes without a signed agreement"}}</span><input name="unsigned" maxlength="500"></label>{{end}}
+  <button type="submit">{{.T "Hand the keys over"}}</button>
+</form>
+<details><summary>{{.T "Cancel the test drive"}}</summary>
+<form method="post" action="/cars/test-drives/{{$t.ID}}/cancel">
+  <label><span>{{.T "Why"}}</span><input name="why" maxlength="500" required></label>
+  <button type="submit" class="secondary">{{.T "Cancel it"}}</button>
+</form>
+</details>
+{{else if eq $t.State "started"}}
+<form method="post" action="/cars/test-drives/{{$t.ID}}/return">
+  <label><span>{{.T "Odometer, km"}}</span><input name="km" inputmode="numeric" required></label>
+  <label><span>{{.T "Anything seen on the car"}}</span><input name="seen" maxlength="500"></label>
+  <button type="submit">{{.T "Take the keys back"}}</button>
+</form>
+{{end}}
+{{end}}
+{{end}}

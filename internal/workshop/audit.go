@@ -75,6 +75,8 @@ var AuditedTransitions = []AuditTransition{
 	// A stock car's job posting taken back because the job went back to
 	// work after it was ready (#164).
 	{"stock_cost.reversed", "stock_unit", "audit_events", true},
+	// A test drive let start before its agreement was signed (#173).
+	{"test_drive.started_unsigned", "test_drive", "audit_events", true},
 	// Rental
 	{"rental.price_overridden", "rental_booking", "audit_events", true},
 }
@@ -203,6 +205,10 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 	case "document", "deposit", "payout":
 	case "stock_unit":
 		if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+			return nil, access.ErrForbidden
+		}
+	case "test_drive":
+		if !scope.Role.SellsVehicles() {
 			return nil, access.ErrForbidden
 		}
 	case "purchase":

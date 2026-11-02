@@ -138,6 +138,7 @@ var waitingSays = map[string]string{
 	"lead_car_gone":       "The car a lead asked about is reserved or sold: %s",
 	"lead_unassigned":     "A new lead nobody has: %s",
 	"lead_unassigned_any": "A new lead nobody has",
+	"test_drive_overdue":  "A test drive is not back: %s",
 	// Rental
 	"rental_handover": "To hand over today: %s",
 	"rental_return":   "Due back today: %s",
@@ -174,6 +175,8 @@ func (w ActionItem) Link() string {
 		return "/outbox"
 	case w.SubjectKind == "lead":
 		return "/cars/leads/" + w.SubjectID
+	case w.SubjectKind == "test_drive":
+		return "/cars/test-drives/" + w.SubjectID
 	case w.SubjectKind == "rental_booking":
 		return "/rental/bookings/" + w.SubjectID
 	}

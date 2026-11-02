@@ -843,12 +843,14 @@ func dealerWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 	}
 	var out []ActionItem
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// In one statement with a test drive out past its end (#173), for
+		// everyone who sells cars: the car is the shop's whoever booked it.
 		rows, err := tx.Query(ctx, `
 			SELECT CASE WHEN n.salesperson_id IS NULL THEN 'lead_unassigned'
 			            WHEN u.status IN ('reserved', 'sold', 'delivered', 'closed', 'written_off') THEN 'lead_car_gone'
 			            ELSE 'lead_follow_up' END,
-			       l.id::text, coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), ''),
-			       coalesce(n.next_step_on::timestamp AT TIME ZONE (SELECT timezone FROM shops), l.created_at)
+			       'lead', l.id::text, coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), ''),
+			       coalesce(n.next_step_on::timestamp AT TIME ZONE (SELECT timezone FROM shops), l.created_at), l.created_at
 			FROM leads l
 			JOIN lead_now n ON n.lead_id = l.id
 			LEFT JOIN stock_units u ON u.id = l.stock_unit_id
@@ -859,17 +861,22 @@ func dealerWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 			       OR (n.salesperson_id::text = $1
 			           AND (u.status IN ('reserved', 'sold', 'delivered', 'closed', 'written_off')
 			                OR n.next_step_on <= (clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops))::date)))
-			ORDER BY 4, l.created_at`, scope.UserID)
+			UNION ALL
+			`+testDrivesOverdue+`
+			ORDER BY 5, 6`, scope.UserID)
 		if err != nil {
 			return fmt.Errorf("read the leads waiting: %w", err)
 		}
 		defer rows.Close()
 		for rows.Next() {
-			it := ActionItem{Module: access.Dealer, SubjectKind: "lead", Urgency: UrgencySoon}
-			if err := rows.Scan(&it.Kind, &it.SubjectID, &it.Text, &it.Due); err != nil {
+			it := ActionItem{Module: access.Dealer, Urgency: UrgencySoon}
+			var at time.Time
+			if err := rows.Scan(&it.Kind, &it.SubjectKind, &it.SubjectID, &it.Text, &it.Due, &at); err != nil {
 				return err
 			}
-			if it.Text == "" {
+			if it.SubjectKind == "test_drive" {
+				it.Urgency = UrgencyNow
+			} else if it.Text == "" {
 				// What they want is theirs to say, and not a car's name.
 				it.Kind += "_any"
 			}
