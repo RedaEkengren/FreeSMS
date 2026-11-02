@@ -370,3 +370,74 @@ func TestAfterTheSaleIsWhatTheCostIsFor(t *testing.T) {
 		}
 	}
 }
+
+// A supplier's cost reversed by hand while the corrected invoice is noted
+// through the workshop's own page: the hand reversal took its cost lock
+// and is waiting to write, and the invoice has locked the job and its
+// trigger wants the same cost. Both take the job before the cost, so one
+// waits for the other rather than each for the other; neither is
+// aborted as a deadlock, and the cost is reversed once.
+func TestACostReversedByHandWhileItsInvoiceIsNotedDoesNotDeadlock(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	job, line := turboJob(t, pool)
+	out := sendOut(t, pool, job, line, time.Now().AddDate(0, 0, 3))
+	record(t, pool, out, workshop.OutsourcedEventInput{Kind: "invoice", AmountMinor: pointerTo(int64(450_000)), InvoiceRef: "TV-1"})
+	var entry string
+	if err := pool.QueryRow(ctx, `SELECT id FROM stock_cost_entries WHERE source = 'outsourced'`).Scan(&entry); err != nil {
+		t.Fatal(err)
+	}
+	waiting := func(n int) {
+		t.Helper()
+		for deadline := time.Now().Add(10 * time.Second); ; {
+			var w int
+			if err := pool.QueryRow(ctx, `SELECT count(*) FROM pg_locks WHERE NOT granted`).Scan(&w); err != nil {
+				t.Fatal(err)
+			}
+			if w >= n {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("%d waiting, want %d", w, n)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	// Something else holds the stock unit for a moment -- a salesperson
+	// moving its deal -- so the hand reversal stops half way, holding what
+	// it took before it writes.
+	hold, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer hold.Rollback(ctx)
+	if _, err := hold.Exec(ctx, `SELECT 1 FROM stock_units WHERE id = $1 FOR UPDATE`, p.StockUnitID); err != nil {
+		t.Fatal(err)
+	}
+	reversed := make(chan error, 1)
+	go func() {
+		_, err := workshop.ReverseStockCost(ctx, pool, buyerScope(), entry, "Fel bil")
+		reversed <- err
+	}()
+	waiting(1)
+	noted := make(chan error, 1)
+	go func() {
+		noted <- workshop.RecordOutsourced(ctx, pool, advisor(), out,
+			workshop.OutsourcedEventInput{Kind: "invoice", AmountMinor: pointerTo(int64(420_000)), InvoiceRef: "TV-1b"})
+	}()
+	waiting(2)
+	if err := hold.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-reversed; err != nil {
+		t.Errorf("the reversal by hand: %v", err)
+	}
+	if err := <-noted; err != nil {
+		t.Errorf("the corrected invoice: %v", err)
+	}
+	var reversals int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM stock_cost_entries WHERE reverses_id = $1`, entry).Scan(&reversals); err != nil || reversals != 1 {
+		t.Errorf("reversed %d times (%v)", reversals, err)
+	}
+}

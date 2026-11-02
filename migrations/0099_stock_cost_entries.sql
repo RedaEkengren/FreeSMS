@@ -142,7 +142,13 @@ BEGIN
     -- it until the new one's amount is noted. Each entry is locked first
     -- the way ReverseStockCost locks it, so a reversal by hand at the same
     -- moment waits and finds it reversed, rather than both reversing it;
-    -- the INSERT below then reads what the wait let commit.
+    -- the INSERT below then reads what the wait let commit. The job comes
+    -- first, then the costs, the order ReverseStockCost takes them in:
+    -- the reversal's foreign key needs a share of the job, so a lock on
+    -- the cost taken before the job would wait on a page that holds the
+    -- job and waits on the cost.
+    PERFORM 1 FROM work_orders w JOIN outsourced_work o ON o.work_order_id = w.id
+      WHERE o.id = NEW.outsourced_id FOR SHARE OF w;
     PERFORM pg_advisory_xact_lock(hashtextextended('cost:' || e.id::text, 0))
        FROM stock_cost_entries e
        JOIN outsourced_events oe ON oe.id = e.outsourced_event_id

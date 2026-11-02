@@ -251,6 +251,17 @@ func ReverseStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 	}
 	var out StockCost
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// One lock order for every path that reverses a cost: the job it
+		// came from, then the cost. The workshop's page noting a supplier's
+		// corrected invoice holds the job FOR UPDATE before its trigger
+		// takes the cost (0099), and the reversal written here must take a
+		// share of the same job for its foreign key; taken in the other
+		// order, each would wait for the other. A cost with no job has no
+		// job to take.
+		if _, err := tx.Exec(ctx, `SELECT 1 FROM work_orders WHERE id = (SELECT work_order_id FROM stock_cost_entries WHERE id = $1)
+			FOR SHARE`, entryID); err != nil {
+			return fmt.Errorf("lock the cost's job: %w", err)
+		}
 		// The key is the id as the database prints it, lower case, the way
 		// the trigger in 0099 builds it: an id sent in capitals is the same
 		// cost and must be the same lock.
