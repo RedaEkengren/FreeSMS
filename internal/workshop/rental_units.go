@@ -261,9 +261,12 @@ func StartFleetMembership(ctx context.Context, pool *pgxpool.Pool, scope access.
 	}
 	var id string
 	err = inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// The unit held, as a booking holds it while it reads the fleet:
+		// the order every rental write takes.
 		var vehicle *string
 		err := tx.QueryRow(ctx, `
-			SELECT r.vehicle_id::text FROM rental_units u JOIN resources r ON r.id = u.resource_id WHERE u.id = $1`, unitID).Scan(&vehicle)
+			SELECT r.vehicle_id::text FROM rental_units u JOIN resources r ON r.id = u.resource_id WHERE u.id = $1
+			FOR UPDATE OF r`, unitID).Scan(&vehicle)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}

@@ -236,3 +236,28 @@ func TestChangingABlockWaitsForItsUnit(t *testing.T) {
 		}
 	}
 }
+
+// A unit's time in the fleet starts with the unit held, as a booking on it
+// is made: the booking reads the fleet as the start left it, not halfway
+// (review 3 #8).
+func TestStartingAFleetPeriodWaitsForTheUnit(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := addUnit(t, pool, workshop.NewRentalUnit{Registration: "ABC 12D", FleetNumber: "V1", Category: "Small van"})
+	u, err := workshop.RentalUnitByID(ctx, pool, rentalDesk(), unit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	held := holdTheUnit(t, pool, u.ResourceID)
+	join := start(func() error {
+		_, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), unit, time.Now().AddDate(-1, 0, 0), "bought", "")
+		return err
+	})
+	waitForWaiters(t, pool, 1, join, "starting the fleet period")
+	if err := held.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := join.result(t); err != nil {
+		t.Errorf("starting the fleet period: %v", err)
+	}
+}
