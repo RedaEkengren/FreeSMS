@@ -2,7 +2,6 @@ package workshop
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -94,37 +93,50 @@ var gapSentences = map[string]HandoverGap{
 // bookingGapsTx asks what each booking lacks for the period given with
 // it, by booking.
 func bookingGapsTx(ctx context.Context, tx pgx.Tx, ids []string, starts, ends []time.Time) (map[string][]HandoverGap, error) {
-	rows, err := tx.Query(ctx, `
-		WITH asked AS (SELECT * FROM unnest($1::uuid[], $2::timestamptz[], $3::timestamptz[]) AS q(id, starts_at, ends_at)),
-		`+bookingGapsCTEs+`
-		SELECT booking_id::text, code, who FROM gaps ORDER BY booking_id, ord, first, added`, ids, starts, ends)
+	gaps, _, err := gapsOfTx(ctx, tx, `SELECT * FROM unnest($1::uuid[], $2::timestamptz[], $3::timestamptz[]) AS q(id, starts_at, ends_at)`,
+		ids, starts, ends)
+	return gaps, err
+}
+
+// rentalBookingGapsTx is what a booking lacks before handover, for the
+// period it is booked for, all at once: one round trip.
+func rentalBookingGapsTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]HandoverGap, error) {
+	gaps, found, err := gapsOfTx(ctx, tx, `SELECT id, starts_at, ends_at FROM rental_bookings WHERE id = $1`, bookingID)
 	if err != nil {
-		return nil, fmt.Errorf("read what is missing: %w", err)
+		return nil, err
+	}
+	if !found[bookingID] {
+		return nil, ErrNotFound
+	}
+	return gaps[bookingID], nil
+}
+
+// gapsOfTx asks bookingGapsCTEs of the bookings asked selects (id,
+// starts_at, ends_at), and says which of them there were.
+func gapsOfTx(ctx context.Context, tx pgx.Tx, asked string, args ...any) (map[string][]HandoverGap, map[string]bool, error) {
+	rows, err := tx.Query(ctx, `
+		WITH asked AS (`+asked+`),
+		`+bookingGapsCTEs+`
+		SELECT q.id::text, coalesce(g.code, ''), coalesce(g.who, '')
+		FROM asked q LEFT JOIN gaps g ON g.booking_id = q.id
+		ORDER BY q.id, g.ord, g.first, g.added`, args...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("read what is missing: %w", err)
 	}
 	defer rows.Close()
-	out := map[string][]HandoverGap{}
+	out, found := map[string][]HandoverGap{}, map[string]bool{}
 	for rows.Next() {
 		var id, code, who string
 		if err := rows.Scan(&id, &code, &who); err != nil {
-			return nil, err
+			return nil, nil, err
+		}
+		found[id] = true
+		if code == "" {
+			continue
 		}
 		g := gapSentences[code]
 		g.Who = who
 		out[id] = append(out[id], g)
 	}
-	return out, rows.Err()
-}
-
-// rentalBookingGapsTx is what a booking lacks before handover, for the
-// period it is booked for, all at once.
-func rentalBookingGapsTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]HandoverGap, error) {
-	var starts, ends time.Time
-	if err := tx.QueryRow(ctx, `SELECT starts_at, ends_at FROM rental_bookings WHERE id = $1`, bookingID).Scan(&starts, &ends); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("read booking: %w", err)
-	}
-	all, err := bookingGapsTx(ctx, tx, []string{bookingID}, []time.Time{starts}, []time.Time{ends})
-	return all[bookingID], err
+	return out, found, rows.Err()
 }
