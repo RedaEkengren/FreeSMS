@@ -115,6 +115,9 @@ func TestTheWholeShopLeavesReadableWithoutFreeSMS(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
 	job, invoiceID := invoicedJob(t, pool)
+	if _, err := pool.Exec(ctx, `UPDATE work_orders SET complaint = '=HYPERLINK("x")' WHERE id = $1`, job); err != nil {
+		t.Fatal(err)
+	}
 
 	// A photograph on an inspection item.
 	var photoKey = "abcdef0123456789abcdef0123456789"
@@ -160,6 +163,11 @@ func TestTheWholeShopLeavesReadableWithoutFreeSMS(t *testing.T) {
 	}
 	if !strings.Contains(string(files["erasures.csv"]), "Begärde radering") {
 		t.Error("the erasure is not recorded in the export")
+	}
+	// A shop's own typing that a spreadsheet would run does not run when
+	// the export is opened in one (review r7, #1).
+	if !strings.Contains(string(files["work_orders.csv"]), "'=HYPERLINK") {
+		t.Error("a complaint written as a formula is exported as one")
 	}
 }
 

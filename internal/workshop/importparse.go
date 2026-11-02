@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/mail"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -308,16 +309,28 @@ func looksLikeFormula(s string) bool {
 }
 
 // SpreadsheetCell is a value as it may be written into a file a
-// spreadsheet opens: one it would run as a formula is led by an
-// apostrophe, which the spreadsheet shows as text and does not run. The
-// same test as an import refuses (looksLikeFormula), applied on the way
-// out.
+// spreadsheet opens: one starting =, +, -, @, a tab or a return is led by
+// an apostrophe, which the spreadsheet shows as text and does not run --
+// a minus as well, since -1+cmd|... runs, unless the whole value is a
+// plain number. Stricter than an import's own test (looksLikeFormula),
+// which must take a negative amount as typed.
 func SpreadsheetCell(s string) string {
-	if looksLikeFormula(s) {
+	if s == "" {
+		return s
+	}
+	switch s[0] {
+	case '=', '+', '@', '\t', '\r':
 		return "'" + s
+	case '-':
+		if !plainNumber.MatchString(s) {
+			return "'" + s
+		}
 	}
 	return s
 }
+
+// plainNumber is a number and nothing else, with a decimal point or comma.
+var plainNumber = regexp.MustCompile(`^-?[0-9]+([.,][0-9]+)?$`)
 
 // parseScaledDecimal reads a number written the Swedish way or the English
 // way into an integer of thousandths, hundredths and so on, refusing digits

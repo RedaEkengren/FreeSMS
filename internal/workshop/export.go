@@ -334,7 +334,8 @@ func writeTable(ctx context.Context, tx pgx.Tx, z *zip.Writer, table string) (in
 			return n, err
 		}
 		for i, v := range values {
-			record[i] = exportValue(v, fields[i].DataTypeOID)
+			// Opened in a spreadsheet, a shop's own typing never runs.
+			record[i] = SpreadsheetCell(exportValue(v, fields[i].DataTypeOID))
 		}
 		if err := cw.Write(record); err != nil {
 			return n, err
