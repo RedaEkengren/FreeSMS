@@ -457,13 +457,15 @@ type DamageCase struct {
 	State       string
 	ObservedAt  time.Time
 	BookingID   string
+	// The protocol it was found at.
+	FoundIn string
 }
 
 // openDamageTx is the unit's damage register: every case not yet
 // repaired. (#197 adds repair; until then every case is open.)
 func openDamageTx(ctx context.Context, tx pgx.Tx, resource string) ([]DamageCase, error) {
 	rows, err := tx.Query(ctx, `
-		SELECT id::text, coalesce(item_key, ''), description, state, observed_at, coalesce(booking_id::text, '')
+		SELECT id::text, coalesce(item_key, ''), description, state, observed_at, coalesce(booking_id::text, ''), found_in::text
 		FROM damage_cases WHERE resource_id = $1 ORDER BY observed_at, id`, resource)
 	if err != nil {
 		return nil, fmt.Errorf("read the damage register: %w", err)
@@ -472,7 +474,7 @@ func openDamageTx(ctx context.Context, tx pgx.Tx, resource string) ([]DamageCase
 	var out []DamageCase
 	for rows.Next() {
 		var d DamageCase
-		if err := rows.Scan(&d.ID, &d.ItemKey, &d.Description, &d.State, &d.ObservedAt, &d.BookingID); err != nil {
+		if err := rows.Scan(&d.ID, &d.ItemKey, &d.Description, &d.State, &d.ObservedAt, &d.BookingID, &d.FoundIn); err != nil {
 			return nil, err
 		}
 		out = append(out, d)
@@ -506,13 +508,15 @@ func compareTx(ctx context.Context, tx pgx.Tx, bookingID, checkInID, resource st
 			}
 		}
 	}
+	// Known is what was there before this return: the cases this check-in
+	// opened are its own findings.
 	known := map[string]bool{}
 	open, err := openDamageTx(ctx, tx, resource)
 	if err != nil {
 		return c, err
 	}
 	for _, d := range open {
-		if d.ItemKey != "" {
+		if d.ItemKey != "" && d.FoundIn != checkInID {
 			known[d.ItemKey] = true
 		}
 	}
@@ -612,7 +616,9 @@ func RentalHandoverOfProtocol(ctx context.Context, pool *pgxpool.Pool, scope acc
 		if v, err = rentalHandoversTx(ctx, tx, bookingID); err != nil {
 			return err
 		}
-		if p.Subject == HandoverIn && v.Comparison == nil {
+		// Compared as itself: a check-in left unfinished is not the one
+		// finished after it.
+		if p.Subject == HandoverIn {
 			var resource string
 			if err := tx.QueryRow(ctx, `SELECT u.resource_id FROM rental_bookings b JOIN rental_units u ON u.id = b.unit_id WHERE b.id = $1`,
 				bookingID).Scan(&resource); err != nil {

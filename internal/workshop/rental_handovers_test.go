@@ -298,3 +298,66 @@ func TestACheckInNeedsNoChecklistOfItsOwn(t *testing.T) {
 		})
 	}
 }
+
+// After the return, its comparison still says what was new at it: the
+// damage case the check-in opened is its own finding, not damage known
+// before it (review of R6, #5).
+func TestAReturnsOwnDamageIsNewToIt(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	_, id, _ := checkedOut(t, pool)
+	left, err := workshop.StartHandover(ctx, pool, rentalDesk(), id, workshop.HandoverIn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.AbandonHandover(ctx, pool, rentalDesk(), left, "Fel bil"); err != nil {
+		t.Fatal(err)
+	}
+	in, err := workshop.StartHandover(ctx, pool, rentalDesk(), id, workshop.HandoverIn)
+	if err != nil || in == left {
+		t.Fatalf("a new check-in after one left: %s, %v", in, err)
+	}
+	back := recordFound(t, pool, in, map[string]string{"Lack och plåt": "fail"})
+	if err := workshop.FinishHandover(ctx, pool, rentalDesk(), in, workshop.HandoverReading{OdometerKm: km64(12100), RenterPresent: true,
+		Damage: []string{itemID(back, "Lack och plåt")}}); err != nil {
+		t.Fatal(err)
+	}
+	view, err := workshop.RentalHandovers(ctx, pool, rentalDesk(), id)
+	if err != nil || view.Comparison == nil {
+		t.Fatalf("%+v, %v", view, err)
+	}
+	for _, c := range view.Comparison.Items {
+		if c.Label == "Lack och plåt" && (!c.New || c.Known) {
+			t.Errorf("the scratch found at this return: new %v, known %v", c.New, c.Known)
+		}
+	}
+}
+
+// A check-in left unfinished is compared as itself, not as the one
+// finished after it (review of R6, #4).
+func TestACheckInLeftIsComparedAsItself(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	_, id, _ := checkedOut(t, pool)
+	left, err := workshop.StartHandover(ctx, pool, rentalDesk(), id, workshop.HandoverIn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.AbandonHandover(ctx, pool, rentalDesk(), left, "Fel bil"); err != nil {
+		t.Fatal(err)
+	}
+	in, _ := workshop.StartHandover(ctx, pool, rentalDesk(), id, workshop.HandoverIn)
+	recordFound(t, pool, in, nil)
+	if err := workshop.FinishHandover(ctx, pool, rentalDesk(), in, workshop.HandoverReading{OdometerKm: km64(12100), RenterPresent: true}); err != nil {
+		t.Fatal(err)
+	}
+	lv, p, err := workshop.RentalHandoverOfProtocol(ctx, pool, rentalDesk(), left)
+	if err != nil || p.ID != left || lv.Comparison == nil {
+		t.Fatalf("the check-in left: %+v, %v", lv, err)
+	}
+	for _, c := range lv.Comparison.Items {
+		if itemID(p, c.Label) != c.In.ID {
+			t.Errorf("the check-in left is shown with another protocol's checkpoint %s", c.Label)
+		}
+	}
+}
