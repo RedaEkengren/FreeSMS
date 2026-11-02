@@ -110,10 +110,16 @@ func registerTx(ctx context.Context, tx pgx.Tx, scope access.Scope, where string
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	ids := make([]string, len(out))
+	for i, e := range out {
+		ids[i] = e.BookingID
+	}
+	drivers, err := rentalDriversOfTx(ctx, tx, ids)
+	if err != nil {
+		return nil, err
+	}
 	for i := range out {
-		if out[i].Drivers, err = rentalDriversTx(ctx, tx, out[i].BookingID); err != nil {
-			return nil, err
-		}
+		out[i].Drivers = drivers[out[i].BookingID]
 	}
 	detail["entries"] = len(out)
 	if err := auditTx(ctx, tx, scope, scope.ShopID, "rental_register.read", "", "", purpose, detail); err != nil {

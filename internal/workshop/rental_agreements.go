@@ -375,8 +375,15 @@ func RentalDrivers(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 }
 
 func rentalDriversTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]RentalDriver, error) {
+	all, err := rentalDriversOfTx(ctx, tx, []string{bookingID})
+	return all[bookingID], err
+}
+
+// rentalDriversOfTx is the drivers of several bookings in one query, by
+// booking.
+func rentalDriversOfTx(ctx context.Context, tx pgx.Tx, bookingIDs []string) (map[string][]RentalDriver, error) {
 	rows, err := tx.Query(ctx, `
-		SELECT d.id, d.party_id,
+		SELECT d.booking_id::text, d.id, d.party_id,
 		       coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, ''),
 		       d.main, d.added_at, d.removed_at IS NOT NULL,
 		       k.passed, coalesce(k.failure, ''), k.checked_at, coalesce(kp.display_name, ''), k.valid_until
@@ -387,25 +394,26 @@ func rentalDriversTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]Rental
 		LEFT JOIN people pp ON pp.id = pa.person_id
 		LEFT JOIN LATERAL (SELECT * FROM rental_licence_checks k WHERE k.driver_id = d.id ORDER BY k.checked_at DESC LIMIT 1) k ON true
 		LEFT JOIN users ku ON ku.id = k.checked_by LEFT JOIN people kp ON kp.id = ku.person_id
-		WHERE d.booking_id = $1
-		ORDER BY d.removed_at IS NOT NULL, NOT d.main, d.added_at`, bookingID)
+		WHERE d.booking_id = ANY($1::uuid[])
+		ORDER BY d.booking_id, d.removed_at IS NOT NULL, NOT d.main, d.added_at`, bookingIDs)
 	if err != nil {
 		return nil, fmt.Errorf("read drivers: %w", err)
 	}
 	defer rows.Close()
-	var out []RentalDriver
+	out := map[string][]RentalDriver{}
 	for rows.Next() {
+		var of string
 		var d RentalDriver
 		var passed *bool
 		var failure, by string
 		var at, until *time.Time
-		if err := rows.Scan(&d.ID, &d.PartyID, &d.Name, &d.Main, &d.AddedAt, &d.Removed, &passed, &failure, &at, &by, &until); err != nil {
+		if err := rows.Scan(&of, &d.ID, &d.PartyID, &d.Name, &d.Main, &d.AddedAt, &d.Removed, &passed, &failure, &at, &by, &until); err != nil {
 			return nil, err
 		}
 		if passed != nil {
 			d.Check = &LicenceCheckResult{Passed: *passed, Failure: failure, CheckedAt: *at, CheckedBy: by, ValidUntil: until}
 		}
-		out = append(out, d)
+		out[of] = append(out[of], d)
 	}
 	return out, rows.Err()
 }

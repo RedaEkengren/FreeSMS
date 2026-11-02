@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
@@ -157,5 +159,69 @@ func TestTheRegistersRetentionIsMissingUntilSet(t *testing.T) {
 	}
 	if r, err := workshop.RentalRegisterRetention(ctx, pool, rentalDesk()); err != nil || r == nil || r.Months != 24 {
 		t.Errorf("after the decision: %+v, %v", r, err)
+	}
+}
+
+// The register is read in round trips that do not grow with its rentals:
+// their drivers come in one query (review r6, #6).
+func TestTheRegisterIsReadInRoundTripsThatDoNotGrow(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	tpl, _ := workshop.SaveChecklistTemplate(ctx, pool, owner(), "", "Tält", []string{"Duk"})
+	if err := workshop.SetTemplateSubjects(ctx, pool, everything(owner()), tpl, []string{workshop.SubjectCheckOut, workshop.SubjectCheckIn}); err != nil {
+		t.Fatal(err)
+	}
+	equipment := profileFor(t, pool, workshop.ProfileEquipment)
+	rules := equipment.Rules
+	rules.CheckOutTemplateID, rules.CheckInTemplateID = tpl, tpl
+	if _, err := workshop.SaveRentalProfile(ctx, pool, rentalOwner(), equipment.ID, rules); err != nil {
+		t.Fatal(err)
+	}
+	tent := addUnit(t, pool, workshop.NewRentalUnit{Name: "Tält", FleetNumber: "T1", Category: "Tent", ProfileID: equipment.ID})
+	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), tent, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
+		t.Fatal(err)
+	}
+	dayPlan(t, pool, "Tent", 10000, "at_start")
+	renter, _ := workshop.CreateParty(ctx, pool, rentalDesk(), workshop.NewParty{Kind: "private", Name: "Tina", Role: workshop.PartyRenter})
+	rent := func(day int) {
+		t.Helper()
+		id, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: tent, RenterID: renter, From: in2031(day, 9), To: in2031(day, 17)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, renter, true)
+		for _, kind := range []string{workshop.HandoverOut, workshop.HandoverIn} {
+			p, err := workshop.StartHandover(ctx, pool, rentalDesk(), id, kind)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := workshop.FinishHandover(ctx, pool, rentalDesk(), p, workshop.HandoverReading{RenterPresent: true}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	cfg := pool.Config()
+	counter := &countingTracer{}
+	cfg.ConnConfig.Tracer = counter
+	counted, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer counted.Close()
+	read := func(want int) int64 {
+		t.Helper()
+		before := counter.n.Load()
+		got, err := workshop.RentalRegister(ctx, counted, rentalOwner(), workshop.RegisterFilter{From: time.Now().AddDate(0, 0, -1), To: in2031(31, 0)}, "Tillsyn")
+		if err != nil || len(got) != want {
+			t.Fatalf("the register: %d rentals, %v; want %d", len(got), err, want)
+		}
+		return counter.n.Load() - before
+	}
+	rent(10)
+	one := read(1)
+	rent(11)
+	rent(12)
+	if three := read(3); three != one {
+		t.Errorf("%d round trips for three rentals, %d for one; want the same", three, one)
 	}
 }
