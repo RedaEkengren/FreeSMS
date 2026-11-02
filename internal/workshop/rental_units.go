@@ -327,19 +327,13 @@ func EndFleetMembership(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 	return inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var joined time.Time
 		var left *time.Time
-		var resource string
 		// The unit first, found and locked in one statement, then the
 		// period: the order every rental write takes.
-		if err := tx.QueryRow(ctx, `
-			SELECT id FROM resources
-			WHERE id = (SELECT u.resource_id FROM fleet_memberships m JOIN rental_units u ON u.id = m.unit_id WHERE m.id = $1)
-			FOR UPDATE`, membershipID).Scan(&resource); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrNotFound
-			}
-			return fmt.Errorf("lock the unit: %w", err)
+		resource, err := lockResourceOfTx(ctx, tx, `SELECT u.resource_id FROM fleet_memberships m JOIN rental_units u ON u.id = m.unit_id WHERE m.id = $1`, membershipID)
+		if err != nil {
+			return err
 		}
-		err := tx.QueryRow(ctx, `SELECT joined_at, left_at FROM fleet_memberships WHERE id = $1 FOR UPDATE`, membershipID).Scan(&joined, &left)
+		err = tx.QueryRow(ctx, `SELECT joined_at, left_at FROM fleet_memberships WHERE id = $1 FOR UPDATE`, membershipID).Scan(&joined, &left)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}

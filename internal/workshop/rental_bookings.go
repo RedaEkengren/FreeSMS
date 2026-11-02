@@ -321,6 +321,21 @@ func lockUnitResourceTx(ctx context.Context, tx pgx.Tx, resource string) error {
 	return nil
 }
 
+// lockResourceOfTx finds a resource by what is on it and locks it, in one
+// statement: of selects the resource's id from $1 -- a block, a booking, a
+// fleet period. The resource first is the order every write to it takes.
+func lockResourceOfTx(ctx context.Context, tx pgx.Tx, of string, arg any) (string, error) {
+	var id string
+	err := tx.QueryRow(ctx, `SELECT id FROM resources WHERE id = (`+of+`) FOR UPDATE`, arg).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("lock the resource: %w", err)
+	}
+	return id, nil
+}
+
 // inFleetTx refuses a period the unit is not in the fleet for, all of it.
 func inFleetTx(ctx context.Context, tx pgx.Tx, unitID string, from, to time.Time) error {
 	var in bool
@@ -557,18 +572,10 @@ func lockRentalTx(ctx context.Context, tx pgx.Tx, id string) (lockedRental, erro
 	// rental write takes, so two never wait on each other.
 	// Found and locked in one statement; the booking's block, and so its
 	// unit, never changes.
-	var one int
+	if _, err := lockResourceOfTx(ctx, tx, `SELECT k.resource_id FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id WHERE b.id = $1`, id); err != nil {
+		return b, err
+	}
 	err := tx.QueryRow(ctx, `
-		SELECT 1 FROM resources
-		WHERE id = (SELECT k.resource_id FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id WHERE b.id = $1)
-		FOR UPDATE`, id).Scan(&one)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return b, ErrNotFound
-	}
-	if err != nil {
-		return b, fmt.Errorf("lock the unit: %w", err)
-	}
-	err = tx.QueryRow(ctx, `
 		SELECT b.unit_id, k.resource_id, b.block_id, `+rentalState+`, b.starts_at, b.ends_at, k.buffer_after, k.status
 		FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id
 		WHERE b.id = $1 FOR UPDATE OF b, k`, id).Scan(&b.unit, &b.resource, &b.block, &b.state, &b.starts, &b.ends, &b.buffer, &b.blockStatus)
