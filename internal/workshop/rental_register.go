@@ -71,7 +71,7 @@ const registerColumns = `
 	          WHERE g.vehicle_id = r.vehicle_id AND g.valid_from <= coalesce(ho.at, b.starts_at)
 	            AND (g.valid_to IS NULL OR g.valid_to > coalesce(ho.at, b.starts_at))
 	          ORDER BY g.valid_from DESC LIMIT 1), ''),
-	coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, ''),
+	` + rentalPartyNameSQL + `,
 	` + rentalState + `, b.starts_at, b.ends_at, ho.at, hi.at,
 	coalesce(ag.id::text, ''), coalesce(ag.title, ''), ag.created_at`
 

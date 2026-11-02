@@ -384,7 +384,7 @@ func rentalDriversTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]Rental
 func rentalDriversOfTx(ctx context.Context, tx pgx.Tx, bookingIDs []string) (map[string][]RentalDriver, error) {
 	rows, err := tx.Query(ctx, `
 		SELECT d.booking_id::text, d.id, d.party_id,
-		       coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, ''),
+		       `+rentalPartyNameSQL+`,
 		       d.main, d.added_at, d.removed_at IS NOT NULL,
 		       k.passed, coalesce(k.failure, ''), k.checked_at, coalesce(kp.display_name, ''), k.valid_until
 		FROM rental_drivers d
@@ -843,7 +843,7 @@ func ProduceRentalAgreement(ctx context.Context, pool *pgxpool.Pool, scope acces
 			extra = money.Format(*extraKm + money.VAT(*extraKm, vat))
 		}
 		var renterName string
-		_ = tx.QueryRow(ctx, `SELECT coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, '')`+
+		_ = tx.QueryRow(ctx, `SELECT `+rentalPartyNameSQL+``+
 			` FROM parties pa LEFT JOIN customers c ON c.id = pa.customer_id LEFT JOIN people cp ON cp.id = c.person_id LEFT JOIN people pp ON pp.id = pa.person_id WHERE pa.id = $1`,
 			renter).Scan(&renterName)
 		n.Title = fmt.Sprintf("R-%d %s", number, unit)

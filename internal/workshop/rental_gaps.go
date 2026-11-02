@@ -66,7 +66,7 @@ const bookingGapsCTEs = `
 	                        AND o.starts_at = a.starts_at AND o.ends_at = a.ends_at)
 	    UNION ALL
 	    SELECT a.id, 4, NOT dr.main, dr.added_at, 'licence',
-	           coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, '')
+	           ` + rentalPartyNameSQL + `
 	    FROM g_booking a
 	    JOIN rental_drivers dr ON dr.booking_id = a.id AND dr.removed_at IS NULL
 	    JOIN parties pa ON pa.id = dr.party_id
