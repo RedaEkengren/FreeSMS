@@ -448,4 +448,3 @@ func fleetUseWaitingTx(ctx context.Context, tx pgx.Tx) ([]ActionItem, error) {
 }
 
 var errExtendInsurance = fmt.Errorf("%w: the unit is not insured for rental use for the longer rental; record the insurance first", ErrInvalid)
-
