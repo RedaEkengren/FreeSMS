@@ -749,3 +749,24 @@ func (c ProposedCharge) Price() int64 {
 	}
 	return *c.UnitPriceMinor
 }
+
+// RentalBookingOfProtocol is the booking a check-out or check-in protocol
+// is of, in one row: where a page goes back to after the handover.
+func RentalBookingOfProtocol(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, protocolID string) (string, error) {
+	if !scope.Role.HandsOverRentals() {
+		return "", access.ErrForbidden
+	}
+	if !looksLikeUUID(protocolID) {
+		return "", ErrNotFound
+	}
+	var id string
+	err := inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		err := tx.QueryRow(ctx, `SELECT coalesce(check_out_id, check_in_id)::text FROM inspections WHERE id = $1 AND subject IN ('check_out', 'check_in')`,
+			protocolID).Scan(&id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
+	})
+	return id, err
+}

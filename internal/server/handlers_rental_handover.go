@@ -126,7 +126,7 @@ func (s *Server) handleRentalHandoverFinish(w http.ResponseWriter, r *http.Reque
 		}
 		reading.FuelEighths = &f
 	}
-	view, _, err := workshop.RentalHandoverOfProtocol(r.Context(), s.pool, session.Scope, r.PathValue("id"))
+	booking, err := workshop.RentalBookingOfProtocol(r.Context(), s.pool, session.Scope, r.PathValue("id"))
 	if s.handoverError(w, r, err) {
 		return
 	}
@@ -134,19 +134,19 @@ func (s *Server) handleRentalHandoverFinish(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	s.submitted(w, r)
-	http.Redirect(w, r, "/rental/bookings/"+view.BookingID, http.StatusSeeOther)
+	http.Redirect(w, r, "/rental/bookings/"+booking, http.StatusSeeOther)
 }
 
 func (s *Server) handleRentalHandoverAbandon(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
-	view, _, err := workshop.RentalHandoverOfProtocol(r.Context(), s.pool, session.Scope, r.PathValue("id"))
+	booking, err := workshop.RentalBookingOfProtocol(r.Context(), s.pool, session.Scope, r.PathValue("id"))
 	if s.handoverError(w, r, err) {
 		return
 	}
 	if err := workshop.AbandonHandover(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("reason")); s.handoverError(w, r, err) {
 		return
 	}
-	http.Redirect(w, r, "/rental/bookings/"+view.BookingID, http.StatusSeeOther)
+	http.Redirect(w, r, "/rental/bookings/"+booking, http.StatusSeeOther)
 }
 
 // handleRentalPhoto serves a check-out or check-in photograph to the
