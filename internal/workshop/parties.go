@@ -345,12 +345,17 @@ func EndPartyRole(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, r
 	})
 }
 
+// partyNameSQL is a party's name as it is read everywhere: the company's
+// for a company, else the person's -- over a party pa joined to its
+// customer c, the customer's person cp and its own person pp.
+const partyNameSQL = `coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, '')`
+
 // partyColumns reads a party's details from wherever they are kept: the
 // customer and its person for a customer's party, the party and its person
 // for any other. The link to the customer is read only when $2 is true.
 const partyColumns = `
 	pa.id::text, pa.kind,
-	coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, ''),
+	` + partyNameSQL + `,
 	coalesce(c.org_number, pa.org_number, ''),
 	coalesce(cp.phone, pp.phone, ''), coalesce(cp.email::text, pp.email::text, ''),
 	coalesce(nullif(CASE WHEN c.id IS NOT NULL
@@ -589,7 +594,7 @@ func MergeParties(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, k
 			var s side
 			err := tx.QueryRow(ctx, `
 				SELECT pa.kind, coalesce(pa.person_id::text, c.person_id::text, ''), pa.customer_id::text, pa.merged_into::text,
-				       coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, '')
+				       `+partyNameSQL+`
 				`+partyJoins+` WHERE pa.id = $1`, id).Scan(&s.kind, &s.person, &s.customer, &s.merged, &s.name)
 			if errors.Is(err, pgx.ErrNoRows) {
 				return s, ErrNotFound

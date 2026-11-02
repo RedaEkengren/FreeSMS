@@ -63,7 +63,7 @@ var bookingGapsCTEs = `
 	                        AND o.starts_at = a.starts_at AND o.ends_at = a.ends_at)
 	    UNION ALL
 	    SELECT a.id, 4, NOT dr.main, dr.added_at, 'licence',
-	           ` + rentalPartyNameSQL + `
+	           ` + partyNameSQL + `
 	    FROM g_booking a
 	    JOIN rental_drivers dr ON dr.booking_id = a.id AND dr.removed_at IS NULL
 	    JOIN parties pa ON pa.id = dr.party_id

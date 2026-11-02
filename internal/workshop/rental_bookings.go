@@ -45,11 +45,6 @@ const rentalState = `
 	  WHERE e.booking_id = b.id AND e.kind IN ('held', 'confirmed', 'checked_out', 'returned', 'cancelled', 'no_show')
 	  ORDER BY e.seq DESC LIMIT 1)`
 
-// rentalPartyNameSQL is a party's name as the rental desk reads it -- the
-// company's for a company, else the person's -- over a party pa joined to
-// its customer c, the customer's person cp and its own person pp.
-const rentalPartyNameSQL = `coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, '')`
-
 // RentalBooking is a booking as the rental desk reads it.
 type RentalBooking struct {
 	ID         string
@@ -879,7 +874,7 @@ func (b lockedRental) open() bool {
 
 const rentalBookingColumns = `
 	b.id, b.number, b.unit_id, u.fleet_number || coalesce(' · ' || reg.registration, ' · ' || r.name, ''), u.resource_id,
-	b.renter_party_id, ` + rentalPartyNameSQL + `,
+	b.renter_party_id, ` + partyNameSQL + `,
 	b.starts_at, b.ends_at, ` + rentalState + `, CASE WHEN k.status = 'held' THEN k.expires_at END, b.block_id,
 	v.profile_id, coalesce(b.plan_id::text, ''), b.included_km, b.extra_km_minor,
 	EXISTS (SELECT 1 FROM rental_bookings o JOIN resource_blocks ok ON ok.id = o.block_id
@@ -1036,7 +1031,7 @@ func Renters(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Ren
 	var out []Renter
 	err := inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
-			SELECT pa.id, `+rentalPartyNameSQL+`,
+			SELECT pa.id, `+partyNameSQL+`,
 			       coalesce(cp.phone, pp.phone, '')
 			FROM parties pa
 			LEFT JOIN customers c ON c.id = pa.customer_id
