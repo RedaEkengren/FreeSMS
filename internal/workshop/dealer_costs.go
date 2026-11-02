@@ -435,18 +435,28 @@ func PostJobCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		if err != nil {
 			return fmt.Errorf("read the job's car: %w", err)
 		}
-		// Done: invoiced, closed, or declined after work. An open job may
-		// yet take parts and hours, and a posting is what the job cost, not
-		// what it has cost so far; one that kept moving would change under
-		// the margin it is read into. Ready is not done: a ready job may be
-		// handed back for more work. The state is read FOR SHARE, so a job
-		// cannot move back while its cost is posted.
+		// Done: ready, invoiced, closed, or declined after work. An open job
+		// may yet take parts and hours, and a posting is what the job cost,
+		// not what it has cost so far; one that kept moving would change
+		// under the margin it is read into.
+		//
+		// Ready is enough. The car is the shop's own, so the job never needs
+		// a customer invoice -- one would bill the shop for work on its own
+		// car, at a number in the gap-free series, with output VAT on it.
+		// A ready job may still go back on the lift; when it does, the
+		// posting is taken back by itself (reverseJobCostTx) and the job
+		// posts again once it is ready again. This is the default pending
+		// the accountant's word on how a dealer's own workshop work on a
+		// stock car is booked (gate G2, #221).
+		//
+		// The state is read FOR SHARE, so a job cannot move back while its
+		// cost is posted.
 		var state State
 		if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1 FOR SHARE`, jobID).Scan(&state); err != nil {
 			return fmt.Errorf("read the job: %w", err)
 		}
 		switch state {
-		case StateInvoiced, StateClosed, StateDeclined:
+		case StateReady, StateInvoiced, StateClosed, StateDeclined:
 		default:
 			return errJobOpen
 		}
@@ -480,4 +490,66 @@ func PostJobCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		return err
 	})
 	return out, err
+}
+
+// reverseJobCostTx takes back the posting of a job on a stock car that has
+// gone from ready back to work, in the transaction that moves it: what it
+// posted is no longer what the job cost. The reversal says why, and an
+// audit event on the car's stock unit records it. A job with no standing
+// posting -- every customer's job -- does nothing. The caller holds the job
+// FOR UPDATE, so the job comes before the cost lock here as everywhere.
+func reverseJobCostTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID string) error {
+	rows, err := tx.Query(ctx, `
+		SELECT e.id, e.stock_unit_id, e.net_minor FROM stock_cost_entries e
+		WHERE e.work_order_id = $1 AND e.source = 'work_order' AND e.reverses_id IS NULL
+		  AND NOT EXISTS (SELECT 1 FROM stock_cost_entries r WHERE r.reverses_id = e.id)
+		ORDER BY e.id`, jobID)
+	if err != nil {
+		return fmt.Errorf("read the job's posting: %w", err)
+	}
+	type posting struct {
+		id, unit string
+		net      int64
+	}
+	var postings []posting
+	for rows.Next() {
+		var p posting
+		if err := rows.Scan(&p.id, &p.unit, &p.net); err != nil {
+			rows.Close()
+			return err
+		}
+		postings = append(postings, p)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	const why = "The job went back to work after it was ready"
+	for _, p := range postings {
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('cost:' || $1::uuid::text, 0))`, p.id); err != nil {
+			return err
+		}
+		var id string
+		err := tx.QueryRow(ctx, `
+			INSERT INTO stock_cost_entries (shop_id, stock_unit_id, kind, net_minor, input_vat_minor, vat_rate_basis,
+			       incurred_on, source, work_order_id, happened_at, note, reverses_id, recorded_by)
+			SELECT shop_id, stock_unit_id, kind, -net_minor, -input_vat_minor, vat_rate_basis,
+			       (clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops WHERE id = shop_id))::date,
+			       source, work_order_id, happened_at, $2, id, NULLIF($3, '')::uuid
+			FROM stock_cost_entries e WHERE id = $1
+			  AND NOT EXISTS (SELECT 1 FROM stock_cost_entries r WHERE r.reverses_id = e.id)
+			RETURNING id`, p.id, why, scope.UserID).Scan(&id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Reversed by hand while this waited for the lock.
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("take back the job's posting: %w", err)
+		}
+		if err := auditTx(ctx, tx, scope, p.unit, "stock_cost.reversed", "", "", why,
+			map[string]any{"work_order_id": jobID, "entry_id": p.id, "reversal_id": id, "net_minor": p.net}); err != nil {
+			return err
+		}
+	}
+	return nil
 }

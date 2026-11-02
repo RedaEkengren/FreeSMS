@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
 	"github.com/RedaEkengren/FreeSMS/internal/testsupport"
@@ -131,19 +133,33 @@ func TestAJobOnAStockCarPostsItsCostOnce(t *testing.T) {
 	if err := workshop.MarkPerformed(ctx, pool, advisor(), job, 1, true); err != nil {
 		t.Fatal(err)
 	}
-	// Ready is not done: a ready job may go back on the lift for more.
+	// Ready, it posts: the shop's own car needs no customer invoice.
 	move(t, pool, job, workshop.StateReady)
-	if _, err := workshop.PostJobCost(ctx, pool, buyerScope(), job); !errors.Is(err, workshop.ErrInvalid) {
-		t.Errorf("a ready job's cost was posted: %v", err)
-	}
-	if _, err := workshop.Issue(ctx, pool, advisor(), job); err != nil {
-		t.Fatal(err)
-	}
 	posted, err := workshop.PostJobCost(ctx, pool, buyerScope(), job)
 	// 2,5 h at 400 kr and two kits at 1 500 kr: 4 000 kr.
 	if err != nil || posted.NetMinor != 400_000 || posted.Source != workshop.CostFromWorkOrder || posted.Kind != workshop.CostWorkshop ||
 		posted.StockUnitID != p.StockUnitID || posted.WorkOrderID != job {
 		t.Fatalf("the job's posting: %+v, %v", posted, err)
+	}
+	// Back on the lift for more, the posting is taken back by itself, with
+	// an event saying so, and the job cannot post until it is ready again.
+	move(t, pool, job, workshop.StateInProgress)
+	costs, err := workshop.CostsOfUnit(ctx, pool, buyerScope(), p.StockUnitID)
+	if err != nil || len(costs.Entries) != 2 || costs.TotalMinor() != 0 || !costs.Entries[0].Reversed {
+		t.Fatalf("after the job went back to work: %+v, %v", costs, err)
+	}
+	var events int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE event = 'stock_cost.reversed' AND subject_id = $1
+		AND detail->>'work_order_id' = $2`, p.StockUnitID, job).Scan(&events); err != nil || events != 1 {
+		t.Errorf("%d events for the posting taken back (%v)", events, err)
+	}
+	if _, err := workshop.PostJobCost(ctx, pool, buyerScope(), job); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a job back in progress posted its cost: %v", err)
+	}
+	move(t, pool, job, workshop.StateReady)
+	posted, err = workshop.PostJobCost(ctx, pool, buyerScope(), job)
+	if err != nil || posted.NetMinor != 400_000 {
+		t.Fatalf("posted again once ready: %+v, %v", posted, err)
 	}
 	again, err := workshop.PostJobCost(ctx, pool, buyerScope(), job)
 	if err != nil || again.ID != posted.ID {
@@ -459,4 +475,26 @@ func TestACostDatedTomorrowIsAfterASaleMadeToday(t *testing.T) {
 	if err != nil || costs.AfterSale != 40_000 || costs.BeforeSale != 0 {
 		t.Errorf("before the sale %d, after it %d (%v); want tomorrow's cost after today's sale", costs.BeforeSale, costs.AfterSale, err)
 	}
+}
+
+// jobTakenBackToWork is a job on the car in stock now (vehicleA) that
+// posted its cost when ready and then went back to work, which takes the
+// posting back.
+func jobTakenBackToWork(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	ctx := context.Background()
+	job := newJob(t, pool)
+	if err := workshop.AddLine(ctx, pool, advisor(), job, workshop.NewLine{Kind: "labour", Description: "Polering",
+		QuantityMilli: 1000, UnitPriceMinor: 95_000, VATRateBasis: 2500}); err != nil {
+		t.Fatal(err)
+	}
+	move(t, pool, job, workshop.StateEstimated, workshop.StateAwaitingApproval, workshop.StateApproved, workshop.StateInProgress)
+	if err := workshop.MarkPerformed(ctx, pool, advisor(), job, 1, true); err != nil {
+		t.Fatal(err)
+	}
+	move(t, pool, job, workshop.StateReady)
+	if _, err := workshop.PostJobCost(ctx, pool, buyerScope(), job); err != nil {
+		t.Fatal(err)
+	}
+	move(t, pool, job, workshop.StateInProgress)
 }
