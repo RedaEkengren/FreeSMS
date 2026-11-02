@@ -371,3 +371,32 @@ func TestABookingWhoseTimeHasPassedLeavesTheList(t *testing.T) {
 		t.Error("a booking whose time has passed is listed as lacking something for its handover")
 	}
 }
+
+// A permit ending within thirty days is on the list from the day it is
+// known; one standing past them is not.
+func TestAPermitEndingSoonIsOnTheList(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	ends := time.Now().AddDate(0, 0, 10)
+	if _, err := workshop.RecordRentalPermit(ctx, pool, rentalOwner(), workshop.NewRentalPermit{
+		Reference: "TSV 1", DecidedOn: day("2024-01-01"), ExpiresOn: &ends, Responsible: "Anna"}); err != nil {
+		t.Fatal(err)
+	}
+	listed := func() bool {
+		items, err := workshop.WaitingFor(ctx, pool, rentalDesk())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return slices.ContainsFunc(items, func(it workshop.ActionItem) bool { return it.Kind == "rental_permit_ends" })
+	}
+	if !listed() {
+		t.Error("a permit ending in ten days is not on the list")
+	}
+	if _, err := workshop.RecordRentalPermit(ctx, pool, rentalOwner(), workshop.NewRentalPermit{
+		Reference: "TSV 2", DecidedOn: ends.AddDate(0, 0, 1), Responsible: "Anna"}); err != nil {
+		t.Fatal(err)
+	}
+	if listed() {
+		t.Error("a permit renewed from the day after is still on the list")
+	}
+}

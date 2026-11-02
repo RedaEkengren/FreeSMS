@@ -3,6 +3,7 @@ package workshop
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -25,7 +26,7 @@ import (
 //   - a driver named at all.
 //
 // A report or insurance let go for exactly this period does not count.
-const bookingGapsCTEs = `
+var bookingGapsCTEs = `
 	g_zone AS (SELECT timezone FROM shops),
 	g_booking AS (
 	    SELECT q.id, q.starts_at, q.ends_at, v.permit_required, v.reporting_required, v.insurance_required, v.licence_check_required,
@@ -42,10 +43,7 @@ const bookingGapsCTEs = `
 	    SELECT a.id AS booking_id, 1 AS ord, false AS first, NULL::timestamptz AS added, 'permit' AS code, '' AS who
 	    FROM g_booking a
 	    WHERE a.permit_required AND EXISTS (
-	        SELECT 1 FROM generate_series(a.first_day, a.last_day, interval '1 day') d
-	        WHERE NOT EXISTS (SELECT 1 FROM rental_permits p LEFT JOIN rental_permit_revocations x ON x.permit_id = p.id
-	                          WHERE p.decided_on <= d::date AND (p.expires_on IS NULL OR d::date <= p.expires_on)
-	                            AND (x.revoked_on IS NULL OR d::date < x.revoked_on)))
+	        SELECT 1 FROM generate_series(a.first_day, a.last_day, interval '1 day') d WHERE NOT ` + permitStandsOn("d::date") + `)
 	    UNION ALL
 	    SELECT a.id, 2, false, NULL, 'not_reported', ''
 	    FROM g_booking a
@@ -80,6 +78,17 @@ const bookingGapsCTEs = `
 	    FROM g_booking a
 	    WHERE a.licence_check_required
 	      AND NOT EXISTS (SELECT 1 FROM rental_drivers dr WHERE dr.booking_id = a.id AND dr.removed_at IS NULL))`
+
+// permitStandsOn is whether a rental permit stands on a day, an SQL date
+// expression: decided by then, not expired, not revoked. The one test of
+// it, for the gaps, a profile's gaps before a booking, and the warning
+// that the permit ends.
+func permitStandsOn(day string) string {
+	return strings.NewReplacer("{day}", day).Replace(`EXISTS (
+	    SELECT 1 FROM rental_permits p LEFT JOIN rental_permit_revocations x ON x.permit_id = p.id
+	    WHERE p.decided_on <= {day} AND (p.expires_on IS NULL OR {day} <= p.expires_on)
+	      AND (x.revoked_on IS NULL OR {day} < x.revoked_on))`)
+}
 
 // gapSentences are what each gap says, as catalogue keys.
 var gapSentences = map[string]HandoverGap{

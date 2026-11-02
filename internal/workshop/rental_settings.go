@@ -193,18 +193,6 @@ func rentalPermitsTx(ctx context.Context, tx pgx.Tx) ([]RentalPermit, error) {
 	return out, rows.Err()
 }
 
-// permitCovers reports whether the permits between them stand on every day
-// from first to last, in the shop's zone: a renewal that starts the day
-// after the old one ends covers the change.
-func permitCovers(permits []RentalPermit, first, last time.Time) bool {
-	for d := dateOnly(first); !d.After(dateOnly(last)); d = d.AddDate(0, 0, 1) {
-		if !slices.ContainsFunc(permits, func(p RentalPermit) bool { return p.ValidOn(d) }) {
-			return false
-		}
-	}
-	return true
-}
-
 // The shipped profiles' bases.
 const (
 	ProfileCar       = "car"
@@ -683,29 +671,26 @@ const (
 // add what they own -- a unit, its drivers -- by asking it too; nothing
 // else asks whether a unit is a car.
 func rentalHandoverGapsTx(ctx context.Context, tx pgx.Tx, profile RentalProfile, from, to time.Time) ([]HandoverGap, error) {
-	var gaps []HandoverGap
-	if profile.Rules.PermitRequired {
-		permits, err := rentalPermitsTx(ctx, tx)
-		if err != nil {
-			return nil, err
-		}
-		loc, err := shopLocationTx(ctx, tx)
-		if err != nil {
-			return nil, err
-		}
-		last := to
-		if last.IsZero() {
-			// Open-ended: it has to stand for as long as can be said.
-			last = from.AddDate(1, 0, 0)
-		} else {
-			last = last.Add(-time.Nanosecond)
-		}
-		if !permitCovers(permits, from.In(loc), last.In(loc)) {
-			gaps = append(gaps, HandoverGap{Code: GapPermit,
-				Sentence: "There is no rental permit that stands for the whole rental."})
-		}
+	if !profile.Rules.PermitRequired {
+		return nil, nil
 	}
-	return gaps, nil
+	if to.IsZero() {
+		// Open-ended: it has to stand for as long as can be said.
+		to = from.AddDate(1, 0, 0)
+	}
+	var missing bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (
+		    SELECT 1 FROM shops z,
+		         generate_series(($1::timestamptz AT TIME ZONE z.timezone)::date,
+		                         (($2::timestamptz - interval '1 microsecond') AT TIME ZONE z.timezone)::date, interval '1 day') d
+		    WHERE NOT `+permitStandsOn("d::date")+`)`, from, to).Scan(&missing); err != nil {
+		return nil, fmt.Errorf("read the permits: %w", err)
+	}
+	if missing {
+		return []HandoverGap{gapSentences[GapPermit]}, nil
+	}
+	return nil, nil
 }
 
 // RentalHandoverGaps answers what a profile version requires before

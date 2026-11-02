@@ -413,6 +413,13 @@ func fleetUseWaitingTx(ctx context.Context, tx pgx.Tx) ([]ActionItem, error) {
 		GROUP BY u.id, u.fleet_number, reg.registration, r.name, t.today
 		HAVING bool_and(i.valid_to IS NOT NULL) AND max(i.valid_to) < t.today + $1::int
 		UNION ALL
+		-- The permit standing today and not on some day of the warning:
+		-- the first such day.
+		SELECT 'rental_permit_ends', 'rental_settings', '', '', (min(d)::date)::timestamptz
+		FROM t, generate_series(t.today, t.today + $1::int, interval '1 day') d
+		WHERE `+permitStandsOn("t.today")+` AND NOT `+permitStandsOn("d::date")+`
+		HAVING count(*) > 0
+		UNION ALL
 		-- A booking ahead that would be refused at the counter today: the
 		-- counter's own question (bookingGapsCTEs), asked of all of them.
 		SELECT 'rental_gaps', 'rental_booking', a.id::text, u.fleet_number || coalesce(' · ' || reg.registration, ' · ' || r.name, ''), a.starts_at
@@ -437,39 +444,8 @@ func fleetUseWaitingTx(ctx context.Context, tx pgx.Tx) ([]ActionItem, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	loc, err := shopLocationTx(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-	now := time.Now().In(loc)
-	permits, err := rentalPermitsTx(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-	if permitCovers(permits, now, now) && !permitCovers(permits, now, now.Add(ExpiryWarning)) {
-		it := ActionItem{Kind: "rental_permit_ends", Module: access.Rental, SubjectKind: "rental_settings", Urgency: UrgencySoon}
-		for d := dateOnly(now); ; d = d.AddDate(0, 0, 1) {
-			if !permitCovers(permits, d, d) {
-				it.Due = d
-				break
-			}
-		}
-		out = append(out, it)
-	}
 	return out, nil
 }
 
 var errExtendInsurance = fmt.Errorf("%w: the unit is not insured for rental use for the longer rental; record the insurance first", ErrInvalid)
 
-// insuranceLastsTx refuses to extend a rental that is out past the
-// insurance its profile requires.
-func insuranceLastsTx(ctx context.Context, tx pgx.Tx, bookingID string, starts, to time.Time) error {
-	gaps, err := bookingGapsTx(ctx, tx, []string{bookingID}, []time.Time{starts}, []time.Time{to})
-	if err != nil {
-		return err
-	}
-	if slices.ContainsFunc(gaps[bookingID], func(g HandoverGap) bool { return g.Code == GapInsurance }) {
-		return errExtendInsurance
-	}
-	return nil
-}
