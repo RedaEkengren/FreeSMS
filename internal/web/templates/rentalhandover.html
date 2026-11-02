@@ -49,12 +49,12 @@
 {{if $open}}
 <h2>{{if $in}}{{.T "Take it back"}}{{else}}{{.T "Hand it over"}}{{end}}</h2>
 <form method="post" action="/rental/handovers/{{$p.ID}}/finish" data-offline>
-  {{if .Rental.Handovers.HasOdometer}}
+  {{/* Fuel or charge is asked of every unit, and may be left out: a
+       generator or a lift has a tank or a battery and no odometer. */}}
   <div class="pair">
-    <label><span>{{.T "Odometer, km"}}</span><input name="odometer" inputmode="numeric" pattern="[0-9 ]*" maxlength="9" required></label>
+    {{if .Rental.Handovers.HasOdometer}}<label><span>{{.T "Odometer, km"}}</span><input name="odometer" inputmode="numeric" pattern="[0-9 ]*" maxlength="9" required></label>{{end}}
     <label><span>{{.T "Fuel or charge"}}</span><select name="fuel"><option value="">&ndash;</option>{{range .Rental.Eighths}}<option value="{{.}}">{{.}}/8</option>{{end}}</select></label>
   </div>
-  {{end}}
   <label class="tick"><input type="checkbox" name="renter_present" value="1" checked> {{.T "The renter is here"}}</label>
   <label class="tick"><input type="checkbox" name="renter_accepted" value="1"> {{.T "The renter has seen the protocol and accepts it"}}</label>
   {{if $in}}

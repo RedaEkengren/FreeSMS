@@ -89,6 +89,10 @@ func TestTheRentalDeskChecksAUnitOutAndIn(t *testing.T) {
 		if resp.StatusCode != http.StatusOK || !strings.Contains(body, `action="`+protocol+`/finish"`) {
 			t.Fatalf("the protocol page: %d %s", resp.StatusCode, body)
 		}
+		// A generator or a lift has a tank or a battery and no odometer.
+		if strings.Contains(body, `name="odometer"`) || !strings.Contains(body, `name="fuel"`) {
+			t.Error("a tent's protocol page: an odometer asked for, or no fuel or charge offered")
+		}
 		if action == "check-in" {
 			for _, it := range p.Items {
 				if it.Label == "Duk" {
