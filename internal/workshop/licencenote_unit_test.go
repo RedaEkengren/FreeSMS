@@ -34,6 +34,13 @@ func TestWhatALicenceNoteMayHold(t *testing.T) {
 		{"born 12th of March", true},
 		{"born 3 Oct 1985", true},
 		{"Sept 9", true},
+		// A day written with a leading zero beside a month's name.
+		{"född 05 mars 1990", true},
+		{"född 05 mars", true},
+		{"01 jan 1985", true},
+		{"DOB March 05", true},
+		{"DOB 3/12/1990", true},
+		{"född 5/3", true},
 		// Not identifiers.
 		{"", false},
 		{"Tyskt körkort, giltigt i Sverige", false},
@@ -48,6 +55,12 @@ func TestWhatALicenceNoteMayHold(t *testing.T) {
 		{"körkort 2-3 år gammalt", false},
 		{"May drive abroad", false},
 		{"Kortet var lite slitet", false},
+		// A fraction, and a month with its year: not a day and a month.
+		{"tank 3/4", false},
+		{"tank 1/2", false},
+		{"giltigt till 12/2031", false},
+		{"giltigt till 12/31", false},
+		{"utfärdat 2019-04", false},
 	} {
 		if got := holdsIdentifier(c.note); got != c.refused {
 			t.Errorf("%q: refused %v, want %v", c.note, got, c.refused)
