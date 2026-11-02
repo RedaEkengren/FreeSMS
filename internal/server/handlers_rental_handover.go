@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -106,7 +107,7 @@ func (s *Server) handleRentalHandoverFinish(w http.ResponseWriter, r *http.Reque
 		RenterPresent:  r.FormValue("renter_present") != "",
 		RenterAccepted: r.FormValue("renter_accepted") != "",
 		Note:           r.FormValue("note"),
-		Damage:         r.Form["damage"],
+		Dismissed:      dismissed(r.Form["shown"], r.Form["damage"]),
 		Key:            r.Header.Get(IdempotencyHeader),
 	}
 	if v := strings.TrimSpace(r.FormValue("odometer")); v != "" {
@@ -222,6 +223,18 @@ func (d rentalData) HandoverEnds() []workshop.RentalHandover {
 	for _, h := range []*workshop.RentalHandover{d.Handovers.Out, d.Handovers.In} {
 		if h != nil {
 			out = append(out, *h)
+		}
+	}
+	return out
+}
+
+// dismissed are the new findings the page showed and the person
+// unticked: let go as not damage.
+func dismissed(shown, ticked []string) []string {
+	var out []string
+	for _, id := range shown {
+		if !slices.Contains(ticked, id) {
+			out = append(out, id)
 		}
 	}
 	return out

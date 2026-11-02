@@ -59,8 +59,8 @@
   <label class="tick"><input type="checkbox" name="renter_accepted" value="1"> {{.T "The renter has seen the protocol and accepts it"}}</label>
   {{if $in}}
   {{with .Rental.NewFindings}}
-  <p class="waiting">{{$.T "Each finding ticked becomes a damage case to look at. It is not a charge. Untick one that was only dirt."}}</p>
-  {{range .}}<label class="tick"><input type="checkbox" name="damage" value="{{.In.ID}}" checked> {{.Label}}{{with .In.Note}}: {{.}}{{end}}</label>{{end}}
+  <p class="waiting">{{$.T "Each new finding becomes a damage case to look at, including one found after this page was opened. It is not a charge. Untick one that was only dirt."}}</p>
+  {{range .}}<input type="hidden" name="shown" value="{{.In.ID}}"><label class="tick"><input type="checkbox" name="damage" value="{{.In.ID}}" checked> {{.Label}}{{with .In.Note}}: {{.}}{{end}}</label>{{end}}
   {{end}}
   {{end}}
   <label><span>{{.T "Note"}}</span><input name="note" maxlength="300"></label>

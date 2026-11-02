@@ -39,8 +39,6 @@ var (
 	errHandoverOdometer  = fmt.Errorf("%w: read the odometer, in whole kilometres", ErrInvalid)
 	errHandoverFuel      = fmt.Errorf("%w: the fuel or charge is read in eighths, from empty to full", ErrInvalid)
 	errHandoverAccepted  = fmt.Errorf("%w: the renter accepts the protocol only when there", ErrInvalid)
-	errHandoverNotOurs   = fmt.Errorf("%w: that checkpoint is not on this protocol", ErrInvalid)
-	errHandoverNotNew    = fmt.Errorf("%w: only a finding new since the check-out becomes a damage case", ErrInvalid)
 	errHandoverAbandoned = fmt.Errorf("%w: that protocol was left; start the handover again", ErrInvalid)
 )
 
@@ -220,10 +218,14 @@ type HandoverReading struct {
 	// The renter saw the protocol and accepted it.
 	RenterAccepted bool
 	Note           string
-	// At check-in, the checkpoints a person confirmed as new damage, by
-	// item id. Each becomes a damage case, observed.
-	Damage []string
-	Key    string
+	// At check-in, the new findings a person let go as not damage -- only
+	// dirt -- by item id. Every other finding new when the check-in is
+	// finished becomes a damage case, observed: the finish may arrive from
+	// an offline phone after answers it queued, and a finding new since
+	// the page was shown must not be lost. One let go that is no longer
+	// new, or not on the protocol, is passed over.
+	Dismissed []string
+	Key       string
 }
 
 // FinishHandover finishes a check-out or check-in protocol, and with it
@@ -297,18 +299,11 @@ func FinishHandover(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 			if err != nil {
 				return err
 			}
-			for _, item := range slices.Compact(slices.Sorted(slices.Values(r.Damage))) {
-				f, ok := cmp.finding(item)
-				switch {
-				case !ok:
-					return errHandoverNotOurs
-				case !f.New:
-					return errHandoverNotNew
+			for _, f := range cmp.Items {
+				if f.New && !slices.Contains(r.Dismissed, f.In.ID) {
+					damage = append(damage, handoverFinding{item: f.In.ID, key: f.Key, label: f.Label, note: f.In.Note})
 				}
-				damage = append(damage, handoverFinding{item: item, key: f.Key, label: f.Label, note: f.In.Note})
 			}
-		} else if len(r.Damage) > 0 {
-			return errHandoverNotNew
 		}
 		if _, err := tx.Exec(ctx, `UPDATE inspections SET completed_at = now() WHERE id = $1`, protocolID); err != nil {
 			return finished(err)
@@ -424,15 +419,6 @@ type ComparedItem struct {
 // HandoverComparison is a check-in beside the check-out before it.
 type HandoverComparison struct {
 	Items []ComparedItem
-}
-
-func (c HandoverComparison) finding(itemID string) (ComparedItem, bool) {
-	for _, it := range c.Items {
-		if it.In.ID == itemID {
-			return it, true
-		}
-	}
-	return ComparedItem{}, false
 }
 
 // statusRank orders what a checkpoint can be found as, from nothing to

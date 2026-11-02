@@ -145,13 +145,10 @@ func TestOnlyANewFindingAtReturnBecomesADamageCase(t *testing.T) {
 			t.Errorf("%s: new %v beside %+v", c.Label, c.New, c.Out)
 		}
 	}
-	// The dent was there when it went out: it is not a new finding.
+	// The dent was there when it went out: it is not a new finding, and
+	// only the scratch becomes a case.
 	if err := workshop.FinishHandover(ctx, pool, rentalDesk(), in, workshop.HandoverReading{OdometerKm: km64(12350), FuelEighths: ptr(5),
-		Damage: []string{itemID(back, "Vänster dörr")}}); !errors.Is(err, workshop.ErrInvalid) {
-		t.Errorf("the known dent confirmed as new damage: %v", err)
-	}
-	if err := workshop.FinishHandover(ctx, pool, rentalDesk(), in, workshop.HandoverReading{OdometerKm: km64(12350), FuelEighths: ptr(5),
-		Damage: []string{itemID(back, "Lack och plåt")}, Note: "Nyckeln i lådan"}); err != nil {
+		Note: "Nyckeln i lådan"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -317,9 +314,8 @@ func TestAReturnsOwnDamageIsNewToIt(t *testing.T) {
 	if err != nil || in == left {
 		t.Fatalf("a new check-in after one left: %s, %v", in, err)
 	}
-	back := recordFound(t, pool, in, map[string]string{"Lack och plåt": "fail"})
-	if err := workshop.FinishHandover(ctx, pool, rentalDesk(), in, workshop.HandoverReading{OdometerKm: km64(12100), RenterPresent: true,
-		Damage: []string{itemID(back, "Lack och plåt")}}); err != nil {
+	recordFound(t, pool, in, map[string]string{"Lack och plåt": "fail"})
+	if err := workshop.FinishHandover(ctx, pool, rentalDesk(), in, workshop.HandoverReading{OdometerKm: km64(12100), RenterPresent: true}); err != nil {
 		t.Fatal(err)
 	}
 	view, err := workshop.RentalHandovers(ctx, pool, rentalDesk(), id)
@@ -359,5 +355,34 @@ func TestACheckInLeftIsComparedAsItself(t *testing.T) {
 		if itemID(p, c.Label) != c.In.ID {
 			t.Errorf("the check-in left is shown with another protocol's checkpoint %s", c.Label)
 		}
+	}
+}
+
+// The finish of a check-in may be sent from a phone that was offline,
+// after answers it queued: what the page showed as new when it was
+// filled in is not what is new when the finish arrives. Every finding
+// new at the finish becomes a damage case unless the person let it go as
+// not damage; one let go that is no longer new is passed over. Nothing
+// is refused for it, so the queue behind it keeps going (review of R6, #2).
+func TestAFinishSentAfterQueuedAnswersMissesNoNewFinding(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	_, id, _ := checkedOut(t, pool)
+	in, err := workshop.StartHandover(ctx, pool, rentalDesk(), id, workshop.HandoverIn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The page showed the rims as new, and the person let them go as dirt;
+	// the queued answers then put the rims right and found the door torn.
+	back := recordFound(t, pool, in, map[string]string{"Fälgar": "attention"})
+	rims := itemID(back, "Fälgar")
+	recordFound(t, pool, in, map[string]string{"Vänster dörr": "fail"})
+	if err := workshop.FinishHandover(ctx, pool, rentalDesk(), in, workshop.HandoverReading{OdometerKm: km64(12100), RenterPresent: true,
+		Dismissed: []string{rims, "99999999-0000-0000-0000-000000000009"}}); err != nil {
+		t.Fatalf("the finish behind the queued answers: %v", err)
+	}
+	view, _ := workshop.RentalHandovers(ctx, pool, rentalDesk(), id)
+	if len(view.Damage) != 1 || view.Damage[0].Description != "Vänster dörr" {
+		t.Errorf("the damage register: %+v; want the torn door alone", view.Damage)
 	}
 }
