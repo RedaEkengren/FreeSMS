@@ -662,7 +662,9 @@ func CompleteDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, s
 		if err := tx.QueryRow(ctx, `SELECT status FROM stock_units WHERE id = $1`, d.StockUnitID).Scan(&status); err != nil {
 			return err
 		}
-		if status != StockSold {
+		// Sold already, or delivered since -- a deal revised after the
+		// car left, completed again -- the car stays where it is.
+		if status != StockSold && status != StockDelivered {
 			if err := moveStockUnitTx(ctx, tx, scope, d.StockUnitID, StockSold, ""); err != nil {
 				return err
 			}
@@ -670,7 +672,13 @@ func CompleteDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, s
 		if _, err := tx.Exec(ctx, `UPDATE stock_units SET vehicle_sale_id = $2 WHERE id = $1`, d.StockUnitID, saleID); err != nil {
 			return fmt.Errorf("tie the car to its sale: %w", err)
 		}
+		var leadWon bool
 		if d.LeadID != "" {
+			if err := tx.QueryRow(ctx, `SELECT coalesce(status, '') = 'won' FROM lead_now WHERE lead_id = $1`, d.LeadID).Scan(&leadWon); err != nil {
+				return err
+			}
+		}
+		if d.LeadID != "" && !leadWon {
 			if err := leadEventTx(ctx, tx, scope, d.LeadID, "status", map[string]any{"status": LeadWon}); err != nil {
 				return err
 			}
@@ -719,6 +727,11 @@ func CancelDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sal
 		if _, err := tx.Exec(ctx, `INSERT INTO vehicle_sale_events (shop_id, sale_id, kind, reason, by_user)
 			VALUES ($1, $2, 'cancelled', $3, NULLIF($4, '')::uuid)`, scope.ShopID, saleID, reason, scope.UserID); err != nil {
 			return fmt.Errorf("cancel the deal: %w", err)
+		}
+		// The car no longer points at a sale that did not happen.
+		if _, err := tx.Exec(ctx, `UPDATE stock_units SET vehicle_sale_id = NULL WHERE id = $1 AND vehicle_sale_id = $2`,
+			d.StockUnitID, saleID); err != nil {
+			return fmt.Errorf("let go of the car: %w", err)
 		}
 		if d.State == DealContracted && status == StockSold {
 			return moveStockUnitTx(ctx, tx, scope, d.StockUnitID, StockForSale, reason)

@@ -91,7 +91,7 @@ type Lead struct {
 	LastActivityAt  time.Time
 	Erased          bool
 	Contacts        []LeadContact
-	// The deal made from it (#175), the newest if several.
+	// The deal made from it (#175) that stands: the newest not cancelled.
 	DealID string
 }
 
@@ -227,7 +227,9 @@ const leadColumns = `
 	       coalesce(l.wishes, ''), l.channel, coalesce(n.status, 'new'), coalesce(n.lost_reason, ''), coalesce(n.lost_note, ''),
 	       coalesce(n.salesperson_id::text, ''), coalesce(sp.display_name, ''), n.next_step_on, coalesce(n.next_step, ''),
 	       l.created_at, n.last_activity_at, l.erased_at IS NOT NULL,
-	       coalesce((SELECT s.id::text FROM vehicle_sales s WHERE s.lead_id = l.id ORDER BY s.created_at DESC LIMIT 1), '')
+	       coalesce((SELECT s.id::text FROM vehicle_sales s WHERE s.lead_id = l.id
+	                 AND NOT EXISTS (SELECT 1 FROM vehicle_sale_events e WHERE e.sale_id = s.id AND e.kind = 'cancelled')
+	                 ORDER BY s.created_at DESC LIMIT 1), '')
 	FROM leads l
 	JOIN lead_now n ON n.lead_id = l.id
 	LEFT JOIN stock_units u ON u.id = l.stock_unit_id

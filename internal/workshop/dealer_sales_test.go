@@ -562,3 +562,79 @@ func TestASalespersonSeesTheirOwnDeals(t *testing.T) {
 		t.Errorf("the owner's deals: %d, %v", len(list), err)
 	}
 }
+
+// A cancelled deal lets go of its car: the car no longer points at it, and
+// its lead offers a new deal.
+func TestACancelledDealLetsGoOfItsCarAndLead(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	d := completedDeal(t, pool)
+	lead, err := workshop.CreateLead(ctx, pool, sales(), workshop.NewLead{PartyID: d.Buyers[0].PartyID, StockUnitID: d.StockUnitID,
+		Channel: "walk_in"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.CancelDeal(ctx, pool, sales(), d.ID, "Köparen ångrade sig"); err != nil {
+		t.Fatal(err)
+	}
+	if u, _ := workshop.StockUnitByID(ctx, pool, sales(), d.StockUnitID); u.VehicleSaleID != "" {
+		t.Errorf("the car still points at the cancelled deal: %+v", u)
+	}
+	next, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: d.StockUnitID, LeadID: lead.ID,
+		Terms: consumerTerms(d.Buyers[0].PartyID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.CancelDeal(ctx, pool, sales(), next.ID, "Igen"); err != nil {
+		t.Fatal(err)
+	}
+	if l, _ := workshop.LeadByID(ctx, pool, sales(), lead.ID); l.DealID != "" {
+		t.Errorf("the lead points at a cancelled deal: %s", l.DealID)
+	}
+}
+
+// A deal revised after its car was delivered is completed again without
+// moving the car back to sold, and its lead is won once.
+func TestADeliveredDealIsCompletedAgainWithoutMovingTheCar(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := carForSale(t, pool)
+	kim := driver(t, pool)
+	lead, err := workshop.CreateLead(ctx, pool, sales(), workshop.NewLead{PartyID: kim, StockUnitID: unit, Channel: "walk_in"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	terms := consumerTerms(kim)
+	terms.TaxTreatment = workshop.TaxOrdinary
+	d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: unit, LeadID: lead.ID, Terms: terms})
+	if err != nil {
+		t.Fatal(err)
+	}
+	complete := func(replacing string) workshop.Deal {
+		t.Helper()
+		doc, _, err := workshop.ProduceSalesContract(ctx, pool, sales(), d.ID, contractTemplate(t, pool), replacing)
+		if err != nil {
+			t.Fatal(err)
+		}
+		signAll(t, pool, doc)
+		done, err := workshop.CompleteDeal(ctx, pool, sales(), d.ID)
+		if err != nil || !done.Completed() {
+			t.Fatalf("completed: %+v, %v", done, err)
+		}
+		return done
+	}
+	first := complete("")
+	moveStock(t, pool, unit, workshop.StockDelivered)
+	terms.Warranty = "Sex månader"
+	if _, err := workshop.ReviseDeal(ctx, pool, sales(), d.ID, first.Version, terms); err != nil {
+		t.Fatal(err)
+	}
+	complete(first.ContractID)
+	if u, _ := workshop.StockUnitByID(ctx, pool, sales(), unit); u.Status != workshop.StockDelivered {
+		t.Errorf("the delivered car after the deal was completed again: %s", u.Status)
+	}
+	var won int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM lead_events WHERE lead_id = $1 AND status = 'won'`, lead.ID).Scan(&won); err != nil || won != 1 {
+		t.Errorf("the lead was won %d times (%v)", won, err)
+	}
+}
