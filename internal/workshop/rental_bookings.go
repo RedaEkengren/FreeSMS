@@ -564,6 +564,9 @@ type lockedRental struct {
 	starts, ends                     time.Time
 	buffer                           time.Duration
 	blockStatus                      string
+	// Where its block starts now: before the booked start once the unit
+	// went out early.
+	blockFrom time.Time
 }
 
 func lockRentalTx(ctx context.Context, tx pgx.Tx, id string) (lockedRental, error) {
@@ -576,9 +579,9 @@ func lockRentalTx(ctx context.Context, tx pgx.Tx, id string) (lockedRental, erro
 		return b, err
 	}
 	err := tx.QueryRow(ctx, `
-		SELECT b.unit_id, k.resource_id, b.block_id, `+rentalState+`, b.starts_at, b.ends_at, k.buffer_after, k.status
+		SELECT b.unit_id, k.resource_id, b.block_id, `+rentalState+`, b.starts_at, b.ends_at, k.buffer_after, k.status, lower(k.period)
 		FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id
-		WHERE b.id = $1 FOR UPDATE OF b, k`, id).Scan(&b.unit, &b.resource, &b.block, &b.state, &b.starts, &b.ends, &b.buffer, &b.blockStatus)
+		WHERE b.id = $1 FOR UPDATE OF b, k`, id).Scan(&b.unit, &b.resource, &b.block, &b.state, &b.starts, &b.ends, &b.buffer, &b.blockStatus, &b.blockFrom)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return b, ErrNotFound
 	}
@@ -764,7 +767,12 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 		if err != nil {
 			return err
 		}
-		if err := reblockTx(ctx, tx, b, b.starts, to); err != nil {
+		// Out since before the booked start, the block keeps starting then.
+		from := b.starts
+		if b.blockFrom.Before(from) {
+			from = b.blockFrom
+		}
+		if err := reblockTx(ctx, tx, b, from, to); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE rental_bookings SET ends_at = $2 WHERE id = $1`, id, to); err != nil {

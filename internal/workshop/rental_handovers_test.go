@@ -503,3 +503,20 @@ func inRentalUse(t *testing.T, pool *pgxpool.Pool, membership string) {
 		t.Fatal(err)
 	}
 }
+
+// Extended while out, a rental handed over early keeps its block from the
+// check-out: the time before the booked start stays the unit's (review r5, #1).
+func TestAnExtensionKeepsTheBlockFromAnEarlyCheckOut(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	_, id, _ := checkedOut(t, pool)
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, in2031(14, 9), ""); err != nil {
+		t.Fatal(err)
+	}
+	view, _ := workshop.RentalHandovers(ctx, pool, rentalDesk(), id)
+	b, _ := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id)
+	blocks := activeBlocks(t, pool, b.ResourceID, time.Now().Add(-time.Hour))
+	if len(blocks) != 1 || !blocks[0].From.Equal(view.Out.At) || blocks[0].To == nil || !blocks[0].To.Equal(in2031(14, 10)) {
+		t.Errorf("the block after extending a rental out since %v: %+v", view.Out.At, blocks)
+	}
+}
