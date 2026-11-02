@@ -4,6 +4,8 @@ import (
 	"net/url"
 	"slices"
 	"testing"
+
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // The finish form names what the page showed as new and what stayed
@@ -26,5 +28,18 @@ func TestTheFinishFormIsReadInBothShapes(t *testing.T) {
 	}
 	if dismissed, confirmed := findingsChosen(url.Values{"finish_form": {"2"}}); dismissed != nil || confirmed != nil {
 		t.Errorf("today's form with nothing shown: let go %v, confirmed %v", dismissed, confirmed)
+	}
+}
+
+// The register's CSV holds a rental once, though the period and the
+// moment asked both found it (review r6, #9).
+func TestTheRegistersRowsHoldEachRentalOnce(t *testing.T) {
+	a := workshop.RegisterEntry{BookingID: "a"}
+	b := workshop.RegisterEntry{BookingID: "b"}
+	if got := registerRows([]workshop.RegisterEntry{a, b}, &a); len(got) != 2 {
+		t.Errorf("the moment's rental, found by the period too: %d rows", len(got))
+	}
+	if got := registerRows([]workshop.RegisterEntry{a}, &b); len(got) != 2 {
+		t.Errorf("the moment's rental, outside the period: %d rows", len(got))
 	}
 }

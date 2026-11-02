@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -110,9 +111,7 @@ func (s *Server) handleRentalRegisterCSV(w http.ResponseWriter, r *http.Request)
 		s.renderError(w, r, http.StatusBadRequest, "Not accepted", "say why the register is read, in 300 characters or fewer")
 		return
 	}
-	if who != nil {
-		entries = append(entries, *who)
-	}
+	entries = registerRows(entries, who)
 	loc := s.shopLocation(r)
 	at := func(t *time.Time) string {
 		if t == nil {
@@ -168,4 +167,13 @@ func (s *Server) handleRegisterRetention(w http.ResponseWriter, r *http.Request)
 	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/rental/settings", http.StatusSeeOther)
+}
+
+// registerRows are the rentals the period found, and the one the moment
+// found if the period did not.
+func registerRows(entries []workshop.RegisterEntry, who *workshop.RegisterEntry) []workshop.RegisterEntry {
+	if who == nil || slices.ContainsFunc(entries, func(e workshop.RegisterEntry) bool { return e.BookingID == who.BookingID }) {
+		return entries
+	}
+	return append(entries, *who)
 }
