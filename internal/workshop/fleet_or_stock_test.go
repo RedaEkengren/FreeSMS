@@ -242,3 +242,29 @@ func TestACarFromStockJoinsTheFleetAndIsRented(t *testing.T) {
 		}
 	})
 }
+
+// The join form gives the time to the minute, and a stock cycle closes to
+// the microsecond: a car joined from stock in the minute its cycle closed
+// joins at the close, not over it (review of the Rental merge, #8).
+func TestACarJoinsTheFleetInTheMinuteItsStockCycleClosed(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	stock := takeIn(t, pool, workshop.StockFromDefleet)
+	moveStock(t, pool, stock.ID, workshop.StockClosed)
+	closed, err := workshop.StockUnitByID(ctx, pool, buyerScope(), stock.ID)
+	if err != nil || closed.ClosedAt == nil {
+		t.Fatalf("the closed cycle: %+v, %v", closed, err)
+	}
+	unit := addUnit(t, pool, workshop.NewRentalUnit{Registration: "ABC 12D", FleetNumber: "V1", Category: "Small van"})
+	// The minute before is still in stock, and refused.
+	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), unit, closed.ClosedAt.Truncate(time.Minute).Add(-time.Second), "from_stock", ""); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("joined the minute before the cycle closed: %v", err)
+	}
+	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), unit, closed.ClosedAt.Truncate(time.Minute), "from_stock", ""); err != nil {
+		t.Fatalf("joined in the minute the cycle closed: %v", err)
+	}
+	u, _ := workshop.RentalUnitByID(ctx, pool, rentalDesk(), unit)
+	if len(u.Memberships) != 1 || !u.Memberships[0].JoinedAt.Equal(*closed.ClosedAt) {
+		t.Errorf("joined at %v; the cycle closed at %v", u.Memberships, closed.ClosedAt)
+	}
+}

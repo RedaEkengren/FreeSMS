@@ -272,6 +272,20 @@ func StartFleetMembership(ctx context.Context, pool *pgxpool.Pool, scope access.
 		if err != nil {
 			return fmt.Errorf("read unit: %w", err)
 		}
+		// A time typed to the minute, in the minute the car's stock cycle
+		// closed -- to the microsecond -- means the close: the car joins
+		// the moment it left stock, not over the seconds before.
+		if vehicle != nil {
+			var closed *time.Time
+			if err := tx.QueryRow(ctx, `
+				SELECT max(closed_at) FROM stock_units
+				WHERE vehicle_id = $1 AND closed_at > $2 AND date_trunc('minute', closed_at) <= $2`, *vehicle, from).Scan(&closed); err != nil {
+				return fmt.Errorf("read the stock cycle: %w", err)
+			}
+			if closed != nil {
+				from = *closed
+			}
+		}
 		err = tx.QueryRow(ctx, `
 			INSERT INTO fleet_memberships (shop_id, unit_id, vehicle_id, joined_at, joined_how, joined_by, joined_note)
 			VALUES ($1, $2, $3, $4, $5, NULLIF($6, '')::uuid, nullif($7, '')) RETURNING id`,
