@@ -361,3 +361,38 @@ func TestTheSameEnquirySentAtOnceIsOneLead(t *testing.T) {
 		}
 	}
 }
+
+// A car known only by its chassis number is named by it, on a lead and in
+// what waits: a lead whose car has gone is never a sentence with nothing
+// in it.
+func TestACarKnownByItsChassisNumberIsNamedByIt(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	anna := salesperson(t, pool, "Anna Säljare", "anna.s@example.test")
+	var vehicle string
+	if err := pool.QueryRow(ctx, `INSERT INTO vehicles (shop_id, vin) VALUES ($1, 'YS3EH5G13Y1234567') RETURNING id`, shopID).Scan(&vehicle); err != nil {
+		t.Fatal(err)
+	}
+	p, err := workshop.RecordPurchase(ctx, pool, buyerScope(), workshop.NewPurchase{VehicleID: vehicle, Reason: workshop.StockFromPurchase,
+		SellerPartyID: theSeller(t, pool), PurchasedOn: time.Now(), PriceMinor: 5_000_000, SellerType: workshop.SellerPrivate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	moveStock(t, pool, p.StockUnitID, workshop.StockForSale)
+	n := walkIn("Kim Köpare", "0701234567")
+	n.StockUnitID, n.Wishes, n.Salesperson = p.StockUnitID, "", anna.UserID
+	l, err := workshop.CreateLead(ctx, pool, anna, n)
+	if err != nil || l.Car != "YS3EH5G13Y1234567" {
+		t.Fatalf("the lead's car: %q, %v", l.Car, err)
+	}
+	moveStock(t, pool, p.StockUnitID, workshop.StockReserved)
+	items, err := workshop.WaitingFor(ctx, pool, anna)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range items {
+		if it.SubjectID == l.ID && (it.Kind != "lead_car_gone" || it.Text != "YS3EH5G13Y1234567" || it.Says() == "") {
+			t.Errorf("the item: %+v, saying %q", it, it.Says())
+		}
+	}
+}

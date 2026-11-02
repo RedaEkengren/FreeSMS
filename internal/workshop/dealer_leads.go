@@ -221,7 +221,7 @@ func leadVisible(p int) string {
 const leadColumns = `
 	SELECT l.id, coalesce(l.party_id::text, ''), coalesce(pn.name, ''), coalesce(l.contact_name, ''),
 	       coalesce(l.contact_phone, ''), coalesce(l.contact_email, ''), coalesce(l.stock_unit_id::text, ''),
-	       coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), ''), coalesce(u.status, ''),
+	       coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), nullif(btrim(v.vin), ''), ''), coalesce(u.status, ''),
 	       coalesce(l.wishes, ''), l.channel, coalesce(n.status, 'new'), coalesce(n.lost_reason, ''), coalesce(n.lost_note, ''),
 	       coalesce(n.salesperson_id::text, ''), coalesce(sp.display_name, ''), n.next_step_on, coalesce(n.next_step, ''),
 	       l.created_at, n.last_activity_at, l.erased_at IS NOT NULL
@@ -853,7 +853,7 @@ func dealerWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 			SELECT CASE WHEN n.salesperson_id IS NULL THEN 'lead_unassigned'
 			            WHEN u.status IN ('reserved', 'sold', 'delivered', 'closed', 'written_off') THEN 'lead_car_gone'
 			            ELSE 'lead_follow_up' END,
-			       'lead', l.id::text, coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), ''),
+			       'lead', l.id::text, coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), nullif(btrim(v.vin), ''), ''),
 			       coalesce(n.next_step_on::timestamp AT TIME ZONE (SELECT timezone FROM shops), l.created_at), l.created_at
 			FROM leads l
 			JOIN lead_now n ON n.lead_id = l.id
@@ -880,7 +880,7 @@ func dealerWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 			}
 			if it.SubjectKind == "test_drive" {
 				it.Urgency = UrgencyNow
-			} else if it.Text == "" {
+			} else if it.Text == "" && it.Kind != "lead_car_gone" {
 				// What they want is theirs to say, and not a car's name.
 				it.Kind += "_any"
 			}
@@ -911,7 +911,7 @@ func CarsInStock(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([
 	var out []StockCar
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
-			SELECT u.id, coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), v.vin, ''), u.status
+			SELECT u.id, coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), nullif(btrim(v.vin), ''), ''), u.status
 			FROM stock_units u JOIN vehicles v ON v.id = u.vehicle_id
 			LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = v.id AND reg.valid_to IS NULL
 			WHERE u.closed_at IS NULL
@@ -984,7 +984,7 @@ func exportLeadsAndDrivesTx(ctx context.Context, tx pgx.Tx, personID string, e *
 	for _, id := range leads {
 		var l ExportedLead
 		if err := tx.QueryRow(ctx, `
-			SELECT l.created_at, l.channel, coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), ''),
+			SELECT l.created_at, l.channel, coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), nullif(btrim(v.vin), ''), ''),
 			       coalesce(l.wishes, ''), coalesce(l.contact_name, ''), coalesce(l.contact_phone, ''), coalesce(l.contact_email, ''),
 			       coalesce(n.status, 'new'),
 			       ARRAY(SELECT to_char(c.at, 'YYYY-MM-DD') || ' ' || c.how || coalesce(': ' || c.note, '')
