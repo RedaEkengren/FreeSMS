@@ -8542,6 +8542,23 @@
     "Test-drive agreement (needs legal review)": {"other": "Provkörningsavtal (behöver juridisk granskning)"},
     "Say who drives: their name and phone number.": {"other": "Ange vem som kör: namn och telefonnummer."},
     "Say when it starts and for how many minutes.": {"other": "Ange när den börjar och hur många minuter."},
-    "say who drives: a name of up to 200 characters and a phone number": {"other": "ange vem som kör: ett namn på högst 200 tecken och ett telefonnummer"}
+    "say who drives: a name of up to 200 characters and a phone number": {"other": "ange vem som kör: ett namn på högst 200 tecken och ett telefonnummer"},
+    "a deal has one to four buyers, each named once": {"other": "en affär har en till fyra köpare, var och en angiven en gång"},
+    "a defect is answered by one of the deal's buyers, on paper with the scan, in person, or electronically": {"other": "ett fel besvaras av en av affärens köpare, på papper med inskanning, på plats eller elektroniskt"},
+    "a price is from nothing up to a billion kronor": {"other": "ett pris är från noll upp till en miljard kronor"},
+    "a warranty and a note are at most 1000 characters, a place 300 and payment terms 500": {"other": "en garanti och en anteckning är högst 1000 tecken, en plats 300 och betalningsvillkor 500"},
+    "an extra has a description, a quantity, a price and a VAT rate": {"other": "ett tillval har en beskrivning, ett antal, ett pris och en momssats"},
+    "describe the defect in 1000 characters or fewer": {"other": "beskriv felet med högst 1000 tecken"},
+    "say whether the buyer is a consumer or a business": {"other": "ange om köparen är en konsument eller ett företag"},
+    "say why the deal is cancelled, in 300 characters or fewer": {"other": "ange varför affären avbryts, med högst 300 tecken"},
+    "that car is not in stock to be sold": {"other": "den bilen finns inte i lager att säljas"},
+    "that is not a sales contract template": {"other": "det är ingen mall för köpeavtal"},
+    "that is not a way a sale is taxed": {"other": "det är inget sätt att beskatta en försäljning"},
+    "that request was already used for another deal": {"other": "den begäran har redan använts för en annan affär"},
+    "the car already has a deal being agreed or contracted; cancel that first": {"other": "bilen har redan en affär som förhandlas eller är avtalad; avbryt den först"},
+    "the contract cannot be completed yet": {"other": "avtalet kan inte slutföras ännu"},
+    "the deal is not where that can be done": {"other": "affären är inte där det kan göras"},
+    "the deal was changed by somebody else meanwhile; read it again": {"other": "affären ändrades av någon annan under tiden; läs den igen"},
+    "this car may not be sold under the margin scheme: its purchase does not make it eligible": {"other": "den här bilen får inte säljas med vinstmarginalbeskattning: inköpet gör den inte berättigad"}
   }
 }

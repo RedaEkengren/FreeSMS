@@ -284,6 +284,15 @@ func MoveStockUnit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		}
 	}
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		return moveStockUnitTx(ctx, tx, scope, id, to, reason)
+	})
+}
+
+// moveStockUnitTx is MoveStockUnit in the caller's transaction, for a deal
+// that sells its car as its contract is completed. The role is checked
+// here, against the move.
+func moveStockUnitTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id string, to StockStatus, reason string) error {
+	{
 		var from StockStatus
 		var resource string
 		err := tx.QueryRow(ctx, `SELECT status, resource_id FROM stock_units WHERE id = $1 FOR UPDATE`, id).Scan(&from, &resource)
@@ -337,7 +346,7 @@ func MoveStockUnit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 			}
 		}
 		return auditTx(ctx, tx, scope, id, "stock_unit.moved", string(from), string(to), reason, nil)
-	})
+	}
 }
 
 // StockUnitByID reads a unit for whoever buys or sells cars.

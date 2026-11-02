@@ -127,5 +127,7 @@ var core = map[string]string{
 	"LeadByID": "a car's leads", "Leads": "a car's leads", "LeadErasureMonths": "a car's leads",
 	"SellersOfCars": "a car's leads: who sells cars", "CarsInStock": "a car's history in stock",
 	// Test drives (#173): read whatever is switched on.
+	// Deals (#175): read whatever is switched on.
+	"DealByID": "a car's deals", "Deals": "a car's deals",
 	"TestDriveByID": "a car's test drives", "TestDrivesOfUnit": "a car's test drives", "TestDriveRules": "a car's test drives",
 }

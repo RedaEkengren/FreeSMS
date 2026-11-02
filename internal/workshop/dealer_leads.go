@@ -91,6 +91,8 @@ type Lead struct {
 	LastActivityAt  time.Time
 	Erased          bool
 	Contacts        []LeadContact
+	// The deal made from it (#175), the newest if several.
+	DealID string
 }
 
 // Open reports whether the lead is still being worked.
@@ -224,7 +226,8 @@ const leadColumns = `
 	       coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), nullif(btrim(v.vin), ''), ''), coalesce(u.status, ''),
 	       coalesce(l.wishes, ''), l.channel, coalesce(n.status, 'new'), coalesce(n.lost_reason, ''), coalesce(n.lost_note, ''),
 	       coalesce(n.salesperson_id::text, ''), coalesce(sp.display_name, ''), n.next_step_on, coalesce(n.next_step, ''),
-	       l.created_at, n.last_activity_at, l.erased_at IS NOT NULL
+	       l.created_at, n.last_activity_at, l.erased_at IS NOT NULL,
+	       coalesce((SELECT s.id::text FROM vehicle_sales s WHERE s.lead_id = l.id ORDER BY s.created_at DESC LIMIT 1), '')
 	FROM leads l
 	JOIN lead_now n ON n.lead_id = l.id
 	LEFT JOIN stock_units u ON u.id = l.stock_unit_id
@@ -242,7 +245,7 @@ func scanLead(row pgx.Row) (Lead, error) {
 	var status string
 	err := row.Scan(&l.ID, &l.PartyID, &l.PartyName, &l.Name, &l.Phone, &l.Email, &l.StockUnitID, &l.Car, &status,
 		&l.Wishes, &l.Channel, &l.Status, &l.LostReason, &l.LostNote, &l.Salesperson, &l.SalespersonName, &l.NextStepOn,
-		&l.NextStep, &l.CreatedAt, &l.LastActivityAt, &l.Erased)
+		&l.NextStep, &l.CreatedAt, &l.LastActivityAt, &l.Erased, &l.DealID)
 	l.CarStatus = StockStatus(status)
 	return l, err
 }
