@@ -141,3 +141,35 @@ func carForSaleAgain(t *testing.T, pool *pgxpool.Pool) string {
 	moveStock(t, pool, p.StockUnitID, workshop.StockForSale)
 	return p.StockUnitID
 }
+
+// An invoice credited only in part still stands: the terms stay frozen,
+// and invoicing again is the same invoice, never a second for the car.
+// Credited in full, it no longer stands.
+func TestAPartlyCreditedSaleInvoiceStillStands(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	d := completedDealOn(t, pool, carForSale(t, pool), workshop.TaxOrdinary)
+	inv, err := workshop.IssueDealInvoice(ctx, pool, sales(), d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The tow bar credited, the car not.
+	if _, err := workshop.IssueCredit(ctx, pool, everything(owner()), inv.ID, workshop.CreditRequest{
+		Lines: []workshop.CreditLine{{Position: 3}}, Reason: "Dragkroken monterades inte"}); err != nil {
+		t.Fatal(err)
+	}
+	terms := consumerTerms(d.Buyers[0].PartyID)
+	terms.TaxTreatment = workshop.TaxOrdinary
+	if _, err := workshop.ReviseDeal(ctx, pool, sales(), d.ID, d.Version, terms); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("revised with the invoice credited in part: %v", err)
+	}
+	if again, err := workshop.IssueDealInvoice(ctx, pool, sales(), d.ID); err != nil || again.ID != inv.ID {
+		t.Errorf("invoiced again with the invoice credited in part: %+v, %v", again, err)
+	}
+	if _, err := workshop.IssueCredit(ctx, pool, everything(owner()), inv.ID, workshop.CreditRequest{Reason: "Köpet gick tillbaka"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.ReviseDeal(ctx, pool, sales(), d.ID, d.Version, terms); err != nil {
+		t.Errorf("revised with the invoice credited in full: %v", err)
+	}
+}

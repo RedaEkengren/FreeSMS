@@ -533,12 +533,7 @@ func ReviseDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sal
 		}
 		// Invoiced, how the sale is taxed is frozen (0207): no new terms
 		// until the invoice is credited.
-		var invoiced bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM invoices i WHERE i.vehicle_sale_id = $1 AND i.credit_of_id IS NULL
-			AND NOT EXISTS (SELECT 1 FROM invoices c WHERE c.credit_of_id = i.id))`, saleID).Scan(&invoiced); err != nil {
-			return fmt.Errorf("read the sale's invoice: %w", err)
-		}
-		if invoiced {
+		if d.InvoiceID != "" {
 			return errDealInvoiced
 		}
 		if err := insertTermsTx(ctx, tx, scope, saleID, d.StockUnitID, d.Version+1, t); err != nil {
@@ -968,11 +963,10 @@ func dealTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id string) (Deal
 		id).Scan(&d.ContractedDocumentID); err != nil {
 		return Deal{}, err
 	}
+	// The invoice that stands for the sale (sale_invoice_standing, 0209).
 	if err := tx.QueryRow(ctx, `
-		SELECT coalesce((SELECT i.series || '-' || i.number FROM invoices i WHERE i.vehicle_sale_id = $1 AND i.credit_of_id IS NULL
-		                 AND NOT EXISTS (SELECT 1 FROM invoices c WHERE c.credit_of_id = i.id) ORDER BY i.number DESC LIMIT 1), ''),
-		       coalesce((SELECT i.id::text FROM invoices i WHERE i.vehicle_sale_id = $1 AND i.credit_of_id IS NULL
-		                 AND NOT EXISTS (SELECT 1 FROM invoices c WHERE c.credit_of_id = i.id) ORDER BY i.number DESC LIMIT 1), '')`,
+		SELECT coalesce(i.series || '-' || i.number, ''), coalesce(i.id::text, '')
+		FROM (SELECT sale_invoice_standing($1) AS id) st LEFT JOIN invoices i ON i.id = st.id`,
 		id).Scan(&d.InvoiceRef, &d.InvoiceID); err != nil {
 		return Deal{}, fmt.Errorf("read the sale's invoice: %w", err)
 	}
@@ -1299,34 +1293,8 @@ func SaleTaxOfDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		if err != nil {
 			return err
 		}
-		out = SaleTax{Treatment: d.Terms.TaxTreatment, EligibilityID: d.EligibilityID}
-		switch d.Terms.TaxTreatment {
-		case TaxMarginScheme:
-			// Terms written before the eligibility relied on was recorded
-			// on them (0205) are read with the one that stands.
-			if out.EligibilityID == "" {
-				if err := tx.QueryRow(ctx, `
-					SELECT e.id FROM vehicle_purchases p JOIN vat_eligibility e ON e.purchase_id = p.id
-					WHERE p.stock_unit_id = $1 AND NOT EXISTS (SELECT 1 FROM vat_eligibility n WHERE n.supersedes_id = e.id)`,
-					d.StockUnitID).Scan(&out.EligibilityID); err != nil {
-					return fmt.Errorf("read the eligibility: %w", err)
-				}
-			}
-			var purchase int64
-			if err := tx.QueryRow(ctx, `SELECT p.tax_purchase_price_minor FROM vat_eligibility e JOIN vehicle_purchases p ON p.id = e.purchase_id
-				WHERE e.id = $1`, out.EligibilityID).Scan(&purchase); err != nil {
-				return fmt.Errorf("read the purchase price: %w", err)
-			}
-			r, err := money.MarginScheme(d.Terms.PriceMinor, purchase, saleVATRate)
-			if err != nil {
-				return fmt.Errorf("%w: %v", ErrInvalid, err)
-			}
-			out.MarginMinor, out.VATMinor, out.BaseMinor = r.MarginMinor, r.VATMinor, r.BaseMinor
-		case TaxOrdinary:
-			out.VATMinor = money.VATInGross(d.Terms.PriceMinor, saleVATRate)
-			out.BaseMinor = d.Terms.PriceMinor - out.VATMinor
-		}
-		return nil
+		out, err = saleTaxTx(ctx, tx, d)
+		return err
 	})
 	return out, err
 }
@@ -1379,21 +1347,15 @@ func IssueDealInvoice(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 		if err != nil {
 			return err
 		}
+		// The invoice that stands, if there is one: the same request again.
+		if d.InvoiceID != "" {
+			err := tx.QueryRow(ctx, `SELECT id, series, number, issued_at, net_minor, vat_minor, gross_minor FROM invoices WHERE id = $1`,
+				d.InvoiceID).Scan(&inv.ID, &inv.Series, &inv.Number, &inv.IssuedAt, &inv.NetMinor, &inv.VATMinor, &inv.GrossMinor)
+			inv.Source = SourceVehicleSale
+			return err
+		}
 		if !d.Completed() {
 			return errDealNotComplete
-		}
-		// The invoice that stands, if there is one: the same request again.
-		err = tx.QueryRow(ctx, `
-			SELECT id, series, number, issued_at, net_minor, vat_minor, gross_minor FROM invoices i
-			WHERE i.vehicle_sale_id = $1 AND i.credit_of_id IS NULL
-			  AND NOT EXISTS (SELECT 1 FROM invoices c WHERE c.credit_of_id = i.id)`, saleID).Scan(&inv.ID, &inv.Series, &inv.Number,
-			&inv.IssuedAt, &inv.NetMinor, &inv.VATMinor, &inv.GrossMinor)
-		if err == nil {
-			inv.Source = SourceVehicleSale
-			return nil
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("read the sale's invoice: %w", err)
 		}
 		customer, err := customerForPartyTx(ctx, tx, scope, d.Buyers[0].PartyID)
 		if err != nil {
@@ -1412,25 +1374,11 @@ func IssueDealInvoice(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 		var lines []SourcedLine
 		switch d.Terms.TaxTreatment {
 		case TaxMarginScheme:
-			eligibility := d.EligibilityID
-			if eligibility == "" {
-				if err := tx.QueryRow(ctx, `
-					SELECT e.id FROM vehicle_purchases p JOIN vat_eligibility e ON e.purchase_id = p.id
-					WHERE p.stock_unit_id = $1 AND NOT EXISTS (SELECT 1 FROM vat_eligibility n WHERE n.supersedes_id = e.id)`,
-					d.StockUnitID).Scan(&eligibility); err != nil {
-					return fmt.Errorf("read the eligibility: %w", err)
-				}
-			}
-			var purchase int64
-			if err := tx.QueryRow(ctx, `SELECT p.tax_purchase_price_minor FROM vat_eligibility e JOIN vehicle_purchases p ON p.id = e.purchase_id
-				WHERE e.id = $1`, eligibility).Scan(&purchase); err != nil {
-				return fmt.Errorf("read the purchase price: %w", err)
-			}
-			r, err := money.MarginScheme(d.Terms.PriceMinor, purchase, saleVATRate)
+			tax, err := saleTaxTx(ctx, tx, d)
 			if err != nil {
-				return fmt.Errorf("%w: %v", ErrInvalid, err)
+				return err
 			}
-			of.marginSchemeVAT = r.VATMinor
+			of.marginSchemeVAT = tax.VATMinor
 			lines = append(lines, SourcedLine{Kind: "vehicle", Description: car, QuantityMilli: 1000,
 				UnitPriceMinor: d.Terms.PriceMinor, MarginScheme: true})
 		case TaxOrdinary:
@@ -1447,4 +1395,37 @@ func IssueDealInvoice(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 		return err
 	})
 	return inv, err
+}
+
+// saleTaxTx is how the deal's car is taxed as its terms stand, one car
+// alone (money.MarginScheme): read by SaleTaxOfDeal and by the invoice.
+// Terms written before the eligibility relied on was recorded on them
+// (0205, 0208) are read with the one that stands.
+func saleTaxTx(ctx context.Context, tx pgx.Tx, d Deal) (SaleTax, error) {
+	out := SaleTax{Treatment: d.Terms.TaxTreatment, EligibilityID: d.EligibilityID}
+	switch d.Terms.TaxTreatment {
+	case TaxMarginScheme:
+		if out.EligibilityID == "" {
+			if err := tx.QueryRow(ctx, `
+				SELECT e.id FROM vehicle_purchases p JOIN vat_eligibility e ON e.purchase_id = p.id
+				WHERE p.stock_unit_id = $1 AND NOT EXISTS (SELECT 1 FROM vat_eligibility n WHERE n.supersedes_id = e.id)`,
+				d.StockUnitID).Scan(&out.EligibilityID); err != nil {
+				return SaleTax{}, fmt.Errorf("read the eligibility: %w", err)
+			}
+		}
+		var purchase int64
+		if err := tx.QueryRow(ctx, `SELECT p.tax_purchase_price_minor FROM vat_eligibility e JOIN vehicle_purchases p ON p.id = e.purchase_id
+			WHERE e.id = $1`, out.EligibilityID).Scan(&purchase); err != nil {
+			return SaleTax{}, fmt.Errorf("read the purchase price: %w", err)
+		}
+		r, err := money.MarginScheme(d.Terms.PriceMinor, purchase, saleVATRate)
+		if err != nil {
+			return SaleTax{}, fmt.Errorf("%w: %v", ErrInvalid, err)
+		}
+		out.MarginMinor, out.VATMinor, out.BaseMinor = r.MarginMinor, r.VATMinor, r.BaseMinor
+	case TaxOrdinary:
+		out.VATMinor = money.VATInGross(d.Terms.PriceMinor, saleVATRate)
+		out.BaseMinor = d.Terms.PriceMinor - out.VATMinor
+	}
+	return out, nil
 }
