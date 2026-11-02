@@ -153,3 +153,86 @@ func TestALicenceCheckWaitingBehindARemovalFindsTheDriverGone(t *testing.T) {
 		t.Errorf("%d checks kept for a driver taken off (%v)", checks, err)
 	}
 }
+
+// A unit with a rental hold on it that has run out.
+func aRunOutHold(t *testing.T, pool *pgxpool.Pool) rentable {
+	t.Helper()
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	until := time.Now().Add(time.Hour)
+	held, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: v.unit, RenterID: v.renter,
+		From: in2031(10, 9), To: in2031(11, 9), HoldUntil: &until})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE resource_blocks SET expires_at = now() - interval '1 minute' WHERE source_id = $1`, held); err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+// A service booked over a rental hold that has run out, while a rental
+// write holding the unit lets the hold go: the booking waits for the unit
+// before it touches the hold, so the two do not wait on each other
+// (review 3 #2).
+func TestBookingAResourceBesideARentalWriteDoesNotDeadlock(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := aRunOutHold(t, pool)
+	held := holdTheUnit(t, pool, v.resource)
+	book := start(func() error {
+		_, err := workshop.BookResource(ctx, pool, rentalDesk(), workshop.ResourceBooking{ResourceID: v.resource,
+			Kind: workshop.BlockService, From: in2031(10, 12), To: in2031(10, 14)})
+		return err
+	})
+	waitForWaiters(t, pool, 1, book, "the booking")
+	// What a rental write does next, holding the unit.
+	if _, err := held.Exec(ctx, `SELECT release_expired_holds($1, tstzrange(NULL, NULL))`, v.resource); err != nil {
+		t.Fatalf("the rental write: %v", err)
+	}
+	if err := held.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := book.result(t); err != nil {
+		t.Errorf("the booking: %v", err)
+	}
+}
+
+// Confirming, letting go and replanning a block wait for its unit, as
+// booking it does: one order for every write to a unit (review 3 #2).
+func TestChangingABlockWaitsForItsUnit(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	block := func(day int) string {
+		t.Helper()
+		until := time.Now().Add(time.Hour)
+		id, err := workshop.BookResource(ctx, pool, rentalDesk(), workshop.ResourceBooking{ResourceID: v.resource,
+			Kind: workshop.BlockService, From: in2031(day, 9), To: in2031(day, 12), HoldUntil: &until})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	confirm, release, override := block(10), block(11), block(12)
+	for _, c := range []struct {
+		what string
+		do   func() error
+	}{
+		{"confirming", func() error { return workshop.ConfirmBlock(ctx, pool, rentalDesk(), confirm) }},
+		{"letting go", func() error { return workshop.ReleaseBlock(ctx, pool, rentalDesk(), release) }},
+		{"replanning", func() error {
+			return workshop.OverrideBlock(ctx, pool, rentalOwner(), override, in2031(13, 9), in2031(13, 12), "Verkstaden flyttade tiden")
+		}},
+	} {
+		held := holdTheUnit(t, pool, v.resource)
+		p := start(c.do)
+		waitForWaiters(t, pool, 1, p, c.what)
+		if err := held.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := p.result(t); err != nil {
+			t.Errorf("%s: %v", c.what, err)
+		}
+	}
+}
