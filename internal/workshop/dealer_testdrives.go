@@ -126,6 +126,10 @@ var (
 	errDriveNote     = fmt.Errorf("%w: a note is at most 300 characters on a check and 500 on a drive", ErrInvalid)
 	errDriveAge      = fmt.Errorf("%w: the youngest driver is from 16 to 99", ErrInvalid)
 	errDriveDriver   = fmt.Errorf("%w: say who drives: a name of up to 200 characters and a phone number", ErrInvalid)
+	// ErrMadeMeanwhile is a contract or agreement made again from a page that
+	// did not show the newest one: somebody made one meanwhile.
+	ErrMadeMeanwhile = fmt.Errorf("%w: somebody made a new one meanwhile; read it again before making another", ErrInvalid)
+
 	// ErrDriveReserved is a car reserved for somebody else: booked again
 	// with DespiteReservation it is let through, unless the shop blocks it.
 	ErrDriveReserved = fmt.Errorf("%w: the car is reserved for another customer", ErrInvalid)
@@ -785,8 +789,8 @@ func TestDriveTemplates(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 // drive, in one transaction with the drive's car locked. replacing is the
 // agreement the caller saw, or empty for none: made again, the new one
 // supersedes it; when the drive's agreement is no longer that one --
-// "make it" pressed twice, two people at once -- the agreement made
-// meanwhile is the answer and nothing more is made. The driver signs it on
+// "make it" pressed twice, two people at once -- nothing more is made and
+// the caller is told (ErrMadeMeanwhile), to read the drive again. The driver signs it on
 // paper or in person (RecordSignature); a signing service that is down
 // leaves it unsigned and the drive still bookable.
 func ProduceTestDriveAgreement(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, driveID, templateVersionID, replacing string) (string, error) {
@@ -812,8 +816,7 @@ func ProduceTestDriveAgreement(ctx context.Context, pool *pgxpool.Pool, scope ac
 			return errDriveState
 		}
 		if d.AgreementID != replacing {
-			doc = d.AgreementID
-			return nil
+			return ErrMadeMeanwhile
 		}
 		var shop, org string
 		if err := tx.QueryRow(ctx, `SELECT name, coalesce(org_number, '') FROM shops`).Scan(&shop, &org); err != nil {

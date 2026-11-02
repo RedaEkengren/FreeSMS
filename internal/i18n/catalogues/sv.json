@@ -8559,6 +8559,7 @@
     "the contract cannot be completed yet": {"other": "avtalet kan inte slutföras ännu"},
     "the deal is not where that can be done": {"other": "affären är inte där det kan göras"},
     "the deal was changed by somebody else meanwhile; read it again": {"other": "affären ändrades av någon annan under tiden; läs den igen"},
-    "this car may not be sold under the margin scheme: its purchase does not make it eligible": {"other": "den här bilen får inte säljas med vinstmarginalbeskattning: inköpet gör den inte berättigad"}
+    "this car may not be sold under the margin scheme: its purchase does not make it eligible": {"other": "den här bilen får inte säljas med vinstmarginalbeskattning: inköpet gör den inte berättigad"},
+    "somebody made a new one meanwhile; read it again before making another": {"other": "någon gjorde ett nytt under tiden; läs det igen innan du gör ett till"}
   }
 }

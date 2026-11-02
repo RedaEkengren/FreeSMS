@@ -397,7 +397,8 @@ func TestADriveDoesNotStartOnACarSoldSinceItWasBooked(t *testing.T) {
 }
 
 // "Make the agreement" pressed twice at once, or again on a page that
-// showed no agreement yet, makes one: the second finds the first's.
+// showed no agreement yet, makes one: the others are told it was made
+// meanwhile, rather than handed it as if they had made it.
 func TestAnAgreementMadeTwiceAtOnceIsOne(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
@@ -422,11 +423,18 @@ func TestAnAgreementMadeTwiceAtOnceIsOne(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+	made := ""
 	for i := range ids {
-		if errs[i] != nil || ids[i] != ids[0] {
-			t.Errorf("press %d: %s, %v; want the one agreement", i, ids[i], errs[i])
+		switch {
+		case errs[i] == nil && made == "":
+			made = ids[i]
+		case errs[i] == nil:
+			t.Errorf("press %d made a second agreement %s", i, ids[i])
+		case !errors.Is(errs[i], workshop.ErrMadeMeanwhile):
+			t.Errorf("press %d: %v; want told it was made meanwhile", i, errs[i])
 		}
 	}
+	ids[0] = made
 	var docs int
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM document_records WHERE subject_id = $1`, d.ID).Scan(&docs); err != nil || docs != 1 {
 		t.Errorf("%d agreements made (%v)", docs, err)

@@ -308,3 +308,22 @@ func TestDealsByRoleModuleAndCancellation(t *testing.T) {
 		}
 	}
 }
+
+// A contract made again from a page that did not show the newest one is
+// refused as made meanwhile: the person reads the deal again.
+func TestAContractMadeOverAnotherIsRefused(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := carForSale(t, pool)
+	d, err := workshop.CreateDeal(ctx, pool, sales(), unit, "", consumerTerms(driver(t, pool)), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tpl := contractTemplate(t, pool)
+	if _, _, err := workshop.ProduceSalesContract(ctx, pool, sales(), d.ID, tpl, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := workshop.ProduceSalesContract(ctx, pool, sales(), d.ID, tpl, ""); !errors.Is(err, workshop.ErrMadeMeanwhile) {
+		t.Errorf("made again from a page that showed none: %v", err)
+	}
+}

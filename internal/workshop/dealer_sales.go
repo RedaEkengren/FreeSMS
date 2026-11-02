@@ -979,7 +979,8 @@ func SalesContractTemplates(ctx context.Context, pool *pgxpool.Pool, scope acces
 // stand from a template version, with its buyers as parties, in one
 // transaction with the deal locked. replacing is the contract the caller
 // saw, or empty for none: made again, the new one supersedes it; when the
-// deal's contract has moved on meanwhile, that one is the answer. It
+// deal's contract has moved on meanwhile, nothing is made
+// (ErrMadeMeanwhile). It
 // returns the "as is" phrases the text holds for a consumer, which the
 // page warns of. The contract never names what the car cost, nor how the
 // sale is taxed: that is the deal's (#176) and the invoice's (#177).
@@ -1010,8 +1011,7 @@ func ProduceSalesContract(ctx context.Context, pool *pgxpool.Pool, scope access.
 			return errDealState
 		}
 		if d.ContractID != replacing {
-			doc = d.ContractID
-			return nil
+			return ErrMadeMeanwhile
 		}
 		var body, kind string
 		if err := tx.QueryRow(ctx, `SELECT v.body, t.kind FROM document_template_versions v JOIN document_templates t ON t.id = v.template_id
