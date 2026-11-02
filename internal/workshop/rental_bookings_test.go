@@ -774,3 +774,41 @@ func TestADailyExtraOnTwoLinesIsChargedForBothWhenExtended(t *testing.T) {
 		t.Errorf("two seats for four days: %d seat-days", got)
 	}
 }
+
+// A booking with a kilometre limit, extended into a season that includes
+// unlimited kilometres, is unlimited from the extension on. The odometer
+// is read when the unit goes out and comes back, not each day, so the
+// kilometres of the added days cannot be told from the others: the whole
+// booking becomes unlimited, the renter's side of the doubt, rather than
+// charging every kilometre of the added days (review 3 #7).
+func TestALimitedBookingExtendedIntoUnlimitedKilometresBecomesUnlimited(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := addUnit(t, pool, workshop.NewRentalUnit{Registration: "ABC 12D", FleetNumber: "V1", Category: "Bil"})
+	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), unit, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
+		t.Fatal(err)
+	}
+	plan, _ := workshop.CreateRatePlan(ctx, pool, rentalOwner(), workshop.NewRatePlan{Name: "Bil", Category: "Bil", VATRateBp: 2500, SeasonRule: "at_start"})
+	km := 100
+	if _, err := workshop.AddRateSeason(ctx, pool, rentalOwner(), plan, workshop.RateSeason{ValidFrom: day("2020-01-01"), Day: kr(40000),
+		IncludedKmPerDay: &km, ExtraKmMinor: kr(300)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.AddRateSeason(ctx, pool, rentalOwner(), plan, workshop.RateSeason{ValidFrom: day("2031-05-11"), Day: kr(40000)}); err != nil {
+		t.Fatal(err)
+	}
+	renter, _ := workshop.CreateParty(ctx, pool, rentalDesk(), workshop.NewParty{Kind: "private", Name: "R", Role: workshop.PartyRenter})
+	id, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: unit, RenterID: renter, From: in2031(10, 9), To: in2031(11, 9)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id); b.IncludedKm == nil || *b.IncludedKm != 100 {
+		t.Fatalf("one day at 100 km: %v", b.IncludedKm)
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, in2031(13, 9), ""); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id); b.IncludedKm != nil {
+		t.Errorf("extended into unlimited kilometres, still limited to %d km", *b.IncludedKm)
+	}
+}

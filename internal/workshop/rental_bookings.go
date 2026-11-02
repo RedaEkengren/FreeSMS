@@ -781,7 +781,17 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 				return err
 			}
 			lines = append(lines, extras...)
-			if quote.IncludedKm != nil && quote.Days > 0 {
+			switch {
+			case quote.IncludedKm == nil:
+				// The added days include unlimited kilometres. The
+				// odometer is read when the unit goes out and comes back,
+				// not each day, so the added days' kilometres cannot be
+				// told from the rest: the whole booking is unlimited from
+				// here, the renter's side of the doubt.
+				if _, err := tx.Exec(ctx, `UPDATE rental_bookings SET included_km = NULL WHERE id = $1`, id); err != nil {
+					return fmt.Errorf("lift the kilometre limit: %w", err)
+				}
+			case quote.Days > 0:
 				perDay := *quote.IncludedKm / int(quote.Days)
 				if _, err := tx.Exec(ctx, `UPDATE rental_bookings SET included_km = included_km + $2 WHERE id = $1 AND included_km IS NOT NULL`,
 					id, perDay*int(added)); err != nil {
