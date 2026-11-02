@@ -520,3 +520,28 @@ func TestAnExtensionKeepsTheBlockFromAnEarlyCheckOut(t *testing.T) {
 		t.Errorf("the block after extending a rental out since %v: %+v", view.Out.At, blocks)
 	}
 }
+
+// A hold that has run out is no booking: it does not stop the unit going
+// out early over its time (review r5, #2).
+func TestAnExpiredHoldDoesNotStopAnEarlyCheckOut(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v, id := handoverReady(t, pool)
+	until := time.Now().Add(time.Hour)
+	held, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: v.unit, RenterID: v.renter,
+		From: in2031(1, 9), To: in2031(2, 9), HoldUntil: &until})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE resource_blocks SET expires_at = clock_timestamp() - interval '1 minute' WHERE id = (SELECT block_id FROM rental_bookings WHERE id = $1)`, held); err != nil {
+		t.Fatal(err)
+	}
+	out, err := workshop.StartHandover(ctx, pool, rentalDesk(), id, workshop.HandoverOut)
+	if err != nil {
+		t.Fatalf("checked out early over a hold run out: %v", err)
+	}
+	recordFound(t, pool, out, nil)
+	if err := workshop.FinishHandover(ctx, pool, rentalDesk(), out, workshop.HandoverReading{OdometerKm: km64(12000), RenterPresent: true}); err != nil {
+		t.Errorf("finishing it: %v", err)
+	}
+}

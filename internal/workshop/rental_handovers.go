@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
@@ -210,7 +211,7 @@ func handoverMayTx(ctx context.Context, tx pgx.Tx, h handoverBooking, kind strin
 		if err := inFleetTx(ctx, tx, h.unit, now, h.ends.Add(h.buffer)); err != nil {
 			return err
 		}
-		if err := takenTx(ctx, tx, h.resource, blockRange(now, h.starts), h.block); err != nil {
+		if err := freeTx(ctx, tx, h.resource, blockRange(now, h.starts), h.block); err != nil {
 			return err
 		}
 	}
@@ -358,7 +359,7 @@ func FinishHandover(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 			// where something is, it stays as it was, and that booking was
 			// shown as at risk while the unit was out.
 			if until := at.Add(h.buffer); until.After(h.ends.Add(h.buffer)) {
-				if err := takenTx(ctx, tx, h.resource, blockRange(h.ends.Add(h.buffer), until), h.block); err == nil {
+				if err := freeTx(ctx, tx, h.resource, blockRange(h.ends.Add(h.buffer), until), h.block); err == nil {
 					if _, err := tx.Exec(ctx, `UPDATE resource_blocks SET period = tstzrange(lower(period), $2) WHERE id = $1 AND upper(period) < $2`,
 						h.block, until); err != nil {
 						return blockConflict(err)
@@ -798,4 +799,13 @@ func RentalBookingOfProtocol(ctx context.Context, pool *pgxpool.Pool, scope acce
 		return err
 	})
 	return id, err
+}
+
+// freeTx is takenTx after letting go the holds over the period that have
+// run out, as booking does: a hold run out is no booking.
+func freeTx(ctx context.Context, tx pgx.Tx, resource string, period pgtype.Range[pgtype.Timestamptz], except string) error {
+	if _, err := tx.Exec(ctx, `SELECT release_expired_holds($1, $2)`, resource, period); err != nil {
+		return fmt.Errorf("release expired holds: %w", err)
+	}
+	return takenTx(ctx, tx, resource, period, except)
 }
