@@ -132,6 +132,19 @@ func TestTheRentalRegisterSaysWhoHadTheVehicleWhen(t *testing.T) {
 	if err != nil || reads != 6 {
 		t.Errorf("%d reads recorded, want 6: %v", reads, err)
 	}
+	// A check-in recorded before its check-out, by a clock set wrong: who
+	// had it at the check-out is the same answer as the register gives
+	// (review r8, #2).
+	var outAt time.Time
+	if err := pool.QueryRow(ctx, `SELECT at FROM rental_handovers WHERE booking_id = $1 AND kind = 'check_out'`, first).Scan(&outAt); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE rental_handovers SET at = $2::timestamptz - interval '1 minute' WHERE booking_id = $1 AND kind = 'check_in'`, first, outAt); err != nil {
+		t.Fatal(err)
+	}
+	if who, err := workshop.WhoHadRegistration(ctx, pool, rentalOwner(), "ABC 12D", outAt, "Felparkering"); err != nil || who == nil || who.BookingID != first {
+		t.Errorf("who had ABC 12D at a check-out its check-in is recorded before: %+v, %v", who, err)
+	}
 	// Switched off, the register is still there for the owner.
 	off := rentalOwner()
 	off.Modules = []access.Module{access.Workshop}

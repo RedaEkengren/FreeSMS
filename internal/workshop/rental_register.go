@@ -196,7 +196,7 @@ func WhoHadRegistration(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		out, err = registerTx(ctx, tx, scope, `
-			ho.at <= $2 AND (hi.at IS NULL OR hi.at > $2)
+			ho.at IS NOT NULL AND `+registerOut+` @> $2::timestamptz
 			AND EXISTS (SELECT 1 FROM vehicle_registrations g WHERE g.vehicle_id = r.vehicle_id AND g.normalised = $1
 			            AND g.valid_from <= $2 AND (g.valid_to IS NULL OR g.valid_to > $2))`,
 			[]any{reg, at}, purpose, map[string]any{"registration": reg, "at": at})
