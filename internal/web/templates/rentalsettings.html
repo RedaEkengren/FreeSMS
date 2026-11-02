@@ -2,6 +2,25 @@
 <h1>{{.T "Rental settings"}}</h1>
 {{$runs := .Session.Scope.Role.RunsTheShop}}
 
+<h2>{{.T "Rental register"}}</h2>
+{{with .Rental.Retention}}
+<p>{{$.T "Kept %d months after a rental ends: %s" .Months .Basis}} <span class="waiting">{{$.T "Decided by %s on %s" .SetBy ($.Date ($.Local .SetAt) "2 Jan 2006")}}</span></p>
+{{else}}
+<p><span class="tag late">{{.T "missing"}}</span> {{.T "How long the rental register is kept has not been decided. Nothing is erased for it until it is."}}</p>
+{{end}}
+{{if $runs}}
+<p><a href="/rental/register">{{.T "Read the rental register"}}</a></p>
+<details><summary>{{.T "Decide how long it is kept"}}</summary>
+<form method="post" action="/rental/register/retention">
+  <div class="pair">
+    <label><span>{{.T "Months after a rental ends"}}</span><input name="months" inputmode="numeric" maxlength="3" required></label>
+    <label><span>{{.T "On what basis"}}</span><input name="basis" maxlength="300" required></label>
+  </div>
+  <button type="submit" class="secondary">{{.T "Record the decision"}}</button>
+</form>
+</details>
+{{end}}
+
 <h2>{{.T "Rental permit"}}</h2>
 <p class="waiting">{{.T "The rental permit (biluthyrningstillstånd) is your business's, granted by Transportstyrelsen. FreeSMS records it and refuses to hand over a unit whose profile needs one when none stands for the whole rental."}}</p>
 {{if .Rental.Permits}}

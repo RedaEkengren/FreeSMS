@@ -18,7 +18,7 @@ import (
 // does not exist; the operations check the role and the module again.
 
 // rentalPages are the templates Rental adds.
-var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "rentalprices", "rentalbooking", "rentalhandover"}
+var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "rentalprices", "rentalbooking", "rentalhandover", "rentalregister"}
 
 // rentalData is what Rental's pages are given.
 type rentalData struct {
@@ -46,6 +46,13 @@ type rentalData struct {
 	FleetUse workshop.FleetUse
 	// Handover gaps let go on the booking.
 	Overrides []workshop.GapOverride
+	// The rental register (#200): what was read, what was asked, and how
+	// long it is kept.
+	Register      []workshop.RegisterEntry
+	Who           *workshop.RegisterEntry
+	RegisterAsked bool
+	RegisterForm  registerForm
+	Retention     *workshop.RegisterRetention
 	// A booking form's own key: sent twice, one booking.
 	Key string
 	Now time.Time
@@ -201,6 +208,7 @@ func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("POST /rental/permits/{id}/revoke", s.requireSession(s.handleRentalPermitRevoke))
 	m.HandleFunc("POST /rental/profiles", s.requireSession(s.handleRentalProfileAdd))
 	m.HandleFunc("POST /rental/profiles/{id}", s.requireSession(s.handleRentalProfileSave))
+	m.HandleFunc("POST /rental/register/retention", s.requireSession(s.handleRegisterRetention))
 	s.rentalHandoverRoutes(m)
 }
 
@@ -220,6 +228,9 @@ func (s *Server) handleRentalSettings(w http.ResponseWriter, r *http.Request) {
 		if d.Checklists, err = workshop.ChecklistTemplates(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
 			return
 		}
+	}
+	if d.Retention, err = workshop.RentalRegisterRetention(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
 	}
 	s.render(w, r, http.StatusOK, "rentalsettings", pageData{Title: "Rental settings", Session: session, Rental: d,
 		Today: time.Now().In(s.shopLocation(r)).Format("2006-01-02")})

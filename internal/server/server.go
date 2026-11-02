@@ -425,6 +425,7 @@ func (s *Server) routes() (http.Handler, error) {
 	// Checklists are Core (owner decision on #143, #147): a job's check, a
 	// purchase appraisal and a rental's check-out are made from the same.
 	s.rentalRoutes(rentalMux)
+	s.rentalCoreRoutes(mux)
 	mux.HandleFunc("GET /checklists", s.requireSession(s.handleChecklists))
 	mux.HandleFunc("POST /checklists", s.requireSession(s.handleSaveChecklist))
 	mux.HandleFunc("GET /checklists/{id}", s.requireSession(s.handleChecklists))
