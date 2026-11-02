@@ -76,3 +76,34 @@ func TestASalespersonSellsACarOnThePages(t *testing.T) {
 		t.Error("a technician was shown a deal")
 	}
 }
+
+// A new deal refused comes back with everything that was typed.
+func TestARefusedDealKeepsWhatWasTyped(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	unit, err := workshop.TakeIntoStock(ctx, pool, owner, vehicleA, workshop.StockFromDefleet, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.MoveStockUnit(ctx, pool, owner, unit.ID, workshop.StockForSale, ""); err != nil {
+		t.Fatal(err)
+	}
+	seller := signIn(t, ts, salesEmail)
+	// The margin scheme on a car moved over from the fleet, with no
+	// purchase: refused.
+	status, page := postBody(t, seller, ts.URL+"/cars/deals", url.Values{"unit": {unit.ID}, "name": {"Kim Köpare"},
+		"phone": {"0701234567"}, "buyer_kind": {"consumer"}, "price": {"125000"}, "tax": {"margin_scheme"},
+		"warranty": {"Sex månader på motorn"}, "delivery_place": {"Hemma hos Kim"}, "odometer": {"123600"},
+		"payment_terms": {"Faktura 10 dagar"}, "note": {"Ring före leverans"}, "line_desc": {"Dragkrok"},
+		"line_qty": {"1"}, "line_price": {"6000"}, "line_vat": {"25"}})
+	if status != http.StatusBadRequest {
+		t.Fatalf("answered %d", status)
+	}
+	for _, want := range []string{"Sex månader på motorn", "Hemma hos Kim", "123600", "Faktura 10 dagar", "Ring före leverans",
+		"Dragkrok", `value="margin_scheme" selected`, "Kim Köpare"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the form came back without %q", want)
+		}
+	}
+}

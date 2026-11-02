@@ -183,7 +183,11 @@ func (s *Server) handleDealCreate(w http.ResponseWriter, r *http.Request) {
 		form[k] = strings.TrimSpace(r.FormValue(k))
 	}
 	key := r.FormValue("key")
-	back := func(status int, msg string) { s.dealsPage(w, r, status, dealData{Form: form, Key: key}, msg) }
+	// Refused, the form comes back as it was typed: the terms read so far
+	// fill it as a deal's terms would.
+	back := func(status int, msg string) {
+		s.dealsPage(w, r, status, dealData{Form: form, Key: key, Deal: workshop.Deal{Terms: t}}, msg)
+	}
 	if msg != "" {
 		back(http.StatusBadRequest, msg)
 		return
