@@ -48,6 +48,10 @@ var ExportTables = []string{
 	"purchase_calculations", "purchase_calculation_costs", "purchase_calculation_acceptances",
 	// What a car cost beyond its price (#164).
 	"stock_cost_entries", "stock_cost_settings",
+	// Each sale of a stock car, and when one fell through.
+	"stock_unit_sales",
+	// What the shop was asked about its cars, and by whom (#172).
+	"leads", "lead_events", "lead_contacts", "lead_settings",
 	// Rental
 	"rental_permits", "rental_permit_revocations", "rental_profiles", "rental_units", "fleet_memberships",
 	"rate_plans", "rate_plan_seasons", "rental_extras", "rental_bookings", "rental_booking_events", "rental_booking_lines",
