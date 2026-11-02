@@ -272,20 +272,8 @@ func BookTestDrive(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 				return fmt.Errorf("read the request: %w", err)
 			}
 		}
-		if ended || status == StockSold || status == StockDelivered {
-			return errDriveCar
-		}
-		if status == StockReserved {
-			_, blocks, err := testDriveSettingsTx(ctx, tx)
-			if err != nil {
-				return err
-			}
-			if blocks {
-				return ErrDriveReservedBlocked
-			}
-			if !n.DespiteReservation {
-				return ErrDriveReserved
-			}
+		if err := driveCarFreeTx(ctx, tx, status, ended, n.DespiteReservation); err != nil {
+			return err
 		}
 		if n.NewDriver != nil {
 			if n.DriverPartyID, err = createPartyTx(ctx, tx, scope, *n.NewDriver, ""); err != nil {
@@ -341,6 +329,30 @@ func BookTestDrive(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		return err
 	})
 	return out, err
+}
+
+// driveCarFreeTx says whether a car in stock may be driven: not once its
+// cycle has ended or it is sold, and, reserved for somebody else, only
+// knowing it (despite), and never where the shop blocks a reserved car.
+// Asked as a drive is booked and again as its keys are handed over: the
+// car may have been reserved or sold in between.
+func driveCarFreeTx(ctx context.Context, tx pgx.Tx, status StockStatus, ended, despite bool) error {
+	if ended || status == StockSold || status == StockDelivered {
+		return errDriveCar
+	}
+	if status != StockReserved {
+		return nil
+	}
+	_, blocks, err := testDriveSettingsTx(ctx, tx)
+	switch {
+	case err != nil:
+		return err
+	case blocks:
+		return ErrDriveReservedBlocked
+	case !despite:
+		return ErrDriveReserved
+	}
+	return nil
 }
 
 // workDriveTx reads a drive to change, its car's resource locked first,
@@ -493,6 +505,17 @@ func StartTestDrive(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		}
 		if d.State != DriveBooked {
 			return errDriveState
+		}
+		// The car as it is now, not as it was booked. Reserved since, the
+		// salesperson handing the keys over knows it.
+		var status StockStatus
+		var ended bool
+		if err := tx.QueryRow(ctx, `SELECT status, closed_at IS NOT NULL FROM stock_units WHERE id = $1`, d.StockUnitID).
+			Scan(&status, &ended); err != nil {
+			return fmt.Errorf("read the car: %w", err)
+		}
+		if err := driveCarFreeTx(ctx, tx, status, ended, true); err != nil {
+			return err
 		}
 		var today time.Time
 		if err := tx.QueryRow(ctx, `SELECT (clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops))::date`).Scan(&today); err != nil {

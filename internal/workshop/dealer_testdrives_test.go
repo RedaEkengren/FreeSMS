@@ -363,3 +363,34 @@ func TestAWalkInDriverIsMadeWithTheDrive(t *testing.T) {
 		t.Errorf("a refused booking left %d parties behind", got-before-1)
 	}
 }
+
+// A car sold to someone else after its drive was booked does not leave on
+// that drive; one reserved meanwhile does not where the shop blocks a
+// reserved car.
+func TestADriveDoesNotStartOnACarSoldSinceItWasBooked(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := carForSale(t, pool)
+	d, err := workshop.BookTestDrive(ctx, pool, sales(), workshop.NewTestDrive{StockUnitID: unit, DriverPartyID: driver(t, pool),
+		From: time.Now(), To: time.Now().Add(time.Hour)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.CheckDriverLicence(ctx, pool, sales(), d.ID, goodLicence()); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.SetTestDriveRules(ctx, pool, everything(owner()), 18, true); err != nil {
+		t.Fatal(err)
+	}
+	moveStock(t, pool, unit, workshop.StockReserved)
+	if err := workshop.StartTestDrive(ctx, pool, everything(owner()), d.ID, 1000, "Papper saknas"); !errors.Is(err, workshop.ErrDriveReservedBlocked) {
+		t.Errorf("started on a car reserved since, where the shop blocks it: %v", err)
+	}
+	moveStock(t, pool, unit, workshop.StockSold)
+	if err := workshop.StartTestDrive(ctx, pool, everything(owner()), d.ID, 1000, "Papper saknas"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("started on a car sold since: %v", err)
+	}
+	if got, _ := workshop.TestDriveByID(ctx, pool, sales(), d.ID); got.State != workshop.DriveBooked {
+		t.Errorf("the drive after the refusals: %s", got.State)
+	}
+}
