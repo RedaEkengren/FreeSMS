@@ -655,3 +655,38 @@ func TestTheAsIsWarningFindsWholePhrasesOnce(t *testing.T) {
 		}
 	}
 }
+
+// One request key sent at once for two cars opens one deal, and the other
+// is told the key was used, never a database error.
+func TestOneRequestKeyForTwoCarsAtOnceIsOneDeal(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	kim := driver(t, pool)
+	units := []string{carForSale(t, pool), func() string {
+		p := boughtCar(t, pool)
+		moveStock(t, pool, p.StockUnitID, workshop.StockForSale)
+		return p.StockUnitID
+	}()}
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	for i, u := range units {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, errs[i] = workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: u, Terms: consumerTerms(kim), Key: "same-key"})
+		}()
+	}
+	wg.Wait()
+	ok := 0
+	for _, err := range errs {
+		switch {
+		case err == nil:
+			ok++
+		case !errors.Is(err, workshop.ErrInvalid):
+			t.Errorf("the other car: %v; want told the key was used", err)
+		}
+	}
+	if ok != 1 {
+		t.Errorf("%d deals opened with one key", ok)
+	}
+}

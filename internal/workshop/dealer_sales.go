@@ -410,8 +410,14 @@ func CreateDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n N
 	}
 	var out Deal
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		// The car's deals one at a time, and the same request after the
-		// one in flight.
+		// The request first, so the same key sent at once for two cars is
+		// looked up after the first has committed; then the car's deals one
+		// at a time. Always in that order.
+		if key != "" {
+			if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('salekey:' || $1, 0))`, key); err != nil {
+				return err
+			}
+		}
 		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('saleunit:' || $1::uuid::text, 0))`, unitID); err != nil {
 			return err
 		}
