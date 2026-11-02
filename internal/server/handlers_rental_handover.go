@@ -230,20 +230,17 @@ func (d rentalData) HandoverEnds() []workshop.RentalHandover {
 	return out
 }
 
-// findingsChosen reads the finish form's findings: the ones the page
-// showed and the person unticked are let go. A form from before the page
-// said what it showed -- cached, and replayed from a phone's queue --
-// names only the ticked, and those are the ones confirmed.
+// findingsChosen reads the finish form's findings. Today's form says so
+// (finish_form=2), names what the page showed as new, and those shown
+// and unticked are let go. A form from before -- cached, and replayed
+// from a phone's queue -- names only the ticked, and those, possibly
+// none, are the ones confirmed.
 func findingsChosen(form url.Values) (dismissed, confirmed []string) {
-	shown, ticked := form["shown"], form["damage"]
-	if len(shown) == 0 {
-		if len(ticked) > 0 {
-			return nil, ticked
-		}
-		return nil, nil
+	if form.Get("finish_form") != "2" {
+		return nil, append([]string{}, form["damage"]...)
 	}
-	for _, id := range shown {
-		if !slices.Contains(ticked, id) {
+	for _, id := range form["shown"] {
+		if !slices.Contains(form["damage"], id) {
 			dismissed = append(dismissed, id)
 		}
 	}

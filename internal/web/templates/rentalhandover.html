@@ -49,6 +49,9 @@
 {{if $open}}
 <h2>{{if $in}}{{.T "Take it back"}}{{else}}{{.T "Hand it over"}}{{end}}</h2>
 <form method="post" action="/rental/handovers/{{$p.ID}}/finish" data-offline>
+  {{/* Which shape of this form it is: an older page, still in a phone's
+       queue, names only the findings ticked. */}}
+  <input type="hidden" name="finish_form" value="2">
   {{/* Fuel or charge is asked of every unit, and may be left out: a
        generator or a lift has a tank or a battery and no odometer. */}}
   <div class="pair">
