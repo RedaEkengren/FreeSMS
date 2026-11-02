@@ -443,7 +443,7 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fi
 
 		// Their leads and test drives (#172, #173), found by their party and
 		// by the number and email they gave, before those are cleared.
-		leadsErased, err := eraseLeadsAndDrivesTx(ctx, tx, personID)
+		leadsErased, drivesErased, err := eraseLeadsAndDrivesTx(ctx, tx, personID)
 		if err != nil {
 			return err
 		}
@@ -542,7 +542,10 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fi
 			clearedNow += fmt.Sprintf(" What %d contracts past their retention said, their naming of them and the scans of signed copies; that they existed, their hash and their signatures stay.", blanked)
 		}
 		if leadsErased > 0 {
-			clearedNow += fmt.Sprintf(" What %d enquiries about cars, and the test drives they took, said about them; that they asked and drove stays.", leadsErased)
+			clearedNow += fmt.Sprintf(" What %d enquiries about cars said about them; that they asked stays.", leadsErased)
+		}
+		if drivesErased > 0 {
+			clearedNow += fmt.Sprintf(" What was noted on %d test drives they took; that they drove and their licence was checked stays.", drivesErased)
 		}
 		if idRemoved > 0 {
 			clearedNow += fmt.Sprintf(" %d identity values held for a purpose that allowed it; that the checks were made stays.", idRemoved)

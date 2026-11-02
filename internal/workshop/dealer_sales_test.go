@@ -24,7 +24,7 @@ func consumerTerms(buyer string) workshop.SaleTerms {
 	return workshop.SaleTerms{Buyers: []string{buyer}, BuyerKind: workshop.BuyerConsumer, PriceMinor: 12_500_000,
 		Warranty: "Tre månader på motor och växellåda", DeliveryOn: &on, DeliveryPlace: "Hos oss", OdometerKm: &km,
 		PaymentTerms: "Kontant vid leverans",
-		Lines: []workshop.SaleLine{{Description: "Vinterhjul", QuantityMilli: 1000, UnitPriceMinor: 800_000, VATRateBasis: 2500}}}
+		Lines:        []workshop.SaleLine{{Description: "Vinterhjul", QuantityMilli: 1000, UnitPriceMinor: 800_000, VATRateBasis: 2500}}}
 }
 
 // signAll records every party of a document as having signed it in

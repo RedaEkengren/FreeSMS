@@ -499,3 +499,54 @@ func TestAnUnsignedStartsNoteIsNotCopiedIntoTheAuditLog(t *testing.T) {
 		t.Errorf("the drive's notes: %v", got.Notes)
 	}
 }
+
+// Somebody who drove a car but never asked about one through a lead is
+// told their test drives were cleared, counted as drives.
+func TestAnErasureSaysWhatItClearedFromTestDrives(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	drive := unsignedDrive(t, pool)
+	var person string
+	if err := pool.QueryRow(ctx, `SELECT pa.person_id::text FROM test_drives d JOIN parties pa ON pa.id = d.driver_party_id WHERE d.id = $1`,
+		drive).Scan(&person); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ErasePerson(ctx, pool, advisor(), &recordingRemover{}, person, "Begäran"); err != nil {
+		t.Fatal(err)
+	}
+	erasures, err := workshop.Erasures(ctx, pool, advisor())
+	if err != nil || len(erasures) == 0 {
+		t.Fatalf("the erasures: %+v, %v", erasures, err)
+	}
+	if !strings.Contains(erasures[0].Cleared, "1 test drive") {
+		t.Errorf("the erasure does not say it cleared a test drive: %q", erasures[0].Cleared)
+	}
+}
+
+// A contact late in the evening is dated on the shop's day in the export,
+// not on the UTC day.
+func TestAnExportedContactIsDatedOnTheShopsDay(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	kim := driver(t, pool)
+	l, err := workshop.CreateLead(ctx, pool, sales(), workshop.NewLead{PartyID: kim, Channel: "phone", Wishes: "Kombi", Note: "Ringde sent"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Half past eleven in the evening UTC is half past midnight the next day
+	// in Stockholm.
+	if _, err := pool.Exec(ctx, `UPDATE lead_contacts SET at = '2026-11-01 23:30:00+00' WHERE lead_id = $1`, l.ID); err != nil {
+		t.Fatal(err)
+	}
+	var person string
+	if err := pool.QueryRow(ctx, `SELECT person_id::text FROM parties WHERE id = $1`, kim).Scan(&person); err != nil {
+		t.Fatal(err)
+	}
+	e, err := workshop.ExportPerson(ctx, pool, advisor(), person)
+	if err != nil || len(e.Leads) != 1 || len(e.Leads[0].Contacts) != 1 {
+		t.Fatalf("the export: %+v, %v", e.Leads, err)
+	}
+	if got := e.Leads[0].Contacts[0]; !strings.HasPrefix(got, "2026-11-02") {
+		t.Errorf("the contact is dated %q; want the shop's day, 2026-11-02", got)
+	}
+}

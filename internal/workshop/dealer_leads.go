@@ -823,18 +823,8 @@ func sweepLeadsTx(ctx context.Context, tx pgx.Tx) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	if len(ids) == 0 {
-		return 0, nil
-	}
-	for _, q := range []string{
-		`UPDATE leads SET party_id = NULL, contact_name = NULL, contact_phone = NULL, contact_phone_digits = NULL,
-		        contact_email = NULL, wishes = NULL, erased_at = clock_timestamp() WHERE id = ANY($1::uuid[])`,
-		`UPDATE lead_contacts SET note = NULL WHERE lead_id = ANY($1::uuid[]) AND note IS NOT NULL`,
-		`UPDATE lead_events SET note = NULL WHERE lead_id = ANY($1::uuid[]) AND note IS NOT NULL`,
-	} {
-		if _, err := tx.Exec(ctx, q, ids); err != nil {
-			return 0, err
-		}
+	if err := eraseLeadsTx(ctx, tx, ids); err != nil {
+		return 0, err
 	}
 	return int64(len(ids)), nil
 }
@@ -980,68 +970,115 @@ func theirLeadsAndDrivesTx(ctx context.Context, tx pgx.Tx, personID string) (lea
 }
 
 // exportLeadsAndDrivesTx adds a person's leads and test drives to what
-// they are given (ExportPerson).
+// they are given (ExportPerson): one statement for the leads and one for
+// the drives, however many there are, dated on the shop's own day.
 func exportLeadsAndDrivesTx(ctx context.Context, tx pgx.Tx, personID string, e *PersonExport) error {
 	leads, drives, err := theirLeadsAndDrivesTx(ctx, tx, personID)
 	if err != nil {
 		return err
 	}
-	for _, id := range leads {
-		var l ExportedLead
-		if err := tx.QueryRow(ctx, `
-			SELECT l.created_at, l.channel, coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), nullif(btrim(v.vin), ''), ''),
+	if len(leads) > 0 {
+		rows, err := tx.Query(ctx, `
+			SELECT l.created_at, l.channel, `+carNameSQL+`,
 			       coalesce(l.wishes, ''), coalesce(l.contact_name, ''), coalesce(l.contact_phone, ''), coalesce(l.contact_email, ''),
 			       coalesce(n.status, 'new'),
-			       ARRAY(SELECT to_char(c.at, 'YYYY-MM-DD') || ' ' || c.how || coalesce(': ' || c.note, '')
+			       ARRAY(SELECT to_char(c.at AT TIME ZONE (SELECT timezone FROM shops), 'YYYY-MM-DD') || ' ' || c.how || coalesce(': ' || c.note, '')
 			             FROM lead_contacts c WHERE c.lead_id = l.id ORDER BY c.at, c.id)
 			FROM leads l JOIN lead_now n ON n.lead_id = l.id
 			LEFT JOIN stock_units u ON u.id = l.stock_unit_id LEFT JOIN vehicles v ON v.id = u.vehicle_id
 			LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = v.id AND reg.valid_to IS NULL
-			WHERE l.id = $1`, id).Scan(&l.Asked, &l.Channel, &l.Car, &l.Wishes, &l.Name, &l.Phone, &l.Email, &l.Status, &l.Contacts); err != nil {
-			return fmt.Errorf("read lead: %w", err)
-		}
-		e.Leads = append(e.Leads, l)
-	}
-	for _, id := range drives {
-		d, err := testDriveTx(ctx, tx, id)
+			WHERE l.id = ANY($1::uuid[]) ORDER BY l.created_at`, leads)
 		if err != nil {
+			return fmt.Errorf("read leads: %w", err)
+		}
+		for rows.Next() {
+			var l ExportedLead
+			if err := rows.Scan(&l.Asked, &l.Channel, &l.Car, &l.Wishes, &l.Name, &l.Phone, &l.Email, &l.Status, &l.Contacts); err != nil {
+				rows.Close()
+				return err
+			}
+			e.Leads = append(e.Leads, l)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
 			return err
 		}
-		x := ExportedTestDrive{Car: d.Car, From: d.StartsAt, To: d.EndsAt, Area: d.Area, Notes: d.Notes}
-		if c := d.Licence; c != nil {
-			x.Categories, x.ValidUntil, x.LicenceNote = c.Categories, c.ValidUntil, c.Note
+	}
+	if len(drives) > 0 {
+		rows, err := tx.Query(ctx, `
+			SELECT `+carNameSQL+`, d.starts_at, d.ends_at, coalesce(d.area, ''),
+			       coalesce(k.categories, '{}'), k.valid_until, coalesce(k.note, ''),
+			       ARRAY(SELECT e.note FROM test_drive_events e WHERE e.test_drive_id = d.id AND e.note IS NOT NULL ORDER BY e.at, e.id)
+			FROM test_drives d
+			JOIN stock_units u ON u.id = d.stock_unit_id JOIN vehicles v ON v.id = u.vehicle_id
+			LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = v.id AND reg.valid_to IS NULL
+			LEFT JOIN LATERAL (SELECT c.categories, c.valid_until, c.note FROM test_drive_licence_checks c
+			                    WHERE c.test_drive_id = d.id ORDER BY c.checked_at DESC, c.id DESC LIMIT 1) k ON true
+			WHERE d.id = ANY($1::uuid[]) ORDER BY d.starts_at`, drives)
+		if err != nil {
+			return fmt.Errorf("read test drives: %w", err)
 		}
-		e.TestDrives = append(e.TestDrives, x)
+		for rows.Next() {
+			var x ExportedTestDrive
+			if err := rows.Scan(&x.Car, &x.From, &x.To, &x.Area, &x.Categories, &x.ValidUntil, &x.LicenceNote, &x.Notes); err != nil {
+				rows.Close()
+				return err
+			}
+			e.TestDrives = append(e.TestDrives, x)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-// eraseLeadsAndDrivesTx clears a person from their leads, as the retention
-// sweep does (sweepLeadsTx), and what was written about them on their test
-// drives; that they asked, which car and how it ended, and that they drove
-// and their licence was checked, stay. It returns how many leads.
-func eraseLeadsAndDrivesTx(ctx context.Context, tx pgx.Tx, personID string) (int, error) {
+// carNameSQL names a car by its plate, its make and model, or its chassis
+// number, over vehicles v and their current registration reg.
+const carNameSQL = `coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), nullif(btrim(v.vin), ''), '')`
+
+// eraseLeadsTx clears the person from leads: the name, the phone, the
+// email, the party, the wishes and what was written about them. Where the
+// lead came from, which car, who had it and how it ended stay. One way,
+// for the retention sweep and for a person's erasure alike.
+func eraseLeadsTx(ctx context.Context, tx pgx.Tx, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	for _, q := range []string{
+		`UPDATE leads SET party_id = NULL, contact_name = NULL, contact_phone = NULL, contact_phone_digits = NULL,
+		        contact_email = NULL, wishes = NULL, erased_at = coalesce(erased_at, clock_timestamp()) WHERE id = ANY($1::uuid[])`,
+		`UPDATE lead_contacts SET note = NULL WHERE lead_id = ANY($1::uuid[]) AND note IS NOT NULL`,
+		`UPDATE lead_events SET note = NULL WHERE lead_id = ANY($1::uuid[]) AND note IS NOT NULL`,
+	} {
+		if _, err := tx.Exec(ctx, q, ids); err != nil {
+			return fmt.Errorf("erase from leads: %w", err)
+		}
+	}
+	return nil
+}
+
+// eraseLeadsAndDrivesTx clears a person from their leads (eraseLeadsTx)
+// and what was written about them on their test drives; that they drove
+// and their licence was checked stay. It returns how many of each.
+func eraseLeadsAndDrivesTx(ctx context.Context, tx pgx.Tx, personID string) (leadCount, driveCount int, err error) {
 	leads, drives, err := theirLeadsAndDrivesTx(ctx, tx, personID)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	for _, q := range []struct {
-		sql string
-		ids []string
-	}{
-		{`UPDATE leads SET party_id = NULL, contact_name = NULL, contact_phone = NULL, contact_phone_digits = NULL,
-		         contact_email = NULL, wishes = NULL, erased_at = coalesce(erased_at, clock_timestamp()) WHERE id = ANY($1::uuid[])`, leads},
-		{`UPDATE lead_contacts SET note = NULL WHERE lead_id = ANY($1::uuid[]) AND note IS NOT NULL`, leads},
-		{`UPDATE lead_events SET note = NULL WHERE lead_id = ANY($1::uuid[]) AND note IS NOT NULL`, leads},
-		{`UPDATE test_drive_licence_checks SET note = NULL WHERE test_drive_id = ANY($1::uuid[]) AND note IS NOT NULL`, drives},
-		{`UPDATE test_drive_events SET note = NULL WHERE test_drive_id = ANY($1::uuid[]) AND note IS NOT NULL`, drives},
-	} {
-		if len(q.ids) == 0 {
-			continue
-		}
-		if _, err := tx.Exec(ctx, q.sql, q.ids); err != nil {
-			return 0, fmt.Errorf("erase from leads and test drives: %w", err)
+	if err := eraseLeadsTx(ctx, tx, leads); err != nil {
+		return 0, 0, err
+	}
+	if len(drives) > 0 {
+		for _, q := range []string{
+			`UPDATE test_drive_licence_checks SET note = NULL WHERE test_drive_id = ANY($1::uuid[]) AND note IS NOT NULL`,
+			`UPDATE test_drive_events SET note = NULL WHERE test_drive_id = ANY($1::uuid[]) AND note IS NOT NULL`,
+		} {
+			if _, err := tx.Exec(ctx, q, drives); err != nil {
+				return 0, 0, fmt.Errorf("erase from test drives: %w", err)
+			}
 		}
 	}
-	return len(leads), nil
+	return len(leads), len(drives), nil
 }
