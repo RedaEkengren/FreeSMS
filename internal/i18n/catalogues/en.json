@@ -206,6 +206,9 @@
     "%d job in progress": {
       "one": "%d job in progress",
       "other": "%d jobs in progress"
-    }
+    },
+    "%d rental to hand over today": {"one": "%d rental to hand over today", "other": "%d rentals to hand over today"},
+    "%d rental due back today": {"one": "%d rental due back today", "other": "%d rentals due back today"},
+    "%d rental out past its return": {"one": "%d rental out past its return", "other": "%d rentals out past their return"}
   }
 }

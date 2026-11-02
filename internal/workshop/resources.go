@@ -331,6 +331,20 @@ func BookResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, b
 
 	var id string
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// The resource first, locked, then its blocks: the order every
+		// write to it takes. Letting a hold go before taking the resource
+		// waits on a rental that holds the resource and wants the hold.
+		var retired bool
+		err := tx.QueryRow(ctx, `SELECT retired_at IS NOT NULL FROM resources WHERE id = $1 FOR UPDATE`, b.ResourceID).Scan(&retired)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("read resource: %w", err)
+		}
+		// The request read once the resource is held: the same request
+		// still in flight has committed by then, and its block is the
+		// answer.
 		if key != "" {
 			err := tx.QueryRow(ctx, `SELECT id FROM resource_blocks WHERE request_key = $1`, key).Scan(&id)
 			if err == nil {
@@ -339,14 +353,6 @@ func BookResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, b
 			if !errors.Is(err, pgx.ErrNoRows) {
 				return fmt.Errorf("read the request: %w", err)
 			}
-		}
-		var retired bool
-		err := tx.QueryRow(ctx, `SELECT retired_at IS NOT NULL FROM resources WHERE id = $1`, b.ResourceID).Scan(&retired)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNotFound
-		}
-		if err != nil {
-			return fmt.Errorf("read resource: %w", err)
 		}
 		if retired {
 			return fmt.Errorf("%w: that has been taken out of use", ErrInvalid)
@@ -402,8 +408,14 @@ func BookResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, b
 	return id, err
 }
 
-// blockKindTx reads a block's kind and state, locked.
+// blockKindTx reads a block's kind and state, locked: its resource first,
+// then the block, the order every write to a resource takes. A block's
+// resource never changes, so reading which one unlocked is safe.
 func blockKindTx(ctx context.Context, tx pgx.Tx, id string) (kind, status string, expired bool, err error) {
+	if _, err = tx.Exec(ctx, `
+		SELECT 1 FROM resources WHERE id = (SELECT resource_id FROM resource_blocks WHERE id = $1) FOR UPDATE`, id); err != nil {
+		return "", "", false, fmt.Errorf("lock the resource: %w", err)
+	}
 	err = tx.QueryRow(ctx, `
 		SELECT kind, status, status = 'held' AND expires_at <= clock_timestamp()
 		FROM resource_blocks WHERE id = $1 FOR UPDATE`, id).Scan(&kind, &status, &expired)

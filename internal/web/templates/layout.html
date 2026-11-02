@@ -33,7 +33,8 @@
     {{if .Session.Scope.Role.RunsTheShop}}<a href="/shop" class="nav">{{.T "The workshop"}}</a>
     <a href="/staff" class="nav">{{.T "Staff"}}</a>
     <a href="/import" class="nav">{{.T "Import"}}</a>
-    <a href="/start" class="nav">{{.T "Getting started"}}</a>{{end}}
+    <a href="/start" class="nav">{{.T "Getting started"}}</a>{{end}}{{if and .Session.Scope.Role.HandsOverRentals (.Runs "rental")}}
+    <a href="/rental" class="nav">{{.T "Rental"}}</a>{{end}}
     {{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/customers" class="nav">{{.T "Customers"}}</a>
     {{if .Runs "workshop"}}<a href="/enquiries" class="nav">{{.T "Enquiries"}}</a>
     <a href="/calendar" class="nav">{{.T "Bookings"}}</a>{{end}}

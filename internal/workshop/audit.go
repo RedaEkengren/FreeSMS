@@ -72,6 +72,8 @@ var AuditedTransitions = []AuditTransition{
 	{"vat_eligibility.corrected", "purchase", "audit_events", true},
 	// Money let leave for a car before its checks passed (#162).
 	{"stock_checks.overridden", "stock_unit", "audit_events", true},
+	// Rental
+	{"rental.price_overridden", "rental_booking", "audit_events", true},
 }
 
 func auditTransition(event string) (AuditTransition, bool) {
@@ -202,6 +204,10 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 		}
 	case "purchase":
 		if !scope.Role.SeesPurchasePrice() {
+			return nil, access.ErrForbidden
+		}
+	case "rental_booking":
+		if !scope.Role.HandsOverRentals() {
 			return nil, access.ErrForbidden
 		}
 	default:

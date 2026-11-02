@@ -86,6 +86,8 @@ var actionProviders = []ActionProvider{
 	// Calls to the outside world a person has to look at (#154).
 	{Name: "outbox", Items: outboxWaiting},
 	{Module: access.Workshop, Name: "workshop", Items: workshopWaiting},
+	// Rental
+	{Module: access.Rental, Name: "rental", Items: rentalWaiting},
 }
 
 // IncompleteError is WaitingFor's when a provider failed: the items of the
@@ -128,6 +130,11 @@ var waitingSays = map[string]string{
 	"unsigned":           "Waiting for a signature: %s",
 	"outbox_given_up":    "%d call to another service was given up",
 	"outbox_manual":      "%d call to another service is a task to do by hand",
+	// Rental
+	"rental_handover": "To hand over today: %s",
+	"rental_return":   "Due back today: %s",
+	"rental_overdue":  "Out past its return: %s",
+	"rental_at_risk":  "May not be back in time for this rental: %s",
 }
 
 // Says is the item's catalogue key.
@@ -157,6 +164,8 @@ func (w ActionItem) Link() string {
 		return "/payment-flows"
 	case w.SubjectKind == "outbox":
 		return "/outbox"
+	case w.SubjectKind == "rental_booking":
+		return "/rental/bookings/" + w.SubjectID
 	}
 	return "/jobs/" + w.SubjectID
 }

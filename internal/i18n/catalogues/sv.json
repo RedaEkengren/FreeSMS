@@ -7982,6 +7982,438 @@
     "a payout for a car names the purchase it pays, and is to its seller or to a lender on it": {"other": "en utbetalning för en bil anger inköpet den betalar, och går till säljaren eller till en långivare på inköpet"},
     "a consigned car's principal is paid under the consignment agreement, which this release does not keep yet": {"other": "uppdragsgivaren för en förmedlad bil får betalt enligt förmedlingsavtalet, som den här versionen ännu inte håller"},
     "every check the shop requires has passed in time, so there is nothing to let through": {"other": "alla kontroller som verksamheten kräver är godkända i tid, så det finns inget att släppa igenom"},
-    "that job is still open; its cost is posted once it is done": {"other": "jobbet är fortfarande öppet; dess kostnad bokförs när det är klart"}
+    "that job is still open; its cost is posted once it is done": {"other": "jobbet är fortfarande öppet; dess kostnad bokförs när det är klart"},
+    "Rental settings": {
+      "other": "Uthyrningsinställningar"
+    },
+    "Write the buffer and the age as whole numbers, and the deposit as an amount.": {
+      "other": "Skriv bufferten och åldern som heltal och depositionen som ett belopp."
+    },
+    "a deposit is nothing or more": {
+      "other": "en deposition är noll eller mer"
+    },
+    "a licence check needs at least one accepted category": {
+      "other": "en körkortskontroll behöver minst en godkänd behörighet"
+    },
+    "a minimum age is between 15 and 99, or none": {
+      "other": "en lägsta ålder är mellan 15 och 99, eller ingen"
+    },
+    "a permit expires on or after the day it was decided": {
+      "other": "ett tillstånd upphör samma dag som det beslutades eller senare"
+    },
+    "a permit is revoked on or after the day it was decided": {
+      "other": "ett tillstånd återkallas samma dag som det beslutades eller senare"
+    },
+    "a profile starts from a car, a trailer, a machine or equipment": {
+      "other": "en profil utgår från en bil, ett släp, en maskin eller utrustning"
+    },
+    "give the permit's reference from Transportstyrelsen, in 100 characters or fewer": {
+      "other": "ange tillståndets beteckning från Transportstyrelsen, högst 100 tecken"
+    },
+    "give the profile a name, in 80 characters or fewer": {
+      "other": "ge profilen ett namn, högst 80 tecken"
+    },
+    "name the person the permit makes responsible, in 200 characters or fewer": {
+      "other": "ange den person som tillståndet anger som ansvarig, högst 200 tecken"
+    },
+    "say when the permit was decided": {
+      "other": "ange när tillståndet beslutades"
+    },
+    "say why the permit was revoked, in 300 characters or fewer": {
+      "other": "ange varför tillståndet återkallades, högst 300 tecken"
+    },
+    "that checklist is not one for a check-out or a check-in": {
+      "other": "den checklistan är inte avsedd för utlämning eller återlämning"
+    },
+    "that is not a Swedish licence category": {
+      "other": "det är ingen svensk körkortsbehörighet"
+    },
+    "that permit is already recorded as revoked": {
+      "other": "det tillståndet är redan registrerat som återkallat"
+    },
+    "the cleaning buffer is between nothing and seven days": {
+      "other": "städbufferten är mellan noll och sju dagar"
+    },
+    "there is already a profile by that name": {
+      "other": "det finns redan en profil med det namnet"
+    },
+    "A booking keeps the rules it was made under. Changing a profile changes the bookings made after it, never one already made.": {
+      "other": "En bokning behåller de regler den gjordes under. En ändrad profil gäller bokningar som görs efter ändringen, aldrig en som redan är gjord."
+    },
+    "A mileage allowance applies": {
+      "other": "En körsträcka ingår"
+    },
+    "A registered vehicle is required": {
+      "other": "Ett registrerat fordon krävs"
+    },
+    "A rental permit is required": {
+      "other": "Biluthyrningstillstånd krävs"
+    },
+    "Add a profile of your own": {
+      "other": "Lägg till en egen profil"
+    },
+    "Add the profile": {
+      "other": "Lägg till profilen"
+    },
+    "Check-in checklist": {
+      "other": "Checklista vid återlämning"
+    },
+    "Check-out checklist": {
+      "other": "Checklista vid utlämning"
+    },
+    "Cleaning buffer, minutes": {
+      "other": "Städbuffert, minuter"
+    },
+    "Decided on": {
+      "other": "Beslutat den"
+    },
+    "Decided on %s": {
+      "other": "Beslutat den %s"
+    },
+    "Default deposit, kr": {
+      "other": "Standarddeposition, kr"
+    },
+    "Every driver's licence is checked before handover": {
+      "other": "Varje förares körkort kontrolleras före utlämning"
+    },
+    "Expires on, if it does": {
+      "other": "Upphör den, om det gör det"
+    },
+    "Licence categories accepted": {
+      "other": "Godkända körkortsbehörigheter"
+    },
+    "Minibus": {
+      "other": "Minibuss"
+    },
+    "Minimum age of a driver": {
+      "other": "Lägsta ålder för förare"
+    },
+    "No permit recorded. A profile that needs one cannot be handed over.": {
+      "other": "Inget tillstånd registrerat. En enhet vars profil kräver tillstånd kan inte lämnas ut."
+    },
+    "Permit reference": {
+      "other": "Tillståndets beteckning"
+    },
+    "Record a permit or a renewal": {
+      "other": "Registrera ett tillstånd eller en förnyelse"
+    },
+    "Record that it was revoked": {
+      "other": "Registrera att det återkallades"
+    },
+    "Record the permit": {
+      "other": "Registrera tillståndet"
+    },
+    "Record the revocation": {
+      "other": "Registrera återkallelsen"
+    },
+    "Rental permit": {
+      "other": "Biluthyrningstillstånd"
+    },
+    "Reported for rental use in the vehicle register": {
+      "other": "Anmält för uthyrning i vägtrafikregistret"
+    },
+    "Responsible person": {
+      "other": "Ansvarig person"
+    },
+    "Responsible: %s": {
+      "other": "Ansvarig: %s"
+    },
+    "Revoked from": {
+      "other": "Återkallat från"
+    },
+    "Save as a new version": {
+      "other": "Spara som ny version"
+    },
+    "Starting from": {
+      "other": "Utgår från"
+    },
+    "The rental permit (biluthyrningstillstånd) is your business's, granted by Transportstyrelsen. FreeSMS records it and refuses to hand over a unit whose profile needs one when none stands for the whole rental.": {
+      "other": "Biluthyrningstillståndet är ert företags, beviljat av Transportstyrelsen. FreeSMS registrerar det och vägrar lämna ut en enhet vars profil kräver tillstånd när inget gäller för hela hyrperioden."
+    },
+    "The renter may not lend it on": {
+      "other": "Hyrestagaren får inte låna ut eller hyra ut den vidare"
+    },
+    "What each kind of unit needs": {
+      "other": "Vad varje slags enhet kräver"
+    },
+    "Your terms, not the law:": {
+      "other": "Era villkor, inte lagens:"
+    },
+    "not confirmed": {
+      "other": "inte bekräftat"
+    },
+    "revoked from %s": {
+      "other": "återkallat från %s"
+    },
+    "until revoked": {
+      "other": "tills vidare"
+    },
+    "version %d": {
+      "other": "version %d"
+    },
+    "Car": {
+      "other": "Bil"
+    },
+    "Trailer": {
+      "other": "Släp"
+    },
+    "Machine": {
+      "other": "Maskin"
+    },
+    "Equipment": {
+      "other": "Utrustning"
+    },
+    "There is no rental permit that stands for the whole rental.": {
+      "other": "Det finns inget biluthyrningstillstånd som gäller för hela hyrperioden."
+    },
+    "Whether the rental marking in the vehicle register is needed before the first rental, and for which kinds of vehicle, is not confirmed.": {
+      "other": "Det är inte bekräftat om uthyrningsmarkeringen i vägtrafikregistret behövs före första uthyrningen, och för vilka slags fordon."
+    },
+    "Lag 1998:492 covers cars and off-road vehicles. Whether a trailer counts is not confirmed, so no permit is required by default.": {
+      "other": "Lag 1998:492 gäller bilar och terrängmotorfordon. Det är inte bekräftat om ett släp räknas, så inget tillstånd krävs som standard."
+    },
+    "Lag 1998:492 covers cars and off-road vehicles. Whether a machine or tractor counts is not confirmed, so no permit is required by default.": {
+      "other": "Lag 1998:492 gäller bilar och terrängmotorfordon. Det är inte bekräftat om en maskin eller traktor räknas, så inget tillstånd krävs som standard."
+    },
+    "The duty to check a licence (16 § lag 1998:492) may not apply to a trailer. It is checked by default, because a heavy trailer needs BE.": {
+      "other": "Skyldigheten att kontrollera körkort (16 § lag 1998:492) gäller kanske inte ett släp. Det kontrolleras ändå som standard, eftersom ett tungt släp kräver BE."
+    },
+    "Whether a machine needs a registration or a licence depends on what it is. Neither is required by default.": {
+      "other": "Om en maskin behöver registrering eller körkort beror på vad det är. Inget av dem krävs som standard."
+    },
+    "Add a unit": {"other": "Lägg till en enhet"},
+    "Add the unit": {"other": "Lägg till enheten"},
+    "another unit has that fleet number": {"other": "en annan enhet har det flottnumret"},
+    "Category": {"other": "Kategori"},
+    "Fleet number": {"other": "Flottnummer"},
+    "give the registration of a vehicle, or a name for something that has none": {"other": "ange registreringsnumret för ett fordon, eller ett namn för något som saknar ett"},
+    "give the unit a category its prices are set by, in 60 characters or fewer": {"other": "ge enheten en kategori som priserna sätts efter, högst 60 tecken"},
+    "give the unit a fleet number, in 40 characters or fewer": {"other": "ge enheten ett flottnummer, högst 40 tecken"},
+    "In the fleet": {"other": "I hyrflottan"},
+    "it is in the fleet then already": {"other": "den är redan i hyrflottan då"},
+    "It leaves the fleet": {"other": "Den lämnar hyrflottan"},
+    "it leaves the fleet after it joined": {"other": "den lämnar hyrflottan efter att den kom in"},
+    "Never in the fleet yet.": {"other": "Har aldrig varit i hyrflottan."},
+    "Nothing to rent out yet.": {"other": "Inget att hyra ut ännu."},
+    "Or a name, for something unregistered": {"other": "Eller ett namn, för något oregistrerat"},
+    "Put it in the fleet": {"other": "Ta in den i hyrflottan"},
+    "Registration, for a vehicle": {"other": "Registreringsnummer, för ett fordon"},
+    "Rentals are booked on it after that. Move or cancel them first:": {"other": "Det finns hyror bokade på den efter det. Flytta eller avboka dem först:"},
+    "Rental unit": {"other": "Hyresenhet"},
+    "Rented under": {"other": "Hyrs ut enligt"},
+    "say how it joins the fleet": {"other": "ange hur den kommer in i hyrflottan"},
+    "say how it leaves the fleet": {"other": "ange hur den lämnar hyrflottan"},
+    "say when it joins the fleet": {"other": "ange när den kommer in i hyrflottan"},
+    "Small van": {"other": "Liten skåpbil"},
+    "Take it out of the fleet": {"other": "Ta ut den ur hyrflottan"},
+    "that is already a rental unit": {"other": "det är redan en hyresenhet"},
+    "that period in the fleet has already ended": {"other": "den perioden i hyrflottan har redan avslutats"},
+    "Units": {"other": "Enheter"},
+    "Bought for the fleet": {"other": "Köpt till hyrflottan"},
+    "Moved from sales stock": {"other": "Flyttad från försäljningslagret"},
+    "Leased in": {"other": "Inleasad"},
+    "Already the business's": {"other": "Redan företagets"},
+    "Other": {"other": "Annat"},
+    "Moved to sales stock": {"other": "Flyttad till försäljningslagret"},
+    "Lease returned": {"other": "Leasing återlämnad"},
+    "Scrapped": {"other": "Skrotad"},
+    "Out of the fleet": {"other": "Utanför hyrflottan"},
+    "Available": {"other": "Ledig"},
+    "Rented out": {"other": "Uthyrd"},
+    "At the workshop": {"other": "På verkstaden"},
+    "Sold off": {"other": "Såld"},
+    "Taken by other use": {"other": "Upptagen av annat"},
+    "Across two seasons": {"other": "Över två säsonger"},
+    "Add an extra": {"other": "Lägg till ett tillval"},
+    "Add a plan": {"other": "Lägg till en prisplan"},
+    "Add the extra": {"other": "Lägg till tillvalet"},
+    "Add the plan": {"other": "Lägg till prisplanen"},
+    "Add the prices": {"other": "Lägg till priserna"},
+    "An excess reduction may be insurance rather than part of the rental, and what is outside the scope of VAT is your adviser's decision: both are marked as not confirmed.": {"other": "En självriskreducering kan vara en försäkring snarare än en del av hyran, och vad som ligger utanför momsens tillämpningsområde avgör er rådgivare: båda markeras som inte bekräftade."},
+    "an extra is at a VAT rate, or outside the scope of VAT at none": {"other": "ett tillval har en momssats, eller ligger utanför momsen utan sats"},
+    "an extra is charged per rental or per day": {"other": "ett tillval tas betalt per hyra eller per dag"},
+    "a plan prices a category of units or one unit": {"other": "en prisplan gäller en kategori enheter eller en enhet"},
+    "a price is nothing or more": {"other": "ett pris är noll eller mer"},
+    "archived": {"other": "arkiverad"},
+    "Archive the plan": {"other": "Arkivera prisplanen"},
+    "a rental ends after it starts": {"other": "en hyra slutar efter att den börjar"},
+    "a season ends after it starts": {"other": "en säsong slutar efter att den börjar"},
+    "a season prices at least one of an hour, a day, a weekend, a week and a month, none below nothing": {"other": "en säsong prissätter minst en av timme, dag, helg, vecka och månad, ingen under noll"},
+    "at least %d minutes": {"other": "minst %d minuter"},
+    "Charged": {"other": "Debiteras"},
+    "day": {"other": "dag"},
+    "%d km a day included": {"other": "%d km per dag ingår"},
+    "%d minutes' grace": {"other": "%d minuters marginal"},
+    "Extras": {"other": "Tillval"},
+    "For a category": {"other": "För en kategori"},
+    "From %s": {"other": "Från %s"},
+    "give the extra a name, in 80 characters or fewer": {"other": "ge tillvalet ett namn, högst 80 tecken"},
+    "give the plan a name, in 80 characters or fewer": {"other": "ge prisplanen ett namn, högst 80 tecken"},
+    "Grace, minutes": {"other": "Marginal, minuter"},
+    "Km included a day": {"other": "Km som ingår per dag"},
+    "month": {"other": "månad"},
+    "No extras yet.": {"other": "Inga tillval ännu."},
+    "No plans yet.": {"other": "Inga prisplaner ännu."},
+    "No prices yet.": {"other": "Inga priser ännu."},
+    "no rate plan prices that unit; add one first": {"other": "ingen prisplan gäller den enheten; lägg till en först"},
+    "one unit": {"other": "en enhet"},
+    "Or for one unit": {"other": "Eller för en enhet"},
+    "outside the scope of VAT": {"other": "utanför momsens tillämpningsområde"},
+    "Outside the scope of VAT": {"other": "Utanför momsens tillämpningsområde"},
+    "per day": {"other": "per dag"},
+    "Per day, kr": {"other": "Per dag, kr"},
+    "Per extra km, kr": {"other": "Per extra km, kr"},
+    "Per hour, kr": {"other": "Per timme, kr"},
+    "Per month, kr": {"other": "Per månad, kr"},
+    "per rental": {"other": "per hyra"},
+    "Per weekend, kr": {"other": "Per helg, kr"},
+    "Per week, kr": {"other": "Per vecka, kr"},
+    "Plans": {"other": "Prisplaner"},
+    "Priced by the season it starts in": {"other": "Prissätts efter säsongen då hyran börjar"},
+    "Price including VAT, kr": {"other": "Pris inklusive moms, kr"},
+    "Prices are shown including VAT. A booking keeps the prices it was confirmed at; a new season or an archived plan changes no booking already made.": {"other": "Priserna visas inklusive moms. En bokning behåller priserna den bekräftades till; en ny säsong eller en arkiverad prisplan ändrar ingen bokning som redan är gjord."},
+    "Prices from a day": {"other": "Priser från en dag"},
+    "Rental prices": {"other": "Hyrespriser"},
+    "say how a rental across two seasons is priced": {"other": "ange hur en hyra över två säsonger prissätts"},
+    "Shortest rental, minutes": {"other": "Kortaste hyra, minuter"},
+    "%s per extra km": {"other": "%s per extra km"},
+    "Split where the new season starts": {"other": "Delas där den nya säsongen börjar"},
+    "Stop offering it": {"other": "Sluta erbjuda det"},
+    "take an extra between once and 99 times": {"other": "ta ett tillval mellan en och 99 gånger"},
+    "that extra is not offered any more": {"other": "det tillvalet erbjuds inte längre"},
+    "that is not a kind of extra": {"other": "det är inget slags tillval"},
+    "that plan is archived": {"other": "den prisplanen är arkiverad"},
+    "the minimum is at most a year and the grace at most a day, neither below nothing": {"other": "minsta hyrtid är högst ett år och marginalen högst en dag, ingen under noll"},
+    "the plan has a season then already": {"other": "prisplanen har redan en säsong då"},
+    "the plan has no price for a rental this long": {"other": "prisplanen har inget pris för en så lång hyra"},
+    "the plan has no season for the day the rental starts": {"other": "prisplanen har ingen säsong för dagen då hyran börjar"},
+    "VAT %d%%": {"other": "Moms %d %%"},
+    "VAT treatment not confirmed": {"other": "Momsbehandlingen inte bekräftad"},
+    "week": {"other": "vecka"},
+    "weekend": {"other": "helg"},
+    "Write prices as amounts and kilometres and minutes as whole numbers.": {"other": "Skriv priser som belopp och kilometer och minuter som heltal."},
+    "Write the VAT rate as a whole per cent.": {"other": "Skriv momssatsen som ett helt antal procent."},
+    "rental": {"other": "hyra"},
+    "Extra driver": {"other": "Extra förare"},
+    "Child seat": {"other": "Bilbarnstol"},
+    "Excess reduction": {"other": "Självriskreducering"},
+    "Cancellation fee": {"other": "Avbokningsavgift"},
+    "No-show fee": {"other": "Avgift vid utebliven hämtning"},
+    "Young driver": {"other": "Ung förare"},
+    "Agreed price for the rent, if not the plan's, kr per unit including VAT": {"other": "Överenskommet pris för hyran, om inte prisplanens, kr per enhet inklusive moms"},
+    "Agreed when it was booked. A later change to a plan or an extra does not change it.": {"other": "Överenskommet vid bokningen. En senare ändring av en prisplan eller ett tillval ändrar det inte."},
+    "a hold runs out later than now and before the rental starts": {"other": "en preliminär bokning löper ut senare än nu och innan hyran börjar"},
+    "a move keeps the rental as long as it was; extend it to make it longer": {"other": "en flytt behåller hyrans längd; förläng den för att göra den längre"},
+    "an extension ends later than the rental does now": {"other": "en förlängning slutar senare än hyran gör nu"},
+    "a renter is a no-show only once the rental was due to start": {"other": "en hyrestagare har uteblivit först när hyran skulle ha börjat"},
+    "Book": {"other": "Boka"},
+    "Confirm the booking": {"other": "Bekräfta bokningen"},
+    "Extend it": {"other": "Förläng den"},
+    "Held until %s": {"other": "Preliminärt bokad till %s"},
+    "Hold only, until (waiting for a deposit or an answer)": {"other": "Bara preliminärt, till (i väntan på deposition eller svar)"},
+    "Kilometres included": {"other": "Kilometer som ingår"},
+    "New renter's name": {"other": "Ny hyrestagares namn"},
+    "No bookings ahead.": {"other": "Inga kommande bokningar."},
+    "Nothing goes out or comes back today.": {"other": "Inget lämnas ut eller kommer tillbaka i dag."},
+    "Of which VAT": {"other": "Varav moms"},
+    "out past its return": {"other": "försenad återlämning"},
+    "Price": {"other": "Pris"},
+    "Priced at %s net; changed by %s: %s": {"other": "Prissatt till %s exklusive moms; ändrat av %s: %s"},
+    "Price plan": {"other": "Prisplan"},
+    "Rental booking": {"other": "Hyresbokning"},
+    "Renter": {"other": "Hyrestagare"},
+    "say why the price is changed, in 300 characters or fewer": {"other": "ange varför priset ändras, högst 300 tecken"},
+    "Someone new, below": {"other": "Någon ny, nedan"},
+    "that party is not a renter": {"other": "den parten är ingen hyrestagare"},
+    "that request was already used for another booking": {"other": "den begäran har redan använts för en annan bokning"},
+    "the booking is not in a state that allows that": {"other": "bokningen är inte i ett läge som tillåter det"},
+    "the hold has run out; book it again": {"other": "den preliminära bokningen har löpt ut; boka igen"},
+    "there is no such line to change the price of": {"other": "det finns ingen sådan rad att ändra priset på"},
+    "The renter did not come": {"other": "Hyrestagaren kom inte"},
+    "the unit": {"other": "enheten"},
+    "the unit is not in the fleet for all of that time": {"other": "enheten är inte i hyrflottan under hela den tiden"},
+    "the unit is out past its return on another rental; book it once it is back": {"other": "enheten är ute förbi sin återlämning på en annan hyra; boka den när den är tillbaka"},
+    "The unit is out with somebody else past its return, and may not be back in time.": {"other": "Enheten är ute hos någon annan förbi sin återlämning och kanske inte är tillbaka i tid."},
+    "The unit's own, or its category's": {"other": "Enhetens egen, eller kategorins"},
+    "Today": {"other": "I dag"},
+    "Until": {"other": "Till"},
+    "Held": {"other": "Preliminär"},
+    "Hold run out": {"other": "Preliminär bokning utlöpt"},
+    "Confirmed": {"other": "Bekräftad"},
+    "Returned": {"other": "Återlämnad"},
+    "No-show": {"other": "Uteblev"},
+    "Requested": {"other": "Efterfrågad"},
+    "Moved": {"other": "Flyttad"},
+    "Extended": {"other": "Förlängd"},
+    "To hand over today: %s": {"other": "Ska lämnas ut i dag: %s"},
+    "Due back today: %s": {"other": "Ska tillbaka i dag: %s"},
+    "Out past its return: %s": {"other": "Försenad återlämning: %s"},
+    "May not be back in time for this rental: %s": {"other": "Kanske inte tillbaka i tid till den här hyran: %s"},
+    "%d rental to hand over today": {"one": "%d hyra att lämna ut i dag", "other": "%d hyror att lämna ut i dag"},
+    "%d rental due back today": {"one": "%d hyra ska tillbaka i dag", "other": "%d hyror ska tillbaka i dag"},
+    "%d rental out past its return": {"one": "%d hyra är försenad", "other": "%d hyror är försenade"},
+    "Change the booking": {"other": "Ändra bokningen"},
+    "Out with the renter": {"other": "Utlämnad"},
+    "Add a driver": {"other": "Lägg till en förare"},
+    "Add the driver": {"other": "Lägg till föraren"},
+    "Agreement": {"other": "Avtal"},
+    "A licence was shown": {"other": "Ett körkort visades"},
+    "an agreement is made for a booking that is held, confirmed or out": {"other": "ett avtal görs för en bokning som är preliminär, bekräftad eller utlämnad"},
+    "Before handover": {"other": "Före utlämning"},
+    "Card shown at the counter": {"other": "Kortet visat i disken"},
+    "Categories it holds": {"other": "Behörigheter det har"},
+    "Check the licence": {"other": "Kontrollera körkortet"},
+    "Driver": {"other": "Förare"},
+    "Drivers": {"other": "Förare"},
+    "drivers are changed before the unit is handed over, or added while it is out": {"other": "förare ändras innan enheten lämnas ut, eller läggs till medan den är ute"},
+    "From the template": {"other": "Från mallen"},
+    "How it was checked": {"other": "Hur det kontrollerades"},
+    "How %s accepted it": {"other": "Hur %s godkände det"},
+    "In person, here": {"other": "På plats, här"},
+    "licence checked": {"other": "körkort kontrollerat"},
+    "licence check failed": {"other": "körkortskontrollen godkändes inte"},
+    "licence not checked": {"other": "körkort inte kontrollerat"},
+    "main driver": {"other": "huvudförare"},
+    "Main driver": {"other": "Huvudförare"},
+    "Make a new version": {"other": "Gör en ny version"},
+    "Make the agreement": {"other": "Gör avtalet"},
+    "missing": {"other": "saknas"},
+    "New driver's name": {"other": "Ny förares namn"},
+    "No agreement made yet. The handover can go ahead without one being signed; accepting is recorded here.": {"other": "Inget avtal gjort ännu. Utlämningen kan ske utan att det är undertecknat; godkännandet registreras här."},
+    "Nobody is named to drive yet.": {"other": "Ingen är angiven som förare ännu."},
+    "No licence number and no picture are kept: only what is asked here, for as long as the licence check's purpose allows.": {"other": "Inget körkortsnummer och ingen bild sparas: bara det som efterfrågas här, så länge körkortskontrollens ändamål tillåter."},
+    "Nothing is missing for the handover.": {"other": "Inget saknas för utlämningen."},
+    "Record that it was accepted": {"other": "Registrera att det godkändes"},
+    "say how the licence was checked, in 200 characters or fewer": {"other": "ange hur körkortet kontrollerades, högst 200 tecken"},
+    "say until when the licence is valid": {"other": "ange till när körkortet gäller"},
+    "say why the driver is taken off, in 300 characters or fewer": {"other": "ange varför föraren tas bort, högst 300 tecken"},
+    "Signed on paper": {"other": "Undertecknat på papper"},
+    "taken off": {"other": "borttagen"},
+    "Take off the rental": {"other": "Ta bort från hyran"},
+    "that driver has been taken off the rental": {"other": "den föraren har tagits bort från hyran"},
+    "that is not a rental agreement template": {"other": "det är ingen mall för hyresavtal"},
+    "that person is already a driver of this rental": {"other": "den personen är redan förare för den här hyran"},
+    "the rental already has a main driver": {"other": "hyran har redan en huvudförare"},
+    "this rental's profile needs no licence check": {"other": "den här hyrans profil kräver ingen körkortskontroll"},
+    "Valid until": {"other": "Giltigt till"},
+    "version of %s": {"other": "version från %s"},
+    "Who saw it signed, on paper": {"other": "Vem som såg det undertecknas, på papper"},
+    "%s has not shown a valid licence for this rental.": {"other": "%s har inte visat ett giltigt körkort för den här hyran."},
+    "No driver is named for the rental.": {"other": "Ingen förare är angiven för hyran."},
+    "No licence was shown.": {"other": "Inget körkort visades."},
+    "The licence does not hold a category this unit needs.": {"other": "Körkortet har ingen behörighet som enheten kräver."},
+    "The licence is not valid for the whole rental.": {"other": "Körkortet gäller inte under hela hyrestiden."},
+    "a rental is at most five years": {"other": "en hyra är högst fem år"},
+    "say how the licence was checked": {"other": "ange hur körkortet kontrollerades"},
+    "keep the note to 80 characters, with no licence or identity number in it": {"other": "håll anteckningen inom 80 tecken, utan körkorts- eller personnummer"},
+    "The card, looked at": {"other": "Kortet, granskat"},
+    "A digital licence, looked at": {"other": "Ett digitalt körkort, granskat"},
+    "A foreign licence, looked at": {"other": "Ett utländskt körkort, granskat"},
+    "Another way, in the note": {"other": "Annat sätt, i anteckningen"},
+    "Note, with no licence or identity number": {"other": "Anteckning, utan körkorts- eller personnummer"},
+    "a driver's licence does not last until the new end; check it again before extending": {"other": "en förares körkort gäller inte till det nya slutet; kontrollera det igen innan hyran förlängs"},
+    "that is more than a licence check can say; shorten the note": {"other": "det är mer än en körkortskontroll kan rymma; korta anteckningen"},
+    "that car is in stock for sale then; it joins the fleet once its cycle in stock has ended": {"other": "bilen finns i lager för försäljning då; den kommer in i hyrflottan när dess lagervarv har avslutats"},
+    "that car is in the rental fleet; end its time in the fleet before it comes into stock": {"other": "bilen finns i hyrflottan; avsluta dess tid i hyrflottan innan den tas in i lager"}
   }
 }

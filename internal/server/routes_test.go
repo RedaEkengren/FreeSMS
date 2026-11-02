@@ -72,6 +72,29 @@ var swept = map[string]string{
 	"POST /stock/move": "", "POST /stock/count": "", "GET /stock/parts/new": "", "POST /stock/parts": "",
 	"GET /staff": "", "GET /receivables": "", "POST /staff": "", "GET /account": "", "POST /account/password": "", "POST /account/language": "", "POST /stock/bands": "", "GET /parts": "",
 	"POST /parts/arrived": "", "GET /checklists": "", "POST /checklists": "",
+	// Rental
+	"GET /rental/settings":                  "",
+	"POST /rental/permits":                  "",
+	"POST /rental/profiles":                 "",
+	"POST /rental/permits/{id}/revoke":      "sweep",
+	"POST /rental/profiles/{id}":            "sweep",
+	"GET /rental":                           "",
+	"POST /rental/units":                    "",
+	"GET /rental/units/{id}":                "sweep",
+	"POST /rental/units/{id}/fleet":         "sweep",
+	"POST /rental/memberships/{id}/end":     "sweep",
+	"GET /rental/prices":                    "",
+	"POST /rental/plans":                    "",
+	"POST /rental/extras":                   "",
+	"POST /rental/plans/{id}/seasons":       "sweep",
+	"POST /rental/plans/{id}/archive":       "sweep",
+	"POST /rental/extras/{id}/archive":      "sweep",
+	"POST /rental/bookings":                 "",
+	"GET /rental/bookings/{id}":             "sweep",
+	"POST /rental/bookings/{id}/{action}":   "sweep",
+	"POST /rental/drivers/{id}/check":       "sweep",
+	"POST /rental/drivers/{id}/remove":      "sweep",
+	"POST /rental/agreements/{id}/accepted": "sweep",
 
 	// The customer's link. Not a shop identifier: it is an unguessable token,
 	// and asking for it with a uuid is a different test -- the share tests
@@ -264,6 +287,17 @@ func fill(pattern string) (method, path string) {
 		// whoever asks; TestNoCarSalesRouteServesAnotherShopsRow asks them
 		// in a shop that does.
 		"/cars/calculations/{id}": "/cars/calculations/bbbbbbbb-0000-0000-0000-0000000000ca",
+		// Rental: ids that are nobody's.
+		"/rental/permits/{id}":     "/rental/permits/bbbbbbbb-0000-0000-0000-0000000000e1",
+		"/rental/profiles/{id}":    "/rental/profiles/bbbbbbbb-0000-0000-0000-0000000000e2",
+		"/rental/units/{id}":       "/rental/units/bbbbbbbb-0000-0000-0000-0000000000e3",
+		"/rental/memberships/{id}": "/rental/memberships/bbbbbbbb-0000-0000-0000-0000000000e4",
+		"/rental/plans/{id}":       "/rental/plans/bbbbbbbb-0000-0000-0000-0000000000e5",
+		"/rental/extras/{id}":      "/rental/extras/bbbbbbbb-0000-0000-0000-0000000000e6",
+		"/rental/bookings/{id}":    "/rental/bookings/bbbbbbbb-0000-0000-0000-0000000000e7",
+		"{action}":                 "confirm",
+		"/rental/drivers/{id}":     "/rental/drivers/bbbbbbbb-0000-0000-0000-0000000000e8",
+		"/rental/agreements/{id}":  "/rental/agreements/bbbbbbbb-0000-0000-0000-0000000000e9",
 	} {
 		path = strings.ReplaceAll(path, from, to)
 	}

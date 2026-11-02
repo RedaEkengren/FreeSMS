@@ -145,6 +145,11 @@ func TestNoPageReadInSwedishShowsAnEnglishSentenceFromTheCatalogue(t *testing.T)
 			}
 			text := pageWords(body)
 			for _, word := range otherModules {
+				// The shop page is where the owner switches a module on, so
+				// it names every module the release offers.
+				if p == "/shop" {
+					break
+				}
 				if strings.Contains(text, word) {
 					leaks["a module the shop does not run: "+word] = append(leaks["a module the shop does not run: "+word], who+" "+p)
 				}

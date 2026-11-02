@@ -48,6 +48,10 @@ var ExportTables = []string{
 	"purchase_calculations", "purchase_calculation_costs", "purchase_calculation_acceptances",
 	// What a car cost beyond its price (#164).
 	"stock_cost_entries", "stock_cost_settings",
+	// Rental
+	"rental_permits", "rental_permit_revocations", "rental_profiles", "rental_units", "fleet_memberships",
+	"rate_plans", "rate_plan_seasons", "rental_extras", "rental_bookings", "rental_booking_events", "rental_booking_lines",
+	"rental_drivers", "rental_licence_checks",
 }
 
 // exportQueries are tables exported with chosen columns, because one of
@@ -84,6 +88,11 @@ var exportQueries = map[string]string{
 		recorded_at, recorded_by FROM vat_eligibility`,
 	"stock_check_settings": `SELECT id, shop_id, seq, kind, required, extract(epoch FROM max_age)::bigint AS max_age_seconds,
 		changed_at, changed_by FROM stock_check_settings`,
+	// Rental: a profile's cleaning buffer in seconds, as a block's buffers.
+	"rental_profile_versions": `SELECT id, shop_id, profile_id, version, permit_required, registration_required,
+		licence_check_required, licence_categories, reporting_required, check_out_template_id, check_in_template_id,
+		extract(epoch FROM cleaning_buffer)::bigint AS cleaning_buffer_seconds, mileage_allowance, default_deposit_minor,
+		minimum_age, sublet_banned, unconfirmed, created_at, created_by FROM rental_profile_versions`,
 }
 
 // exportExcluded are the tables that do not go, and why.
