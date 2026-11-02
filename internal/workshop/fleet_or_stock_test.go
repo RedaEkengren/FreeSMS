@@ -199,3 +199,46 @@ func TestTheRefusalIsNotAddedOverAnOverlapAlreadyThere(t *testing.T) {
 		t.Errorf("migrated over a car in the fleet and in stock: %v", err)
 	}
 }
+
+// Closing a stock cycle takes the car's resource out of use. Joining the
+// fleet from stock brings it back, so the car the dealer handed over can
+// be rented -- whether it was a rental unit before or is made one now.
+func TestACarFromStockJoinsTheFleetAndIsRented(t *testing.T) {
+	ctx := context.Background()
+	t.Run("a unit before", func(t *testing.T) {
+		pool := setup(t)
+		v := rentableVan(t, pool)
+		u, err := workshop.RentalUnitByID(ctx, pool, rentalDesk(), v.unit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := workshop.EndFleetMembership(ctx, pool, rentalDesk(), u.Memberships[0].ID, time.Now(), "to_stock", ""); err != nil {
+			t.Fatal(err)
+		}
+		stock := takeIn(t, pool, workshop.StockFromDefleet)
+		moveStock(t, pool, stock.ID, workshop.StockClosed)
+		if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), v.unit, time.Now(), "from_stock", ""); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := v.book(pool, in2031(10, 9), in2031(12, 9)); err != nil {
+			t.Errorf("a car back in the fleet from stock, booked: %v", err)
+		}
+	})
+	t.Run("a unit made after", func(t *testing.T) {
+		pool := setup(t)
+		stock := takeIn(t, pool, workshop.StockFromDefleet)
+		moveStock(t, pool, stock.ID, workshop.StockClosed)
+		unit := addUnit(t, pool, workshop.NewRentalUnit{Registration: "ABC 12D", FleetNumber: "V1", Category: "Small van"})
+		if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), unit, time.Now(), "from_stock", ""); err != nil {
+			t.Fatal(err)
+		}
+		renter, err := workshop.CreateParty(ctx, pool, rentalDesk(), workshop.NewParty{Kind: "private", Name: "Rita Hyrare", Role: workshop.PartyRenter})
+		if err != nil {
+			t.Fatal(err)
+		}
+		v := rentable{unit: unit, renter: renter, plan: dayPlan(t, pool, "Small van", 40000, "at_start")}
+		if _, err := v.book(pool, in2031(10, 9), in2031(12, 9)); err != nil {
+			t.Errorf("a car from stock made a unit and put in the fleet, booked: %v", err)
+		}
+	})
+}

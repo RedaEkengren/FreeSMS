@@ -223,26 +223,24 @@ func unitResourceTx(ctx context.Context, tx pgx.Tx, scope access.Scope, registra
 		return "", fmt.Errorf("look up registration: %w", err)
 	}
 	// The vehicle's one resource, however often it is bought and sold
-	// (0070). One taken out of use is not made rentable from here.
-	var retired bool
+	// (0070). One taken out of use -- a stock cycle ended -- may still be
+	// made a unit: it comes back into use when it joins the fleet.
 	err = tx.QueryRow(ctx, `
 		INSERT INTO resources (shop_id, kind, vehicle_id, created_by) VALUES ($1, 'vehicle', $2, NULLIF($3, '')::uuid)
-		ON CONFLICT (vehicle_id) DO NOTHING RETURNING id, false`, scope.ShopID, vehicle, scope.UserID).Scan(&id, &retired)
+		ON CONFLICT (vehicle_id) DO NOTHING RETURNING id`, scope.ShopID, vehicle, scope.UserID).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		err = tx.QueryRow(ctx, `SELECT id, retired_at IS NOT NULL FROM resources WHERE vehicle_id = $1`, vehicle).Scan(&id, &retired)
+		err = tx.QueryRow(ctx, `SELECT id FROM resources WHERE vehicle_id = $1`, vehicle).Scan(&id)
 	}
 	if err != nil {
 		return "", fmt.Errorf("the vehicle's resource: %w", err)
-	}
-	if retired {
-		return "", errUnitRetired
 	}
 	return id, nil
 }
 
 // StartFleetMembership puts a unit in the fleet from a moment. Refused while
 // it is in the fleet then already -- the database refuses it too, for the
-// unit and for its vehicle.
+// unit and for its vehicle. A vehicle taken out of use -- its stock cycle
+// ended -- comes back into use with it, as a car bought back does.
 func StartFleetMembership(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, unitID string, from time.Time, how, note string) (string, error) {
 	if !scope.Role.HandsOverRentals() {
 		return "", access.ErrForbidden
@@ -284,6 +282,11 @@ func StartFleetMembership(ctx context.Context, pool *pgxpool.Pool, scope access.
 			return errFleetInStock
 		case errors.As(err, &pg) && pg.Code == "23P01":
 			return errInFleetAlready
+		case err != nil:
+			return err
+		}
+		if vehicle != nil {
+			_, err = vehicleResourceTx(ctx, tx, scope, *vehicle)
 		}
 		return err
 	})
