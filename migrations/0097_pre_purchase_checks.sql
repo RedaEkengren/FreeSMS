@@ -2,6 +2,13 @@
 -- New tables, and one more subject an audit event may have, which the
 -- previous release never writes. The previous release reads none of it.
 --
+-- It also changes Core's payouts table (0078): a CHECK that a payout names
+-- only what its purpose is for, after taking the subject off any payout
+-- the previous release wrote that names something else (see the end of
+-- this file). The previous release reads payouts and still runs: it never
+-- asks for the constraint, and the payouts it writes from its pages name
+-- no subject.
+--
 -- Before money leaves for a car, the buyer has checked, and recorded, that
 -- it is not under a driving ban, carries no credit purchase or undisclosed
 -- lender, owes no vehicle tax Kronofogden could pursue, has a known
@@ -120,7 +127,23 @@ GRANT SELECT, INSERT ON stock_check_overrides TO freesms_app;
 -- else names nothing. A payout for something else naming a car would let
 -- money leave for that car without its checks, an override or a reason.
 -- Refused here as well as in the application, whatever writes it. The
--- previous release has no page that names a payout's subject at all, so
--- it never writes one this refuses.
+-- previous release has no page that names a payout's subject at all, but
+-- its CreatePayout never refused one, so a payout for something else
+-- naming a purchase or a consignment may exist, written through it by a
+-- script or an integration.
+--
+-- Such a payout is not deleted or moved to another purpose: the money it
+-- records left, for what the shop said, and neither is ours to change.
+-- Its subject is taken off -- it never was what the payout was for, and
+-- no check was asked of it -- and what it named is kept at the head of
+-- its note, so nothing it said is lost. The constraint is added NOT VALID
+-- first, so every payout written from here on is held to it while the
+-- old ones are put right, and then validated over them all.
 ALTER TABLE payouts ADD CONSTRAINT payouts_subject_is_its_purpose
-    CHECK (subject_kind IS NULL OR subject_kind = purpose);
+    CHECK (subject_kind IS NULL OR subject_kind = purpose) NOT VALID;
+UPDATE payouts
+   SET note = left('[Named ' || subject_kind || ' ' || subject_id || ', which it was not for] ' || coalesce(note, ''), 300),
+       subject_kind = NULL,
+       subject_id = NULL
+ WHERE subject_kind IS NOT NULL AND subject_kind <> purpose;
+ALTER TABLE payouts VALIDATE CONSTRAINT payouts_subject_is_its_purpose;
