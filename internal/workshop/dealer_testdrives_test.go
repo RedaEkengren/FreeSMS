@@ -3,6 +3,7 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -476,5 +477,25 @@ func TestASharedPhoneDoesNotMakeAnothersLeadYours(t *testing.T) {
 	}
 	if l, err := workshop.LeadByID(ctx, pool, everything(owner()), bos.ID); err != nil || l.Erased || l.Wishes == "" {
 		t.Errorf("Bo's lead after Anna was erased: %+v, %v", l, err)
+	}
+}
+
+// Why a drive went without a signed agreement is written where an erasure
+// reaches it, on the drive; the audit event that it happened says so in
+// fixed words, never the note, which can name the driver.
+func TestAnUnsignedStartsNoteIsNotCopiedIntoTheAuditLog(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	drive := unsignedDrive(t, pool)
+	var reason string
+	if err := pool.QueryRow(ctx, `SELECT reason FROM audit_events WHERE event = 'test_drive.started_unsigned' AND subject_id = $1`,
+		drive).Scan(&reason); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(reason, "Papperet slut") {
+		t.Errorf("the audit reason holds the note: %q", reason)
+	}
+	if got, _ := workshop.TestDriveByID(ctx, pool, sales(), drive); len(got.Notes) != 1 || got.Notes[0] != "Papperet slut" {
+		t.Errorf("the drive's notes: %v", got.Notes)
 	}
 }

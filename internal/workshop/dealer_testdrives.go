@@ -34,6 +34,10 @@ const (
 // TestDriveLicenceMethods are the ways a licence is looked at.
 var TestDriveLicenceMethods = []string{"card_inspected", "digital_licence", "foreign_inspected", "other"}
 
+// unsignedStartReason is the audit log's reason for a drive started
+// without a signed agreement: why, in the person's words, is on the drive.
+const unsignedStartReason = "Started without a signed agreement; why is noted on the drive"
+
 // defaultTestDriveAge is the youngest driver let out until the shop says:
 // the age a Swedish B licence is held from.
 const defaultTestDriveAge = 18
@@ -498,7 +502,10 @@ func StartTestDrive(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 				return errDriveUnsigned
 			}
 			note = unsignedNote
-			if err := auditTx(ctx, tx, scope, d.ID, "test_drive.started_unsigned", "", "", unsignedNote,
+			// The note can name the driver, so it is kept on the drive,
+			// where erasing them reaches it; the audit log, which is
+			// append-only, says it happened in fixed words.
+			if err := auditTx(ctx, tx, scope, d.ID, "test_drive.started_unsigned", "", "", unsignedStartReason,
 				map[string]any{"agreement_id": d.AgreementID}); err != nil {
 				return err
 			}
