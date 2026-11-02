@@ -352,3 +352,22 @@ func TestABookingDueAndNotOutIsListedWhileItLacksSomething(t *testing.T) {
 		t.Errorf("a booking due an hour ago, not out and lacking a permit: %+v", items)
 	}
 }
+
+// A booking whose whole time has passed without the unit going out is
+// not handed over now: it leaves the list of what is missing (review r7, #3).
+func TestABookingWhoseTimeHasPassedLeavesTheList(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	gone, err := v.book(pool, time.Now().Add(-5*time.Hour), time.Now().Add(-time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, err := workshop.WaitingFor(ctx, pool, rentalDesk())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.ContainsFunc(items, func(it workshop.ActionItem) bool { return it.Kind == "rental_gaps" && it.SubjectID == gone }) {
+		t.Error("a booking whose time has passed is listed as lacking something for its handover")
+	}
+}

@@ -377,12 +377,14 @@ func fleetUseWaitingTx(ctx context.Context, tx pgx.Tx) ([]ActionItem, error) {
 		    SELECT DISTINCT ON (membership_id) membership_id, direction
 		    FROM fleet_rental_reports ORDER BY membership_id, reported_on DESC, recorded_at DESC),
 		t AS (SELECT (clock_timestamp() AT TIME ZONE timezone)::date AS today, timezone FROM shops),
-		-- Confirmed and not out: due, or past due and still not handed over.
+		-- Confirmed and not out: due, or past due and still not handed
+		-- over while its time lasts. One whose whole time has passed is no
+		-- handover to prepare for.
 		ahead AS (
 		    SELECT b.id, b.unit_id, b.starts_at, b.ends_at
 		    FROM rental_bookings b
 		    JOIN resource_blocks k ON k.id = b.block_id
-		    WHERE `+rentalState+` = 'confirmed' AND b.starts_at < clock_timestamp() + $2::interval),
+		    WHERE `+rentalState+` = 'confirmed' AND b.starts_at < clock_timestamp() + $2::interval AND b.ends_at > clock_timestamp()),
 		asked AS (SELECT id, starts_at, ends_at FROM ahead),
 		`+bookingGapsCTEs+`
 		SELECT CASE WHEN m.left_at IS NULL THEN 'rental_report_in' ELSE 'rental_report_out' END,
