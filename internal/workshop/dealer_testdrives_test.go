@@ -439,3 +439,42 @@ func TestAnAgreementMadeTwiceAtOnceIsOne(t *testing.T) {
 		t.Errorf("the drive's agreement: %s, want %s", got.AgreementID, again)
 	}
 }
+
+// Two people who share a family phone: one's export does not hold the
+// other's lead, and erasing one leaves the other's lead as it was. Only a
+// lead with no party is found by the number or email it gave.
+func TestASharedPhoneDoesNotMakeAnothersLeadYours(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	mk := func(name, email string) (party, person string) {
+		t.Helper()
+		id, err := workshop.CreateParty(ctx, pool, everything(owner()), workshop.NewParty{Kind: "private", Name: name,
+			Phone: "08-123 456", Email: email, Role: workshop.PartyBuyer})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := pool.QueryRow(ctx, `SELECT person_id::text FROM parties WHERE id = $1`, id).Scan(&person); err != nil {
+			t.Fatal(err)
+		}
+		return id, person
+	}
+	_, anna := mk("Anna Andersson", "anna@example.test")
+	bo, _ := mk("Bo Andersson", "bo@example.test")
+	bos, err := workshop.CreateLead(ctx, pool, sales(), workshop.NewLead{PartyID: bo, Phone: "08-123 456", Channel: "phone", Wishes: "Bos kombi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, err := workshop.ExportPerson(ctx, pool, advisor(), anna)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(e.Leads) != 0 {
+		t.Errorf("Anna's export holds %d leads that are Bo's", len(e.Leads))
+	}
+	if err := workshop.ErasePerson(ctx, pool, advisor(), &recordingRemover{}, anna, "Begäran"); err != nil {
+		t.Fatal(err)
+	}
+	if l, err := workshop.LeadByID(ctx, pool, everything(owner()), bos.ID); err != nil || l.Erased || l.Wishes == "" {
+		t.Errorf("Bo's lead after Anna was erased: %+v, %v", l, err)
+	}
+}

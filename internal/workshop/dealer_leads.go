@@ -940,7 +940,9 @@ func CarsInStock(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([
 // theirLeadsAndDrivesTx finds a person's leads and the test drives they
 // took: by their party -- on its own or as a customer, and any merged into
 // one -- and, for a lead entered with only a name, by the phone number or
-// email they gave, as a second enquiry from them would be recognised.
+// email they gave, as a second enquiry from them would be recognised. A
+// lead that names a party is that party's only: two people who share a
+// family phone do not get each other's leads.
 func theirLeadsAndDrivesTx(ctx context.Context, tx pgx.Tx, personID string) (leads, drives []string, err error) {
 	var phone, email string
 	if err := tx.QueryRow(ctx, `SELECT coalesce(phone, ''), lower(coalesce(email::text, '')) FROM people WHERE id = $1`, personID).
@@ -958,7 +960,7 @@ func theirLeadsAndDrivesTx(ctx context.Context, tx pgx.Tx, personID string) (lea
 	rows, err := tx.Query(ctx, theirs+`
 		SELECT l.id FROM leads l
 		WHERE l.party_id IN (SELECT id FROM theirs) OR party_now(l.party_id) IN (SELECT id FROM theirs)
-		   OR ($2 <> '' AND l.contact_phone_digits = $2) OR ($3 <> '' AND l.contact_email = $3)
+		   OR (l.party_id IS NULL AND (($2 <> '' AND l.contact_phone_digits = $2) OR ($3 <> '' AND l.contact_email = $3)))
 		ORDER BY l.created_at`, personID, digits, email)
 	if err != nil {
 		return nil, nil, fmt.Errorf("read their leads: %w", err)
