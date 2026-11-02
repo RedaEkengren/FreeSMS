@@ -37,7 +37,7 @@ CREATE TABLE stock_units (
     -- When the sale that stands was made: set as the car is sold, kept
     -- as it is delivered, and cleared if the sale falls through (sold back
     -- to for sale), because a sale that fell through was never a sale.
-    -- Costs read which side of it they are on (0205).
+    -- Costs read which side of it they are on (0099).
     sold_at           timestamptz,
     closed_at         timestamptz,
     closed_by         uuid        REFERENCES users(id) ON DELETE RESTRICT,

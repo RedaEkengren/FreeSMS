@@ -36,8 +36,9 @@ import (
 // already reads. "The workshop is unchanged" is measured here rather than
 // asserted: the seeded shop (scripts/seed.sql), taken to an issued invoice, a
 // payment and a credit note, is rendered page by page and compared with
-// files kept in testdata/golden. Ids, instants, dates and the static files'
-// version strings are normalised; nothing else is.
+// files kept in testdata/golden. Ids, instants, dates, the drawing of a
+// payment code (which encodes the dates) and the static files' version
+// strings are normalised; nothing else is.
 //
 // A difference fails. If it is meant, the files are written again with
 //
@@ -456,6 +457,7 @@ func compareGolden(t *testing.T, pool *pgxpool.Pool, world goldenWorld, issuedBe
 			t.Errorf("%s: %v (write it with -golden.update)", p.file, err)
 			continue
 		}
+		want = goldenQR.ReplaceAll(want, []byte("${1}<modules>${2}"))
 		if issuedBefore0091 {
 			want = goldenPaymentCode.ReplaceAll(want, nil)
 			// The electronic invoice is paid with its number instead,
@@ -552,6 +554,11 @@ var (
 		`jan|feb|mar|apr|maj|jun|jul|aug|sep|okt|nov|dec)\b( \d{4})?`)
 	goldenWeekday = regexp.MustCompile(`(^|[^\pL])(Mon|Tue|Wed|Thu|Fri|Sat|Sun|mån|tis|ons|tor|fre|lör|sön)( \d{1,2})?([^\pL]|$)`)
 	goldenAsset   = regexp.MustCompile(`\?v=[0-9a-f]+`)
+	// The modules of a payment code: it encodes the invoice's date and due
+	// date, so it is drawn differently every day, as a date is written.
+	// What it says is paycode_test.go's and payref's to check; the page
+	// keeps its kind, size and caption.
+	goldenQR = regexp.MustCompile(`(<figure class="paycode"><svg[^>]*>.*?<path fill="#000" d=")[^"]*(")`)
 	// The payment reference and code on an invoice (#234), in Swedish.
 	goldenDocumentID  = regexp.MustCompile(`\n  <cbc:ID>([A-Z]+-[0-9]+)</cbc:ID>`)
 	goldenPaymentID   = regexp.MustCompile(`<cbc:PaymentID>[0-9]+</cbc:PaymentID>`)
@@ -560,7 +567,7 @@ var (
 
 // normaliseGolden replaces what varies between two runs of the same release
 // -- ids, instants, dates in any of the ways a page writes them, times of
-// day, the static files' versions -- and
+// day, a payment code's drawing, the static files' versions -- and
 // nothing else. Each distinct id keeps its own placeholder, so a link that
 // pointed at the invoice still points at the same thing as the invoice.
 func normaliseGolden(s string) string {
@@ -579,6 +586,7 @@ func normaliseGolden(s string) string {
 	s = goldenDay.ReplaceAllString(s, "<day>")
 	s = goldenWeekday.ReplaceAllString(s, "$1<weekday>$4")
 	s = goldenAsset.ReplaceAllString(s, "?v=<version>")
+	s = goldenQR.ReplaceAllString(s, "${1}<modules>${2}")
 	return s
 }
 

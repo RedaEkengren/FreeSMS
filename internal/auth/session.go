@@ -245,7 +245,7 @@ func authenticate(ctx context.Context, pool *pgxpool.Pool, shopID, token string,
 		// technician (#225): an exception past its end stops counting at
 		// the next request, with nothing to sweep it. That is the one rule
 		// technician_fields_open (0090) reads too
-		// (technician_fields_open_rows, 0200), asked for this person's
+		// (technician_fields_open_rows, 0094), asked for this person's
 		// exceptions alone, and not asked at all for somebody who is not a
 		// technician, whose other role shows them each field anyway or none
 		// of them.
