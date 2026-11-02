@@ -545,3 +545,21 @@ func TestAnExpiredHoldDoesNotStopAnEarlyCheckOut(t *testing.T) {
 		t.Errorf("finishing it: %v", err)
 	}
 }
+
+// A finish that names the findings confirmed -- the old form's shape --
+// opens cases for those alone, and passes over one no longer new.
+func TestAFinishNamingTheConfirmedOpensOnlyThose(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	_, id, _ := checkedOut(t, pool)
+	in, _ := workshop.StartHandover(ctx, pool, rentalDesk(), id, workshop.HandoverIn)
+	back := recordFound(t, pool, in, map[string]string{"Fälgar": "fail", "Vänster dörr": "fail"})
+	if err := workshop.FinishHandover(ctx, pool, rentalDesk(), in, workshop.HandoverReading{OdometerKm: km64(12100), RenterPresent: true,
+		Confirmed: []string{itemID(back, "Fälgar"), itemID(back, "Lack och plåt")}}); err != nil {
+		t.Fatal(err)
+	}
+	view, _ := workshop.RentalHandovers(ctx, pool, rentalDesk(), id)
+	if len(view.Damage) != 1 || view.Damage[0].Description != "Fälgar" {
+		t.Errorf("the damage register: %+v; want the rims alone", view.Damage)
+	}
+}

@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -107,9 +108,10 @@ func (s *Server) handleRentalHandoverFinish(w http.ResponseWriter, r *http.Reque
 		RenterPresent:  r.FormValue("renter_present") != "",
 		RenterAccepted: r.FormValue("renter_accepted") != "",
 		Note:           r.FormValue("note"),
-		Dismissed:      dismissed(r.Form["shown"], r.Form["damage"]),
-		Key:            r.Header.Get(IdempotencyHeader),
+
+		Key: r.Header.Get(IdempotencyHeader),
 	}
+	reading.Dismissed, reading.Confirmed = findingsChosen(r.Form)
 	if v := strings.TrimSpace(r.FormValue("odometer")); v != "" {
 		km, err := strconv.ParseInt(strings.ReplaceAll(v, " ", ""), 10, 64)
 		if err != nil {
@@ -228,14 +230,22 @@ func (d rentalData) HandoverEnds() []workshop.RentalHandover {
 	return out
 }
 
-// dismissed are the new findings the page showed and the person
-// unticked: let go as not damage.
-func dismissed(shown, ticked []string) []string {
-	var out []string
+// findingsChosen reads the finish form's findings: the ones the page
+// showed and the person unticked are let go. A form from before the page
+// said what it showed -- cached, and replayed from a phone's queue --
+// names only the ticked, and those are the ones confirmed.
+func findingsChosen(form url.Values) (dismissed, confirmed []string) {
+	shown, ticked := form["shown"], form["damage"]
+	if len(shown) == 0 {
+		if len(ticked) > 0 {
+			return nil, ticked
+		}
+		return nil, nil
+	}
 	for _, id := range shown {
 		if !slices.Contains(ticked, id) {
-			out = append(out, id)
+			dismissed = append(dismissed, id)
 		}
 	}
-	return out
+	return dismissed, nil
 }

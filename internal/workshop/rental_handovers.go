@@ -237,6 +237,10 @@ type HandoverReading struct {
 	// the page was shown must not be lost. One let go that is no longer
 	// new, or not on the protocol, is passed over.
 	Dismissed []string
+	// Confirmed, when given, names the findings to open cases for instead:
+	// the shape of a finish form cached before it said what it showed,
+	// replayed by an offline phone. Only those still new are opened.
+	Confirmed []string
 	Key       string
 }
 
@@ -312,7 +316,11 @@ func FinishHandover(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 				return err
 			}
 			for _, f := range cmp.Items {
-				if f.New && !slices.Contains(r.Dismissed, f.In.ID) {
+				chosen := !slices.Contains(r.Dismissed, f.In.ID)
+				if r.Confirmed != nil {
+					chosen = slices.Contains(r.Confirmed, f.In.ID)
+				}
+				if f.New && chosen {
 					damage = append(damage, handoverFinding{item: f.In.ID, key: f.Key, label: f.Label, note: f.In.Note})
 				}
 			}
