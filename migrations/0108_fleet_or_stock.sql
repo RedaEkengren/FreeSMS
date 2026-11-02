@@ -5,6 +5,15 @@
 -- the same time. The previous release does not prevent that itself, and
 -- is refused here for it, which is the point.
 --
+-- Safe means the data stays right, and it does: the previous release's
+-- writes are refused or accepted exactly as this release's are. What it
+-- gets wrong is the sentence. Its StartFleetMembership reads every
+-- exclusion violation as the unit's own and tells the desk "it is in the
+-- fleet then already" when the car is in stock; its openStockUnitTx does
+-- not know this refusal and answers the buyer with the database's error,
+-- an internal error page. Both refuse what should be refused; neither
+-- says why. That is accepted for the length of a rollback.
+--
 -- A car is in the rental fleet (fleet_memberships, 0101) or in the
 -- dealer's stock (stock_units, 0095), never both at once: the rental desk
 -- does not rent out a car the dealer is selling, and the dealer does not
