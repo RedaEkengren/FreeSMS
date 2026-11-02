@@ -684,8 +684,7 @@ func rentalHandoverGapsTx(ctx context.Context, tx pgx.Tx, profile RentalProfile,
 	if err := tx.QueryRow(ctx, `
 		SELECT EXISTS (
 		    SELECT 1 FROM shops z,
-		         generate_series(($1::timestamptz AT TIME ZONE z.timezone)::date,
-		                         (($2::timestamptz - interval '1 microsecond') AT TIME ZONE z.timezone)::date, interval '1 day') d
+		         generate_series(`+firstDay("$1::timestamptz", "z.timezone")+`, `+lastDay("$2::timestamptz", "z.timezone")+`, interval '1 day') d
 		    WHERE NOT `+permitStandsOn("d::date")+`)`, from, to).Scan(&missing); err != nil {
 		return nil, fmt.Errorf("read the permits: %w", err)
 	}

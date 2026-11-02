@@ -30,8 +30,8 @@ var bookingGapsCTEs = `
 	g_zone AS (SELECT timezone FROM shops),
 	g_booking AS (
 	    SELECT q.id, q.starts_at, q.ends_at, v.permit_required, v.reporting_required, v.insurance_required, v.licence_check_required,
-	           (q.starts_at AT TIME ZONE z.timezone)::date AS first_day,
-	           ((q.ends_at - interval '1 microsecond') AT TIME ZONE z.timezone)::date AS last_day,
+	           ` + firstDay("q.starts_at", "z.timezone") + ` AS first_day,
+	           ` + lastDay("q.ends_at", "z.timezone") + ` AS last_day,
 	           (q.ends_at AT TIME ZONE z.timezone)::date AS end_day,
 	           (SELECT m.id FROM fleet_memberships m WHERE m.unit_id = b.unit_id AND m.joined_at <= greatest(q.starts_at, clock_timestamp())
 	             ORDER BY m.joined_at DESC LIMIT 1) AS membership
@@ -79,15 +79,25 @@ var bookingGapsCTEs = `
 	    WHERE a.licence_check_required
 	      AND NOT EXISTS (SELECT 1 FROM rental_drivers dr WHERE dr.booking_id = a.id AND dr.removed_at IS NULL))`
 
+// firstDay and lastDay are the first and last day a period from..to
+// touches in a zone, as SQL dates: the last is the day before the end
+// when the end falls at midnight. The gaps and a profile's gaps before a
+// booking count days the same way.
+func firstDay(from, zone string) string { return "(" + from + " AT TIME ZONE " + zone + ")::date" }
+
+func lastDay(to, zone string) string {
+	return "((" + to + " - interval '1 microsecond') AT TIME ZONE " + zone + ")::date"
+}
+
 // permitStandsOn is whether a rental permit stands on a day, an SQL date
 // expression: decided by then, not expired, not revoked. The one test of
 // it, for the gaps, a profile's gaps before a booking, and the warning
 // that the permit ends.
 func permitStandsOn(day string) string {
-	return strings.NewReplacer("{day}", day).Replace(`EXISTS (
+	return strings.ReplaceAll(`EXISTS (
 	    SELECT 1 FROM rental_permits p LEFT JOIN rental_permit_revocations x ON x.permit_id = p.id
 	    WHERE p.decided_on <= {day} AND (p.expires_on IS NULL OR {day} <= p.expires_on)
-	      AND (x.revoked_on IS NULL OR {day} < x.revoked_on))`)
+	      AND (x.revoked_on IS NULL OR {day} < x.revoked_on))`, "{day}", day)
 }
 
 // gapSentences are what each gap says, as catalogue keys.

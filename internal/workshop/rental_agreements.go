@@ -843,7 +843,7 @@ func ProduceRentalAgreement(ctx context.Context, pool *pgxpool.Pool, scope acces
 			extra = money.Format(*extraKm + money.VAT(*extraKm, vat))
 		}
 		var renterName string
-		_ = tx.QueryRow(ctx, `SELECT `+rentalPartyNameSQL+``+
+		_ = tx.QueryRow(ctx, `SELECT `+rentalPartyNameSQL+
 			` FROM parties pa LEFT JOIN customers c ON c.id = pa.customer_id LEFT JOIN people cp ON cp.id = c.person_id LEFT JOIN people pp ON pp.id = pa.person_id WHERE pa.id = $1`,
 			renter).Scan(&renterName)
 		n.Title = fmt.Sprintf("R-%d %s", number, unit)
