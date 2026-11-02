@@ -729,65 +729,6 @@ const (
 	GapLicence  = "licence"
 )
 
-// rentalBookingGapsTx is what a booking still lacks before its unit may be
-// handed over: its profile's requirements (rentalHandoverGapsTx) for its
-// own period, and a passing licence check this rental for every driver
-// listed, when the profile needs one. Check-out (#194) refuses while any is
-// missing; none of these can be overridden.
-func rentalBookingGapsTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]HandoverGap, error) {
-	var version string
-	var starts, ends time.Time
-	if err := tx.QueryRow(ctx, `SELECT profile_version_id, starts_at, ends_at FROM rental_bookings WHERE id = $1`, bookingID).Scan(&version, &starts, &ends); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("read booking: %w", err)
-	}
-	p, err := profileVersionTx(ctx, tx, version)
-	if err != nil {
-		return nil, err
-	}
-	gaps, err := rentalHandoverGapsTx(ctx, tx, p, starts, ends)
-	if err != nil {
-		return nil, err
-	}
-	// The unit's own: reported into rental use, insured for it (#202),
-	// less what a person with the right let go.
-	fleet, err := fleetUseGapsTx(ctx, tx, bookingID, p, starts, ends)
-	if err != nil {
-		return nil, err
-	}
-	gaps = append(gaps, fleet...)
-	if !p.Rules.LicenceCheckRequired {
-		return gaps, nil
-	}
-	drivers, err := rentalDriversTx(ctx, tx, bookingID)
-	if err != nil {
-		return nil, err
-	}
-	loc, err := shopLocationTx(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-	listed := 0
-	for _, d := range drivers {
-		if d.Removed {
-			continue
-		}
-		listed++
-		// Asked again against the rental as it is now: extended since the
-		// check, the licence may not last it.
-		if d.Check == nil || !d.Check.Passed || d.Check.ValidUntil == nil || !licenceLasts(*d.Check.ValidUntil, ends, loc) {
-			gaps = append(gaps, HandoverGap{Code: GapLicence, Who: d.Name,
-				Sentence: "%s has not shown a valid licence for this rental."})
-		}
-	}
-	if listed == 0 {
-		gaps = append(gaps, HandoverGap{Code: GapNoDriver, Sentence: "No driver is named for the rental."})
-	}
-	return gaps, nil
-}
-
 // RentalBookingGaps is what a booking still lacks before handover, all at
 // once.
 func RentalBookingGaps(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, bookingID string) ([]HandoverGap, error) {

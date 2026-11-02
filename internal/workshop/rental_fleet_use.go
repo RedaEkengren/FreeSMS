@@ -251,55 +251,6 @@ func insuranceCovers(ins []FleetInsurance, first, last time.Time) bool {
 	return true
 }
 
-// fleetUseGapsTx is what the booking's unit lacks for its period in the
-// fleet: a report into rental use where the profile requires one, and an
-// insurance covering rental use on every day of the rental where it
-// requires that.
-// Gaps a person let go are left out.
-func fleetUseGapsTx(ctx context.Context, tx pgx.Tx, bookingID string, p RentalProfile, starts, ends time.Time) ([]HandoverGap, error) {
-	var membership *string
-	if err := tx.QueryRow(ctx, `
-		SELECT (SELECT m.id::text FROM fleet_memberships m WHERE m.unit_id = b.unit_id AND m.joined_at <= greatest(b.starts_at, clock_timestamp())
-		          ORDER BY m.joined_at DESC LIMIT 1)
-		FROM rental_bookings b WHERE b.id = $1`, bookingID).Scan(&membership); err != nil {
-		return nil, fmt.Errorf("read the unit: %w", err)
-	}
-	var use FleetUse
-	if membership != nil {
-		var err error
-		if use, err = fleetUseTx(ctx, tx, *membership); err != nil {
-			return nil, err
-		}
-	}
-	loc, err := shopLocationTx(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-	var gaps []HandoverGap
-	if p.Rules.ReportingRequired && !use.Reported() {
-		gaps = append(gaps, HandoverGap{Code: GapNotReported, Overridable: true,
-			Sentence: "The unit has not been reported into rental use in the vehicle register."})
-	}
-	if p.Rules.InsuranceRequired && !insuranceCovers(use.Insurances, starts.In(loc), ends.Add(-time.Nanosecond).In(loc)) {
-		gaps = append(gaps, HandoverGap{Code: GapInsurance, Overridable: true,
-			Sentence: "No insurance covering rental use is recorded for every day of the rental."})
-	}
-	if len(gaps) == 0 {
-		return nil, nil
-	}
-	// Let go for exactly this period: a move or an extension asks again,
-	// and so does the period an extension is asked about.
-	let, err := gapOverridesTx(ctx, tx, bookingID)
-	if err != nil {
-		return nil, err
-	}
-	return slices.DeleteFunc(gaps, func(g HandoverGap) bool {
-		return slices.ContainsFunc(let, func(o GapOverride) bool {
-			return o.Code == g.Code && o.Starts.Equal(starts) && o.Ends.Equal(ends)
-		})
-	}), nil
-}
-
 // GapOverride is a handover gap let go, by whom and why.
 type GapOverride struct {
 	Code   string
@@ -417,10 +368,8 @@ func rentalPaperworkWaiting(ctx context.Context, pool *pgxpool.Pool, scope acces
 //
 // A unit's own items ask its profile as it is now: they are about the
 // unit from here on. A booking's ask the profile version it was booked
-// under, as the counter does (rentalBookingGapsTx), and this statement
-// asks the same questions as that function in one go: the permit on
-// every day, the report, the insurance on every day, each driver's
-// licence -- less what was let go for the booking as it is.
+// under, as the counter does: this statement asks the counter's own
+// question (bookingGapsCTEs) of every booking ahead in one go.
 func fleetUseWaitingTx(ctx context.Context, tx pgx.Tx) ([]ActionItem, error) {
 	var out []ActionItem
 	rows, err := tx.Query(ctx, `
@@ -428,20 +377,14 @@ func fleetUseWaitingTx(ctx context.Context, tx pgx.Tx) ([]ActionItem, error) {
 		    SELECT DISTINCT ON (membership_id) membership_id, direction
 		    FROM fleet_rental_reports ORDER BY membership_id, reported_on DESC, recorded_at DESC),
 		t AS (SELECT (clock_timestamp() AT TIME ZONE timezone)::date AS today, timezone FROM shops),
+		-- Confirmed and not out: due, or past due and still not handed over.
 		ahead AS (
-		    SELECT b.id, b.unit_id, b.starts_at, b.ends_at, v.permit_required, v.reporting_required, v.insurance_required,
-		           v.licence_check_required,
-		           (b.starts_at AT TIME ZONE t.timezone)::date AS first_day,
-		           ((b.ends_at - interval '1 microsecond') AT TIME ZONE t.timezone)::date AS last_day,
-		           (b.ends_at AT TIME ZONE t.timezone)::date AS end_day,
-		           (SELECT m.id FROM fleet_memberships m WHERE m.unit_id = b.unit_id AND m.joined_at <= greatest(b.starts_at, clock_timestamp())
-		             ORDER BY m.joined_at DESC LIMIT 1) AS membership
+		    SELECT b.id, b.unit_id, b.starts_at, b.ends_at
 		    FROM rental_bookings b
 		    JOIN resource_blocks k ON k.id = b.block_id
-		    JOIN rental_profile_versions v ON v.id = b.profile_version_id
-		    CROSS JOIN t
-		    -- Confirmed and not out: due, or past due and still not handed over.
-		    WHERE `+rentalState+` = 'confirmed' AND b.starts_at < clock_timestamp() + $2::interval)
+		    WHERE `+rentalState+` = 'confirmed' AND b.starts_at < clock_timestamp() + $2::interval),
+		asked AS (SELECT id, starts_at, ends_at FROM ahead),
+		`+bookingGapsCTEs+`
 		SELECT CASE WHEN m.left_at IS NULL THEN 'rental_report_in' ELSE 'rental_report_out' END,
 		       'rental_unit', u.id::text, u.fleet_number || coalesce(' · ' || reg.registration, ' · ' || r.name, ''), coalesce(m.left_at, m.joined_at)
 		FROM fleet_memberships m
@@ -467,35 +410,14 @@ func fleetUseWaitingTx(ctx context.Context, tx pgx.Tx) ([]ActionItem, error) {
 		GROUP BY u.id, u.fleet_number, reg.registration, r.name, t.today
 		HAVING bool_and(i.valid_to IS NOT NULL) AND max(i.valid_to) < t.today + $1::int
 		UNION ALL
-		-- A booking ahead that would be refused at the counter today.
+		-- A booking ahead that would be refused at the counter today: the
+		-- counter's own question (bookingGapsCTEs), asked of all of them.
 		SELECT 'rental_gaps', 'rental_booking', a.id::text, u.fleet_number || coalesce(' · ' || reg.registration, ' · ' || r.name, ''), a.starts_at
 		FROM ahead a
 		JOIN rental_units u ON u.id = a.unit_id
 		JOIN resources r ON r.id = u.resource_id
 		LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = r.vehicle_id AND reg.valid_to IS NULL
-		WHERE (a.permit_required AND EXISTS (
-		          SELECT 1 FROM generate_series(a.first_day, a.last_day, interval '1 day') d
-		          WHERE NOT EXISTS (SELECT 1 FROM rental_permits p LEFT JOIN rental_permit_revocations x ON x.permit_id = p.id
-		                            WHERE p.decided_on <= d::date AND (p.expires_on IS NULL OR d::date <= p.expires_on)
-		                              AND (x.revoked_on IS NULL OR d::date < x.revoked_on))))
-		   OR (a.reporting_required
-		       AND (SELECT direction FROM fleet_rental_reports f WHERE f.membership_id = a.membership
-		             ORDER BY f.reported_on DESC, f.recorded_at DESC LIMIT 1) IS DISTINCT FROM 'in'
-		       AND NOT EXISTS (SELECT 1 FROM rental_gap_overrides o WHERE o.booking_id = a.id AND o.code = 'not_reported'
-		                         AND o.starts_at = a.starts_at AND o.ends_at = a.ends_at))
-		   OR (a.insurance_required
-		       AND EXISTS (SELECT 1 FROM generate_series(a.first_day, a.last_day, interval '1 day') d
-		                   WHERE NOT EXISTS (SELECT 1 FROM fleet_insurances i WHERE i.membership_id = a.membership AND i.covers_rental = 'yes'
-		                                     AND i.valid_from <= d::date AND (i.valid_to IS NULL OR d::date <= i.valid_to)))
-		       AND NOT EXISTS (SELECT 1 FROM rental_gap_overrides o WHERE o.booking_id = a.id AND o.code = 'insurance'
-		                         AND o.starts_at = a.starts_at AND o.ends_at = a.ends_at))
-		   OR (a.licence_check_required
-		       AND (NOT EXISTS (SELECT 1 FROM rental_drivers dr WHERE dr.booking_id = a.id AND dr.removed_at IS NULL)
-		            OR EXISTS (SELECT 1 FROM rental_drivers dr
-		                       LEFT JOIN LATERAL (SELECT c.passed, c.valid_until FROM rental_licence_checks c WHERE c.driver_id = dr.id
-		                                          ORDER BY c.checked_at DESC LIMIT 1) c ON true
-		                       WHERE dr.booking_id = a.id AND dr.removed_at IS NULL
-		                         AND (c.passed IS NOT TRUE OR c.valid_until IS NULL OR c.valid_until < a.end_day))))
+		WHERE EXISTS (SELECT 1 FROM gaps g WHERE g.booking_id = a.id)
 		ORDER BY 5, 4`, int(ExpiryWarning/(24*time.Hour)), ExpiryWarning)
 	if err != nil {
 		return nil, fmt.Errorf("read the fleet's paperwork: %w", err)
@@ -539,22 +461,11 @@ var errExtendInsurance = fmt.Errorf("%w: the unit is not insured for rental use 
 // insuranceLastsTx refuses to extend a rental that is out past the
 // insurance its profile requires.
 func insuranceLastsTx(ctx context.Context, tx pgx.Tx, bookingID string, starts, to time.Time) error {
-	var version string
-	if err := tx.QueryRow(ctx, `SELECT profile_version_id FROM rental_bookings WHERE id = $1`, bookingID).Scan(&version); err != nil {
-		return fmt.Errorf("read booking: %w", err)
-	}
-	p, err := profileVersionTx(ctx, tx, version)
+	gaps, err := bookingGapsTx(ctx, tx, []string{bookingID}, []time.Time{starts}, []time.Time{to})
 	if err != nil {
 		return err
 	}
-	if !p.Rules.InsuranceRequired {
-		return nil
-	}
-	gaps, err := fleetUseGapsTx(ctx, tx, bookingID, p, starts, to)
-	if err != nil {
-		return err
-	}
-	if slices.ContainsFunc(gaps, func(g HandoverGap) bool { return g.Code == GapInsurance }) {
+	if slices.ContainsFunc(gaps[bookingID], func(g HandoverGap) bool { return g.Code == GapInsurance }) {
 		return errExtendInsurance
 	}
 	return nil
