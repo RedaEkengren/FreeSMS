@@ -142,12 +142,9 @@ type Deal struct {
 	Defects []Defect
 	// The newest contract, which terms it was made from, and whether every
 	// buyer it names has signed it.
-	ContractID      string
-	ContractTermsID string
-	ContractSigned  bool
-	// The terms the deal was last completed on, if it was, and the
-	// contract it was completed with.
-	ContractedTermsID    string
+	ContractID     string
+	ContractSigned bool
+	// The contract the deal was last completed with, if it was.
 	ContractedDocumentID string
 	// What the newest contract was made from (Basis, as it stood then).
 	ContractBasis string
@@ -784,22 +781,20 @@ func Deals(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, all bool
 			       coalesce(sp.display_name, ''), s.created_at,
 			       coalesce((SELECT e.kind FROM vehicle_sale_events e WHERE e.sale_id = s.id ORDER BY e.seq DESC LIMIT 1), 'draft'),
 			       t.id, t.version, t.buyer_kind, t.price_minor, coalesce(t.sale_tax_treatment, ''),
-			       ARRAY(SELECT b.party_id::text FROM vehicle_sale_buyers b WHERE b.terms_id = t.id ORDER BY b.position),
-			       ARRAY(SELECT coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END,
-			                             cp.display_name, pp.display_name, '')
-			             FROM vehicle_sale_buyers b JOIN parties pa ON pa.id = b.party_id
-			             LEFT JOIN customers c ON c.id = pa.customer_id LEFT JOIN people cp ON cp.id = c.person_id
-			             LEFT JOIN people pp ON pp.id = pa.person_id
-			             WHERE b.terms_id = t.id ORDER BY b.position),
-			       ARRAY(SELECT l.description FROM vehicle_sale_lines l WHERE l.terms_id = t.id ORDER BY l.position),
-			       ARRAY(SELECT l.quantity_milli FROM vehicle_sale_lines l WHERE l.terms_id = t.id ORDER BY l.position),
-			       ARRAY(SELECT l.unit_price_minor FROM vehicle_sale_lines l WHERE l.terms_id = t.id ORDER BY l.position),
-			       ARRAY(SELECT l.vat_rate_basis FROM vehicle_sale_lines l WHERE l.terms_id = t.id ORDER BY l.position)
+			       coalesce(b.ids, '{}'), coalesce(b.names, '{}'), coalesce(l.descs, '{}'), coalesce(l.qtys, '{}'),
+			       coalesce(l.prices, '{}'), coalesce(l.rates, '{}')
 			FROM vehicle_sales s
 			JOIN stock_units u ON u.id = s.stock_unit_id JOIN vehicles v ON v.id = u.vehicle_id
 			LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = v.id AND reg.valid_to IS NULL
 			JOIN users su ON su.id = s.salesperson_id LEFT JOIN people sp ON sp.id = su.person_id
 			JOIN LATERAL (SELECT * FROM vehicle_sale_terms t WHERE t.sale_id = s.id ORDER BY t.version DESC LIMIT 1) t ON true
+			LEFT JOIN LATERAL (
+				SELECT array_agg(b.party_id::text ORDER BY b.position) AS ids, array_agg(`+partyNameSQL+` ORDER BY b.position) AS names
+				FROM vehicle_sale_buyers b `+partyNameJoins+` WHERE b.terms_id = t.id) b ON true
+			LEFT JOIN LATERAL (
+				SELECT array_agg(l.description ORDER BY l.position) AS descs, array_agg(l.quantity_milli ORDER BY l.position) AS qtys,
+				       array_agg(l.unit_price_minor ORDER BY l.position) AS prices, array_agg(l.vat_rate_basis ORDER BY l.position) AS rates
+				FROM vehicle_sale_lines l WHERE l.terms_id = t.id) l ON true
 			WHERE ($1 OR NOT EXISTS (SELECT 1 FROM vehicle_sale_events e WHERE e.sale_id = s.id AND e.kind = 'cancelled'))
 			  AND ($2 = '' OR s.salesperson_id::text = $2)
 			ORDER BY s.created_at DESC LIMIT 200`, all, dealSeer(scope))
@@ -874,7 +869,7 @@ func dealTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id string) (Deal
 	d.Terms.DeliveryOn = on
 	rows, err := tx.Query(ctx, `
 		SELECT b.party_id,
-		       coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, '')
+		       `+partyNameSQL+`
 		FROM vehicle_sale_buyers b JOIN parties pa ON pa.id = b.party_id
 		LEFT JOIN customers c ON c.id = pa.customer_id LEFT JOIN people cp ON cp.id = c.person_id LEFT JOIN people pp ON pp.id = pa.person_id
 		WHERE b.terms_id = $1 ORDER BY b.position`, d.TermsID)
@@ -939,7 +934,7 @@ func dealTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id string) (Deal
 	// The newest contract, which terms it was made from (its data says),
 	// and whether every party it names has signed.
 	err = tx.QueryRow(ctx, `
-		SELECT r.id, coalesce(r.data->>'terms_id', ''),
+		SELECT r.id,
 		       -- A contract made before contracts said what they were made
 		       -- from: its terms and the defects known when it was made.
 		       coalesce(r.data->>'basis', (r.data->>'terms_id') || ':' ||
@@ -950,15 +945,14 @@ func dealTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id string) (Deal
 		FROM document_records r
 		WHERE r.kind = 'sales_contract' AND r.subject_kind = 'sale' AND r.subject_id = $1
 		  AND NOT EXISTS (SELECT 1 FROM document_records n WHERE n.supersedes_id = r.id)
-		ORDER BY r.created_at DESC LIMIT 1`, id).Scan(&d.ContractID, &d.ContractTermsID, &d.ContractBasis, &d.ContractSigned)
+		ORDER BY r.created_at DESC LIMIT 1`, id).Scan(&d.ContractID, &d.ContractBasis, &d.ContractSigned)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return Deal{}, fmt.Errorf("read the contract: %w", err)
 	}
 	if err := tx.QueryRow(ctx, `
-		SELECT coalesce(e.terms_id::text, ''), coalesce(e.document_id::text, '')
-		FROM (SELECT 1) one LEFT JOIN LATERAL (SELECT terms_id, document_id FROM vehicle_sale_events
-		                                       WHERE sale_id = $1 AND kind = 'contracted' ORDER BY seq DESC LIMIT 1) e ON true`,
-		id).Scan(&d.ContractedTermsID, &d.ContractedDocumentID); err != nil {
+		SELECT coalesce((SELECT document_id::text FROM vehicle_sale_events
+		                 WHERE sale_id = $1 AND kind = 'contracted' ORDER BY seq DESC LIMIT 1), '')`,
+		id).Scan(&d.ContractedDocumentID); err != nil {
 		return Deal{}, err
 	}
 	if d.MarginSchemeEligible, err = eligibleForSchemeTx(ctx, tx, d.StockUnitID); err != nil {
@@ -1315,3 +1309,12 @@ func SaleTaxOfDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	})
 	return out, err
 }
+
+// partyNameSQL names a party pa -- a company by its name, a person by
+// theirs -- over partyNameJoins.
+const partyNameSQL = `coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, '')`
+
+// partyNameJoins reaches a sale buyer b's party and its customer and
+// people, for partyNameSQL.
+const partyNameJoins = `JOIN parties pa ON pa.id = b.party_id LEFT JOIN customers c ON c.id = pa.customer_id
+	LEFT JOIN people cp ON cp.id = c.person_id LEFT JOIN people pp ON pp.id = pa.person_id`
