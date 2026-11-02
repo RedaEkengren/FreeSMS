@@ -381,13 +381,6 @@ func setStateInScopeTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID
 	if err := setStateTx(ctx, tx, jobID, to); err != nil {
 		return err
 	}
-	// A job on a stock car may have posted its cost once ready (Dealer,
-	// #164); back to work, that posting no longer stands.
-	if from == StateReady && to == StateInProgress {
-		if err := reverseJobCostTx(ctx, tx, scope, jobID); err != nil {
-			return err
-		}
-	}
 
 	// Handing the car back is the one moment somebody is certainly
 	// finished with it, so it is the moment their clock stops. Left

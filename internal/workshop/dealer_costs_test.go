@@ -534,3 +534,110 @@ func TestASaleThatFellThroughIsKept(t *testing.T) {
 		}
 	}
 }
+
+// readyPostedStockJob is a job on the car in stock with one hour of
+// labour, ready, its cost posted at 400 kr the hour.
+func readyPostedStockJob(t *testing.T, pool *pgxpool.Pool) (job, unit string) {
+	t.Helper()
+	ctx := context.Background()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	if err := workshop.SetInternalLabourRate(ctx, pool, everything(owner()), 40_000); err != nil {
+		t.Fatal(err)
+	}
+	job = newJob(t, pool)
+	if err := workshop.AddLine(ctx, pool, advisor(), job, workshop.NewLine{Kind: "labour", Description: "Rekond",
+		QuantityMilli: 1000, UnitPriceMinor: 95_000, VATRateBasis: 2500}); err != nil {
+		t.Fatal(err)
+	}
+	move(t, pool, job, workshop.StateEstimated, workshop.StateAwaitingApproval, workshop.StateApproved, workshop.StateInProgress)
+	if err := workshop.MarkPerformed(ctx, pool, advisor(), job, 1, true); err != nil {
+		t.Fatal(err)
+	}
+	move(t, pool, job, workshop.StateReady)
+	if posted, err := workshop.PostJobCost(ctx, pool, buyerScope(), job); err != nil || posted.NetMinor != 40_000 {
+		t.Fatalf("the posting: %+v, %v", posted, err)
+	}
+	return job, p.StockUnitID
+}
+
+// standingJobCost is what the job's standing posting says, or -1 for none.
+func standingJobCost(t *testing.T, pool *pgxpool.Pool, unit string) int64 {
+	t.Helper()
+	costs, err := workshop.CostsOfUnit(context.Background(), pool, buyerScope(), unit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range costs.Entries {
+		if c.Source == workshop.CostFromWorkOrder && c.ReversesID == "" && !c.Reversed {
+			return c.NetMinor
+		}
+	}
+	return -1
+}
+
+// A posted job's cost is what the job cost: whatever changes its parts or
+// its hours afterwards, or sends it back to work by any path, takes the
+// posting back with an event, and it is posted again from what the job
+// now holds.
+func TestAPostedJobCostIsTakenBackWhenTheJobChanges(t *testing.T) {
+	ctx := context.Background()
+	for name, change := range map[string]func(t *testing.T, pool *pgxpool.Pool, job string){
+		"a task added": func(t *testing.T, pool *pgxpool.Pool, job string) {
+			task, err := workshop.AddTask(ctx, pool, advisor(), job, "Polera igen", 0, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := standingJobCost(t, pool, unitOf(t, pool, job)); got != -1 {
+				t.Errorf("the posting stands at %d with the job back at work", got)
+			}
+			if err := workshop.MoveTask(ctx, pool, technician(), task, workshop.TaskMove{To: workshop.TaskDone}); err != nil {
+				t.Fatal(err)
+			}
+			move(t, pool, job, workshop.StateReady)
+		},
+		"a part taken out": func(t *testing.T, pool *pgxpool.Pool, job string) {
+			stockShelf(t, pool, 4)
+			if err := workshop.TakeOut(ctx, pool, technician(), job, stockedPart, 1); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"the hours edited": func(t *testing.T, pool *pgxpool.Pool, job string) {
+			l := lineOf(t, pool, job, 1)
+			e := asEdit(l)
+			e.QuantityMilli, e.Reason = 2000, "Tog längre tid"
+			if _, err := workshop.EditLine(ctx, pool, advisor(), job, 1, l.Revision, e); err != nil {
+				t.Fatal(err)
+			}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			pool := setup(t)
+			addTechnician(t, pool)
+			job, unit := readyPostedStockJob(t, pool)
+			change(t, pool, job)
+			if got := standingJobCost(t, pool, unit); got != -1 {
+				t.Errorf("the posting still stands at %d after %s", got, name)
+			}
+			var events int
+			if err := pool.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE event = 'stock_cost.reversed' AND subject_id = $1`,
+				unit).Scan(&events); err != nil || events != 1 {
+				t.Errorf("%d events for the posting taken back (%v)", events, err)
+			}
+			again, err := workshop.PostJobCost(ctx, pool, buyerScope(), job)
+			if err != nil || again.NetMinor == 0 {
+				t.Errorf("posted again: %+v, %v", again, err)
+			}
+		})
+	}
+}
+
+// unitOf is the stock unit a job's car is in.
+func unitOf(t *testing.T, pool *pgxpool.Pool, job string) string {
+	t.Helper()
+	var unit string
+	if err := pool.QueryRow(context.Background(), `SELECT u.id FROM work_orders w JOIN stock_units u ON u.vehicle_id = w.vehicle_id
+		AND u.closed_at IS NULL WHERE w.id = $1`, job).Scan(&unit); err != nil {
+		t.Fatal(err)
+	}
+	return unit
+}
