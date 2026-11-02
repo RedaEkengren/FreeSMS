@@ -90,7 +90,7 @@ GRANT SELECT, INSERT ON stock_cost_settings TO freesms_app;
 -- when it was posted, and read whenever a cost is read, never stored:
 --
 --   * A cost is after the sale when the moment it is for (happened_at) is
---     later than the sale that stands (stock_units.sold_at). Work on a job
+--     later than the sale that stands (stock_unit_sales, 0095). Work on a job
 --     opened before the sale is before it however late its invoice is
 --     posted; a job opened after the sale is after it.
 --   * A cost dated rather than timed is for the end of its day, or the
@@ -101,8 +101,9 @@ GRANT SELECT, INSERT ON stock_cost_settings TO freesms_app;
 --     before it and one entered after is after it. A cost dated the day of
 --     the sale and entered on a later day is after it: what is not known
 --     to be before the sale is not counted in what the car cost to sell.
---   * A sale that falls through (sold back to for sale) clears sold_at:
---     it was never a sale, and every cost is before the next one.
+--   * A sale that falls through (sold back to for sale) no longer stands:
+--     it is kept, with when it fell through, but nothing is after it, and
+--     every cost is before the next one.
 --   * A reversal, and a supplier's invoice that replaces another, carry
 --     the moment of the entry they stand in for (the replacement because it
 --     is for the same job), so they are always on its side of the sale.
@@ -111,7 +112,8 @@ GRANT SELECT, INSERT ON stock_cost_settings TO freesms_app;
 -- undone -- or written off has no sale to be after. One rule, read by the
 -- application wherever a cost is read.
 CREATE FUNCTION stock_cost_post_sale(unit uuid, happened timestamptz) RETURNS boolean LANGUAGE sql STABLE AS $$
-    SELECT coalesce(happened > sold_at, false) FROM stock_units WHERE id = unit
+    SELECT coalesce(happened > (SELECT s.sold_at FROM stock_unit_sales s
+                                 WHERE s.stock_unit_id = unit AND s.fell_through_at IS NULL), false)
 $$;
 
 -- The moment a cost dated by hand is for: the end of its day where the

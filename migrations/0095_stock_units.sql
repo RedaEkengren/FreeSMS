@@ -1,5 +1,5 @@
 -- rollback: safe
--- A new table, and one more subject the audit log accepts, which the
+-- New tables, and one more subject the audit log accepts, which the
 -- previous release never writes. The previous release reads none of it.
 --
 -- A stock unit is one cycle of a car through the dealer's stock (#160):
@@ -34,11 +34,6 @@ CREATE TABLE stock_units (
     -- When the car was first offered for sale in this cycle: stock days
     -- for the salesperson count from here (#168). Set once.
     first_for_sale_at timestamptz,
-    -- When the sale that stands was made: set as the car is sold, kept
-    -- as it is delivered, and cleared if the sale falls through (sold back
-    -- to for sale), because a sale that fell through was never a sale.
-    -- Costs read which side of it they are on (0099).
-    sold_at           timestamptz,
     closed_at         timestamptz,
     closed_by         uuid        REFERENCES users(id) ON DELETE RESTRICT,
     -- The sale that ended it. vehicle_sales comes with M8; invoices
@@ -50,7 +45,6 @@ CREATE TABLE stock_units (
     -- A cycle is over exactly when it has reached an end.
     CHECK ((status IN ('delivered', 'closed', 'written_off')) = (closed_at IS NOT NULL)),
     CHECK (first_for_sale_at IS NULL OR first_for_sale_at >= opened_at),
-    CHECK ((status IN ('sold', 'delivered')) = (sold_at IS NOT NULL)),
     -- One open cycle per vehicle at a time, refused by the database: two
     -- buyers taking the same car in at the same moment cannot both succeed.
     CONSTRAINT stock_units_one_cycle_at_a_time EXCLUDE USING gist (
@@ -71,7 +65,49 @@ CREATE POLICY shop_isolation ON stock_units
 -- opened stay. Its status moves, and every move is an audit event.
 REVOKE ALL ON stock_units FROM freesms_app;
 GRANT SELECT, INSERT ON stock_units TO freesms_app;
-GRANT UPDATE (status, first_for_sale_at, sold_at, closed_at, closed_by, vehicle_sale_id) ON stock_units TO freesms_app;
+GRANT UPDATE (status, first_for_sale_at, closed_at, closed_by, vehicle_sale_id) ON stock_units TO freesms_app;
+
+-- Each time the car is sold in a cycle: a row, not a column on the unit.
+-- A sale can fall through (sold back to for sale) and the car be sold
+-- again, and a moment written over could not say when the first sale was
+-- made or that it fell through. The sale that stands is the one that has
+-- not fallen through; delivering the car keeps it. Costs read which side
+-- of it they are on (0099).
+CREATE TABLE stock_unit_sales (
+    id               uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    shop_id          uuid        NOT NULL REFERENCES shops(id) ON DELETE RESTRICT,
+    stock_unit_id    uuid        NOT NULL REFERENCES stock_units(id) ON DELETE RESTRICT,
+    sold_at          timestamptz NOT NULL DEFAULT clock_timestamp(),
+    sold_by          uuid        REFERENCES users(id) ON DELETE RESTRICT,
+    -- Set once, when the sale falls through; never cleared.
+    fell_through_at  timestamptz,
+    fell_through_by  uuid        REFERENCES users(id) ON DELETE RESTRICT,
+    CHECK (fell_through_at IS NULL OR fell_through_at >= sold_at),
+    CHECK (fell_through_at IS NOT NULL OR fell_through_by IS NULL)
+);
+-- One sale stands at a time.
+CREATE UNIQUE INDEX stock_unit_sales_standing_idx ON stock_unit_sales (stock_unit_id) WHERE fell_through_at IS NULL;
+
+ALTER TABLE stock_unit_sales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stock_unit_sales FORCE ROW LEVEL SECURITY;
+CREATE POLICY shop_isolation ON stock_unit_sales
+    USING (shop_id = nullif(current_setting('app.current_shop', true), '')::uuid)
+    WITH CHECK (shop_id = nullif(current_setting('app.current_shop', true), '')::uuid);
+REVOKE ALL ON stock_unit_sales FROM freesms_app;
+GRANT SELECT, INSERT ON stock_unit_sales TO freesms_app;
+GRANT UPDATE (fell_through_at, fell_through_by) ON stock_unit_sales TO freesms_app;
+
+-- A sale's falling through is written once: what it said stays.
+CREATE FUNCTION stock_unit_sales_fall_through_once() RETURNS trigger AS $$
+BEGIN
+    IF OLD.fell_through_at IS NOT NULL THEN
+        RAISE EXCEPTION 'that sale has already fallen through' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER stock_unit_sales_fall_through_once BEFORE UPDATE ON stock_unit_sales
+    FOR EACH ROW EXECUTE FUNCTION stock_unit_sales_fall_through_once();
 
 -- Car sales and rental each widen this list on a branch of their own, so
 -- each adds its kinds to the list as it stands (widen_text_check, 0093)

@@ -316,11 +316,25 @@ func MoveStockUnit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		if _, err := tx.Exec(ctx, `
 			UPDATE stock_units SET status = $2,
 			       first_for_sale_at = CASE WHEN $2 = 'for_sale' THEN coalesce(first_for_sale_at, clock_timestamp()) ELSE first_for_sale_at END,
-			       sold_at = CASE WHEN $2 = 'sold' THEN clock_timestamp() WHEN $2 = 'delivered' THEN sold_at END,
 			       closed_at = CASE WHEN $3 THEN clock_timestamp() END,
 			       closed_by = CASE WHEN $3 THEN NULLIF($4, '')::uuid END
 			WHERE id = $1`, id, string(to), to.Ended(), scope.UserID); err != nil {
 			return fmt.Errorf("move the stock unit: %w", err)
+		}
+		// A sale is a row (stock_unit_sales): made as the car is sold, and
+		// marked as fallen through, never removed, when it goes back to for
+		// sale. Delivered, the sale stands as it was.
+		switch {
+		case to == StockSold:
+			if _, err := tx.Exec(ctx, `INSERT INTO stock_unit_sales (shop_id, stock_unit_id, sold_by) VALUES ($1, $2, NULLIF($3, '')::uuid)`,
+				scope.ShopID, id, scope.UserID); err != nil {
+				return fmt.Errorf("record the sale: %w", err)
+			}
+		case from == StockSold && to == StockForSale:
+			if _, err := tx.Exec(ctx, `UPDATE stock_unit_sales SET fell_through_at = clock_timestamp(), fell_through_by = NULLIF($2, '')::uuid
+				WHERE stock_unit_id = $1 AND fell_through_at IS NULL`, id, scope.UserID); err != nil {
+				return fmt.Errorf("record the sale falling through: %w", err)
+			}
 		}
 		return auditTx(ctx, tx, scope, id, "stock_unit.moved", string(from), string(to), reason, nil)
 	})

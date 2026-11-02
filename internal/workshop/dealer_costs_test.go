@@ -498,3 +498,39 @@ func jobTakenBackToWork(t *testing.T, pool *pgxpool.Pool) {
 	}
 	move(t, pool, job, workshop.StateInProgress)
 }
+
+// A sale is a row: sold, fallen through and sold again is two sales, the
+// first kept with the moment it fell through. Which side of a sale a cost
+// is on is read from the sale that stands, and nothing about an earlier
+// sale is written over.
+func TestASaleThatFellThroughIsKept(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	moveStock(t, pool, p.StockUnitID, workshop.StockForSale, workshop.StockSold)
+	between, err := workshop.RecordStockCost(ctx, pool, buyerScope(), p.StockUnitID, cost(workshop.CostTransport, 10_000))
+	if err != nil || !between.PostSale {
+		t.Fatalf("a cost after the first sale: %+v, %v", between, err)
+	}
+	moveStock(t, pool, p.StockUnitID, workshop.StockForSale, workshop.StockSold)
+	costs, err := workshop.CostsOfUnit(ctx, pool, buyerScope(), p.StockUnitID)
+	if err != nil || costs.BeforeSale != 10_000 || costs.AfterSale != 0 {
+		t.Errorf("after the second sale: before %d, after %d (%v); want the cost between the two sales before the one that stands",
+			costs.BeforeSale, costs.AfterSale, err)
+	}
+	moveStock(t, pool, p.StockUnitID, workshop.StockDelivered)
+	var sales, fell, standing int
+	if err := pool.QueryRow(ctx, `SELECT count(*), count(fell_through_at), count(*) FILTER (WHERE fell_through_at IS NULL)
+		FROM stock_unit_sales WHERE stock_unit_id = $1`, p.StockUnitID).Scan(&sales, &fell, &standing); err != nil {
+		t.Fatal(err)
+	}
+	if sales != 2 || fell != 1 || standing != 1 {
+		t.Errorf("%d sales, %d fell through, %d standing; want 2, 1 and 1", sales, fell, standing)
+	}
+	for _, stmt := range []string{`UPDATE stock_unit_sales SET sold_at = now()`, `DELETE FROM stock_unit_sales`,
+		`UPDATE stock_unit_sales SET fell_through_at = now() WHERE fell_through_at IS NOT NULL`} {
+		if err := asApp(ctx, pool, stmt); err == nil {
+			t.Errorf("%q as the application was let through", stmt)
+		}
+	}
+}
