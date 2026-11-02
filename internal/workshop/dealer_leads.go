@@ -91,8 +91,21 @@ type Lead struct {
 	LastActivityAt  time.Time
 	Erased          bool
 	Contacts        []LeadContact
-	// The deal made from it (#175) that stands: the newest not cancelled.
-	DealID string
+	// The deal made from it (#175) that stands: the newest not cancelled,
+	// when the reader may open it; DealElsewhere says one stands that is
+	// another salesperson's.
+	DealID          string
+	DealElsewhere   bool
+	dealSalesperson string
+}
+
+// seenBy keeps the lead's deal to what the reader may open (dealSeer).
+func (l Lead) seenBy(scope access.Scope) Lead {
+	if seer := dealSeer(scope); l.DealID != "" && seer != "" && l.dealSalesperson != seer {
+		l.DealID, l.DealElsewhere = "", true
+	}
+	l.dealSalesperson = ""
+	return l
 }
 
 // Open reports whether the lead is still being worked.
@@ -227,15 +240,17 @@ const leadColumns = `
 	       coalesce(l.wishes, ''), l.channel, coalesce(n.status, 'new'), coalesce(n.lost_reason, ''), coalesce(n.lost_note, ''),
 	       coalesce(n.salesperson_id::text, ''), coalesce(sp.display_name, ''), n.next_step_on, coalesce(n.next_step, ''),
 	       l.created_at, n.last_activity_at, l.erased_at IS NOT NULL,
-	       coalesce((SELECT s.id::text FROM vehicle_sales s WHERE s.lead_id = l.id
-	                 AND NOT EXISTS (SELECT 1 FROM vehicle_sale_events e WHERE e.sale_id = s.id AND e.kind = 'cancelled')
-	                 ORDER BY s.created_at DESC LIMIT 1), '')
+	       coalesce(ld.id, ''), coalesce(ld.salesperson, '')
 	FROM leads l
 	JOIN lead_now n ON n.lead_id = l.id
 	LEFT JOIN stock_units u ON u.id = l.stock_unit_id
 	LEFT JOIN vehicles v ON v.id = u.vehicle_id
 	LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = v.id AND reg.valid_to IS NULL
 	LEFT JOIN users su ON su.id = n.salesperson_id LEFT JOIN people sp ON sp.id = su.person_id
+	LEFT JOIN LATERAL (
+		SELECT s.id::text AS id, s.salesperson_id::text AS salesperson FROM vehicle_sales s WHERE s.lead_id = l.id
+		  AND NOT EXISTS (SELECT 1 FROM vehicle_sale_events e WHERE e.sale_id = s.id AND e.kind = 'cancelled')
+		ORDER BY s.created_at DESC LIMIT 1) ld ON true
 	LEFT JOIN LATERAL (
 		SELECT coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name) AS name
 		FROM parties pa LEFT JOIN customers c ON c.id = pa.customer_id
@@ -247,7 +262,7 @@ func scanLead(row pgx.Row) (Lead, error) {
 	var status string
 	err := row.Scan(&l.ID, &l.PartyID, &l.PartyName, &l.Name, &l.Phone, &l.Email, &l.StockUnitID, &l.Car, &status,
 		&l.Wishes, &l.Channel, &l.Status, &l.LostReason, &l.LostNote, &l.Salesperson, &l.SalespersonName, &l.NextStepOn,
-		&l.NextStep, &l.CreatedAt, &l.LastActivityAt, &l.Erased, &l.DealID)
+		&l.NextStep, &l.CreatedAt, &l.LastActivityAt, &l.Erased, &l.DealID, &l.dealSalesperson)
 	l.CarStatus = StockStatus(status)
 	return l, err
 }
@@ -261,6 +276,7 @@ func leadTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id string) (Lead
 	if err != nil {
 		return Lead{}, fmt.Errorf("read lead: %w", err)
 	}
+	l = l.seenBy(scope)
 	rows, err := tx.Query(ctx, `
 		SELECT c.at, coalesce(p.display_name, ''), c.how, coalesce(c.note, '')
 		FROM lead_contacts c LEFT JOIN users u ON u.id = c.by_user LEFT JOIN people p ON p.id = u.person_id
@@ -430,7 +446,7 @@ func CreateLead(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n N
 					rows.Close()
 					return err
 				}
-				same = append(same, l)
+				same = append(same, l.seenBy(scope))
 			}
 			rows.Close()
 			if err := rows.Err(); err != nil {
@@ -531,7 +547,7 @@ func Leads(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, closed b
 			if err != nil {
 				return err
 			}
-			out = append(out, l)
+			out = append(out, l.seenBy(scope))
 		}
 		return rows.Err()
 	})

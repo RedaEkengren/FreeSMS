@@ -88,6 +88,6 @@
 {{end}}
 {{end}}
 {{if and $l.Open (not $l.Erased)}}<p><a href="/cars/test-drives/new?lead={{$l.ID}}">{{.T "Book a test drive"}}</a>
-  {{if $l.DealID}}&middot; <a href="/cars/deals/{{$l.DealID}}">{{.T "The deal"}}</a>{{else}}&middot; <a href="/cars/deals?lead={{$l.ID}}">{{.T "Open a deal"}}</a>{{end}}</p>{{end}}
+  {{if $l.DealID}}&middot; <a href="/cars/deals/{{$l.DealID}}">{{.T "The deal"}}</a>{{else if $l.DealElsewhere}}&middot; {{.T "A deal stands, with another salesperson"}}{{else}}&middot; <a href="/cars/deals?lead={{$l.ID}}">{{.T "Open a deal"}}</a>{{end}}</p>{{end}}
 <p><a href="/cars/leads">{{.T "All leads"}}</a></p>
 {{end}}

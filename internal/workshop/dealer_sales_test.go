@@ -758,3 +758,33 @@ func TestNoTemplateChosenIsTheShippedOneOrAQuestion(t *testing.T) {
 		t.Errorf("no template chosen, with only the shop's own: %v; want asked which", err)
 	}
 }
+
+// A lead passed to another salesperson after a deal was made from it
+// shows that a deal stands, but not one they cannot open.
+func TestALeadShowsOnlyADealItsReaderMaySee(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	anna := salesperson(t, pool, "Anna Säljare", "anna.s@example.test")
+	bo := salesperson(t, pool, "Bo Säljare", "bo.s@example.test")
+	unit := carForSale(t, pool)
+	kim := driver(t, pool)
+	lead, err := workshop.CreateLead(ctx, pool, anna, workshop.NewLead{PartyID: kim, StockUnitID: unit, Channel: "walk_in",
+		Salesperson: anna.UserID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := workshop.CreateDeal(ctx, pool, anna, workshop.NewDeal{UnitID: unit, LeadID: lead.ID, Terms: consumerTerms(kim)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.ReassignLeads(ctx, pool, everything(owner()), anna.UserID, bo.UserID); err != nil {
+		t.Fatal(err)
+	}
+	got, err := workshop.LeadByID(ctx, pool, bo, lead.ID)
+	if err != nil || got.DealID != "" || !got.DealElsewhere {
+		t.Errorf("Bo's view of the lead: deal %q, elsewhere %v (%v)", got.DealID, got.DealElsewhere, err)
+	}
+	if mine, _ := workshop.LeadByID(ctx, pool, everything(owner()), lead.ID); mine.DealID != d.ID {
+		t.Errorf("the owner's view of the lead: deal %q", mine.DealID)
+	}
+}
