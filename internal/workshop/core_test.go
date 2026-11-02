@@ -123,4 +123,7 @@ var core = map[string]string{
 	"StockCheckSettings": "a car's history in stock", "PurchaseSplitOf": "a car's history in stock",
 	"CalculationByID": "a car's history in stock", "CalculationsForVehicle": "a car's history in stock",
 	"CostsOfUnit": "a car's history in stock", "InternalLabourRate": "a car's history in stock",
+	// Leads (#172): what the shop was asked, read whatever is switched on.
+	"LeadByID": "a car's leads", "Leads": "a car's leads", "LeadErasureMonths": "a car's leads",
+	"SellersOfCars": "a car's leads: who sells cars", "CarsInStock": "a car's history in stock",
 }

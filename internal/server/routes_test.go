@@ -246,6 +246,9 @@ var swept = map[string]string{
 	// Dealer
 	"GET /cars/calculations/new": "", "POST /cars/calculations": "",
 	"GET /cars/calculations/{id}": "sweep", "POST /cars/calculations/{id}/accept": "sweep",
+	"GET /cars/leads": "", "POST /cars/leads": "", "POST /cars/leads/settings": "", "POST /cars/leads/reassign": "",
+	"GET /cars/leads/{id}": "sweep", "POST /cars/leads/{id}/contacts": "sweep", "POST /cars/leads/{id}/status": "sweep",
+	"POST /cars/leads/{id}/assign": "sweep", "POST /cars/leads/{id}/next": "sweep",
 }
 
 // fill substitutes shop B's identifiers into a pattern.
@@ -287,6 +290,7 @@ func fill(pattern string) (method, path string) {
 		// whoever asks; TestNoCarSalesRouteServesAnotherShopsRow asks them
 		// in a shop that does.
 		"/cars/calculations/{id}": "/cars/calculations/bbbbbbbb-0000-0000-0000-0000000000ca",
+		"/cars/leads/{id}":        "/cars/leads/bbbbbbbb-0000-0000-0000-0000000000cb",
 		// Rental: ids that are nobody's.
 		"/rental/permits/{id}":     "/rental/permits/bbbbbbbb-0000-0000-0000-0000000000e1",
 		"/rental/profiles/{id}":    "/rental/profiles/bbbbbbbb-0000-0000-0000-0000000000e2",

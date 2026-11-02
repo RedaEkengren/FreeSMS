@@ -674,11 +674,14 @@ type SweepResult struct {
 	IdentityValues int64
 	// Vehicle lookups past their year, deleted (#155).
 	VehicleLookups int64
+	// Leads that never became a deal, the person erased from them (#172).
+	Leads int64
 }
 
 // Empty reports whether there was nothing to do.
 func (s SweepResult) Empty() bool {
-	return s.LoginAttempts == 0 && s.Shares == 0 && s.JobLinks == 0 && s.ImportPreviews == 0 && s.IdentityValues == 0 && s.VehicleLookups == 0
+	return s.LoginAttempts == 0 && s.Shares == 0 && s.JobLinks == 0 && s.ImportPreviews == 0 && s.IdentityValues == 0 && s.VehicleLookups == 0 &&
+		s.Leads == 0
 }
 
 // Sweep applies the retention policy.
@@ -729,6 +732,14 @@ func Sweep(ctx context.Context, pool *pgxpool.Pool, shopID string) (SweepResult,
 			tag, err := tx.Exec(ctx, `DELETE FROM vehicle_lookups WHERE looked_up_at < now() - $1::interval`,
 				seconds(vehicleLookupRetention))
 			r.VehicleLookups = tag.RowsAffected()
+			return err
+		}),
+
+		// A lead that never became a deal keeps the person for the shop's
+		// period after it last moved; its figures stay.
+		step("leads", func(ctx context.Context, tx pgx.Tx) error {
+			n, err := sweepLeadsTx(ctx, tx)
+			r.Leads = n
 			return err
 		}),
 

@@ -209,6 +209,7 @@
     },
     "%d rental to hand over today": {"one": "%d rental to hand over today", "other": "%d rentals to hand over today"},
     "%d rental due back today": {"one": "%d rental due back today", "other": "%d rentals due back today"},
-    "%d rental out past its return": {"one": "%d rental out past its return", "other": "%d rentals out past their return"}
+    "%d rental out past its return": {"one": "%d rental out past its return", "other": "%d rentals out past their return"},
+    "%d more open lead is another salesperson's": {"one": "%d more open lead is another salesperson's", "other": "%d more open leads are other salespeople's"}
   }
 }
