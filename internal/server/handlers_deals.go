@@ -37,16 +37,36 @@ type dealData struct {
 	UnsavedLines []lineRow
 }
 
+// termsFields are the terms form's fields in its order, with their labels:
+// the one list the form's carry-over is read from.
+var termsFields = [][2]string{{"buyer_kind", "The buyer is"}, {"price", "Price of the car, VAT included, in kronor"},
+	{"tax", "How the sale is taxed"}, {"warranty", "Warranty"}, {"delivery_on", "Delivered on"}, {"delivery_place", "Where"},
+	{"odometer", "Odometer, km"}, {"payment_terms", "Payment"}, {"note", "Note"}}
+
+// unsavedField is a field typed and not saved: its label, its value, and
+// whether the value is one of the form's choices, shown in words.
+type unsavedField struct {
+	Label, Value string
+	Choice       bool
+}
+
 // UnsavedFields are the terms fields typed and not saved, in the form's
-// order, as label and value; empty ones left out.
-func (d dealData) UnsavedFields() [][2]string {
-	var out [][2]string
-	for _, f := range [][2]string{{"buyer_kind", "The buyer is"}, {"price", "Price of the car, VAT included, in kronor"},
-		{"tax", "How the sale is taxed"}, {"warranty", "Warranty"}, {"delivery_on", "Delivered on"}, {"delivery_place", "Where"},
-		{"odometer", "Odometer, km"}, {"payment_terms", "Payment"}, {"note", "Note"}} {
-		if v := d.Unsaved[f[0]]; v != "" {
-			out = append(out, [2]string{f[1], v})
+// order; empty ones left out. A choice -- the buyer kind, the tax
+// treatment -- is its words, as the form shows it.
+func (d dealData) UnsavedFields() []unsavedField {
+	var out []unsavedField
+	for _, f := range termsFields {
+		v := d.Unsaved[f[0]]
+		if v == "" {
+			continue
 		}
+		u := unsavedField{Label: f[1], Value: v}
+		if f[0] == "buyer_kind" || f[0] == "tax" {
+			if w := workshop.DealLabel(v); w != "" {
+				u.Value, u.Choice = w, true
+			}
+		}
+		out = append(out, u)
 	}
 	return out
 }
@@ -299,21 +319,27 @@ func (s *Server) handleDealCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) dealPage(w http.ResponseWriter, r *http.Request, status int, msg string) {
-	s.dealPageTyped(w, r, status, msg, nil)
+	s.dealPageWith(w, r, status, msg, dealData{})
 }
 
-// dealPageTyped is the deal's page with the terms form as it was typed,
-// when typed is given.
+// dealPageTyped is the deal's page with the terms form as it was typed:
+// a revision refused for one of its fields.
 func (s *Server) dealPageTyped(w http.ResponseWriter, r *http.Request, status int, msg string, typed *dealData) {
+	s.dealPageWith(w, r, status, msg, dealData{Typed: true, TypedLines: typed.TypedLines, Form: typed.Form})
+}
+
+// dealPageUnsaved is the deal's page with the terms form as the terms now
+// stand, and what was typed shown apart: a revision refused as made over
+// another's.
+func (s *Server) dealPageUnsaved(w http.ResponseWriter, r *http.Request, status int, msg string, form map[string]string, lines []lineRow) {
+	s.dealPageWith(w, r, status, msg, dealData{Unsaved: form, UnsavedLines: lines})
+}
+
+// dealPageWith is the deal's page, with what the form comes back with
+// already in with.
+func (s *Server) dealPageWith(w http.ResponseWriter, r *http.Request, status int, msg string, with dealData) {
 	session := sessionFrom(r.Context())
-	var d dealData
-	if typed != nil && typed.Unsaved != nil {
-		d.Unsaved, d.UnsavedLines = typed.Unsaved, typed.UnsavedLines
-		typed = nil
-	}
-	if typed != nil {
-		d.Typed, d.TypedLines = true, typed.TypedLines
-	}
+	d := with
 	var err error
 	if d.Deal, err = workshop.DealByID(r.Context(), s.pool, session.Scope, r.PathValue("id")); s.handoverError(w, r, err) {
 		return
@@ -331,9 +357,8 @@ func (s *Server) dealPageTyped(w http.ResponseWriter, r *http.Request, status in
 			return
 		}
 	}
-	d.Form = map[string]string{}
-	if typed != nil {
-		d.Form = typed.Form
+	if d.Form == nil {
+		d.Form = map[string]string{}
 	}
 	s.render(w, r, status, "deal", pageData{Title: "Deal", Session: session, Deals: d, Error: msg})
 }
@@ -373,7 +398,7 @@ func (s *Server) handleDealRevise(w http.ResponseWriter, r *http.Request) {
 	if errors.Is(err, workshop.ErrDealMoved) {
 		// The form shows the terms as they now stand, never what was typed
 		// over them; what was typed is shown apart, to carry over by hand.
-		s.dealPageTyped(w, r, http.StatusBadRequest, trimInvalid(err), &dealData{Unsaved: form, UnsavedLines: typedLines})
+		s.dealPageUnsaved(w, r, http.StatusBadRequest, trimInvalid(err), form, typedLines)
 		return
 	}
 	if errors.Is(err, workshop.ErrInvalid) {

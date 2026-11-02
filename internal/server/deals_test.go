@@ -300,13 +300,14 @@ func TestARevisionOverAnotherShowsTheCurrentTermsAndWhatWasTyped(t *testing.T) {
 	if _, err := workshop.ReviseDeal(ctx, pool, owner, d.ID, 1, theirs); err != nil {
 		t.Fatal(err)
 	}
-	mine := url.Values{"version": {"1"}, "buyer": {d.Buyers[0].PartyID}, "buyer_kind": {"consumer"}, "price": {"125000"},
-		"warranty": {"Min garanti"}}
+	mine := url.Values{"version": {"1"}, "buyer": {d.Buyers[0].PartyID}, "buyer_kind": {"business"}, "price": {"125000"},
+		"tax": {"ordinary"}, "warranty": {"Min garanti"}}
 	status, page := postBody(t, seller, ts.URL+where+"/terms", mine)
 	if status != http.StatusBadRequest {
 		t.Fatalf("a revision over another answered %d", status)
 	}
-	for _, want := range []string{`name="version" value="2"`, `value="Deras garanti"`, "Min garanti"} {
+	for _, want := range []string{`name="version" value="2"`, `value="Deras garanti"`, "Min garanti", "How the sale is taxed: Ordinary VAT",
+		"The buyer is: A business"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page does not have %s", want)
 		}
