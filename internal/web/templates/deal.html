@@ -1,33 +1,33 @@
-{{define "terms"}}{{$d := .Deals}}{{$t := $d.Deal.Terms}}
+{{define "terms"}}{{$d := .Deals}}
   <div class="pair">
     <label><span>{{.T "The buyer is"}}</span>
-      <select name="buyer_kind">{{range $d.Kinds}}<option value="{{.}}"{{if or (eq . $t.BuyerKind) (eq . (index $d.Form "buyer_kind"))}} selected{{end}}>{{$.T ($d.Word .)}}</option>{{end}}</select></label>
+      <select name="buyer_kind">{{range $d.Kinds}}<option value="{{.}}"{{if eq . ($d.Field "buyer_kind")}} selected{{end}}>{{$.T ($d.Word .)}}</option>{{end}}</select></label>
     <label><span>{{.T "Price of the car, VAT included, in kronor"}}</span>
-      <input name="price" inputmode="decimal" required value="{{if $d.Deal.ID}}{{$d.Kronor $t.PriceMinor}}{{else}}{{index $d.Form "price"}}{{end}}"></label>
+      <input name="price" inputmode="decimal" required value="{{$d.Field "price"}}"></label>
   </div>
   <label><span>{{.T "How the sale is taxed"}}</span>
     <select name="tax"><option value="">{{.T "Not chosen yet"}}</option>
-      {{range $d.Treatments}}<option value="{{.}}"{{if eq . $t.TaxTreatment}} selected{{end}}>{{$.T ($d.Word .)}}</option>{{end}}</select></label>
-  <label><span>{{.T "Warranty"}}</span><input name="warranty" maxlength="1000" value="{{$t.Warranty}}"></label>
+      {{range $d.Treatments}}<option value="{{.}}"{{if eq . ($d.Field "tax")}} selected{{end}}>{{$.T ($d.Word .)}}</option>{{end}}</select></label>
+  <label><span>{{.T "Warranty"}}</span><input name="warranty" maxlength="1000" value="{{$d.Field "warranty"}}"></label>
   <div class="pair">
-    <label><span>{{.T "Delivered on"}}</span><input type="date" name="delivery_on" value="{{with $t.DeliveryOn}}{{$.Date . "2006-01-02"}}{{end}}"></label>
-    <label><span>{{.T "Where"}}</span><input name="delivery_place" maxlength="300" value="{{$t.DeliveryPlace}}"></label>
+    <label><span>{{.T "Delivered on"}}</span><input type="date" name="delivery_on" value="{{$d.Field "delivery_on"}}"></label>
+    <label><span>{{.T "Where"}}</span><input name="delivery_place" maxlength="300" value="{{$d.Field "delivery_place"}}"></label>
   </div>
   <div class="pair">
-    <label><span>{{.T "Odometer, km"}}</span><input name="odometer" inputmode="numeric" value="{{with $t.OdometerKm}}{{.}}{{end}}"></label>
-    <label><span>{{.T "Payment"}}</span><input name="payment_terms" maxlength="500" value="{{$t.PaymentTerms}}"></label>
+    <label><span>{{.T "Odometer, km"}}</span><input name="odometer" inputmode="numeric" value="{{$d.Field "odometer"}}"></label>
+    <label><span>{{.T "Payment"}}</span><input name="payment_terms" maxlength="500" value="{{$d.Field "payment_terms"}}"></label>
   </div>
   <fieldset><legend>{{.T "Sold with the car"}}</legend>
   {{range $d.LineRows}}
   <div class="pair">
-    <label><span>{{$.T "Description"}}</span><input name="line_desc" maxlength="300" value="{{.Description}}"></label>
-    <label><span>{{$.T "Quantity"}}</span><input name="line_qty" inputmode="decimal" value="{{$d.Qty .QuantityMilli}}"></label>
-    <label><span>{{$.T "Price before VAT, in kronor"}}</span><input name="line_price" inputmode="decimal" value="{{if .Description}}{{$d.Kronor .UnitPriceMinor}}{{end}}"></label>
-    <label><span>{{$.T "VAT, per cent"}}</span><input name="line_vat" inputmode="numeric" value="{{$d.Percent .VATRateBasis}}"></label>
+    <label><span>{{$.T "Description"}}</span><input name="line_desc" maxlength="300" value="{{.Desc}}"></label>
+    <label><span>{{$.T "Quantity"}}</span><input name="line_qty" inputmode="decimal" value="{{.Qty}}"></label>
+    <label><span>{{$.T "Price before VAT, in kronor"}}</span><input name="line_price" inputmode="decimal" value="{{.Price}}"></label>
+    <label><span>{{$.T "VAT, per cent"}}</span><input name="line_vat" inputmode="numeric" value="{{.VAT}}"></label>
   </div>
   {{end}}
   </fieldset>
-  <label><span>{{.T "Note"}}</span><textarea name="note" maxlength="1000" rows="2">{{$t.Note}}</textarea></label>
+  <label><span>{{.T "Note"}}</span><textarea name="note" maxlength="1000" rows="2">{{$d.Field "note"}}</textarea></label>
 {{end}}
 {{define "content"}}
 {{$d := .Deals}}{{$x := $d.Deal}}

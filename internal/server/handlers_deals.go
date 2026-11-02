@@ -27,6 +27,47 @@ type dealData struct {
 	Form     map[string]string
 	Key      string
 	All      bool
+	// A form sent back refused: every field as it was typed, the extras
+	// as rows of what was typed in each.
+	Typed      bool
+	TypedLines []lineRow
+}
+
+// lineRow is an extra as a form shows it.
+type lineRow struct{ Desc, Qty, Price, VAT string }
+
+// Field is a terms field as the form shows it: as it was typed when a
+// form comes back refused or the deal is new, the deal's own otherwise.
+func (d dealData) Field(name string) string {
+	if d.Typed || d.Deal.ID == "" {
+		return d.Form[name]
+	}
+	t := d.Deal.Terms
+	switch name {
+	case "buyer_kind":
+		return t.BuyerKind
+	case "price":
+		return plainAmount(t.PriceMinor)
+	case "tax":
+		return t.TaxTreatment
+	case "warranty":
+		return t.Warranty
+	case "delivery_on":
+		if t.DeliveryOn != nil {
+			return t.DeliveryOn.Format("2006-01-02")
+		}
+	case "delivery_place":
+		return t.DeliveryPlace
+	case "odometer":
+		if t.OdometerKm != nil {
+			return strconv.FormatInt(*t.OdometerKm, 10)
+		}
+	case "payment_terms":
+		return t.PaymentTerms
+	case "note":
+		return t.Note
+	}
+	return ""
 }
 
 // Word is a buyer kind, tax treatment, state or way of answering, as a
@@ -39,11 +80,17 @@ func (dealData) Treatments() []string {
 	return []string{workshop.TaxOrdinary, workshop.TaxMarginScheme}
 }
 
-// LineRows are the extra rows a terms form offers: the deal's extras and
-// two empty ones.
-func (d dealData) LineRows() []workshop.SaleLine {
-	return append(append([]workshop.SaleLine{}, d.Deal.Terms.Lines...), workshop.SaleLine{VATRateBasis: 2500},
-		workshop.SaleLine{VATRateBasis: 2500})
+// LineRows are the extra rows a terms form offers: what was typed, or the
+// deal's extras, and two empty ones.
+func (d dealData) LineRows() []lineRow {
+	rows := append([]lineRow{}, d.TypedLines...)
+	if !d.Typed {
+		for _, l := range d.Deal.Terms.Lines {
+			rows = append(rows, lineRow{Desc: l.Description, Qty: d.Qty(l.QuantityMilli), Price: plainAmount(l.UnitPriceMinor),
+				VAT: strconv.Itoa(l.VATRateBasis / 100)})
+		}
+	}
+	return append(rows, lineRow{VAT: "25"}, lineRow{VAT: "25"})
 }
 
 // Qty is a line's quantity as typed.
@@ -95,7 +142,27 @@ func (s *Server) dealRoutes(m routeMux) {
 
 // termsForm reads the terms a form sends; the buyers are the "buyer"
 // values, in order.
-func (s *Server) termsForm(r *http.Request) (workshop.SaleTerms, map[string]string, string) {
+func (s *Server) termsForm(r *http.Request) (workshop.SaleTerms, map[string]string, []lineRow, string) {
+	t, form, msg := s.readTerms(r)
+	var rows []lineRow
+	descs, qtys, prices, rates := r.Form["line_desc"], r.Form["line_qty"], r.Form["line_price"], r.Form["line_vat"]
+	at := func(xs []string, i int) string {
+		if i < len(xs) {
+			return strings.TrimSpace(xs[i])
+		}
+		return ""
+	}
+	for i, d := range descs {
+		if strings.TrimSpace(d) != "" {
+			rows = append(rows, lineRow{Desc: strings.TrimSpace(d), Qty: at(qtys, i), Price: at(prices, i), VAT: at(rates, i)})
+		}
+	}
+	return t, form, rows, msg
+}
+
+// readTerms reads the terms a form sends; the buyers are the "buyer"
+// values, in order.
+func (s *Server) readTerms(r *http.Request) (workshop.SaleTerms, map[string]string, string) {
 	form := map[string]string{}
 	for _, k := range []string{"buyer_kind", "price", "tax", "warranty", "delivery_on", "delivery_place", "odometer",
 		"payment_terms", "note"} {
@@ -178,7 +245,7 @@ func (s *Server) handleDealCreate(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusBadRequest, "Not accepted", "")
 		return
 	}
-	t, form, msg := s.termsForm(r)
+	t, form, typedLines, msg := s.termsForm(r)
 	for _, k := range []string{"unit", "lead", "name", "phone", "email"} {
 		form[k] = strings.TrimSpace(r.FormValue(k))
 	}
@@ -186,7 +253,7 @@ func (s *Server) handleDealCreate(w http.ResponseWriter, r *http.Request) {
 	// Refused, the form comes back as it was typed: the terms read so far
 	// fill it as a deal's terms would.
 	back := func(status int, msg string) {
-		s.dealsPage(w, r, status, dealData{Form: form, Key: key, Deal: workshop.Deal{Terms: t}}, msg)
+		s.dealsPage(w, r, status, dealData{Form: form, Key: key, Typed: true, TypedLines: typedLines}, msg)
 	}
 	if msg != "" {
 		back(http.StatusBadRequest, msg)
@@ -213,8 +280,17 @@ func (s *Server) handleDealCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) dealPage(w http.ResponseWriter, r *http.Request, status int, msg string) {
+	s.dealPageTyped(w, r, status, msg, nil)
+}
+
+// dealPageTyped is the deal's page with the terms form as it was typed,
+// when typed is given.
+func (s *Server) dealPageTyped(w http.ResponseWriter, r *http.Request, status int, msg string, typed *dealData) {
 	session := sessionFrom(r.Context())
 	var d dealData
+	if typed != nil {
+		d.Typed, d.TypedLines = true, typed.TypedLines
+	}
 	var err error
 	if d.Deal, err = workshop.DealByID(r.Context(), s.pool, session.Scope, r.PathValue("id")); s.handoverError(w, r, err) {
 		return
@@ -233,6 +309,9 @@ func (s *Server) dealPage(w http.ResponseWriter, r *http.Request, status int, ms
 		}
 	}
 	d.Form = map[string]string{}
+	if typed != nil {
+		d.Form = typed.Form
+	}
 	s.render(w, r, status, "deal", pageData{Title: "Deal", Session: session, Deals: d, Error: msg})
 }
 
@@ -260,13 +339,18 @@ func (s *Server) handleDealRevise(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusBadRequest, "Not accepted", "")
 		return
 	}
-	t, _, msg := s.termsForm(r)
+	t, form, typedLines, msg := s.termsForm(r)
+	typed := &dealData{Form: form, Typed: true, TypedLines: typedLines}
 	if msg != "" {
-		s.dealPage(w, r, http.StatusBadRequest, msg)
+		s.dealPageTyped(w, r, http.StatusBadRequest, msg, typed)
 		return
 	}
 	version, _ := strconv.Atoi(r.FormValue("version"))
 	_, err := workshop.ReviseDeal(r.Context(), s.pool, session.Scope, r.PathValue("id"), version, t)
+	if errors.Is(err, workshop.ErrInvalid) {
+		s.dealPageTyped(w, r, http.StatusBadRequest, trimInvalid(err), typed)
+		return
+	}
 	s.backToDeal(w, r, err)
 }
 

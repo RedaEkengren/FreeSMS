@@ -142,3 +142,58 @@ func TestReadingADealWritesNothing(t *testing.T) {
 		t.Error("no contract was made from the shipped template")
 	}
 }
+
+// A form refused for one bad field -- a new deal or a revision -- comes
+// back with every field as it was typed, the bad one too.
+func TestARefusedTermsFormKeepsEveryTypedField(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	unit, err := workshop.TakeIntoStock(ctx, pool, owner, vehicleA, workshop.StockFromDefleet, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.MoveStockUnit(ctx, pool, owner, unit.ID, workshop.StockForSale, ""); err != nil {
+		t.Fatal(err)
+	}
+	seller := signIn(t, ts, salesEmail)
+	typed := url.Values{"unit": {unit.ID}, "name": {"Kim Köpare"}, "phone": {"0701234567"}, "buyer_kind": {"business"},
+		"price": {"125000"}, "tax": {"ordinary"}, "warranty": {"Sex månader"}, "delivery_on": {"2026-12-24"},
+		"delivery_place": {"Hemma"}, "odometer": {"12x"}, "payment_terms": {"Faktura"}, "note": {"Ring först"},
+		"line_desc": {"Dragkrok"}, "line_qty": {"2"}, "line_price": {"6000"}, "line_vat": {"12"}}
+	want := []string{"Sex månader", `value="2026-12-24"`, "Hemma", `value="12x"`, "Faktura", "Ring först", "Dragkrok",
+		`value="2"`, `value="6000"`, `value="12"`, `value="business" selected`, `value="ordinary" selected`}
+	status, page := postBody(t, seller, ts.URL+"/cars/deals", typed)
+	if status != http.StatusBadRequest {
+		t.Fatalf("a new deal with a bad odometer answered %d", status)
+	}
+	for _, w := range want {
+		if !strings.Contains(page, w) {
+			t.Errorf("the new deal came back without %s", w)
+		}
+	}
+
+	typed.Set("odometer", "123600")
+	resp := postResponse(t, seller, ts.URL+"/cars/deals", typed)
+	where := resp.Header.Get("Location")
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("the deal answered %d", resp.StatusCode)
+	}
+	d, err := workshop.DealByID(ctx, pool, owner, strings.TrimPrefix(where, "/cars/deals/"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	typed.Set("odometer", "12x")
+	typed.Set("version", "1")
+	typed.Set("buyer", d.Buyers[0].PartyID)
+	typed.Set("warranty", "Ett år")
+	status, page = postBody(t, seller, ts.URL+where+"/terms", typed)
+	if status != http.StatusBadRequest {
+		t.Fatalf("a revision with a bad odometer answered %d", status)
+	}
+	for _, w := range append(want[1:], "Ett år") {
+		if !strings.Contains(page, w) {
+			t.Errorf("the revision came back without %s", w)
+		}
+	}
+}
