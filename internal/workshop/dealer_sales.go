@@ -1388,7 +1388,7 @@ func IssueDealInvoice(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 				UnitPriceMinor: d.Terms.PriceMinor, MarginScheme: true})
 		case TaxOrdinary:
 			lines = append(lines, SourcedLine{Kind: "vehicle", Description: car, QuantityMilli: 1000,
-				UnitPriceMinor: d.Terms.PriceMinor - money.VATInGross(d.Terms.PriceMinor, saleVATRate), VATRateBasis: saleVATRate})
+				GrossMinor: d.Terms.PriceMinor, VATRateBasis: saleVATRate})
 		default:
 			return errDealIncomplete
 		}

@@ -198,3 +198,35 @@ func TestAnInvoicedDealIsNotCancelledUntilCredited(t *testing.T) {
 		t.Errorf("a credited deal cancelled: %v", err)
 	}
 }
+
+// A car under ordinary VAT is invoiced at exactly its price: the VAT is
+// what is inside the price, and the net the rest -- not a net from which
+// the VAT is worked out again and rounds a öre the other way.
+func TestAnOrdinaryCarIsInvoicedAtExactlyItsPrice(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	kim := driver(t, pool)
+	for _, price := range []int64{102, 12_500_003, 9_999_999} {
+		unit := carForSaleAgain(t, pool)
+		terms := workshop.SaleTerms{Buyers: []string{kim}, BuyerKind: workshop.BuyerConsumer, PriceMinor: price, TaxTreatment: workshop.TaxOrdinary}
+		d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: unit, Terms: terms})
+		if err != nil {
+			t.Fatal(err)
+		}
+		doc, _, err := workshop.ProduceSalesContract(ctx, pool, sales(), d.ID, "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		signAll(t, pool, doc)
+		if _, err := workshop.CompleteDeal(ctx, pool, sales(), d.ID); err != nil {
+			t.Fatal(err)
+		}
+		inv, err := workshop.IssueDealInvoice(ctx, pool, sales(), d.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if inv.GrossMinor != price {
+			t.Errorf("a car priced %d öre was invoiced at %d (net %d, VAT %d)", price, inv.GrossMinor, inv.NetMinor, inv.VATMinor)
+		}
+	}
+}

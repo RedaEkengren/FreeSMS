@@ -38,6 +38,10 @@ type SourcedLine struct {
 	// A car sold under the margin scheme (#177): kind "vehicle", at its
 	// gross price and rate 0, outside the VAT bands. A vehicle sale's only.
 	MarginScheme bool
+	// Priced with its VAT (a car's price, #177): the VAT is what is inside
+	// it at the rate (money.VATInGross) and the net the rest, so the line
+	// comes to exactly this; UnitPriceMinor is then not given.
+	GrossMinor int64
 }
 
 // MarginSchemeStatement is the statement a margin-scheme invoice carries,
@@ -142,14 +146,31 @@ func issueSourcedTx(ctx context.Context, tx pgx.Tx, scope access.Scope, of sourc
 			return Invoice{}, fmt.Errorf("%w: a line is labour, a part, sublet work, consumables or a fee", ErrInvalid)
 		}
 		net := money.LineNet(g.QuantityMilli, g.UnitPriceMinor)
+		vat := money.VAT(net, g.VATRateBasis)
+		if g.GrossMinor != 0 {
+			if g.QuantityMilli != 1000 || g.UnitPriceMinor != 0 {
+				return Invoice{}, fmt.Errorf("%w: a line priced with its VAT is one of it", ErrInvalid)
+			}
+			vat = money.VATInGross(g.GrossMinor, g.VATRateBasis)
+			net = g.GrossMinor - vat
+			g.UnitPriceMinor = net
+		}
 		lines = append(lines, invoiceLine{
 			Kind: g.Kind, Description: g.Description, QuantityMilli: g.QuantityMilli,
 			UnitPriceMinor: g.UnitPriceMinor, VATRateBasis: g.VATRateBasis,
-			NetMinor: net, VATMinor: money.VAT(net, g.VATRateBasis),
+			NetMinor: net, VATMinor: vat,
 			UnitCode: unitCode(g.Kind, ""), MarginScheme: g.MarginScheme,
 		})
 	}
-	totals := money.Compute(toMoneyLines(lines))
+	// The lines' own amounts, summed: each line's VAT is rounded on its
+	// own, so this is what Compute gives -- and a line priced with its VAT
+	// keeps the VAT that was inside its price.
+	var totals money.Totals
+	for _, l := range lines {
+		totals.NetMinor += l.NetMinor
+		totals.VATMinor += l.VATMinor
+	}
+	totals.GrossMinor = totals.NetMinor + totals.VATMinor
 
 	b, err := buyerTx(ctx, tx, of.customerID)
 	if err != nil {
