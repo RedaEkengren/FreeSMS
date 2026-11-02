@@ -624,3 +624,86 @@ func MergeParties(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, k
 		return logChangeTx(ctx, tx, scope, "party", dropID, drop.person, "merged into", "", keep.name, reason)
 	})
 }
+
+// CustomerForParty is the customer a party is invoiced as: the one it is
+// already, or one made from it now (customerForPartyTx). For whoever
+// invoices a party -- the front desk, a salesperson, the rental desk -- and
+// only a party they may see. Core, whatever the shop runs.
+func CustomerForParty(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, partyID string) (string, error) {
+	if !scope.Role.SeesCustomerPersonalData() && !scope.Role.SellsVehicles() && !scope.Role.HandsOverRentals() {
+		return "", access.ErrForbidden
+	}
+	if !looksLikeUUID(partyID) {
+		return "", ErrNotFound
+	}
+	var id string
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		if err := partySeenTx(ctx, tx, scope, partyID); err != nil {
+			return err
+		}
+		var err error
+		id, err = customerForPartyTx(ctx, tx, scope, partyID)
+		return err
+	})
+	return id, err
+}
+
+// customerForPartyTx gives a party its one customer, in the caller's
+// transaction, and returns it: the customer the party already is, or one
+// made now from the party's own details, which move to it -- the person
+// (name, telephone, email), or the company's name and number, and the
+// address -- as the front desk keeps a customer's, the party then pointing
+// at it (parties_details_in_one_place, 0206). Invoices are addressed to
+// customers (plan v2: parties are linked 1:1 to customers), so a car's
+// buyer (#177) and a renter (#199, Rental invoicing) are invoiced through
+// this. Idempotent: the party is locked first, so two calls at once make
+// one customer. The caller checks the role and that the party is one it
+// may see.
+func customerForPartyTx(ctx context.Context, tx pgx.Tx, scope access.Scope, partyID string) (string, error) {
+	var id, kind string
+	var customer, person, company, org, line1, line2, postal, city, country *string
+	err := tx.QueryRow(ctx, `
+		SELECT id, kind, customer_id::text, person_id::text, company_name, org_number, address_line1, address_line2,
+		       postal_code, city, country
+		FROM parties WHERE id = party_now($1) FOR UPDATE`, partyID).Scan(&id, &kind, &customer, &person, &company, &org,
+		&line1, &line2, &postal, &city, &country)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("read party: %w", err)
+	}
+	if customer != nil {
+		return *customer, nil
+	}
+	// This party becomes the customer: the trigger that gives every new
+	// customer a party of its own leaves it to this one (0206).
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.party_becoming_customer', $1, true)`, id); err != nil {
+		return "", err
+	}
+	var made string
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO customers (shop_id, kind, person_id, company_name, org_number, address_line1, address_line2, postal_code, city, country)
+		VALUES ($1, $2, $3::uuid, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+		scope.ShopID, kind, person, company, org, line1, line2, postal, city, country).Scan(&made); err != nil {
+		return "", fmt.Errorf("make the party's customer: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE parties SET customer_id = $2, person_id = NULL, company_name = NULL, org_number = NULL, address_line1 = NULL,
+		       address_line2 = NULL, postal_code = NULL, city = NULL, country = NULL, revision = revision + 1
+		WHERE id = $1`, id, made); err != nil {
+		return "", fmt.Errorf("tie the party to its customer: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.party_becoming_customer', '', true)`); err != nil {
+		return "", err
+	}
+	// A customer from now, as every customer's party is.
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO party_roles (shop_id, party_id, role, valid_from, started_by)
+		SELECT $1, $2, 'customer', clock_timestamp(), NULLIF($3, '')::uuid
+		WHERE NOT EXISTS (SELECT 1 FROM party_roles WHERE party_id = $2 AND role = 'customer' AND valid_to IS NULL)`,
+		scope.ShopID, id, scope.UserID); err != nil {
+		return "", fmt.Errorf("make the party a customer: %w", err)
+	}
+	return made, nil
+}

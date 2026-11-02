@@ -107,6 +107,9 @@ var core = map[string]string{
 	"StartShopExport": "privacy", "FinishShopExport": "privacy", "WriteShopExport": "privacy",
 	"ShopExports": "privacy", "ShopExportByID": "privacy",
 
+	// Parties as customers to invoice (#177, #199).
+	"CustomerForParty": "a party invoiced: who it is billed as",
+
 	// The shop itself.
 	"ShopDetailsFor": "the shop", "SaveDetails": "the shop",
 	"ModulesFor": "what the shop runs", "ModuleChanges": "what the shop runs", "SwitchModule": "what the shop runs",
