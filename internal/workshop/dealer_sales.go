@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
@@ -935,10 +936,41 @@ func SalesContractWarnings(body, buyerKind string) []string {
 		return nil
 	}
 	lower := strings.ToLower(body)
-	var out []string
+	isLetter := func(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) }
+	type found struct {
+		phrase   string
+		from, to int
+	}
+	var all []found
 	for _, p := range asIsPhrases {
-		if strings.Contains(lower, p) {
-			out = append(out, p)
+		for start := 0; ; {
+			i := strings.Index(lower[start:], p)
+			if i < 0 {
+				break
+			}
+			from, to := start+i, start+i+len(p)
+			start = from + 1
+			// A whole phrase: no letter just before it or just after.
+			if before, _ := utf8.DecodeLastRuneInString(lower[:from]); from > 0 && isLetter(before) {
+				continue
+			}
+			if after, _ := utf8.DecodeRuneInString(lower[to:]); to < len(lower) && isLetter(after) {
+				continue
+			}
+			all = append(all, found{p, from, to})
+		}
+	}
+	// A phrase inside a longer one found at the same place is that one.
+	var out []string
+	for _, f := range all {
+		inside := false
+		for _, g := range all {
+			if g != f && g.from <= f.from && f.to <= g.to && g.to-g.from > f.to-f.from {
+				inside = true
+			}
+		}
+		if !inside && !slices.Contains(out, f.phrase) {
+			out = append(out, f.phrase)
 		}
 	}
 	return out

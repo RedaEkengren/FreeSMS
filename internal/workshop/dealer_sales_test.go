@@ -638,3 +638,20 @@ func TestADeliveredDealIsCompletedAgainWithoutMovingTheCar(t *testing.T) {
 		t.Errorf("the lead was won %d times (%v)", won, err)
 	}
 }
+
+// The "as is" warning finds whole phrases once: not "as is" inside "has
+// issues", and "som den står och går" as one phrase, not two.
+func TestTheAsIsWarningFindsWholePhrasesOnce(t *testing.T) {
+	for body, want := range map[string][]string{
+		"Bilen säljs som den står och går.":         {"som den står och går"},
+		"The seller has issued this contract.":      nil,
+		"Köparen har sett den, i befintligt skick.": {"befintligt skick"},
+		"Sold AS IS, in its current condition.":     {"as is", "in its current condition"},
+		"Vi besom den äran att ...":                 nil,
+	} {
+		got := workshop.SalesContractWarnings(body, workshop.BuyerConsumer)
+		if strings.Join(got, "|") != strings.Join(want, "|") {
+			t.Errorf("%q: %v, want %v", body, got, want)
+		}
+	}
+}
