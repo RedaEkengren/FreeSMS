@@ -31,7 +31,7 @@ func TestTheWidenedListsStillRefuseAnUnknownValue(t *testing.T) {
 	if err := event("no_such_subject"); err == nil {
 		t.Error("an audit event about an unknown subject was written")
 	}
-	for _, source := range []string{"purchase", "drop_off"} {
+	for _, source := range []string{"purchase", "drop_off", "check_out", "check_in"} {
 		if err := reading(source); err != nil {
 			t.Errorf("an odometer reading from %s: %v", source, err)
 		}

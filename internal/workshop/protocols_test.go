@@ -3,6 +3,7 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -39,7 +40,32 @@ func rentalChecklist(t *testing.T, pool *pgxpool.Pool) string {
 		[]string{workshop.SubjectCheckOut, workshop.SubjectCheckIn}); err != nil {
 		t.Fatalf("SetTemplateSubjects: %v", err)
 	}
+	seedRental(t, pool, rentalA)
 	return id
+}
+
+// seedRental writes a booking with this id, as a protocol of a rental must
+// be of one (0301). Only the row: these tests are about protocols, so its
+// own references are not checked on this connection.
+func seedRental(t *testing.T, pool *pgxpool.Pool, id string) {
+	t.Helper()
+	ctx := context.Background()
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Release()
+	for _, s := range []string{
+		`SET session_replication_role = replica`,
+		`INSERT INTO rental_bookings (id, shop_id, block_id, number, unit_id, renter_party_id, starts_at, ends_at, profile_version_id)
+		 VALUES ('` + id + `', '` + shopID + `', gen_random_uuid(), (SELECT coalesce(max(number), 0) + 1 FROM rental_bookings), gen_random_uuid(), gen_random_uuid(), now(), now() + interval '1 day', gen_random_uuid())
+		 ON CONFLICT (id) DO NOTHING`,
+		`RESET session_replication_role`,
+	} {
+		if _, err := conn.Exec(ctx, s); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func checkOut(t *testing.T, pool *pgxpool.Pool, template, key string) string {
@@ -127,6 +153,7 @@ func TestAReplayedProtocolKeyFindsOnlyTheSameRequest(t *testing.T) {
 		t.Errorf("a replayed check-out of a vehicle that is not there: %v, want not found", err)
 	}
 	first := checkOut(t, pool, tpl, "phone-2")
+	seedRental(t, pool, "66666666-0000-0000-0000-000000000002")
 	if _, err := start("66666666-0000-0000-0000-000000000002", vehicleA, "phone-2"); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("the key of one rental's check-out used for another: %v, want refused", err)
 	}
@@ -139,6 +166,7 @@ func TestAReplayedProtocolKeyFindsOnlyTheSameRequest(t *testing.T) {
 	// An identifier is the same identifier in capitals, as the database
 	// reads it: the replay of a request sent so is the same request.
 	const upper = "6666AAAA-0000-0000-0000-00000000000B"
+	seedRental(t, pool, strings.ToLower(upper))
 	once, err := start(upper, vehicleA, "phone-caps")
 	if err != nil {
 		t.Fatal(err)
