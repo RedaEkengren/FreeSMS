@@ -42,7 +42,7 @@
 {{else}}
 <p>{{$.T "Nothing is missing for the handover."}}</p>
 {{end}}
-{{range $.Rental.Overrides}}<p class="waiting">{{$.T "Let go by %s: %s" .By .Reason}}</p>{{end}}
+{{range $.Rental.Overrides}}<p class="waiting">{{$.T "Let go by %s: %s" .By .Reason}}{{if not .Current}} &middot; {{$.T "for the period booked before, which no longer stands"}}{{end}}</p>{{end}}
 {{end}}
 
 <h2>{{$.T "Handover"}}</h2>

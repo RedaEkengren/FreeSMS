@@ -8538,6 +8538,7 @@
     "Months after a rental ends": {"other": "Månader efter att en hyra har slutat"},
     "On what basis": {"other": "På vilken grund"},
     "Read the rental register": {"other": "Läs uthyrningsregistret"},
-    "Record the decision": {"other": "Registrera beslutet"}
+    "Record the decision": {"other": "Registrera beslutet"},
+    "for the period booked before, which no longer stands": {"other": "för den tidigare bokade perioden, som inte längre gäller"}
   }
 }

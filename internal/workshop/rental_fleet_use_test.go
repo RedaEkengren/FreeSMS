@@ -288,6 +288,10 @@ func TestALetGoGapAndTheInsuranceAreAskedAgainForANewPeriod(t *testing.T) {
 	if gaps, _ := workshop.RentalBookingGaps(ctx, pool, rentalDesk(), id); !slices.Contains(gapCodes(t, gaps), workshop.GapNotReported) {
 		t.Errorf("a gap let go for the old period, after an extension: %v", gapCodes(t, gaps))
 	}
+	// Still shown, who and why, as let go for an earlier period (review r6, #8).
+	if let, err := workshop.RentalGapOverrides(ctx, pool, rentalDesk(), id); err != nil || len(let) != 1 || let[0].Current || let[0].Reason != "Anmäls i morgon" {
+		t.Errorf("what was let go, after an extension: %+v, %v", let, err)
+	}
 
 	pool2 := setup(t)
 	_, out, _ := checkedOut(t, pool2)
