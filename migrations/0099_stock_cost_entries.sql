@@ -94,7 +94,8 @@ GRANT SELECT, INSERT ON stock_cost_settings TO freesms_app;
 --     opened before the sale is before it however late its invoice is
 --     posted; a job opened after the sale is after it.
 --   * A cost dated rather than timed is for the end of its day, or the
---     moment it was recorded if that is earlier: one dated before the day
+--     moment it was recorded if that is earlier, or the start of its day
+--     if that is still to come (stock_cost_dated): one dated before the day
 --     of the sale is before it, one dated a later day is after it, and on
 --     the day of the sale itself, one entered before the sale was made is
 --     before it and one entered after is after it. A cost dated the day of
@@ -114,9 +115,14 @@ CREATE FUNCTION stock_cost_post_sale(unit uuid, happened timestamptz) RETURNS bo
 $$;
 
 -- The moment a cost dated by hand is for: the end of its day where the
--- shop is, or now if that is earlier.
+-- shop is, or now if that is earlier -- unless its day has not begun yet,
+-- when it is the start of that day. A cost entered this morning for
+-- tomorrow is for tomorrow, and so after a sale made this afternoon, as
+-- its date says; taking now would put it before.
 CREATE FUNCTION stock_cost_dated(shop uuid, day date) RETURNS timestamptz LANGUAGE sql VOLATILE AS $$
-    SELECT least(clock_timestamp(), (day + 1)::timestamp AT TIME ZONE (SELECT timezone FROM shops WHERE id = shop))
+    SELECT CASE WHEN day::timestamp AT TIME ZONE tz > clock_timestamp() THEN day::timestamp AT TIME ZONE tz
+                ELSE least(clock_timestamp(), (day + 1)::timestamp AT TIME ZONE tz) END
+      FROM (SELECT timezone AS tz FROM shops WHERE id = shop) s
 $$;
 
 -- A supplier's invoice for work sent out from a job on a car in stock is

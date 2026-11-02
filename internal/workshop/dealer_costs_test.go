@@ -441,3 +441,22 @@ func TestACostReversedByHandWhileItsInvoiceIsNotedDoesNotDeadlock(t *testing.T) 
 		t.Errorf("reversed %d times (%v)", reversals, err)
 	}
 }
+
+// A cost dated a day still to come is for that day: entered this morning
+// for tomorrow, it is after a sale made this afternoon, as its date says,
+// not before it because it was typed in first.
+func TestACostDatedTomorrowIsAfterASaleMadeToday(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	tomorrow := cost(workshop.CostTransport, 40_000)
+	tomorrow.IncurredOn = time.Now().AddDate(0, 0, 1)
+	if _, err := workshop.RecordStockCost(ctx, pool, buyerScope(), p.StockUnitID, tomorrow); err != nil {
+		t.Fatal(err)
+	}
+	moveStock(t, pool, p.StockUnitID, workshop.StockForSale, workshop.StockReserved, workshop.StockSold)
+	costs, err := workshop.CostsOfUnit(ctx, pool, buyerScope(), p.StockUnitID)
+	if err != nil || costs.AfterSale != 40_000 || costs.BeforeSale != 0 {
+		t.Errorf("before the sale %d, after it %d (%v); want tomorrow's cost after today's sale", costs.BeforeSale, costs.AfterSale, err)
+	}
+}
