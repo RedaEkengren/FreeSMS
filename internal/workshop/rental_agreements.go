@@ -521,15 +521,11 @@ func RecordLicenceCheck(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 	}
 	var passed bool
 	err := inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		var party, booking string
-		var accepted []string
-		var needed, removed bool
-		var ends time.Time
-		err := tx.QueryRow(ctx, `
-			SELECT d.party_id, d.booking_id, d.removed_at IS NOT NULL, v.licence_check_required, v.licence_categories, b.ends_at
-			FROM rental_drivers d JOIN rental_bookings b ON b.id = d.booking_id
-			JOIN rental_profile_versions v ON v.id = b.profile_version_id
-			WHERE d.id = $1`, driverID).Scan(&party, &booking, &removed, &needed, &accepted, &ends)
+		// Which rental, unlocked; the unit; then the driver, read as the
+		// last write to the unit left it -- not as it was before this
+		// waited for the unit, when it may since have been taken off.
+		var booking string
+		err := tx.QueryRow(ctx, `SELECT booking_id FROM rental_drivers WHERE id = $1`, driverID).Scan(&booking)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
@@ -539,6 +535,16 @@ func RecordLicenceCheck(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		b, err := lockRentalTx(ctx, tx, booking)
 		if err != nil {
 			return err
+		}
+		var party string
+		var accepted []string
+		var needed, removed bool
+		if err := tx.QueryRow(ctx, `
+			SELECT d.party_id, d.removed_at IS NOT NULL, v.licence_check_required, v.licence_categories
+			FROM rental_drivers d JOIN rental_bookings b ON b.id = d.booking_id
+			JOIN rental_profile_versions v ON v.id = b.profile_version_id
+			WHERE d.id = $1`, driverID).Scan(&party, &removed, &needed, &accepted); err != nil {
+			return fmt.Errorf("read driver: %w", err)
 		}
 		switch {
 		case removed:

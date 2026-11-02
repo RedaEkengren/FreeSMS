@@ -2,6 +2,7 @@ package workshop_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -120,5 +121,35 @@ func TestRemovingADriverWhileTheirLicenceIsCheckedDoesNotDeadlock(t *testing.T) 
 	}
 	if err := remove.result(t); err != nil {
 		t.Errorf("the removal: %v", err)
+	}
+}
+
+// A licence check waiting for the unit while the driver is taken off is
+// refused once it has the unit: it reads the driver again, and records
+// nothing for somebody no longer driving (review 3 #3).
+func TestALicenceCheckWaitingBehindARemovalFindsTheDriverGone(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v, _, driver := aDriverOnABooking(t, pool)
+	held := holdTheUnit(t, pool, v.resource)
+	remove := start(func() error { return workshop.RemoveRentalDriver(ctx, pool, rentalDesk(), driver, "Kör inte") })
+	waitForWaiters(t, pool, 1, remove, "the removal")
+	check := start(func() error {
+		_, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, licenceShown())
+		return err
+	})
+	waitForWaiters(t, pool, 2, check, "the licence check")
+	if err := held.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := remove.result(t); err != nil {
+		t.Fatalf("the removal: %v", err)
+	}
+	if err := check.result(t); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a licence check for a driver taken off meanwhile: %v", err)
+	}
+	var checks int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM rental_licence_checks WHERE driver_id = $1`, driver).Scan(&checks); err != nil || checks != 0 {
+		t.Errorf("%d checks kept for a driver taken off (%v)", checks, err)
 	}
 }
