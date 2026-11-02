@@ -21,6 +21,11 @@ func TestTheFinishFormIsReadInBothShapes(t *testing.T) {
 	if dismissedOld != nil || !slices.Equal(confirmedOld, []string{"a"}) {
 		t.Errorf("the old form: let go %v, confirmed %v", dismissedOld, confirmedOld)
 	}
+	// The form from between the two, which named what it showed and not
+	// its shape, is read as naming what it showed (review r7, #2).
+	if dismissed, confirmed := findingsChosen(url.Values{"shown": {"a", "b"}, "damage": {"b"}}); !slices.Equal(dismissed, []string{"a"}) || confirmed != nil {
+		t.Errorf("the form with shown and no shape: let go %v, confirmed %v", dismissed, confirmed)
+	}
 	// The old form with nothing ticked confirmed nothing (review r6, #2);
 	// today's with nothing shown lets nothing go.
 	if _, none := findingsChosen(url.Values{"note": {"x"}}); none == nil || len(none) != 0 {

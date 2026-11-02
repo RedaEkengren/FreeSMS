@@ -232,11 +232,14 @@ func (d rentalData) HandoverEnds() []workshop.RentalHandover {
 
 // findingsChosen reads the finish form's findings. Today's form says so
 // (finish_form=2), names what the page showed as new, and those shown
-// and unticked are let go. A form from before -- cached, and replayed
+// and unticked are let go; so does a form that names what it showed
+// without saying its shape. A form from before -- cached, and replayed
 // from a phone's queue -- names only the ticked, and those, possibly
 // none, are the ones confirmed.
 func findingsChosen(form url.Values) (dismissed, confirmed []string) {
-	if form.Get("finish_form") != "2" {
+	// Today's form says its shape; the one before it, which named what it
+	// showed, has the same meaning. Only one naming neither is the oldest.
+	if form.Get("finish_form") != "2" && len(form["shown"]) == 0 {
 		return nil, append([]string{}, form["damage"]...)
 	}
 	for _, id := range form["shown"] {
