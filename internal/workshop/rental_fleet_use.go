@@ -287,12 +287,16 @@ func fleetUseGapsTx(ctx context.Context, tx pgx.Tx, bookingID string, p RentalPr
 	if len(gaps) == 0 {
 		return nil, nil
 	}
+	// Let go for exactly this period: a move or an extension asks again,
+	// and so does the period an extension is asked about.
 	let, err := gapOverridesTx(ctx, tx, bookingID)
 	if err != nil {
 		return nil, err
 	}
 	return slices.DeleteFunc(gaps, func(g HandoverGap) bool {
-		return slices.ContainsFunc(let, func(o GapOverride) bool { return o.Code == g.Code })
+		return slices.ContainsFunc(let, func(o GapOverride) bool {
+			return o.Code == g.Code && o.Starts.Equal(starts) && o.Ends.Equal(ends)
+		})
 	}), nil
 }
 
@@ -302,15 +306,21 @@ type GapOverride struct {
 	Reason string
 	By     string
 	At     time.Time
+	// The booked period it was let go for, and whether that is the
+	// booking's period now: one for an earlier period no longer stands.
+	Starts, Ends time.Time
+	Current      bool
 }
 
-// gapOverridesTx are the gaps let go for the booking as it is now: one let
-// go before it was moved or extended no longer stands.
+// gapOverridesTx are every gap let go on the booking, each with the
+// booked period it was let go for, and whether that is the booking's
+// period now.
 func gapOverridesTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]GapOverride, error) {
 	rows, err := tx.Query(ctx, `
-		SELECT o.code, o.reason, coalesce(p.display_name, ''), o.at
+		SELECT o.code, o.reason, coalesce(p.display_name, ''), o.at, o.starts_at, o.ends_at,
+		       o.starts_at = b.starts_at AND o.ends_at = b.ends_at
 		FROM rental_gap_overrides o
-		JOIN rental_bookings b ON b.id = o.booking_id AND b.starts_at = o.starts_at AND b.ends_at = o.ends_at
+		JOIN rental_bookings b ON b.id = o.booking_id
 		LEFT JOIN users us ON us.id = o.by_user LEFT JOIN people p ON p.id = us.person_id
 		WHERE o.booking_id = $1 ORDER BY o.at`, bookingID)
 	if err != nil {
@@ -320,7 +330,7 @@ func gapOverridesTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]GapOver
 	var out []GapOverride
 	for rows.Next() {
 		var o GapOverride
-		if err := rows.Scan(&o.Code, &o.Reason, &o.By, &o.At); err != nil {
+		if err := rows.Scan(&o.Code, &o.Reason, &o.By, &o.At, &o.Starts, &o.Ends, &o.Current); err != nil {
 			return nil, err
 		}
 		out = append(out, o)

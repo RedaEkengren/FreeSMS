@@ -303,3 +303,29 @@ func TestALetGoGapAndTheInsuranceAreAskedAgainForANewPeriod(t *testing.T) {
 		t.Errorf("a rental out extended past its insurance: %v", err)
 	}
 }
+
+// Insurance let go for the rental as booked does not carry over to a
+// longer one: extended while out, it is asked for the new period
+// (review r6, #1).
+func TestAnInsuranceLetGoDoesNotCoverAnExtension(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	_, id := handoverReady(t, pool)
+	if _, err := pool.Exec(ctx, `DELETE FROM fleet_insurances`); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.OverrideHandoverGap(ctx, pool, rentalOwner(), id, workshop.GapInsurance, "Försäkring på väg"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := workshop.StartHandover(ctx, pool, rentalDesk(), id, workshop.HandoverOut)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recordFound(t, pool, out, nil)
+	if err := workshop.FinishHandover(ctx, pool, rentalDesk(), out, workshop.HandoverReading{OdometerKm: km64(12000), RenterPresent: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, in2031(20, 9), ""); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("extended past an insurance let go only for the booked period: %v", err)
+	}
+}
