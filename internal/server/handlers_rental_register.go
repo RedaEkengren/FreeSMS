@@ -19,8 +19,11 @@ import (
 // Every read asks why, and the operation records it.
 
 func (s *Server) rentalCoreRoutes(m routeMux) {
+	// The page's form is a GET; a read is a POST, since it records why
+	// it was made and its purpose is no address to keep in a history.
 	m.HandleFunc("GET /rental/register", s.requireSession(s.handleRentalRegister))
-	m.HandleFunc("GET /rental/register.csv", s.requireSession(s.handleRentalRegisterCSV))
+	m.HandleFunc("POST /rental/register", s.requireSession(s.handleRentalRegister))
+	m.HandleFunc("POST /rental/register.csv", s.requireSession(s.handleRentalRegisterCSV))
 }
 
 // errBadDate is a date or a moment the register's form sent that did
@@ -37,10 +40,10 @@ type registerForm struct {
 // readRegister reads the part of the register a request asks for: nothing
 // until it gives a purpose, and then the period, the moment, or both.
 func (s *Server) readRegister(r *http.Request, scope access.Scope) (registerForm, []workshop.RegisterEntry, *workshop.RegisterEntry, bool, error) {
-	f := registerForm{From: r.FormValue("from"), To: r.FormValue("to"), Unit: r.FormValue("unit"),
-		Registration: r.FormValue("registration"), Purpose: r.FormValue("purpose"),
-		WhoRegistration: r.FormValue("who_registration"), WhoAt: r.FormValue("who_at")}
-	if strings.TrimSpace(f.Purpose) == "" {
+	f := registerForm{From: r.PostFormValue("from"), To: r.PostFormValue("to"), Unit: r.PostFormValue("unit"),
+		Registration: r.PostFormValue("registration"), Purpose: r.PostFormValue("purpose"),
+		WhoRegistration: r.PostFormValue("who_registration"), WhoAt: r.PostFormValue("who_at")}
+	if r.Method != http.MethodPost || strings.TrimSpace(f.Purpose) == "" {
 		return f, nil, nil, false, nil
 	}
 	loc := s.shopLocation(r)
@@ -84,6 +87,8 @@ func (s *Server) handleRentalRegister(w http.ResponseWriter, r *http.Request) {
 	if s.handoverError(w, r, err) {
 		return
 	}
+	// Who had which car is not for a shared cache or the back button.
+	w.Header().Set("Cache-Control", "no-store")
 	d := rentalData{Register: entries, Who: who, RegisterAsked: asked, RegisterForm: f}
 	if session.Scope.Uses(access.Rental) {
 		// The units to choose from, while Rental is on; off, the register
@@ -119,6 +124,7 @@ func (s *Server) handleRentalRegisterCSV(w http.ResponseWriter, r *http.Request)
 		}
 		return t.In(loc).Format("2006-01-02 15:04")
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="rental-register.csv"`)
 	out := csv.NewWriter(w)

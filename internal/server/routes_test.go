@@ -74,7 +74,8 @@ var swept = map[string]string{
 	"POST /parts/arrived": "", "GET /checklists": "", "POST /checklists": "",
 	// Rental
 	"GET /rental/register":                             "",
-	"GET /rental/register.csv":                         "",
+	"POST /rental/register":                            "",
+	"POST /rental/register.csv":                        "",
 	"POST /rental/register/retention":                  "",
 	"GET /rental/settings":                             "",
 	"POST /rental/permits":                             "",

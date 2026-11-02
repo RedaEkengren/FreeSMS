@@ -3,7 +3,7 @@
 <h1>{{.T "Rental register"}}</h1>
 <p class="waiting">{{.T "Who had which unit when, as the authority that granted the permit, or the police, may ask to see it. Every read is recorded with who read it, when and why."}}</p>
 
-<form method="get" action="/rental/register">
+<form method="post" action="/rental/register">
   <label><span>{{.T "Why it is read"}}</span><input name="purpose" maxlength="300" value="{{$f.Purpose}}" required></label>
   <h2>{{.T "Over a period"}}</h2>
   <div class="pair">

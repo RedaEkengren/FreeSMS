@@ -43,24 +43,31 @@ func TestTheOwnerReadsTheRentalRegister(t *testing.T) {
 		t.Error("the settings do not say the register's retention is missing")
 	}
 	q := url.Values{"purpose": {"Transportstyrelsens tillsyn"}, "from": {"2031-05-01"}, "to": {"2031-05-31"}}
+	// A read records why, so it is sent, not linked: a GET with the
+	// purpose in its address reads nothing (review r6, #10).
 	resp, _ = client.Get(ts.URL + "/rental/register?" + q.Encode())
-	if body := readBody(t, resp); resp.StatusCode != http.StatusOK || !strings.Contains(body, "R-1") || !strings.Contains(body, "Rita Hyrare") {
-		t.Errorf("the register page: %d %s", resp.StatusCode, body)
+	if body := readBody(t, resp); resp.StatusCode != http.StatusOK || strings.Contains(body, "R-1") {
+		t.Errorf("the register read by a link: %d", resp.StatusCode)
 	}
-	resp, _ = client.Get(ts.URL + "/rental/register.csv?" + q.Encode())
+	resp = postModuleForm(t, client, ts.URL, "/rental/register", q)
+	if body := readBody(t, resp); resp.StatusCode != http.StatusOK || !strings.Contains(body, "R-1") || !strings.Contains(body, "Rita Hyrare") ||
+		!strings.Contains(resp.Header.Get("Cache-Control"), "no-store") {
+		t.Errorf("the register page: %d %q %s", resp.StatusCode, resp.Header.Get("Cache-Control"), body)
+	}
+	resp = postModuleForm(t, client, ts.URL, "/rental/register.csv", q)
 	body := readBody(t, resp)
 	if resp.StatusCode != http.StatusOK || !strings.HasPrefix(body, "booking,unit,registration") || !strings.Contains(body, `R-1,V9,REG 123,"'=HYPERLINK(""x"") Rita Hyrare"`) {
 		t.Errorf("the register's CSV: %d %s", resp.StatusCode, body)
 	}
 	desk := signIn(t, ts, rentalEmail)
-	if resp, _ := desk.Get(ts.URL + "/rental/register?" + q.Encode()); resp.StatusCode != http.StatusForbidden {
+	if resp := postModuleForm(t, desk, ts.URL, "/rental/register", q); resp.StatusCode != http.StatusForbidden {
 		t.Errorf("the rental desk's register: %d", resp.StatusCode)
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO shop_module_changes (shop_id, module, enabled) VALUES ('`+shopA+`', 'rental', false)`); err != nil {
 		t.Fatal(err)
 	}
 	off := signIn(t, ts, ownerEmail)
-	resp, _ = off.Get(ts.URL + "/rental/register?" + q.Encode())
+	resp = postModuleForm(t, off, ts.URL, "/rental/register", q)
 	if body := readBody(t, resp); resp.StatusCode != http.StatusOK || !strings.Contains(body, "R-1") {
 		t.Errorf("the register with Rental off: %d", resp.StatusCode)
 	}
