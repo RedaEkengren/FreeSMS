@@ -36,7 +36,7 @@
   {{with $t.LeadID}}&middot; <a href="/cars/leads/{{.}}">{{$.T "Lead"}}</a>{{end}}</p>
 <ul class="lines">
   <li><div class="row"><span>{{.T "Licence"}}</span>
-    <span>{{with $t.Licence}}{{if .Passes $d.At}}{{$.T "Checked"}}{{else}}{{$.T "Not good for today"}}{{end}}{{else}}{{.T "Not checked"}}{{end}}</span></div>
+    <span>{{with $t.Licence}}{{if .Passes $d.Day}}{{$.T "Checked"}}{{else}}{{$.T "Not good for today"}}{{end}}{{else}}{{.T "Not checked"}}{{end}}</span></div>
     {{with $t.Licence}}<div class="waiting">{{$.T ($d.Word .Method)}} &middot; {{range $i, $c := .Categories}}{{if $i}}, {{end}}{{$c}}{{end}}
       {{with .ValidUntil}}&middot; {{$.T "valid until %s" ($.Date . "2 Jan 2006")}}{{end}} &middot; {{.CheckedBy}}, {{$.Date ($.Local .CheckedAt) "2 Jan 15:04"}}</div>{{end}}</li>
   <li><div class="row"><span>{{.T "Agreement"}}</span>

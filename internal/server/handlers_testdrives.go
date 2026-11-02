@@ -29,6 +29,16 @@ type driveData struct {
 	Today    string
 	// The moment the page was made, for what is late.
 	At time.Time
+	// The shop's day, as a date, for whether a licence is good today: the
+	// day StartTestDrive judges it on.
+	Day time.Time
+}
+
+// shopDay is now's date where the shop is, at midnight UTC, the way the
+// database hands back a date.
+func shopDay(now time.Time, loc *time.Location) time.Time {
+	y, m, d := now.In(loc).Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
 // Methods are the ways a licence is looked at.
@@ -174,6 +184,7 @@ func (s *Server) handleTestDrive(w http.ResponseWriter, r *http.Request) {
 	}
 	d.Today = time.Now().In(s.shopLocation(r)).Format(time.DateOnly)
 	d.At = time.Now()
+	d.Day = shopDay(d.At, s.shopLocation(r))
 	s.render(w, r, http.StatusOK, "testdrive", pageData{Title: "Test drive", Session: session, Drives: d})
 }
 

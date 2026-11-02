@@ -82,10 +82,12 @@ type LicenceCheck struct {
 
 // Passes reports whether the check lets the drive start on day: the
 // driver's identity seen, a licence for a car valid that day, and old
-// enough.
+// enough. day is the shop's date, at midnight UTC as the database hands a
+// date back -- never an instant, whose UTC day is not the shop's for two
+// hours of every night.
 func (c LicenceCheck) Passes(day time.Time) bool {
 	return c.IDChecked && c.AgeOK && slices.Contains(c.Categories, "B") &&
-		(c.ValidUntil == nil || !c.ValidUntil.Before(day.Truncate(24*time.Hour)))
+		(c.ValidUntil == nil || !c.ValidUntil.Before(day))
 }
 
 // NewTestDrive is a drive to book.
