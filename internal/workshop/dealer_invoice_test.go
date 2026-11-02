@@ -173,3 +173,28 @@ func TestAPartlyCreditedSaleInvoiceStillStands(t *testing.T) {
 		t.Errorf("revised with the invoice credited in full: %v", err)
 	}
 }
+
+// A deal with an invoice standing is not cancelled: the car would be on
+// sale again with a live invoice, and could be invoiced twice. Credited,
+// it is.
+func TestAnInvoicedDealIsNotCancelledUntilCredited(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	d := completedDealOn(t, pool, carForSale(t, pool), workshop.TaxOrdinary)
+	inv, err := workshop.IssueDealInvoice(ctx, pool, sales(), d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.CancelDeal(ctx, pool, sales(), d.ID, "Köparen ångrade sig"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("an invoiced deal cancelled: %v", err)
+	}
+	if u, _ := workshop.StockUnitByID(ctx, pool, sales(), d.StockUnitID); u.Status != workshop.StockSold {
+		t.Errorf("the car after the refused cancel: %s", u.Status)
+	}
+	if _, err := workshop.IssueCredit(ctx, pool, everything(owner()), inv.ID, workshop.CreditRequest{Reason: "Köpet gick tillbaka"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.CancelDeal(ctx, pool, sales(), d.ID, "Köparen ångrade sig"); err != nil {
+		t.Errorf("a credited deal cancelled: %v", err)
+	}
+}

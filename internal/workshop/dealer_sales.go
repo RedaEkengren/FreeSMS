@@ -730,6 +730,11 @@ func CancelDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sal
 		if d.State == DealCancelled {
 			return nil
 		}
+		// An invoice that stands is credited first: otherwise the car is on
+		// sale again with a live invoice, and could be invoiced twice.
+		if d.InvoiceID != "" {
+			return errDealInvoiced
+		}
 		var status StockStatus
 		if err := tx.QueryRow(ctx, `SELECT status FROM stock_units WHERE id = $1`, d.StockUnitID).Scan(&status); err != nil {
 			return err
