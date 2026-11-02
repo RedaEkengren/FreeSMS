@@ -11,6 +11,9 @@ package workshop_test
 // permission contract (#144, internal/testsupport/contract.go) reads this map
 // from the source and fails on anything else.
 var core = map[string]string{
+	// The rental register (#200): the duty to show it to the authority
+	// outlives the module, so it stays readable with Rental off.
+	"RentalRegister": "the rental register, kept for the authority", "WhoHadRegistration": "the rental register, kept for the authority",
 	// Documents and money: issued whatever made them, corrected, paid and
 	// handed to the accountant as long as the books are kept.
 	// Identity records (#153): who a party is, read across modules.

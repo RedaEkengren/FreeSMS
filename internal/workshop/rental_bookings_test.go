@@ -367,6 +367,10 @@ func rentalAudited(t *testing.T, pool *pgxpool.Pool, made func(event, kind, id s
 		t.Fatal(err)
 	}
 	made("rental.price_overridden", "rental_booking", id)
+	if _, err := workshop.RentalRegister(context.Background(), pool, rentalOwner(), workshop.RegisterFilter{From: in2031(1, 0), To: in2031(30, 0)}, "Tillsyn"); err != nil {
+		t.Fatal(err)
+	}
+	made("rental_register.read", "shop", shopID)
 }
 
 // After every migration, audit_events takes a subject Core had and

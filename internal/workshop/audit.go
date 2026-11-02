@@ -74,6 +74,8 @@ var AuditedTransitions = []AuditTransition{
 	{"stock_checks.overridden", "stock_unit", "audit_events", true},
 	// Rental
 	{"rental.price_overridden", "rental_booking", "audit_events", true},
+	// Every read of the rental register, with its purpose (#200).
+	{"rental_register.read", "shop", "audit_events", true},
 }
 
 func auditTransition(event string) (AuditTransition, bool) {
