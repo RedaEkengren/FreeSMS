@@ -254,6 +254,10 @@ var swept = map[string]string{
 	"POST /cars/test-drives/{id}/agreement": "sweep", "POST /cars/test-drives/{id}/signed": "sweep",
 	"POST /cars/test-drives/{id}/start": "sweep", "POST /cars/test-drives/{id}/return": "sweep",
 	"POST /cars/test-drives/{id}/cancel": "sweep",
+	"GET /cars/deals":                    "", "POST /cars/deals": "",
+	"GET /cars/deals/{id}": "sweep", "POST /cars/deals/{id}/terms": "sweep", "POST /cars/deals/{id}/defects": "sweep",
+	"POST /cars/deals/{id}/defects/{defect}/answer": "sweep", "POST /cars/deals/{id}/contract": "sweep",
+	"POST /cars/deals/{id}/signed": "sweep", "POST /cars/deals/{id}/complete": "sweep", "POST /cars/deals/{id}/cancel": "sweep",
 }
 
 // fill substitutes shop B's identifiers into a pattern.
@@ -297,6 +301,8 @@ func fill(pattern string) (method, path string) {
 		"/cars/calculations/{id}": "/cars/calculations/bbbbbbbb-0000-0000-0000-0000000000ca",
 		"/cars/leads/{id}":        "/cars/leads/bbbbbbbb-0000-0000-0000-0000000000cb",
 		"/cars/test-drives/{id}":  "/cars/test-drives/bbbbbbbb-0000-0000-0000-0000000000cc",
+		"/cars/deals/{id}":        "/cars/deals/bbbbbbbb-0000-0000-0000-0000000000cd",
+		"{defect}":                "bbbbbbbb-0000-0000-0000-0000000000ce",
 		// Rental: ids that are nobody's.
 		"/rental/permits/{id}":     "/rental/permits/bbbbbbbb-0000-0000-0000-0000000000e1",
 		"/rental/profiles/{id}":    "/rental/profiles/bbbbbbbb-0000-0000-0000-0000000000e2",
