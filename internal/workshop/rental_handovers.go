@@ -664,7 +664,7 @@ func rentalHandoversTx(ctx context.Context, tx pgx.Tx, bookingID string) (Rental
 	if err := rows.Err(); err != nil {
 		return v, err
 	}
-	under, err := readProtocols(ctx, tx, `coalesce(i.check_out_id, i.check_in_id) = $1 AND i.subject IN ('check_out', 'check_in')
+	under, err := readProtocols(ctx, tx, `(i.check_out_id = $1 OR i.check_in_id = $1)
 		AND i.completed_at IS NULL AND i.abandoned_at IS NULL`, bookingID)
 	if err != nil {
 		return v, err

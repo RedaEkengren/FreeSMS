@@ -386,3 +386,16 @@ func TestAFinishSentAfterQueuedAnswersMissesNoNewFinding(t *testing.T) {
 		t.Errorf("the damage register: %+v; want the torn door alone", view.Damage)
 	}
 }
+
+// A booking's protocols are found by an index on each of its two
+// columns, not by reading every inspection the shop has (review of R6, #8).
+func TestABookingsProtocolsAreFoundByAnIndex(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	for _, col := range []string{"check_out_id", "check_in_id"} {
+		var n int
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM pg_indexes WHERE tablename = 'inspections' AND indexdef LIKE '%(' || $1 || ')%'`, col).Scan(&n); err != nil || n == 0 {
+			t.Errorf("no index on inspections.%s: %d, %v", col, n, err)
+		}
+	}
+}

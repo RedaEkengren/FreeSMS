@@ -36,6 +36,10 @@ ALTER TABLE inspections ADD CONSTRAINT inspections_check_out_fkey
     FOREIGN KEY (check_out_id) REFERENCES rental_bookings(id) ON DELETE RESTRICT;
 ALTER TABLE inspections ADD CONSTRAINT inspections_check_in_fkey
     FOREIGN KEY (check_in_id) REFERENCES rental_bookings(id) ON DELETE RESTRICT;
+-- A booking's protocols are found by these, each end by its own column.
+CREATE INDEX inspections_check_out_idx ON inspections (check_out_id) WHERE check_out_id IS NOT NULL;
+CREATE INDEX inspections_check_in_idx ON inspections (check_in_id) WHERE check_in_id IS NOT NULL;
+
 SELECT widen_text_check('odometer_readings', 'odometer_readings_source_check', 'source', ARRAY['check_out', 'check_in']);
 
 -- The handover itself: once for each end of a booking. Its time is the
