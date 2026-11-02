@@ -41,8 +41,9 @@ CREATE TABLE fleet_insurances (
 );
 CREATE INDEX fleet_insurances_membership_idx ON fleet_insurances (membership_id, valid_from);
 
--- A handover gap a person with the right let go, and why: one per booking
--- and gap. The permit and the licence check are never let go (refused by
+-- A handover gap a person with the right let go, and why: for the rental
+-- as it was then, its booked start and end. Moved or extended, it is asked
+-- again. The permit and the licence check are never let go (refused by
 -- the CHECK as well as the code).
 CREATE TABLE rental_gap_overrides (
     id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -52,7 +53,9 @@ CREATE TABLE rental_gap_overrides (
     reason     text        NOT NULL CHECK (length(btrim(reason)) BETWEEN 1 AND 300),
     by_user    uuid        REFERENCES users(id) ON DELETE RESTRICT,
     at         timestamptz NOT NULL DEFAULT clock_timestamp(),
-    UNIQUE (booking_id, code)
+    starts_at  timestamptz NOT NULL,
+    ends_at    timestamptz NOT NULL,
+    UNIQUE (booking_id, code, starts_at, ends_at)
 );
 
 -- Whether a profile requires the insurance: a rule of its own, as the

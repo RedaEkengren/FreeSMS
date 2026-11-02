@@ -206,3 +206,42 @@ func TestInsuranceIsAProfilesRule(t *testing.T) {
 		t.Errorf("a tent whose profile requires insurance: %v", gapCodes(t, gaps))
 	}
 }
+
+// A gap let go is let go for the rental as it was then: moved or
+// extended, it is asked again. And a rental out is not extended past its
+// insurance, as it is not past a licence (review r5, #4).
+func TestALetGoGapAndTheInsuranceAreAskedAgainForANewPeriod(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	id, err := v.book(pool, in2031(10, 9), in2031(12, 9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.OverrideHandoverGap(ctx, pool, rentalOwner(), id, workshop.GapNotReported, "Anmäls i morgon"); err != nil {
+		t.Fatal(err)
+	}
+	if gaps, _ := workshop.RentalBookingGaps(ctx, pool, rentalDesk(), id); slices.Contains(gapCodes(t, gaps), workshop.GapNotReported) {
+		t.Fatalf("let go, and still there: %v", gapCodes(t, gaps))
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, in2031(13, 9), ""); err != nil {
+		t.Fatal(err)
+	}
+	if gaps, _ := workshop.RentalBookingGaps(ctx, pool, rentalDesk(), id); !slices.Contains(gapCodes(t, gaps), workshop.GapNotReported) {
+		t.Errorf("a gap let go for the old period, after an extension: %v", gapCodes(t, gaps))
+	}
+
+	pool2 := setup(t)
+	_, out, _ := checkedOut(t, pool2)
+	b, _ := workshop.RentalBookingByID(ctx, pool2, rentalDesk(), out)
+	u, _ := workshop.RentalUnitByID(ctx, pool2, rentalDesk(), b.UnitID)
+	pool2.Exec(ctx, `DELETE FROM fleet_insurances`)
+	end := day("2031-05-12")
+	if _, err := workshop.RecordFleetInsurance(ctx, pool2, rentalDesk(), u.Memberships[0].ID, workshop.FleetInsurance{Insurer: "Bolaget", PolicyRef: "P",
+		ValidFrom: day("2024-01-01"), ValidTo: &end, CoversRental: "yes"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool2, rentalDesk(), out, in2031(14, 9), ""); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a rental out extended past its insurance: %v", err)
+	}
+}

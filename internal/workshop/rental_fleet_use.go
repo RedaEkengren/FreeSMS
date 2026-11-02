@@ -304,10 +304,14 @@ type GapOverride struct {
 	At     time.Time
 }
 
+// gapOverridesTx are the gaps let go for the booking as it is now: one let
+// go before it was moved or extended no longer stands.
 func gapOverridesTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]GapOverride, error) {
 	rows, err := tx.Query(ctx, `
 		SELECT o.code, o.reason, coalesce(p.display_name, ''), o.at
-		FROM rental_gap_overrides o LEFT JOIN users us ON us.id = o.by_user LEFT JOIN people p ON p.id = us.person_id
+		FROM rental_gap_overrides o
+		JOIN rental_bookings b ON b.id = o.booking_id AND b.starts_at = o.starts_at AND b.ends_at = o.ends_at
+		LEFT JOIN users us ON us.id = o.by_user LEFT JOIN people p ON p.id = us.person_id
 		WHERE o.booking_id = $1 ORDER BY o.at`, bookingID)
 	if err != nil {
 		return nil, fmt.Errorf("read what was let go: %w", err)
@@ -342,7 +346,7 @@ func RentalGapOverrides(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 }
 
 // OverrideHandoverGap lets a missing report or insurance go for one
-// booking, with the reason: the handover can then go ahead without it. The
+// booking as it is booked now, with the reason: the handover can then go ahead without it. The
 // permit and the licence check are never let go. Whoever runs the shop.
 func OverrideHandoverGap(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, bookingID, code, reason string) error {
 	if !scope.Role.RunsTheShop() {
@@ -369,7 +373,10 @@ func OverrideHandoverGap(ctx context.Context, pool *pgxpool.Pool, scope access.S
 		if !slices.ContainsFunc(gaps, func(g HandoverGap) bool { return g.Code == code && g.Overridable }) {
 			return errOverrideGap
 		}
-		_, err = tx.Exec(ctx, `INSERT INTO rental_gap_overrides (shop_id, booking_id, code, reason, by_user) VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid)`,
+		_, err = tx.Exec(ctx, `
+			INSERT INTO rental_gap_overrides (shop_id, booking_id, code, reason, by_user, starts_at, ends_at)
+			SELECT $1, b.id, $3, $4, NULLIF($5, '')::uuid, b.starts_at, b.ends_at FROM rental_bookings b WHERE b.id = $2
+			ON CONFLICT (booking_id, code, starts_at, ends_at) DO NOTHING`,
 			scope.ShopID, bookingID, code, reason, scope.UserID)
 		return err
 	})
@@ -475,4 +482,30 @@ func fleetUseWaitingTx(ctx context.Context, tx pgx.Tx) ([]ActionItem, error) {
 		}
 	}
 	return out, nil
+}
+
+var errExtendInsurance = fmt.Errorf("%w: the unit is not insured for rental use for the longer rental; record the insurance first", ErrInvalid)
+
+// insuranceLastsTx refuses to extend a rental that is out past the
+// insurance its profile requires.
+func insuranceLastsTx(ctx context.Context, tx pgx.Tx, bookingID string, starts, to time.Time) error {
+	var version string
+	if err := tx.QueryRow(ctx, `SELECT profile_version_id FROM rental_bookings WHERE id = $1`, bookingID).Scan(&version); err != nil {
+		return fmt.Errorf("read booking: %w", err)
+	}
+	p, err := profileVersionTx(ctx, tx, version)
+	if err != nil {
+		return err
+	}
+	if !p.Rules.InsuranceRequired {
+		return nil
+	}
+	gaps, err := fleetUseGapsTx(ctx, tx, bookingID, p, starts, to)
+	if err != nil {
+		return err
+	}
+	if slices.ContainsFunc(gaps, func(g HandoverGap) bool { return g.Code == GapInsurance }) {
+		return errExtendInsurance
+	}
+	return nil
 }

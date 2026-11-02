@@ -753,6 +753,10 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 			if err := licencesLastTx(ctx, tx, id, to); err != nil {
 				return err
 			}
+			// Nor past its insurance for rental use (#202).
+			if err := insuranceLastsTx(ctx, tx, id, b.starts, to); err != nil {
+				return err
+			}
 		}
 		if err := inFleetTx(ctx, tx, b.unit, b.starts, to.Add(b.buffer)); err != nil {
 			return err

@@ -385,6 +385,7 @@ func TestARentalOutIsNotExtendedPastADriversLicence(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
 	v := rentableVan(t, pool)
+	reported(t, pool, v)
 	id, err := v.book(pool, wallAt("2031-06-08 09:00"), wallAt("2031-06-09 09:00"))
 	if err != nil {
 		t.Fatal(err)
