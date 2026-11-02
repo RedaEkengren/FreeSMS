@@ -11,6 +11,7 @@ import (
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // strictLiability is wording that makes a consumer renter answer for damage
@@ -70,6 +71,7 @@ func TestEveryDriverShowsALicenceForEachRental(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
 	v := rentableVan(t, pool)
+	reported(t, pool, v)
 	if _, err := workshop.RecordRentalPermit(ctx, pool, rentalOwner(), workshop.NewRentalPermit{
 		Reference: "TSV 1", DecidedOn: day("2020-01-01"), Responsible: "Anna"}); err != nil {
 		t.Fatal(err)
@@ -339,6 +341,7 @@ func TestALicenceCheckIsAskedAgainstTheRentalAsItIsNow(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
 	v := rentableVan(t, pool)
+	reported(t, pool, v)
 	if _, err := workshop.RecordRentalPermit(ctx, pool, rentalOwner(), workshop.NewRentalPermit{
 		Reference: "TSV 1", DecidedOn: day("2020-01-01"), Responsible: "Anna"}); err != nil {
 		t.Fatal(err)
@@ -446,4 +449,15 @@ func TestALicenceNoteRefusesIdentifiersHoweverWritten(t *testing.T) {
 	if err := shown(strings.Repeat("x", 80), append(many, workshop.LicenceCategories...)...); err != nil && !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("thirty categories and a full note: %v", err)
 	}
+}
+
+// reported records a rentable van as reported into rental use and
+// insured for it (#202), so a test of the drivers sees only theirs.
+func reported(t *testing.T, pool *pgxpool.Pool, v rentable) {
+	t.Helper()
+	u, err := workshop.RentalUnitByID(context.Background(), pool, rentalDesk(), v.unit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inRentalUse(t, pool, u.Memberships[0].ID)
 }

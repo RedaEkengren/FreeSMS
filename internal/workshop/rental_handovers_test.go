@@ -40,9 +40,11 @@ func handoverReady(t *testing.T, pool *pgxpool.Pool) (rentable, string) {
 		t.Fatal(err)
 	}
 	unit := addUnit(t, pool, workshop.NewRentalUnit{Registration: "ABC 12D", FleetNumber: "V1", Category: "Bil"})
-	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), unit, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
+	membership, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), unit, time.Now().AddDate(-1, 0, 0), "bought", "")
+	if err != nil {
 		t.Fatal(err)
 	}
+	inRentalUse(t, pool, membership)
 	plan, _ := workshop.CreateRatePlan(ctx, pool, rentalOwner(), workshop.NewRatePlan{Name: "Bil", Category: "Bil", VATRateBp: 2500, SeasonRule: "at_start"})
 	km := 100
 	if _, err := workshop.AddRateSeason(ctx, pool, rentalOwner(), plan, workshop.RateSeason{ValidFrom: day("2020-01-01"), Day: kr(40000),
@@ -486,4 +488,18 @@ func activeBlocks(t *testing.T, pool *pgxpool.Pool, resource string, from time.T
 		}
 	}
 	return out
+}
+
+// inRentalUse records a period in the fleet as reported into rental use
+// and insured for it, from long ago and until further notice (#202).
+func inRentalUse(t *testing.T, pool *pgxpool.Pool, membership string) {
+	t.Helper()
+	ctx := context.Background()
+	if _, err := workshop.RecordFleetReport(ctx, pool, rentalDesk(), membership, workshop.ReportedIn, day("2024-01-02"), "Anmäld"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordFleetInsurance(ctx, pool, rentalDesk(), membership, workshop.FleetInsurance{Insurer: "Försäkringsbolaget",
+		PolicyRef: "P-1", ValidFrom: day("2024-01-01"), CoversRental: "yes"}); err != nil {
+		t.Fatal(err)
+	}
 }

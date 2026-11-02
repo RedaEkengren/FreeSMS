@@ -54,6 +54,8 @@ var ExportTables = []string{
 	"rental_drivers", "rental_licence_checks",
 	// Each end of a rental, and what a return found (#194).
 	"rental_handovers", "damage_cases",
+	// A fleet vehicle's paperwork, and handover gaps let go (#202).
+	"fleet_rental_reports", "fleet_insurances", "rental_gap_overrides",
 }
 
 // exportQueries are tables exported with chosen columns, because one of

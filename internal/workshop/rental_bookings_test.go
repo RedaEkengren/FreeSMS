@@ -427,7 +427,9 @@ func TestTheRentalDesksDayIsInTheQueueAndOnTheHomePage(t *testing.T) {
 	kinds := map[string]string{}
 	for _, it := range items {
 		kinds[it.Kind] = it.SubjectID
-		if it.Link() != "/rental/bookings/"+it.SubjectID || it.Says() == "" {
+		// A unit's paperwork goes to the unit (#202); a booking to itself.
+		if (it.SubjectKind == "rental_booking" && it.Link() != "/rental/bookings/"+it.SubjectID) ||
+			(it.SubjectKind == "rental_unit" && it.Link() != "/rental/units/"+it.SubjectID) || it.Says() == "" {
 			t.Errorf("an item that leads nowhere or says nothing: %+v", it)
 		}
 	}

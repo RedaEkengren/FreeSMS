@@ -743,6 +743,13 @@ func rentalBookingGapsTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]Ha
 	if err != nil {
 		return nil, err
 	}
+	// The unit's own: reported into rental use, insured for it (#202),
+	// less what a person with the right let go.
+	fleet, err := fleetUseGapsTx(ctx, tx, bookingID, p, starts, ends)
+	if err != nil {
+		return nil, err
+	}
+	gaps = append(gaps, fleet...)
 	if !p.Rules.LicenceCheckRequired {
 		return gaps, nil
 	}
