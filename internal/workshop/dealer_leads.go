@@ -933,3 +933,110 @@ func CarsInStock(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([
 	})
 	return out, err
 }
+
+// theirLeadsAndDrivesTx finds a person's leads and the test drives they
+// took: by their party -- on its own or as a customer, and any merged into
+// one -- and, for a lead entered with only a name, by the phone number or
+// email they gave, as a second enquiry from them would be recognised.
+func theirLeadsAndDrivesTx(ctx context.Context, tx pgx.Tx, personID string) (leads, drives []string, err error) {
+	var phone, email string
+	if err := tx.QueryRow(ctx, `SELECT coalesce(phone, ''), lower(coalesce(email::text, '')) FROM people WHERE id = $1`, personID).
+		Scan(&phone, &email); err != nil {
+		return nil, nil, fmt.Errorf("read person: %w", err)
+	}
+	digits := ""
+	if phone != "" {
+		digits = leadPhoneDigits(phone)
+	}
+	const theirs = `
+		WITH theirs AS (
+		  SELECT pa.id FROM parties pa LEFT JOIN customers c ON c.id = pa.customer_id
+		  WHERE pa.person_id = $1 OR c.person_id = $1)`
+	rows, err := tx.Query(ctx, theirs+`
+		SELECT l.id FROM leads l
+		WHERE l.party_id IN (SELECT id FROM theirs) OR party_now(l.party_id) IN (SELECT id FROM theirs)
+		   OR ($2 <> '' AND l.contact_phone_digits = $2) OR ($3 <> '' AND l.contact_email = $3)
+		ORDER BY l.created_at`, personID, digits, email)
+	if err != nil {
+		return nil, nil, fmt.Errorf("read their leads: %w", err)
+	}
+	if leads, err = pgx.CollectRows(rows, pgx.RowTo[string]); err != nil {
+		return nil, nil, err
+	}
+	rows, err = tx.Query(ctx, theirs+`
+		SELECT d.id FROM test_drives d
+		WHERE d.driver_party_id IN (SELECT id FROM theirs) OR party_now(d.driver_party_id) IN (SELECT id FROM theirs)
+		ORDER BY d.starts_at`, personID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("read their test drives: %w", err)
+	}
+	drives, err = pgx.CollectRows(rows, pgx.RowTo[string])
+	return leads, drives, err
+}
+
+// exportLeadsAndDrivesTx adds a person's leads and test drives to what
+// they are given (ExportPerson).
+func exportLeadsAndDrivesTx(ctx context.Context, tx pgx.Tx, personID string, e *PersonExport) error {
+	leads, drives, err := theirLeadsAndDrivesTx(ctx, tx, personID)
+	if err != nil {
+		return err
+	}
+	for _, id := range leads {
+		var l ExportedLead
+		if err := tx.QueryRow(ctx, `
+			SELECT l.created_at, l.channel, coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), ''),
+			       coalesce(l.wishes, ''), coalesce(l.contact_name, ''), coalesce(l.contact_phone, ''), coalesce(l.contact_email, ''),
+			       coalesce(n.status, 'new'),
+			       ARRAY(SELECT to_char(c.at, 'YYYY-MM-DD') || ' ' || c.how || coalesce(': ' || c.note, '')
+			             FROM lead_contacts c WHERE c.lead_id = l.id ORDER BY c.at, c.id)
+			FROM leads l JOIN lead_now n ON n.lead_id = l.id
+			LEFT JOIN stock_units u ON u.id = l.stock_unit_id LEFT JOIN vehicles v ON v.id = u.vehicle_id
+			LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = v.id AND reg.valid_to IS NULL
+			WHERE l.id = $1`, id).Scan(&l.Asked, &l.Channel, &l.Car, &l.Wishes, &l.Name, &l.Phone, &l.Email, &l.Status, &l.Contacts); err != nil {
+			return fmt.Errorf("read lead: %w", err)
+		}
+		e.Leads = append(e.Leads, l)
+	}
+	for _, id := range drives {
+		d, err := testDriveTx(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		x := ExportedTestDrive{Car: d.Car, From: d.StartsAt, To: d.EndsAt, Area: d.Area, Notes: d.Notes}
+		if c := d.Licence; c != nil {
+			x.Categories, x.ValidUntil, x.LicenceNote = c.Categories, c.ValidUntil, c.Note
+		}
+		e.TestDrives = append(e.TestDrives, x)
+	}
+	return nil
+}
+
+// eraseLeadsAndDrivesTx clears a person from their leads, as the retention
+// sweep does (sweepLeadsTx), and what was written about them on their test
+// drives; that they asked, which car and how it ended, and that they drove
+// and their licence was checked, stay. It returns how many leads.
+func eraseLeadsAndDrivesTx(ctx context.Context, tx pgx.Tx, personID string) (int, error) {
+	leads, drives, err := theirLeadsAndDrivesTx(ctx, tx, personID)
+	if err != nil {
+		return 0, err
+	}
+	for _, q := range []struct {
+		sql string
+		ids []string
+	}{
+		{`UPDATE leads SET party_id = NULL, contact_name = NULL, contact_phone = NULL, contact_phone_digits = NULL,
+		         contact_email = NULL, wishes = NULL, erased_at = coalesce(erased_at, clock_timestamp()) WHERE id = ANY($1::uuid[])`, leads},
+		{`UPDATE lead_contacts SET note = NULL WHERE lead_id = ANY($1::uuid[]) AND note IS NOT NULL`, leads},
+		{`UPDATE lead_events SET note = NULL WHERE lead_id = ANY($1::uuid[]) AND note IS NOT NULL`, leads},
+		{`UPDATE test_drive_licence_checks SET note = NULL WHERE test_drive_id = ANY($1::uuid[]) AND note IS NOT NULL`, drives},
+		{`UPDATE test_drive_events SET note = NULL WHERE test_drive_id = ANY($1::uuid[]) AND note IS NOT NULL`, drives},
+	} {
+		if len(q.ids) == 0 {
+			continue
+		}
+		if _, err := tx.Exec(ctx, q.sql, q.ids); err != nil {
+			return 0, fmt.Errorf("erase from leads and test drives: %w", err)
+		}
+	}
+	return len(leads), nil
+}

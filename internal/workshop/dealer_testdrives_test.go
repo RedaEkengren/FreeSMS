@@ -265,3 +265,64 @@ func unsignedDrive(t *testing.T, pool *pgxpool.Pool) string {
 	}
 	return d.ID
 }
+
+// A person who asked about cars and drove one is given what the leads and
+// the drives hold about them -- as a party, and where they were only a
+// name with their number or email -- and erasing them clears it from both.
+func TestLeadsAndTestDrivesAreInAPersonsExportAndErasure(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := carForSale(t, pool)
+	kim, err := workshop.CreateParty(ctx, pool, everything(owner()), workshop.NewParty{
+		Kind: "private", Name: "Kim Köpare", Phone: "070-123 45 67", Email: "kim@example.test", Role: workshop.PartyBuyer})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var person string
+	if err := pool.QueryRow(ctx, `SELECT person_id::text FROM parties WHERE id = $1`, kim).Scan(&person); err != nil {
+		t.Fatal(err)
+	}
+	asParty, err := workshop.CreateLead(ctx, pool, sales(), workshop.NewLead{PartyID: kim, StockUnitID: unit, Channel: "walk_in",
+		Note: "Kim vill ha dragkrok"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byNumber, err := workshop.CreateLead(ctx, pool, sales(), workshop.NewLead{Name: "Kim K", Phone: "+46 70 123 45 67",
+		Channel: "phone", Wishes: "Kombi åt Kim", Alongside: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := workshop.BookTestDrive(ctx, pool, sales(), workshop.NewTestDrive{StockUnitID: unit, DriverPartyID: kim, LeadID: asParty.ID,
+		From: time.Now(), To: time.Now().Add(time.Hour), Area: "Inom stan"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := goodLicence()
+	check.Note = "Kims körkort är nytt"
+	if err := workshop.CheckDriverLicence(ctx, pool, sales(), d.ID, check); err != nil {
+		t.Fatal(err)
+	}
+
+	e, err := workshop.ExportPerson(ctx, pool, advisor(), person)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(e.Leads) != 2 || len(e.TestDrives) != 1 || e.TestDrives[0].LicenceNote != "Kims körkort är nytt" {
+		t.Errorf("the export: %d leads, %+v", len(e.Leads), e.TestDrives)
+	}
+
+	if err := workshop.ErasePerson(ctx, pool, advisor(), &recordingRemover{}, person, "Begäran"); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{asParty.ID, byNumber.ID} {
+		l, err := workshop.LeadByID(ctx, pool, everything(owner()), id)
+		if err != nil || !l.Erased || l.Name != "" || l.Phone != "" || l.Wishes != "" || l.PartyID != "" ||
+			(len(l.Contacts) > 0 && l.Contacts[0].Note != "") {
+			t.Errorf("lead %s after the erasure: %+v, %v", id, l, err)
+		}
+	}
+	var note *string
+	if err := pool.QueryRow(ctx, `SELECT note FROM test_drive_licence_checks WHERE test_drive_id = $1`, d.ID).Scan(&note); err != nil || note != nil {
+		t.Errorf("the licence check's note after the erasure: %v, %v", note, err)
+	}
+}
