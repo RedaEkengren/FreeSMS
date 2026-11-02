@@ -334,8 +334,10 @@ func writeTable(ctx context.Context, tx pgx.Tx, z *zip.Writer, table string) (in
 			return n, err
 		}
 		for i, v := range values {
-			// Opened in a spreadsheet, a shop's own typing never runs.
-			record[i] = SpreadsheetCell(exportValue(v, fields[i].DataTypeOID))
+			// As stored: this is data for software and a restore, and a
+			// value is not rewritten for a spreadsheet (SpreadsheetCell is
+			// for the files people open, as the rental register's).
+			record[i] = exportValue(v, fields[i].DataTypeOID)
 		}
 		if err := cw.Write(record); err != nil {
 			return n, err

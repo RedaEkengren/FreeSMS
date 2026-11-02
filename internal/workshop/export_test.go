@@ -115,7 +115,13 @@ func TestTheWholeShopLeavesReadableWithoutFreeSMS(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
 	job, invoiceID := invoicedJob(t, pool)
-	if _, err := pool.Exec(ctx, `UPDATE work_orders SET complaint = '=HYPERLINK("x")' WHERE id = $1`, job); err != nil {
+	// Values as typed, a phone number and a note starting as a formula
+	// would: the export is data for software, and carries them unchanged
+	// (review r8, #1).
+	if _, err := pool.Exec(ctx, `UPDATE work_orders SET complaint = '- see note' WHERE id = $1`, job); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE people SET phone = '+46 70 123 45 67' WHERE id = '22222222-2222-2222-2222-222222222222'`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -164,10 +170,11 @@ func TestTheWholeShopLeavesReadableWithoutFreeSMS(t *testing.T) {
 	if !strings.Contains(string(files["erasures.csv"]), "Begärde radering") {
 		t.Error("the erasure is not recorded in the export")
 	}
-	// A shop's own typing that a spreadsheet would run does not run when
-	// the export is opened in one (review r7, #1).
-	if !strings.Contains(string(files["work_orders.csv"]), "'=HYPERLINK") {
-		t.Error("a complaint written as a formula is exported as one")
+	if jobs := csvRows(t, files["work_orders.csv"]); len(jobs) == 0 || jobs[0]["complaint"] != "- see note" {
+		t.Errorf("a complaint starting with a minus did not leave as typed: %v", jobs)
+	}
+	if !strings.Contains(string(files["people.csv"]), ",+46 70 123 45 67,") {
+		t.Error("a phone number starting with a plus did not leave as typed")
 	}
 }
 
