@@ -3,10 +3,17 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io/fs"
+	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
+	"github.com/RedaEkengren/FreeSMS/internal/database"
+	"github.com/RedaEkengren/FreeSMS/internal/testsupport"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/migrations"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -94,5 +101,101 @@ func TestTheFleetAndStockAreOneQueueForACar(t *testing.T) {
 	}
 	if err := stock.result(t); err == nil {
 		t.Error("a car put in the fleet and in stock at once: both stand")
+	}
+}
+
+// An overlap that got in anyway -- written by the release before the
+// refusal, which a rollback may run over it -- can still be ended from
+// either side. Only a period made longer is checked again: ending one,
+// or a status move that leaves its end as it was, is not refused for an
+// overlap it does not add to.
+func TestAnOverlapAlreadyThereCanBeEnded(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool) // vehicle A, in the fleet since a year ago
+	for _, s := range []string{`ALTER TABLE stock_units DISABLE TRIGGER vehicle_fleet_or_stock`} {
+		if _, err := pool.Exec(ctx, s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	stock := takeIn(t, pool, workshop.StockFromDefleet)
+	if _, err := pool.Exec(ctx, `ALTER TABLE stock_units ENABLE TRIGGER vehicle_fleet_or_stock`); err != nil {
+		t.Fatal(err)
+	}
+	moveStock(t, pool, stock.ID, workshop.StockForSale)
+	// Made longer, it is checked again and refused. (Not something the
+	// application role may do; the owner can, and the trigger still runs.)
+	_, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = opened_at - interval '1 day' WHERE id = $1`, stock.ID)
+	if err == nil || !strings.Contains(err.Error(), "23P01") {
+		t.Errorf("a stock cycle made longer over a fleet period: %v", err)
+	}
+	u, err := workshop.RentalUnitByID(ctx, pool, rentalDesk(), v.unit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.EndFleetMembership(ctx, pool, rentalDesk(), u.Memberships[0].ID, time.Now(), "to_stock", ""); err != nil {
+		t.Errorf("ending the fleet side of an overlap: %v", err)
+	}
+	moveStock(t, pool, stock.ID, workshop.StockClosed)
+}
+
+// A database that already holds a car in both, written before the refusal
+// existed, is not migrated over it in silence: the migration stops and
+// names the car, so the overlap is ended by a person who knows which side
+// is right.
+func TestTheRefusalIsNotAddedOverAnOverlapAlreadyThere(t *testing.T) {
+	pool := testsupport.FreshPool(t)
+	ctx := context.Background()
+	names, err := fs.Glob(migrations.FS, "*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	refusal := ""
+	for _, n := range names {
+		if strings.HasSuffix(n, "_fleet_or_stock.sql") {
+			refusal = n
+		}
+	}
+	if refusal == "" {
+		t.Fatal("no fleet_or_stock migration")
+	}
+	before := fstest.MapFS{}
+	for _, n := range names {
+		if n < refusal {
+			body, err := fs.ReadFile(migrations.FS, n)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before[n] = &fstest.MapFile{Data: body}
+		}
+	}
+	if err := database.Migrate(ctx, pool, before); err != nil {
+		t.Fatal(err)
+	}
+	err = database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		for _, s := range []string{
+			`INSERT INTO shops (id, name) VALUES ('` + shopID + `', 'Verkstaden')`,
+			`INSERT INTO vehicles (id, shop_id) VALUES ('` + vehicleA + `', '` + shopID + `')`,
+			`INSERT INTO resources (id, shop_id, kind, vehicle_id) VALUES ('66666666-6666-6666-6666-666666666666', '` + shopID + `', 'vehicle', '` + vehicleA + `')`,
+			`INSERT INTO rental_profiles (id, shop_id, base, name) VALUES ('77777777-7777-7777-7777-777777777777', '` + shopID + `', 'car', 'Bil')`,
+			`INSERT INTO rental_units (id, shop_id, resource_id, profile_id, fleet_number, category)
+			 VALUES ('88888888-8888-8888-8888-888888888888', '` + shopID + `', '66666666-6666-6666-6666-666666666666', '77777777-7777-7777-7777-777777777777', 'V1', 'Van')`,
+			`INSERT INTO fleet_memberships (shop_id, unit_id, vehicle_id, joined_at, joined_how)
+			 VALUES ('` + shopID + `', '88888888-8888-8888-8888-888888888888', '` + vehicleA + `', now() - interval '1 year', 'bought')`,
+			`INSERT INTO stock_units (shop_id, vehicle_id, resource_id, reason)
+			 VALUES ('` + shopID + `', '` + vehicleA + `', '66666666-6666-6666-6666-666666666666', 'defleet')`,
+		} {
+			if _, err := tx.Exec(ctx, s); err != nil {
+				return fmt.Errorf("%s: %w", s, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = database.Migrate(ctx, pool, migrations.FS)
+	if err == nil || !strings.Contains(err.Error(), vehicleA) || !strings.Contains(err.Error(), "fleet") {
+		t.Errorf("migrated over a car in the fleet and in stock: %v", err)
 	}
 }
