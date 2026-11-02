@@ -333,3 +333,22 @@ func TestAnInsuranceLetGoDoesNotCoverAnExtension(t *testing.T) {
 		t.Errorf("extended past an insurance let go only for the booked period: %v", err)
 	}
 }
+
+// A confirmed booking whose time has come and that has not gone out is
+// still on the list while it lacks something (review r6, #3).
+func TestABookingDueAndNotOutIsListedWhileItLacksSomething(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool) // a car with no permit and no driver
+	due, err := v.book(pool, time.Now().Add(-time.Hour), time.Now().Add(5*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, err := workshop.WaitingFor(ctx, pool, rentalDesk())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(items, func(it workshop.ActionItem) bool { return it.Kind == "rental_gaps" && it.SubjectID == due }) {
+		t.Errorf("a booking due an hour ago, not out and lacking a permit: %+v", items)
+	}
+}

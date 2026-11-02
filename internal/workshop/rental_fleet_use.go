@@ -411,8 +411,8 @@ func rentalPaperworkWaiting(ctx context.Context, pool *pgxpool.Pool, scope acces
 // not reported into rental use where its profile asks it, one out of the
 // fleet still reported in, an insurance ending within ExpiryWarning or
 // ended with none after it, the permit ending, and a confirmed booking
-// starting within ExpiryWarning that would be refused at the counter
-// today. Read from the rows each time, never kept; a task is done when a
+// starting within ExpiryWarning -- or past its start and not handed over
+// -- that would be refused at the counter today. Read from the rows each time, never kept; a task is done when a
 // person records what they did.
 //
 // A unit's own items ask its profile as it is now: they are about the
@@ -440,7 +440,8 @@ func fleetUseWaitingTx(ctx context.Context, tx pgx.Tx) ([]ActionItem, error) {
 		    JOIN resource_blocks k ON k.id = b.block_id
 		    JOIN rental_profile_versions v ON v.id = b.profile_version_id
 		    CROSS JOIN t
-		    WHERE `+rentalState+` = 'confirmed' AND b.starts_at >= clock_timestamp() AND b.starts_at < clock_timestamp() + $2::interval)
+		    -- Confirmed and not out: due, or past due and still not handed over.
+		    WHERE `+rentalState+` = 'confirmed' AND b.starts_at < clock_timestamp() + $2::interval)
 		SELECT CASE WHEN m.left_at IS NULL THEN 'rental_report_in' ELSE 'rental_report_out' END,
 		       'rental_unit', u.id::text, u.fleet_number || coalesce(' · ' || reg.registration, ' · ' || r.name, ''), coalesce(m.left_at, m.joined_at)
 		FROM fleet_memberships m
