@@ -283,7 +283,9 @@ func verifyShop(ctx context.Context, tx pgx.Tx, files Files, sr *ShopReport) err
 	}
 
 	// Every audit event is about something that is there (#151): a restore
-	// that lost a table, or a row, leaves an event naming nothing.
+	// that lost a table, or a row, leaves an event naming nothing. A module
+	// that widens audit_events_subject_kind_check adds its branch here;
+	// TestEveryAuditSubjectKindIsOneVerifyCanFind fails until it does.
 	if n, err := count(`
 		SELECT count(*) FROM audit_events e
 		WHERE NOT CASE e.subject_kind
@@ -297,6 +299,10 @@ func verifyShop(ctx context.Context, tx pgx.Tx, files Files, sr *ShopReport) err
 		  WHEN 'customer'       THEN EXISTS (SELECT 1 FROM customers x WHERE x.id = e.subject_id)
 		  WHEN 'vehicle'        THEN EXISTS (SELECT 1 FROM vehicles x WHERE x.id = e.subject_id)
 		  WHEN 'work_order'     THEN EXISTS (SELECT 1 FROM work_orders x WHERE x.id = e.subject_id)
+		  WHEN 'identity_record' THEN EXISTS (SELECT 1 FROM identity_records x WHERE x.id = e.subject_id)
+		  WHEN 'stock_unit'     THEN EXISTS (SELECT 1 FROM stock_units x WHERE x.id = e.subject_id)
+		  WHEN 'purchase'       THEN EXISTS (SELECT 1 FROM vehicle_purchases x WHERE x.id = e.subject_id)
+		  WHEN 'rental_booking' THEN EXISTS (SELECT 1 FROM rental_bookings x WHERE x.id = e.subject_id)
 		  ELSE false END`); err != nil {
 		return err
 	} else if n > 0 {
