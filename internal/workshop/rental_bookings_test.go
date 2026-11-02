@@ -731,3 +731,46 @@ func TestADailyExtraKeepsItsCountAcrossTheChangeOfHour(t *testing.T) {
 		t.Errorf("one seat for two days and two more: %d seat-days", seats/1000)
 	}
 }
+
+// A daily extra taken on two lines -- a seat, and another seat -- is
+// charged for both on an extension, and a second extension charges the
+// same two again rather than the lines of the first counted on top
+// (review 3 #4).
+func TestADailyExtraOnTwoLinesIsChargedForBothWhenExtended(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	seat, _ := workshop.AddRentalExtra(ctx, pool, rentalOwner(), workshop.NewRentalExtra{Kind: "child_seat", Name: "Barnstol", Per: "day",
+		PriceMinor: 5000, VATRateBp: 2500, VATCategory: "S"})
+	id, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: v.unit, RenterID: v.renter,
+		From: in2031(10, 9), To: in2031(11, 9), Extras: []workshop.ExtraChoice{{ExtraID: seat, Count: 1}, {ExtraID: seat, Count: 1}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seatDays := func() int64 {
+		t.Helper()
+		b, err := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var n int64
+		for _, l := range b.Lines {
+			if l.ExtraID == seat {
+				n += l.QuantityMilli
+			}
+		}
+		return n / 1000
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, in2031(13, 9), ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := seatDays(); got != 2*3 {
+		t.Errorf("two seats for three days: %d seat-days", got)
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, in2031(14, 9), ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := seatDays(); got != 2*4 {
+		t.Errorf("two seats for four days: %d seat-days", got)
+	}
+}

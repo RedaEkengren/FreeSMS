@@ -795,15 +795,21 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 
 // perDayExtrasTx is the extras a booking took by the day, for the days an
 // extension adds: as many of each as it took, at the price it was agreed
-// at.
+// at. One extra may be on several lines of the same booking or extension
+// -- a seat, and another seat -- so the lines are added up within each,
+// and an extension's lines, which repeat the number, are not added to the
+// booking's.
 func perDayExtrasTx(ctx context.Context, tx pgx.Tx, bookingID string, days, added int64) ([]frozenLine, error) {
 	rows, err := tx.Query(ctx, `
-		SELECT l.extra_id::text, l.unit, l.description, sum(l.quantity_milli), l.unit_price_minor, l.vat_rate_bp, l.vat_category, l.unconfirmed,
-		       coalesce(max(l.extra_count), 0)
-		FROM rental_booking_lines l JOIN rental_extras e ON e.id = l.extra_id
-		WHERE l.booking_id = $1 AND e.per = 'day'
-		GROUP BY l.extra_id, l.unit, l.description, l.unit_price_minor, l.vat_rate_bp, l.vat_category, l.unconfirmed
-		ORDER BY min(l.position)`, bookingID)
+		SELECT extra_id::text, unit, description, sum(quantity_milli), unit_price_minor, vat_rate_bp, vat_category, unconfirmed,
+		       coalesce(max(taken), 0)
+		FROM (SELECT l.extra_id, l.unit, l.description, l.unit_price_minor, l.vat_rate_bp, l.vat_category, l.unconfirmed,
+		             sum(l.quantity_milli) AS quantity_milli, sum(l.extra_count) AS taken, min(l.position) AS position
+		      FROM rental_booking_lines l JOIN rental_extras e ON e.id = l.extra_id
+		      WHERE l.booking_id = $1 AND e.per = 'day'
+		      GROUP BY l.extra_id, l.unit, l.description, l.unit_price_minor, l.vat_rate_bp, l.vat_category, l.unconfirmed, l.event_id) per_event
+		GROUP BY extra_id, unit, description, unit_price_minor, vat_rate_bp, vat_category, unconfirmed
+		ORDER BY min(position)`, bookingID)
 	if err != nil {
 		return nil, fmt.Errorf("read the extras: %w", err)
 	}
