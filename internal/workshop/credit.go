@@ -28,6 +28,13 @@ import (
 // A price correction is money. It does not put anything back on a shelf: a part
 // that physically comes back is its own movement, confirmed on its own.
 
+// errCreditSchemeAdjustment is an adjustment asked of a margin-scheme
+// invoice (#177).
+var errCreditSchemeAdjustment = fmt.Errorf("%w: a car sold under the margin scheme is reduced by crediting its line, not by an adjustment", ErrInvalid)
+
+// errRebillSale is a car sale's invoice rebilled (#177).
+var errRebillSale = fmt.Errorf("%w: a car sale is invoiced again through its deal, whose terms say who buys", ErrInvalid)
+
 // ErrNothingToCredit is returned when there is nothing left of an invoice to
 // credit.
 var ErrNothingToCredit = ErrAlreadyCredited
@@ -244,6 +251,16 @@ func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRe
 			Kind: o.kind, Description: o.description, QuantityMilli: -qty, UnitPriceMinor: o.unit, VATRateBasis: o.rate,
 			NetMinor: -net, VATMinor: -vat, CreditsLineID: o.id, UnitCode: o.unitCode, MarginScheme: o.marginScheme,
 		})
+	}
+	// A car under the margin scheme is reduced by crediting its line, which
+	// works its VAT out again (creditedSchemeTx); an adjustment would carry
+	// ordinary VAT and take none of the scheme's back.
+	if len(req.Adjustments) > 0 {
+		for _, o := range origs {
+			if o.marginScheme {
+				return p, errCreditSchemeAdjustment
+			}
+		}
 	}
 	for _, a := range req.Adjustments {
 		desc := strings.TrimSpace(a.Description)
@@ -522,6 +539,12 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 		}
 		if isCredit {
 			return fmt.Errorf("%w: a credit note cannot be rebilled", ErrInvalid)
+		}
+		// A car sale is invoiced again through its deal (#177): its terms
+		// say who buys and how it is taxed, and are frozen while an invoice
+		// stands.
+		if orig.Source == SourceVehicleSale {
+			return errRebillSale
 		}
 		var existing *string
 		if err := tx.QueryRow(ctx, `SELECT replacement_invoice_id::text FROM invoice_corrections WHERE original_invoice_id = $1 AND kind = 'rebill'`, invoiceID).Scan(&existing); err == nil && existing != nil {

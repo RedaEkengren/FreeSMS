@@ -3,6 +3,7 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -282,7 +283,8 @@ func TestAMarginSchemeCreditAndRebillKeepTheSchemesVAT(t *testing.T) {
 		t.Errorf("the rest credited: VAT %d; want -6 000 kr, so 8 000 kr back over both", vat)
 	}
 
-	// Billed again to another buyer: the same VAT and statement.
+	// Billed again to another buyer is not done by rebilling: a car sale is
+	// invoiced again through its deal, whose terms say who buys.
 	other, err := workshop.CreateParty(ctx, pool, everything(owner()), workshop.NewParty{Kind: "private", Name: "Lo Letare",
 		Phone: "0731234567", Role: workshop.PartyBuyer})
 	if err != nil {
@@ -292,12 +294,9 @@ func TestAMarginSchemeCreditAndRebillKeepTheSchemesVAT(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	again, err := workshop.RebillTo(ctx, pool, everything(owner()), inv.ID, workshop.RebillRequest{CustomerID: customer, Reason: "Fel köpare"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if vat, statement := schemeOf(t, pool, again.ID); vat != 800_000 || statement != workshop.MarginSchemeStatement {
-		t.Errorf("the replacement: VAT %d, statement %q; want 8 000 kr and the statement", vat, statement)
+	if _, err := workshop.RebillTo(ctx, pool, everything(owner()), inv.ID, workshop.RebillRequest{CustomerID: customer,
+		Reason: "Fel köpare"}); !errors.Is(err, workshop.ErrInvalid) || !strings.Contains(err.Error(), "through its deal") {
+		t.Errorf("a car sale rebilled past its deal: %v", err)
 	}
 }
 
@@ -343,5 +342,22 @@ func TestACreditBelowThePurchasePriceTakesBackAllTheSchemesVAT(t *testing.T) {
 	}
 	if vat, _ := schemeOf(t, pool, c.ID); vat != -800_000 {
 		t.Errorf("70 000 kr off: VAT %d; want all 8 000 kr back", vat)
+	}
+}
+
+// An adjustment on a margin-scheme invoice is refused: it would carry
+// ordinary VAT and take back none of the scheme's. The car's line is
+// credited instead.
+func TestAnAdjustmentOnAMarginSchemeInvoiceIsRefused(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	d := completedDealOn(t, pool, eligibleCar(t, pool), workshop.TaxMarginScheme)
+	inv, err := workshop.IssueDealInvoice(ctx, pool, sales(), d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.IssueCredit(ctx, pool, everything(owner()), inv.ID, workshop.CreditRequest{Reason: "Rabatt",
+		Adjustments: []workshop.Adjustment{{Description: "Rabatt", NetMinor: 500_000, VATRateBasis: 2500}}}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("an adjustment on a margin-scheme invoice: %v", err)
 	}
 }
