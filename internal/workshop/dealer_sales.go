@@ -344,7 +344,33 @@ func lockDealTx(ctx context.Context, tx pgx.Tx, id string) error {
 // contracted at a time; the same request sent again finds the deal it
 // made. The salesperson is whoever opens it. For whoever sells cars, in a
 // shop that sells them.
-func CreateDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, unitID, leadID string, t SaleTerms, key string) (Deal, error) {
+// NewDeal is a deal to open: the car, the lead it came from if any, the
+// first terms, and the request's own key. NewBuyer, given, is a buyer who
+// is not a party yet -- a private person by name and phone or email --
+// made in the deal's own transaction and named first, so a deal sent twice
+// or refused makes no stray person.
+type NewDeal struct {
+	UnitID   string
+	LeadID   string
+	Terms    SaleTerms
+	NewBuyer *NewParty
+	Key      string
+}
+
+func CreateDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n NewDeal) (Deal, error) {
+	unitID, leadID, t, key := n.UnitID, n.LeadID, n.Terms, n.Key
+	var newBuyer *NewParty
+	if n.NewBuyer != nil {
+		nb := *n.NewBuyer
+		nb.Kind, nb.Role, nb.Name = "private", PartyBuyer, strings.TrimSpace(nb.Name)
+		if nb.Name == "" || utf8.RuneCountInString(nb.Name) > 200 || utf8.RuneCountInString(nb.Phone) > 40 ||
+			utf8.RuneCountInString(nb.Email) > 200 {
+			return Deal{}, errDealBuyers
+		}
+		newBuyer = &nb
+		// A stand-in, checked as an id, replaced by the party once made.
+		t.Buyers = append([]string{"00000000-0000-0000-0000-000000000000"}, t.Buyers...)
+	}
 	if !scope.Role.SellsVehicles() {
 		return Deal{}, access.ErrForbidden
 	}
@@ -406,6 +432,14 @@ func CreateDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, uni
 		}
 		if leadID != "" {
 			if _, err := leadTx(ctx, tx, scope, leadID); err != nil {
+				return err
+			}
+		}
+		if newBuyer != nil {
+			if err := mayRecordPartyRole(scope.Role, scope, newBuyer.Role); err != nil {
+				return err
+			}
+			if t.Buyers[0], err = createPartyTx(ctx, tx, scope, *newBuyer, ""); err != nil {
 				return err
 			}
 		}

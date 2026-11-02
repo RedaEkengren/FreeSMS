@@ -68,17 +68,17 @@ func TestADealIsContractedWithEachDefectAcceptedOnItsOwn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, err := workshop.CreateDeal(ctx, pool, sales(), unit, lead.ID, consumerTerms(kim), "deal-1")
+	d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: unit, LeadID: lead.ID, Terms: consumerTerms(kim), Key: "deal-1"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.State != workshop.DealDraft || d.Version != 1 || d.TotalMinor() != 12_500_000+1_000_000 || len(d.Buyers) != 1 {
 		t.Errorf("the new deal: %+v", d)
 	}
-	if again, err := workshop.CreateDeal(ctx, pool, sales(), unit, lead.ID, consumerTerms(kim), "deal-1"); err != nil || again.ID != d.ID {
+	if again, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: unit, LeadID: lead.ID, Terms: consumerTerms(kim), Key: "deal-1"}); err != nil || again.ID != d.ID {
 		t.Errorf("the same request again: %+v, %v", again, err)
 	}
-	if _, err := workshop.CreateDeal(ctx, pool, sales(), unit, "", consumerTerms(kim), "deal-2"); !errors.Is(err, workshop.ErrInvalid) {
+	if _, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: unit, LeadID: "", Terms: consumerTerms(kim), Key: "deal-2"}); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("a second deal on the car: %v", err)
 	}
 	if l, _ := workshop.LeadByID(ctx, pool, sales(), lead.ID); l.Status != workshop.LeadOfferMade || l.DealID != d.ID {
@@ -177,7 +177,7 @@ func TestARefusedDefectStopsAConsumersContractButNotABusinesss(t *testing.T) {
 			kim := driver(t, pool)
 			terms := consumerTerms(kim)
 			terms.BuyerKind, terms.TaxTreatment = kind, workshop.TaxOrdinary
-			d, err := workshop.CreateDeal(ctx, pool, sales(), p.StockUnitID, "", terms, "")
+			d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: p.StockUnitID, Terms: terms})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -216,7 +216,7 @@ func TestAnAsIsClauseInAConsumerContractIsWarnedOf(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, err := workshop.CreateDeal(ctx, pool, sales(), unit, "", consumerTerms(kim), "")
+	d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: unit, LeadID: "", Terms: consumerTerms(kim), Key: ""})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +238,7 @@ func TestDealsByRoleModuleAndCancellation(t *testing.T) {
 	unit := carForSale(t, pool)
 	kim := driver(t, pool)
 	for name, s := range map[string]access.Scope{"a buyer": buyerScope(), "the front desk": everything(advisor()), "a technician": everything(technician())} {
-		got, err := workshop.CreateDeal(ctx, pool, s, unit, "", consumerTerms(kim), "")
+		got, err := workshop.CreateDeal(ctx, pool, s, workshop.NewDeal{UnitID: unit, LeadID: "", Terms: consumerTerms(kim), Key: ""})
 		if !errors.Is(err, access.ErrForbidden) && !errors.Is(err, workshop.ErrNotFound) {
 			t.Errorf("%s made a deal: %v", name, err)
 		}
@@ -248,7 +248,7 @@ func TestDealsByRoleModuleAndCancellation(t *testing.T) {
 	}
 	off := sales()
 	off.Modules = []access.Module{access.Workshop}
-	if _, err := workshop.CreateDeal(ctx, pool, off, unit, "", consumerTerms(kim), ""); !errors.Is(err, access.ErrModuleOff) {
+	if _, err := workshop.CreateDeal(ctx, pool, off, workshop.NewDeal{UnitID: unit, LeadID: "", Terms: consumerTerms(kim), Key: ""}); !errors.Is(err, access.ErrModuleOff) {
 		t.Errorf("a deal with car sales off: %v", err)
 	}
 	var wg sync.WaitGroup
@@ -257,7 +257,7 @@ func TestDealsByRoleModuleAndCancellation(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, errs[i] = workshop.CreateDeal(ctx, pool, sales(), unit, "", consumerTerms(kim), "")
+			_, errs[i] = workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: unit, LeadID: "", Terms: consumerTerms(kim), Key: ""})
 		}()
 	}
 	wg.Wait()
@@ -298,7 +298,7 @@ func TestDealsByRoleModuleAndCancellation(t *testing.T) {
 	if u, _ := workshop.StockUnitByID(ctx, pool, sales(), unit); u.Status != workshop.StockForSale {
 		t.Errorf("the car after the deal was cancelled: %s", u.Status)
 	}
-	if _, err := workshop.CreateDeal(ctx, pool, sales(), unit, "", consumerTerms(kim), ""); err != nil {
+	if _, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: unit, LeadID: "", Terms: consumerTerms(kim), Key: ""}); err != nil {
 		t.Errorf("a new deal after the first was cancelled: %v", err)
 	}
 	for _, stmt := range []string{`DELETE FROM vehicle_sales`, `UPDATE vehicle_sale_terms SET price_minor = 1`,
@@ -315,7 +315,7 @@ func TestAContractMadeOverAnotherIsRefused(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
 	unit := carForSale(t, pool)
-	d, err := workshop.CreateDeal(ctx, pool, sales(), unit, "", consumerTerms(driver(t, pool)), "")
+	d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: unit, Terms: consumerTerms(driver(t, pool))})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,5 +325,38 @@ func TestAContractMadeOverAnotherIsRefused(t *testing.T) {
 	}
 	if _, _, err := workshop.ProduceSalesContract(ctx, pool, sales(), d.ID, tpl, ""); !errors.Is(err, workshop.ErrMadeMeanwhile) {
 		t.Errorf("made again from a page that showed none: %v", err)
+	}
+}
+
+// A buyer who is not a party yet is made with the deal: sent twice, one
+// person; refused, none.
+func TestANewBuyerIsMadeWithTheDeal(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := carForSale(t, pool)
+	parties := func() (n int) {
+		t.Helper()
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM parties`).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	before := parties()
+	terms := consumerTerms("")
+	terms.Buyers = nil
+	n := workshop.NewDeal{UnitID: unit, Terms: terms, NewBuyer: &workshop.NewParty{Name: "Lo Letare", Phone: "0731234567"}, Key: "nb-1"}
+	d, err := workshop.CreateDeal(ctx, pool, sales(), n)
+	if err != nil || len(d.Buyers) != 1 || d.Buyers[0].Name != "Lo Letare" {
+		t.Fatalf("the deal with a new buyer: %+v, %v", d, err)
+	}
+	if again, err := workshop.CreateDeal(ctx, pool, sales(), n); err != nil || again.ID != d.ID {
+		t.Errorf("sent again: %+v, %v", again, err)
+	}
+	n.Key = "nb-2"
+	if _, err := workshop.CreateDeal(ctx, pool, sales(), n); !errors.Is(err, workshop.ErrInvalid) {
+		t.Fatalf("a second deal on the car: %v", err)
+	}
+	if got := parties(); got != before+1 {
+		t.Errorf("%d people made for one new buyer", got-before)
 	}
 }
