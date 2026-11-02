@@ -13,6 +13,16 @@
 -- the application.
 ALTER TABLE vehicle_sale_terms ADD COLUMN eligibility_id uuid REFERENCES vat_eligibility(id) ON DELETE RESTRICT;
 
+-- Terms that chose the scheme before this: the assessment that stood when
+-- they were written -- the newest recorded by then.
+UPDATE vehicle_sale_terms t
+   SET eligibility_id = (SELECT e.id FROM vehicle_sales s
+                           JOIN vehicle_purchases p ON p.stock_unit_id = s.stock_unit_id
+                           JOIN vat_eligibility e ON e.purchase_id = p.id
+                          WHERE s.id = t.sale_id AND e.recorded_at <= t.created_at
+                          ORDER BY e.recorded_at DESC, e.id DESC LIMIT 1)
+ WHERE t.sale_tax_treatment = 'margin_scheme' AND t.eligibility_id IS NULL;
+
 CREATE FUNCTION vehicle_sale_terms_eligibility() RETURNS trigger AS $$
 DECLARE
     standing uuid;

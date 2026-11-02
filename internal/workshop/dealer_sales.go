@@ -1284,9 +1284,19 @@ func SaleTaxOfDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		out = SaleTax{Treatment: d.Terms.TaxTreatment, EligibilityID: d.EligibilityID}
 		switch d.Terms.TaxTreatment {
 		case TaxMarginScheme:
+			// Terms written before the eligibility relied on was recorded
+			// on them (0205) are read with the one that stands.
+			if out.EligibilityID == "" {
+				if err := tx.QueryRow(ctx, `
+					SELECT e.id FROM vehicle_purchases p JOIN vat_eligibility e ON e.purchase_id = p.id
+					WHERE p.stock_unit_id = $1 AND NOT EXISTS (SELECT 1 FROM vat_eligibility n WHERE n.supersedes_id = e.id)`,
+					d.StockUnitID).Scan(&out.EligibilityID); err != nil {
+					return fmt.Errorf("read the eligibility: %w", err)
+				}
+			}
 			var purchase int64
 			if err := tx.QueryRow(ctx, `SELECT p.tax_purchase_price_minor FROM vat_eligibility e JOIN vehicle_purchases p ON p.id = e.purchase_id
-				WHERE e.id = $1`, d.EligibilityID).Scan(&purchase); err != nil {
+				WHERE e.id = $1`, out.EligibilityID).Scan(&purchase); err != nil {
 				return fmt.Errorf("read the purchase price: %w", err)
 			}
 			r, err := money.MarginScheme(d.Terms.PriceMinor, purchase, saleVATRate)

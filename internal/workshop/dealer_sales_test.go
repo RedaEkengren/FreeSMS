@@ -690,3 +690,29 @@ func TestOneRequestKeyForTwoCarsAtOnceIsOneDeal(t *testing.T) {
 		t.Errorf("%d deals opened with one key", ok)
 	}
 }
+
+// Terms written before the eligibility they relied on was recorded on
+// them -- by the release before 0205 -- are read with the eligibility
+// that stands, not refused.
+func TestTermsWithoutTheirEligibilityAreReadWithTheStandingOne(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := eligibleCar(t, pool)
+	terms := consumerTerms(driver(t, pool))
+	terms.TaxTreatment = workshop.TaxMarginScheme
+	d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: unit, Terms: terms})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{`ALTER TABLE vehicle_sale_terms DISABLE TRIGGER vehicle_sale_terms_eligibility`,
+		`UPDATE vehicle_sale_terms SET eligibility_id = NULL WHERE sale_id = '` + d.ID + `'`,
+		`ALTER TABLE vehicle_sale_terms ENABLE TRIGGER vehicle_sale_terms_eligibility`} {
+		if _, err := pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tax, err := workshop.SaleTaxOfDeal(ctx, pool, buyerScope(), d.ID)
+	if err != nil || tax.VATMinor != 800_000 || tax.EligibilityID == "" {
+		t.Errorf("the tax of terms with no eligibility recorded: %+v, %v", tax, err)
+	}
+}
