@@ -42,6 +42,10 @@ type rentalData struct {
 	// A booking's handovers, and the protocol on the handover page.
 	Handovers workshop.RentalHandoverView
 	Protocol  workshop.Protocol
+	// The unit's newest period in the fleet: reported, insured (#202).
+	FleetUse workshop.FleetUse
+	// Handover gaps let go on the booking.
+	Overrides []workshop.GapOverride
 	// A booking form's own key: sent twice, one booking.
 	Key string
 	Now time.Time
@@ -190,6 +194,8 @@ func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("GET /rental/units/{id}", s.requireSession(s.handleRentalUnit))
 	m.HandleFunc("POST /rental/units/{id}/fleet", s.requireSession(s.handleFleetJoin))
 	m.HandleFunc("POST /rental/memberships/{id}/end", s.requireSession(s.handleFleetLeave))
+	m.HandleFunc("POST /rental/memberships/{id}/report", s.requireSession(s.handleFleetReport))
+	m.HandleFunc("POST /rental/memberships/{id}/insurance", s.requireSession(s.handleFleetInsurance))
 	m.HandleFunc("GET /rental/settings", s.requireSession(s.handleRentalSettings))
 	m.HandleFunc("POST /rental/permits", s.requireSession(s.handleRentalPermit))
 	m.HandleFunc("POST /rental/permits/{id}/revoke", s.requireSession(s.handleRentalPermitRevoke))
@@ -362,6 +368,11 @@ func (s *Server) renderRentalUnit(w http.ResponseWriter, r *http.Request, id str
 	}
 	if d.Bookings, err = workshop.RentalBookings(r.Context(), s.pool, session.Scope, time.Now(), time.Now().AddDate(1, 0, 0)); s.handoverError(w, r, err) {
 		return
+	}
+	if len(u.Memberships) > 0 {
+		if d.FleetUse, err = workshop.FleetUseOf(r.Context(), s.pool, session.Scope, u.Memberships[0].ID); s.handoverError(w, r, err) {
+			return
+		}
 	}
 	s.render(w, r, status, "rentalunit", pageData{Title: "Rental unit", Session: session,
 		Rental: d, Today: time.Now().In(s.shopLocation(r)).Format(wallClockLayout)})
@@ -610,6 +621,9 @@ func (s *Server) handleRentalBooking(w http.ResponseWriter, r *http.Request) {
 	if d.Handovers, err = workshop.RentalHandovers(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
 		return
 	}
+	if d.Overrides, err = workshop.RentalGapOverrides(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
+		return
+	}
 	s.render(w, r, http.StatusOK, "rentalbooking", pageData{Title: "Rental booking", Session: session, Rental: d,
 		Today: time.Now().In(s.shopLocation(r)).Format("2006-01-02")})
 }
@@ -625,6 +639,8 @@ func (s *Server) handleRentalBookingAction(w http.ResponseWriter, r *http.Reques
 	case "check-in":
 		s.handleRentalHandoverStart(w, r, workshop.HandoverIn)
 		return
+	case "let-go":
+		err = workshop.OverrideHandoverGap(r.Context(), s.pool, session.Scope, id, r.FormValue("code"), r.FormValue("reason"))
 	case "confirm":
 		err = workshop.ConfirmRentalBooking(r.Context(), s.pool, session.Scope, id)
 	case "cancel", "no-show":

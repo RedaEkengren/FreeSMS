@@ -83,6 +83,8 @@ var swept = map[string]string{
 	"GET /rental/units/{id}":                           "sweep",
 	"POST /rental/units/{id}/fleet":                    "sweep",
 	"POST /rental/memberships/{id}/end":                "sweep",
+	"POST /rental/memberships/{id}/report":             "sweep",
+	"POST /rental/memberships/{id}/insurance":          "sweep",
 	"GET /rental/prices":                               "",
 	"POST /rental/plans":                               "",
 	"POST /rental/extras":                              "",

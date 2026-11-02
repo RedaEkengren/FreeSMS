@@ -28,11 +28,21 @@
 <h2>{{$.T "Before handover"}}</h2>
 {{if $.Rental.Gaps}}
 <ul class="lines">
-  {{range $.Rental.Gaps}}<li><span class="tag late">{{$.T "missing"}}</span> {{if .Who}}{{$.T .Sentence .Who}}{{else}}{{$.T .Sentence}}{{end}}</li>{{end}}
+  {{range $.Rental.Gaps}}<li><span class="tag late">{{$.T "missing"}}</span> {{if .Who}}{{$.T .Sentence .Who}}{{else}}{{$.T .Sentence}}{{end}}
+    {{if and .Overridable $.Session.Scope.Role.RunsTheShop}}
+    <details><summary>{{$.T "Let it go for this rental"}}</summary>
+    <form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/let-go">
+      <input type="hidden" name="code" value="{{.Code}}">
+      <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="300" required></label>
+      <button type="submit" class="secondary">{{$.T "Let it go"}}</button>
+    </form>
+    </details>
+    {{end}}</li>{{end}}
 </ul>
 {{else}}
 <p>{{$.T "Nothing is missing for the handover."}}</p>
 {{end}}
+{{range $.Rental.Overrides}}<p class="waiting">{{$.T "Let go by %s: %s" .By .Reason}}</p>{{end}}
 {{end}}
 
 <h2>{{$.T "Handover"}}</h2>
