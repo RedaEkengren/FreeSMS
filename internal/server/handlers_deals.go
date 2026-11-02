@@ -31,6 +31,24 @@ type dealData struct {
 	// as rows of what was typed in each.
 	Typed      bool
 	TypedLines []lineRow
+	// A revision refused as made over another's: what was typed, shown
+	// apart from the form, which holds the terms as they now stand.
+	Unsaved      map[string]string
+	UnsavedLines []lineRow
+}
+
+// UnsavedFields are the terms fields typed and not saved, in the form's
+// order, as label and value; empty ones left out.
+func (d dealData) UnsavedFields() [][2]string {
+	var out [][2]string
+	for _, f := range [][2]string{{"buyer_kind", "The buyer is"}, {"price", "Price of the car, VAT included, in kronor"},
+		{"tax", "How the sale is taxed"}, {"warranty", "Warranty"}, {"delivery_on", "Delivered on"}, {"delivery_place", "Where"},
+		{"odometer", "Odometer, km"}, {"payment_terms", "Payment"}, {"note", "Note"}} {
+		if v := d.Unsaved[f[0]]; v != "" {
+			out = append(out, [2]string{f[1], v})
+		}
+	}
+	return out
 }
 
 // lineRow is an extra as a form shows it.
@@ -289,6 +307,10 @@ func (s *Server) dealPage(w http.ResponseWriter, r *http.Request, status int, ms
 func (s *Server) dealPageTyped(w http.ResponseWriter, r *http.Request, status int, msg string, typed *dealData) {
 	session := sessionFrom(r.Context())
 	var d dealData
+	if typed != nil && typed.Unsaved != nil {
+		d.Unsaved, d.UnsavedLines = typed.Unsaved, typed.UnsavedLines
+		typed = nil
+	}
 	if typed != nil {
 		d.Typed, d.TypedLines = true, typed.TypedLines
 	}
@@ -348,6 +370,12 @@ func (s *Server) handleDealRevise(w http.ResponseWriter, r *http.Request) {
 	}
 	version, _ := strconv.Atoi(r.FormValue("version"))
 	_, err := workshop.ReviseDeal(r.Context(), s.pool, session.Scope, r.PathValue("id"), version, t)
+	if errors.Is(err, workshop.ErrDealMoved) {
+		// The form shows the terms as they now stand, never what was typed
+		// over them; what was typed is shown apart, to carry over by hand.
+		s.dealPageTyped(w, r, http.StatusBadRequest, trimInvalid(err), &dealData{Unsaved: form, UnsavedLines: typedLines})
+		return
+	}
 	if errors.Is(err, workshop.ErrInvalid) {
 		s.dealPageTyped(w, r, http.StatusBadRequest, trimInvalid(err), typed)
 		return

@@ -272,3 +272,46 @@ func TestAMarginSchemeInvoiceOnThePage(t *testing.T) {
 		}
 	}
 }
+
+// A revision made over one somebody else saved meanwhile is refused, and
+// the form comes back with the terms as they now stand -- so sending it
+// again cannot overwrite theirs unseen -- and what was typed shown apart.
+func TestARevisionOverAnotherShowsTheCurrentTermsAndWhatWasTyped(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	unit, err := workshop.TakeIntoStock(ctx, pool, owner, vehicleA, workshop.StockFromDefleet, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.MoveStockUnit(ctx, pool, owner, unit.ID, workshop.StockForSale, ""); err != nil {
+		t.Fatal(err)
+	}
+	seller := signIn(t, ts, salesEmail)
+	form := url.Values{"unit": {unit.ID}, "name": {"Kim Köpare"}, "phone": {"0701234567"}, "buyer_kind": {"consumer"}, "price": {"125000"}}
+	resp := postResponse(t, seller, ts.URL+"/cars/deals", form)
+	where := resp.Header.Get("Location")
+	d, err := workshop.DealByID(ctx, pool, owner, strings.TrimPrefix(where, "/cars/deals/"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	theirs := d.Terms
+	theirs.Warranty = "Deras garanti"
+	if _, err := workshop.ReviseDeal(ctx, pool, owner, d.ID, 1, theirs); err != nil {
+		t.Fatal(err)
+	}
+	mine := url.Values{"version": {"1"}, "buyer": {d.Buyers[0].PartyID}, "buyer_kind": {"consumer"}, "price": {"125000"},
+		"warranty": {"Min garanti"}}
+	status, page := postBody(t, seller, ts.URL+where+"/terms", mine)
+	if status != http.StatusBadRequest {
+		t.Fatalf("a revision over another answered %d", status)
+	}
+	for _, want := range []string{`name="version" value="2"`, `value="Deras garanti"`, "Min garanti"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the page does not have %s", want)
+		}
+	}
+	if strings.Contains(page, `value="Min garanti"`) {
+		t.Error("what was typed is back in the form, to overwrite theirs when sent again")
+	}
+}

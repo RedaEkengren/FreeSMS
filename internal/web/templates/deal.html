@@ -133,7 +133,11 @@
 {{else}}<form method="post" action="/cars/deals/{{$x.ID}}/invoice"><button type="submit">{{.T "Invoice the sale"}}</button></form>{{end}}
 {{end}}
 
-<details><summary>{{.T "Change the terms"}}</summary>
+{{if $d.Unsaved}}<section class="callout"><h2>{{.T "What you typed, not saved"}}</h2>
+  <p class="waiting">{{.T "Somebody saved the terms while you were changing them. The form below holds theirs; carry over what you still want."}}</p>
+  <ul>{{range $d.UnsavedFields}}<li>{{$.T (index . 0)}}: {{index . 1}}</li>{{end}}
+  {{range $d.UnsavedLines}}<li>{{.Desc}}: {{.Qty}} &times; {{.Price}} ({{.VAT}}%)</li>{{end}}</ul></section>{{end}}
+<details{{if $d.Unsaved}} open{{end}}><summary>{{.T "Change the terms"}}</summary>
 <form method="post" action="/cars/deals/{{$x.ID}}/terms">
   <input type="hidden" name="version" value="{{$x.Version}}">
   {{range $x.Buyers}}<input type="hidden" name="buyer" value="{{.PartyID}}">{{end}}

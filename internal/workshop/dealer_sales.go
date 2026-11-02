@@ -225,7 +225,7 @@ var (
 	errDealCar            = fmt.Errorf("%w: that car is not in stock to be sold", ErrInvalid)
 	errDealOpen           = fmt.Errorf("%w: the car already has a deal being agreed or contracted; cancel that first", ErrInvalid)
 	errDealKey            = fmt.Errorf("%w: that request was already used for another deal", ErrInvalid)
-	errDealMoved          = fmt.Errorf("%w: the deal was changed by somebody else meanwhile; read it again", ErrInvalid)
+	ErrDealMoved          = fmt.Errorf("%w: the deal was changed by somebody else meanwhile; read it again", ErrInvalid)
 	errDealState          = fmt.Errorf("%w: the deal is not where that can be done", ErrInvalid)
 	errDealDefect         = fmt.Errorf("%w: describe the defect in 1000 characters or fewer", ErrInvalid)
 	errDealAnswer         = fmt.Errorf("%w: a defect is answered by one of the deal's buyers, on paper with the scan, in person, or electronically", ErrInvalid)
@@ -331,7 +331,7 @@ func insertTermsTx(ctx context.Context, tx pgx.Tx, scope access.Scope, saleID, u
 		scope.ShopID, saleID, version, t.BuyerKind, t.PriceMinor, t.TaxTreatment, t.Warranty, on, t.DeliveryPlace, t.OdometerKm,
 		t.PaymentTerms, t.Note, scope.UserID).Scan(&terms); err != nil {
 		if isUniqueViolation(err, "vehicle_sale_terms_sale_id_version_key") {
-			return errDealMoved
+			return ErrDealMoved
 		}
 		return fmt.Errorf("record the terms: %w", err)
 	}
@@ -529,7 +529,7 @@ func ReviseDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sal
 			return errDealState
 		}
 		if d.Version != fromVersion {
-			return errDealMoved
+			return ErrDealMoved
 		}
 		// Invoiced, how the sale is taxed is frozen (0207): no new terms
 		// until the invoice is credited.
