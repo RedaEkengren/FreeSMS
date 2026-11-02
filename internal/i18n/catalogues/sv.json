@@ -8625,6 +8625,13 @@
     "From the shipped agreement, a draft that needs legal review.": {"other": "Från det medföljande avtalet, ett utkast som behöver juridisk granskning."},
     "say which of the shop's contract templates to use": {"other": "ange vilken av verksamhetens avtalsmallar som ska användas"},
     "say which of the shop's agreement templates to use": {"other": "ange vilken av verksamhetens avtalsmallar för provkörning som ska användas"},
-    "A deal stands, with another salesperson": {"other": "Det finns en affär, hos en annan säljare"}
+    "A deal stands, with another salesperson": {"other": "Det finns en affär, hos en annan säljare"},
+    "the contract is not complete; a deal is invoiced once it is": {"other": "avtalet är inte klart; en affär faktureras när det är klart"},
+    "the sale has been invoiced, so its terms are frozen; credit the invoice first": {"other": "försäljningen har fakturerats, så villkoren är låsta; kreditera fakturan först"},
+    "a car is sold on a vehicle sale's invoice, under the margin scheme at no VAT of its own": {"other": "en bil säljs på en bilförsäljnings faktura, med vinstmarginalbeskattning utan egen moms"},
+    "Sold under the margin scheme": {"other": "Såld med vinstmarginalbeskattning"},
+    "Invoice the sale": {"other": "Fakturera försäljningen"},
+    "Invoiced as %s": {"other": "Fakturerad som %s"},
+    "a car sale in this period cannot be exported yet: how it is posted waits on the accountant": {"other": "en bilförsäljning i perioden kan inte exporteras ännu: hur den bokförs väntar på revisorn"}
   }
 }

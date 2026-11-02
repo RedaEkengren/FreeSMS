@@ -35,7 +35,14 @@ type SourcedLine struct {
 	QuantityMilli  int64
 	UnitPriceMinor int64
 	VATRateBasis   int
+	// A car sold under the margin scheme (#177): kind "vehicle", at its
+	// gross price and rate 0, outside the VAT bands. A vehicle sale's only.
+	MarginScheme bool
 }
+
+// MarginSchemeStatement is the statement a margin-scheme invoice carries,
+// frozen onto it in Swedish whatever the reader's language (#177).
+const MarginSchemeStatement = "Vinstmarginalbeskattning för begagnade varor"
 
 // ManualInvoice is a sale entered by hand: something sold that no module
 // records, invoiced to a customer.
@@ -90,6 +97,9 @@ type sourced struct {
 	vehicleSaleID string
 	rentalID      string
 	customerID    string
+	// A margin-scheme sale's VAT, for the books and the VAT return, never
+	// shown to the buyer (#177).
+	marginSchemeVAT int64
 }
 
 // issueSourcedTx writes an invoice that is not a job's, inside the caller's
@@ -122,7 +132,13 @@ func issueSourcedTx(ctx context.Context, tx pgx.Tx, scope access.Scope, of sourc
 		if g.Kind == "" {
 			g.Kind = "part"
 		}
-		if _, booked := salesAccounts[g.Kind]; !booked {
+		// A car sold is a vehicle sale's, and under the margin scheme
+		// carries no VAT of its own on the invoice.
+		if g.Kind == "vehicle" || g.MarginScheme {
+			if of.source != SourceVehicleSale || g.Kind != "vehicle" || (g.MarginScheme && g.VATRateBasis != 0) {
+				return Invoice{}, fmt.Errorf("%w: a car is sold on a vehicle sale's invoice, under the margin scheme at no VAT of its own", ErrInvalid)
+			}
+		} else if _, booked := salesAccounts[g.Kind]; !booked {
 			return Invoice{}, fmt.Errorf("%w: a line is labour, a part, sublet work, consumables or a fee", ErrInvalid)
 		}
 		net := money.LineNet(g.QuantityMilli, g.UnitPriceMinor)
@@ -130,7 +146,7 @@ func issueSourcedTx(ctx context.Context, tx pgx.Tx, scope access.Scope, of sourc
 			Kind: g.Kind, Description: g.Description, QuantityMilli: g.QuantityMilli,
 			UnitPriceMinor: g.UnitPriceMinor, VATRateBasis: g.VATRateBasis,
 			NetMinor: net, VATMinor: money.VAT(net, g.VATRateBasis),
-			UnitCode: unitCode(g.Kind, ""),
+			UnitCode: unitCode(g.Kind, ""), MarginScheme: g.MarginScheme,
 		})
 	}
 	totals := money.Compute(toMoneyLines(lines))
@@ -156,10 +172,10 @@ func issueSourcedTx(ctx context.Context, tx pgx.Tx, scope access.Scope, of sourc
 		   seller_payment_terms_days, seller_f_tax,
 		   net_minor, vat_minor, gross_minor,
 		   ` + electronicColumns + `,
-		   source, vehicle_sale_id, rental_id, customer_id)
+		   source, vehicle_sale_id, rental_id, customer_id, margin_scheme_statement, margin_scheme_vat_minor)
 		VALUES ($1,$2,$3,NULLIF($4, '')::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
 		        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,
-		        $34, NULLIF($35, '')::uuid, NULLIF($36, '')::uuid, $37::uuid)
+		        $34, NULLIF($35, '')::uuid, NULLIF($36, '')::uuid, $37::uuid, $38, $39)
 		RETURNING id, issued_at`
 	ocr, err := paymentOCR(DefaultSeries, number)
 	if err != nil {
@@ -173,7 +189,13 @@ func issueSourcedTx(ctx context.Context, tx pgx.Tx, scope access.Scope, of sourc
 		sold.PaymentTermsDays, sold.FTax,
 		totals.NetMinor, totals.VATMinor, totals.GrossMinor,
 	}, electronicArgs(sold, b.buyer, ocr)...)
-	args = append(args, of.source, of.vehicleSaleID, of.rentalID, b.customerID)
+	var statement, schemeVAT any
+	for _, l := range lines {
+		if l.MarginScheme {
+			statement, schemeVAT = MarginSchemeStatement, of.marginSchemeVAT
+		}
+	}
+	args = append(args, of.source, of.vehicleSaleID, of.rentalID, b.customerID, statement, schemeVAT)
 	inv := Invoice{Series: DefaultSeries, Number: number, Source: of.source, CustomerName: b.name,
 		NetMinor: totals.NetMinor, VATMinor: totals.VATMinor, GrossMinor: totals.GrossMinor}
 	if err := tx.QueryRow(ctx, insert, args...).Scan(&inv.ID, &inv.IssuedAt); err != nil {

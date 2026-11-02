@@ -445,6 +445,8 @@ type invoiceLine struct {
 	CreditsLineID string
 	// UN/ECE Recommendation 20 code for the unit; see unitCode.
 	UnitCode string
+	// A car sold under the margin scheme (#177).
+	MarginScheme bool
 }
 
 func chargeableLines(ctx context.Context, tx pgx.Tx, workOrderID string) ([]invoiceLine, error) {
@@ -502,13 +504,13 @@ func writeInvoiceLines(ctx context.Context, tx pgx.Tx, shopID, invoiceID string,
 		INSERT INTO invoice_lines
 		  (shop_id, invoice_id, position, kind, description, quantity,
 		   unit_price_minor, vat_rate_bp, net_minor, vat_minor, credits_line_id,
-		   unit_code, vat_category)
+		   unit_code, vat_category, margin_scheme)
 		VALUES ($1,$2,$3,$4,$5,($6::bigint)::numeric / 1000,$7,$8,$9,$10,nullif($11, '')::uuid,
-		        nullif($12, ''), nullif($13, ''))`
+		        nullif($12, ''), nullif($13, ''), $14)`
 	for _, l := range lines {
 		if _, err := tx.Exec(ctx, insert, shopID, invoiceID, l.Position, l.Kind, l.Description,
 			l.QuantityMilli, l.UnitPriceMinor, l.VATRateBasis, l.NetMinor, l.VATMinor, l.CreditsLineID,
-			l.UnitCode, vatCategory(l.VATRateBasis)); err != nil {
+			l.UnitCode, vatCategory(l.VATRateBasis), l.MarginScheme); err != nil {
 			return fmt.Errorf("write invoice line %d: %w", l.Position, err)
 		}
 	}
@@ -720,6 +722,9 @@ type Document struct {
 	IssuedBy string
 	Lines    []DocumentLine
 	Bands    []money.VATBand
+	// The statement a margin-scheme sale carries, frozen in Swedish as
+	// issued (#177); empty for every other document.
+	MarginSchemeStatement string
 
 	// Set on a credit note, and on an invoice that has been credited: both
 	// halves need to point at the other, because a document that has been
@@ -771,7 +776,26 @@ type DocumentLine struct {
 	VATMinor       int64
 	UnitCode       string
 	VATCategory    string
+	// A car sold under the margin scheme (#177): at its gross price, with
+	// no VAT shown and outside the VAT bands.
+	MarginScheme bool
 }
+
+// MarginSchemeMinor is what the document's margin-scheme cars come to, at
+// their gross price.
+func (d Document) MarginSchemeMinor() int64 {
+	var t int64
+	for _, l := range d.Lines {
+		if l.MarginScheme {
+			t += l.NetMinor
+		}
+	}
+	return t
+}
+
+// OrdinaryNetMinor is the net of everything taxed as usual: the document's
+// net less its margin-scheme cars, which have no net the buyer is shown.
+func (d Document) OrdinaryNetMinor() int64 { return d.NetMinor - d.MarginSchemeMinor() }
 
 // Quantity renders thousandths the way a work order line does.
 func (l DocumentLine) Quantity() string {
@@ -921,10 +945,14 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 		return err
 	}
 
+	if err := tx.QueryRow(ctx, `SELECT coalesce(margin_scheme_statement, '') FROM invoices WHERE id = $1`, id).
+		Scan(&d.MarginSchemeStatement); err != nil {
+		return fmt.Errorf("read the statement: %w", err)
+	}
 	rows, err := tx.Query(ctx, `
 		SELECT position, kind, description,
 		       (quantity * 1000)::bigint, unit_price_minor, vat_rate_bp,
-		       net_minor, vat_minor, coalesce(unit_code, ''), coalesce(vat_category, '')
+		       net_minor, vat_minor, coalesce(unit_code, ''), coalesce(vat_category, ''), margin_scheme
 		FROM invoice_lines WHERE invoice_id = $1 ORDER BY position`, id)
 	if err != nil {
 		return fmt.Errorf("read invoice lines: %w", err)
@@ -934,7 +962,7 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 		var l DocumentLine
 		if err := rows.Scan(&l.Position, &l.Kind, &l.Description,
 			&l.QuantityMilli, &l.UnitPriceMinor, &l.VATRateBasis,
-			&l.NetMinor, &l.VATMinor, &l.UnitCode, &l.VATCategory); err != nil {
+			&l.NetMinor, &l.VATMinor, &l.UnitCode, &l.VATCategory, &l.MarginScheme); err != nil {
 			return fmt.Errorf("scan invoice line: %w", err)
 		}
 		d.Lines = append(d.Lines, l)
@@ -947,6 +975,11 @@ func bandsFrom(lines []DocumentLine) []money.VATBand {
 	byRate := map[int]*money.VATBand{}
 	var rates []int
 	for _, l := range lines {
+		// A car under the margin scheme is outside the bands: its VAT is
+		// in its margin, which the buyer is never shown.
+		if l.MarginScheme {
+			continue
+		}
 		b, ok := byRate[l.VATRateBasis]
 		if !ok {
 			b = &money.VATBand{RateBasisPoints: l.VATRateBasis}

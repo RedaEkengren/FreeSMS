@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -194,6 +195,80 @@ func TestARefusedTermsFormKeepsEveryTypedField(t *testing.T) {
 	for _, w := range append(want[1:], "Ett år") {
 		if !strings.Contains(page, w) {
 			t.Errorf("the revision came back without %s", w)
+		}
+	}
+}
+
+// A margin-scheme sale invoiced from the deal's page: the invoice the
+// owner opens says "Vinstmarginalbeskattning för begagnade varor", shows
+// the car at its price with no VAT for it, and shows neither the margin
+// nor what the car was bought for.
+func TestAMarginSchemeInvoiceOnThePage(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	// Bought for 85 000 kr from a private seller, with the agreement as
+	// evidence: eligible for the margin scheme.
+	sellerParty, err := workshop.CreateParty(ctx, pool, owner, workshop.NewParty{Kind: "private", Name: "Sälj Säljare",
+		Role: workshop.PartySeller})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := workshop.RecordPurchase(ctx, pool, owner, workshop.NewPurchase{VehicleID: vehicleA, Reason: workshop.StockFromPurchase,
+		SellerPartyID: sellerParty, PurchasedOn: time.Now(), PriceMinor: 8_500_000, SellerType: workshop.SellerPrivate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tpl, err := workshop.SaveDocumentTemplate(ctx, pool, owner, "", workshop.DocPurchaseAgreement, "Köpeavtal", "{seller} säljer.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidence, err := workshop.ProduceDocument(ctx, pool, owner, workshop.NewDocumentRecord{Kind: workshop.DocPurchaseAgreement,
+		SubjectKind: "purchase", SubjectID: p.ID, TemplateVersionID: tpl.VersionID, Title: "Köpeavtal",
+		Parties: []workshop.DocumentPartyRole{{PartyID: sellerParty, Role: "seller"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.CorrectVATEligibility(ctx, pool, owner, p.ID, workshop.SellerPrivate, []string{evidence}, "Avtalet"); err != nil {
+		t.Fatal(err)
+	}
+	unit := workshop.StockUnit{ID: p.StockUnitID}
+	if err := workshop.MoveStockUnit(ctx, pool, owner, unit.ID, workshop.StockForSale, ""); err != nil {
+		t.Fatal(err)
+	}
+	seller := signIn(t, ts, salesEmail)
+	resp := postResponse(t, seller, ts.URL+"/cars/deals", url.Values{"unit": {unit.ID}, "name": {"Kim Köpare"},
+		"phone": {"0701234567"}, "buyer_kind": {"consumer"}, "price": {"125000"}, "tax": {"margin_scheme"}})
+	where := resp.Header.Get("Location")
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("opening the deal answered %d", resp.StatusCode)
+	}
+	post := func(path string, form url.Values) {
+		t.Helper()
+		if resp := postResponse(t, seller, ts.URL+where+path, form); resp.StatusCode != http.StatusSeeOther {
+			t.Fatalf("%s answered %d", path, resp.StatusCode)
+		}
+	}
+	post("/contract", url.Values{"template": {""}})
+	deal, _ := workshop.DealByID(ctx, pool, owner, strings.TrimPrefix(where, "/cars/deals/"))
+	doc, _ := workshop.DocumentRecordByID(ctx, pool, owner, deal.ContractID)
+	post("/signed", url.Values{"party": {doc.Parties[0].ID}, "hash": {doc.Hash}, "method": {"in_person_click"}})
+	post("/complete", nil)
+	post("/invoice", nil)
+	deal, _ = workshop.DealByID(ctx, pool, owner, deal.ID)
+	if deal.InvoiceID == "" {
+		t.Fatal("the deal was not invoiced")
+	}
+	page := get(t, signIn(t, ts, ownerEmail), ts.URL+"/invoices/"+deal.InvoiceID, http.StatusOK)
+	text := visibleText(page)
+	for _, want := range []string{"Vinstmarginalbeskattning för begagnade varor", "125"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("the invoice does not say %q:\n%s", want, text)
+		}
+	}
+	for _, never := range []string{"40 000", "40000", "85 000", "85000", "8 000,00", "8000.00"} {
+		if strings.Contains(text, never) {
+			t.Errorf("the invoice shows %q, the margin or what the car cost:\n%s", never, text)
 		}
 	}
 }

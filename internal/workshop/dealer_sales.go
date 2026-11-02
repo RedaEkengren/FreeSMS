@@ -146,6 +146,9 @@ type Deal struct {
 	ContractSigned bool
 	// The contract the deal was last completed with, if it was.
 	ContractedDocumentID string
+	// The invoice that stands for the sale, as its reference, and its id.
+	InvoiceRef string
+	InvoiceID  string
 	// What the newest contract was made from (Basis, as it stood then).
 	ContractBasis string
 	// The car may be sold under the margin scheme (vat_eligibility).
@@ -527,6 +530,16 @@ func ReviseDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sal
 		}
 		if d.Version != fromVersion {
 			return errDealMoved
+		}
+		// Invoiced, how the sale is taxed is frozen (0207): no new terms
+		// until the invoice is credited.
+		var invoiced bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM invoices i WHERE i.vehicle_sale_id = $1 AND i.credit_of_id IS NULL
+			AND NOT EXISTS (SELECT 1 FROM invoices c WHERE c.credit_of_id = i.id))`, saleID).Scan(&invoiced); err != nil {
+			return fmt.Errorf("read the sale's invoice: %w", err)
+		}
+		if invoiced {
+			return errDealInvoiced
 		}
 		if err := insertTermsTx(ctx, tx, scope, saleID, d.StockUnitID, d.Version+1, t); err != nil {
 			return err
@@ -955,6 +968,14 @@ func dealTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id string) (Deal
 		id).Scan(&d.ContractedDocumentID); err != nil {
 		return Deal{}, err
 	}
+	if err := tx.QueryRow(ctx, `
+		SELECT coalesce((SELECT i.series || '-' || i.number FROM invoices i WHERE i.vehicle_sale_id = $1 AND i.credit_of_id IS NULL
+		                 AND NOT EXISTS (SELECT 1 FROM invoices c WHERE c.credit_of_id = i.id) ORDER BY i.number DESC LIMIT 1), ''),
+		       coalesce((SELECT i.id::text FROM invoices i WHERE i.vehicle_sale_id = $1 AND i.credit_of_id IS NULL
+		                 AND NOT EXISTS (SELECT 1 FROM invoices c WHERE c.credit_of_id = i.id) ORDER BY i.number DESC LIMIT 1), '')`,
+		id).Scan(&d.InvoiceRef, &d.InvoiceID); err != nil {
+		return Deal{}, fmt.Errorf("read the sale's invoice: %w", err)
+	}
 	if d.MarginSchemeEligible, err = eligibleForSchemeTx(ctx, tx, d.StockUnitID); err != nil {
 		return Deal{}, err
 	}
@@ -1318,3 +1339,112 @@ const partyNameSQL = `coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.com
 // people, for partyNameSQL.
 const partyNameJoins = `JOIN parties pa ON pa.id = b.party_id LEFT JOIN customers c ON c.id = pa.customer_id
 	LEFT JOIN people cp ON cp.id = c.person_id LEFT JOIN people pp ON pp.id = pa.person_id`
+
+var errDealInvoiced = fmt.Errorf("%w: the sale has been invoiced, so its terms are frozen; credit the invoice first", ErrInvalid)
+
+var errDealNotComplete = fmt.Errorf("%w: the contract is not complete; a deal is invoiced once it is", ErrInvalid)
+
+// IssueDealInvoice invoices a completed deal (#177), from the shop's one
+// series, to its first buyer as a customer (customerForPartyTx). Invoiced
+// again while that invoice stands, it is the same invoice. Behind defaults
+// pending the accountant (gate G2, #221):
+//   - under the margin scheme the car is one line at its gross price with no
+//     VAT and outside the bands, the invoice says "Vinstmarginalbeskattning
+//     för begagnade varor", and the scheme's VAT -- that car's margin times
+//     0.2, never offset against another -- is kept on the invoice for the
+//     books and never shown, nor the margin;
+//   - under ordinary VAT the car is a line at 25 per cent;
+//   - the extras are ordinary lines at their own rates.
+//
+// How it is posted is not decided: the accounting export refuses a period
+// with a car sale (ErrCarSalePostings). Once invoiced, the terms -- and so
+// how the sale is taxed -- are frozen until the invoice is credited (0207).
+// For whoever sells cars, on a deal they may see.
+func IssueDealInvoice(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, saleID string) (Invoice, error) {
+	if !scope.Role.SellsVehicles() {
+		return Invoice{}, access.ErrForbidden
+	}
+	if err := scope.Require(access.Dealer); err != nil {
+		return Invoice{}, err
+	}
+	if !looksLikeUUID(saleID) {
+		return Invoice{}, ErrNotFound
+	}
+	var inv Invoice
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		if err := lockDealTx(ctx, tx, saleID); err != nil {
+			return err
+		}
+		d, err := dealTx(ctx, tx, scope, saleID)
+		if err != nil {
+			return err
+		}
+		if !d.Completed() {
+			return errDealNotComplete
+		}
+		// The invoice that stands, if there is one: the same request again.
+		err = tx.QueryRow(ctx, `
+			SELECT id, series, number, issued_at, net_minor, vat_minor, gross_minor FROM invoices i
+			WHERE i.vehicle_sale_id = $1 AND i.credit_of_id IS NULL
+			  AND NOT EXISTS (SELECT 1 FROM invoices c WHERE c.credit_of_id = i.id)`, saleID).Scan(&inv.ID, &inv.Series, &inv.Number,
+			&inv.IssuedAt, &inv.NetMinor, &inv.VATMinor, &inv.GrossMinor)
+		if err == nil {
+			inv.Source = SourceVehicleSale
+			return nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("read the sale's invoice: %w", err)
+		}
+		customer, err := customerForPartyTx(ctx, tx, scope, d.Buyers[0].PartyID)
+		if err != nil {
+			return err
+		}
+		var vin string
+		if err := tx.QueryRow(ctx, `SELECT coalesce(v.vin, '') FROM stock_units u JOIN vehicles v ON v.id = u.vehicle_id WHERE u.id = $1`,
+			d.StockUnitID).Scan(&vin); err != nil {
+			return err
+		}
+		car := d.Car
+		if vin != "" && vin != d.Car {
+			car += ", " + vin
+		}
+		of := sourced{source: SourceVehicleSale, vehicleSaleID: saleID, customerID: customer}
+		var lines []SourcedLine
+		switch d.Terms.TaxTreatment {
+		case TaxMarginScheme:
+			eligibility := d.EligibilityID
+			if eligibility == "" {
+				if err := tx.QueryRow(ctx, `
+					SELECT e.id FROM vehicle_purchases p JOIN vat_eligibility e ON e.purchase_id = p.id
+					WHERE p.stock_unit_id = $1 AND NOT EXISTS (SELECT 1 FROM vat_eligibility n WHERE n.supersedes_id = e.id)`,
+					d.StockUnitID).Scan(&eligibility); err != nil {
+					return fmt.Errorf("read the eligibility: %w", err)
+				}
+			}
+			var purchase int64
+			if err := tx.QueryRow(ctx, `SELECT p.tax_purchase_price_minor FROM vat_eligibility e JOIN vehicle_purchases p ON p.id = e.purchase_id
+				WHERE e.id = $1`, eligibility).Scan(&purchase); err != nil {
+				return fmt.Errorf("read the purchase price: %w", err)
+			}
+			r, err := money.MarginScheme(d.Terms.PriceMinor, purchase, saleVATRate)
+			if err != nil {
+				return fmt.Errorf("%w: %v", ErrInvalid, err)
+			}
+			of.marginSchemeVAT = r.VATMinor
+			lines = append(lines, SourcedLine{Kind: "vehicle", Description: car, QuantityMilli: 1000,
+				UnitPriceMinor: d.Terms.PriceMinor, MarginScheme: true})
+		case TaxOrdinary:
+			lines = append(lines, SourcedLine{Kind: "vehicle", Description: car, QuantityMilli: 1000,
+				UnitPriceMinor: d.Terms.PriceMinor - money.VATInGross(d.Terms.PriceMinor, saleVATRate), VATRateBasis: saleVATRate})
+		default:
+			return errDealIncomplete
+		}
+		for _, l := range d.Terms.Lines {
+			lines = append(lines, SourcedLine{Kind: "part", Description: l.Description, QuantityMilli: l.QuantityMilli,
+				UnitPriceMinor: l.UnitPriceMinor, VATRateBasis: l.VATRateBasis})
+		}
+		inv, err = issueSourcedTx(ctx, tx, scope, of, lines)
+		return err
+	})
+	return inv, err
+}

@@ -128,6 +128,10 @@
 {{if not $x.Missing}}{{if not $x.Completed}}
 <form method="post" action="/cars/deals/{{$x.ID}}/complete"><button type="submit">{{.T "Complete the contract"}}</button></form>
 {{end}}{{end}}
+{{if $x.Completed}}<h2>{{.T "Invoice"}}</h2>
+{{if $x.InvoiceRef}}<p>{{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/invoices/{{$x.InvoiceID}}">{{.T "Invoiced as %s" $x.InvoiceRef}}</a>{{else}}{{.T "Invoiced as %s" $x.InvoiceRef}}{{end}}</p>
+{{else}}<form method="post" action="/cars/deals/{{$x.ID}}/invoice"><button type="submit">{{.T "Invoice the sale"}}</button></form>{{end}}
+{{end}}
 
 <details><summary>{{.T "Change the terms"}}</summary>
 <form method="post" action="/cars/deals/{{$x.ID}}/terms">

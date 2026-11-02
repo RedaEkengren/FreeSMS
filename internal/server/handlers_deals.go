@@ -138,6 +138,7 @@ func (s *Server) dealRoutes(m routeMux) {
 	m.HandleFunc("POST /cars/deals/{id}/signed", s.requireSession(s.handleDealSigned))
 	m.HandleFunc("POST /cars/deals/{id}/complete", s.requireSession(s.handleDealComplete))
 	m.HandleFunc("POST /cars/deals/{id}/cancel", s.requireSession(s.handleDealCancel))
+	m.HandleFunc("POST /cars/deals/{id}/invoice", s.requireSession(s.handleDealInvoice))
 }
 
 // termsForm reads the terms a form sends; the buyers are the "buyer"
@@ -401,4 +402,12 @@ func (s *Server) handleDealComplete(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDealCancel(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	s.backToDeal(w, r, workshop.CancelDeal(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("reason")))
+}
+
+// handleDealInvoice invoices a completed deal; the deal's page then says
+// which invoice it is.
+func (s *Server) handleDealInvoice(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	_, err := workshop.IssueDealInvoice(r.Context(), s.pool, session.Scope, r.PathValue("id"))
+	s.backToDeal(w, r, err)
 }

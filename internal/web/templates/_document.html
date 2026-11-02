@@ -54,9 +54,9 @@
     {{range .Bands}}
     <dt>{{$.T "VAT"}} {{divide .RateBasisPoints 100}}%</dt><dd>{{$.Money .VATMinor}}</dd>
     {{end}}
-    <dt>{{$.T "Net"}}</dt><dd>{{$.Money .NetMinor}}</dd>
+    {{/* A car under the margin scheme (#177): its price, outside the bands, and the statement, frozen in Swedish; on this line, so any other document renders as it did. */}}{{with .MarginSchemeMinor}}<dt>{{$.T "Sold under the margin scheme"}}</dt><dd>{{$.Money .}}</dd>{{end}}<dt>{{$.T "Net"}}</dt><dd>{{$.Money .OrdinaryNetMinor}}</dd>
     <dt class="grand">{{$.T "Total"}}</dt><dd class="grand">{{$.Money .GrossMinor}}</dd>
-  </dl>
+  </dl>{{with .MarginSchemeStatement}}<p><strong>{{.}}</strong></p>{{end}}
 
   {{/* A cash invoice says it was paid, and how, frozen with it (#156); on this line, so any other document renders as it did. */}}{{$paid := .PaidOnIssue}}{{with .PaidOnIssue}}<p><strong>{{$.T "Paid"}}</strong> {{$.Date ($.Local .At) "2 Jan 2006 15:04"}}</p><ul class="plain">{{range .With}}<li>{{$.T .Method}} {{$.Money .AmountMinor}}{{if .RoundingMinor}} + {{$.Money .RoundingMinor}} {{$.T "rounding"}}{{end}}{{with .Reference}} &middot; {{.}}{{end}}</li>{{end}}</ul>{{end}}{{with .Seller}}
   {{if and .PaymentReference (not $paid)}}<p>{{$.T "Pay to %s" .PaymentReference}}{{if .PaymentTermsDays}}, {{$.N "%d day net" .PaymentTermsDays}}{{end}}</p>{{end}}{{/* The reference to pay with and the code to scan (#234), on this line so a document without them renders as it did. */}}{{with $.Document}}{{if and .PaymentOCR (not $paid) (not .IsCreditNote)}}
