@@ -54,3 +54,25 @@ func TestALossIsNeverOffsetAgainstAnotherCar(t *testing.T) {
 		t.Error("MarginSchemeVAT and MarginScheme disagree")
 	}
 }
+
+// The VAT inside a price that includes it: a fifth at 25 per cent, half an
+// öre away from zero, and the price without it is the rest.
+func TestVATInGross(t *testing.T) {
+	for _, c := range []struct {
+		gross int64
+		rate  int
+		vat   int64
+	}{
+		{12_500_000, 2500, 2_500_000},
+		{0, 2500, 0},
+		{3, 2500, 1},
+		{2, 2500, 0},
+		{14, 1200, 2},
+		{-12_500_000, 2500, -2_500_000},
+		{1000, 0, 0},
+	} {
+		if got := VATInGross(c.gross, c.rate); got != c.vat {
+			t.Errorf("VATInGross(%d, %d) = %d, want %d", c.gross, c.rate, got, c.vat)
+		}
+	}
+}

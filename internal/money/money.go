@@ -108,6 +108,13 @@ func MarginSchemeVAT(salePriceGrossMinor, taxPurchasePriceMinor int64, rateBasis
 	return divRound(margin*int64(rateBasisPoints), 10000+int64(rateBasisPoints))
 }
 
+// VATInGross is the VAT inside a price that includes it, at the rate in
+// basis points: gross x rate / (10000 + rate), half away from zero -- a
+// fifth at 25 per cent. The price without it is gross less this.
+func VATInGross(grossMinor int64, rateBasisPoints int) int64 {
+	return divRound(grossMinor*int64(rateBasisPoints), 10000+int64(rateBasisPoints))
+}
+
 // MaxVehicleMinor is the most a car's sale or purchase price may be here: a
 // billion kronor. Above it MarginScheme refuses rather than risk an amount
 // that does not fit; within it, margin times rate fits int64 many times

@@ -1310,7 +1310,7 @@ func SaleTaxOfDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 			}
 			out.MarginMinor, out.VATMinor, out.BaseMinor = r.MarginMinor, r.VATMinor, r.BaseMinor
 		case TaxOrdinary:
-			out.VATMinor = money.Scale(d.Terms.PriceMinor, saleVATRate, 10000+saleVATRate)
+			out.VATMinor = money.VATInGross(d.Terms.PriceMinor, saleVATRate)
 			out.BaseMinor = d.Terms.PriceMinor - out.VATMinor
 		}
 		return nil
