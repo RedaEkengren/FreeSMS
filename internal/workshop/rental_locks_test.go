@@ -261,3 +261,52 @@ func TestStartingAFleetPeriodWaitsForTheUnit(t *testing.T) {
 		t.Errorf("starting the fleet period: %v", err)
 	}
 }
+
+// Taking a rental's unit is one statement, not a read and then a lock:
+// every rental write pays for it. Confirming a hold and ending a fleet
+// period are each counted whole -- the transaction, the scope, the lock,
+// the work (review 3 #9).
+func TestTakingARentalsUnitIsOneRoundTrip(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	until := time.Now().Add(time.Hour)
+	held, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: v.unit, RenterID: v.renter,
+		From: in2031(10, 9), To: in2031(11, 9), HoldUntil: &until})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := addUnit(t, pool, workshop.NewRentalUnit{Registration: "XYZ 99A", FleetNumber: "V2", Category: "Small van"})
+	membership, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), other, time.Now().AddDate(-1, 0, 0), "bought", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := pool.Config()
+	counter := &countingTracer{}
+	cfg.ConnConfig.Tracer = counter
+	counted, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer counted.Close()
+	for _, c := range []struct {
+		what   string
+		budget int64
+		do     func() error
+	}{
+		{"confirming a hold", 8, func() error { return workshop.ConfirmRentalBooking(ctx, counted, rentalDesk(), held) }},
+		{"ending a fleet period", 9, func() error {
+			return workshop.EndFleetMembership(ctx, counted, rentalDesk(), membership, time.Now(), "sold", "")
+		}},
+	} {
+		before := counter.n.Load()
+		if err := c.do(); err != nil {
+			t.Fatalf("%s: %v", c.what, err)
+		}
+		if n := counter.n.Load() - before; n > c.budget {
+			t.Errorf("%s: %d statements, over its %d", c.what, n, c.budget)
+		} else {
+			t.Logf("%s: %d statements", c.what, n)
+		}
+	}
+}

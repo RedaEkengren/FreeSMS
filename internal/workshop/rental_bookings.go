@@ -555,16 +555,18 @@ func lockRentalTx(ctx context.Context, tx pgx.Tx, id string) (lockedRental, erro
 	b := lockedRental{id: id}
 	// The unit first, then the booking and its block: the one order every
 	// rental write takes, so two never wait on each other.
-	var resource string
-	err := tx.QueryRow(ctx, `SELECT k.resource_id FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id WHERE b.id = $1`, id).Scan(&resource)
+	// Found and locked in one statement; the booking's block, and so its
+	// unit, never changes.
+	var one int
+	err := tx.QueryRow(ctx, `
+		SELECT 1 FROM resources
+		WHERE id = (SELECT k.resource_id FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id WHERE b.id = $1)
+		FOR UPDATE`, id).Scan(&one)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return b, ErrNotFound
 	}
 	if err != nil {
-		return b, fmt.Errorf("read booking: %w", err)
-	}
-	if err := lockUnitResourceTx(ctx, tx, resource); err != nil {
-		return b, err
+		return b, fmt.Errorf("lock the unit: %w", err)
 	}
 	err = tx.QueryRow(ctx, `
 		SELECT b.unit_id, k.resource_id, b.block_id, `+rentalState+`, b.starts_at, b.ends_at, k.buffer_after, k.status
