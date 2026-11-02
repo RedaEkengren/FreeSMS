@@ -641,8 +641,8 @@ func RentalHandoverOfProtocol(ctx context.Context, pool *pgxpool.Pool, scope acc
 			return err
 		}
 		// Compared as itself: a check-in left unfinished is not the one
-		// finished after it.
-		if p.Subject == HandoverIn {
+		// finished after it. The finished one is compared already.
+		if p.Subject == HandoverIn && (v.In == nil || v.In.ProtocolID != p.ID) {
 			var resource string
 			if err := tx.QueryRow(ctx, `SELECT u.resource_id FROM rental_bookings b JOIN rental_units u ON u.id = b.unit_id WHERE b.id = $1`,
 				bookingID).Scan(&resource); err != nil {
