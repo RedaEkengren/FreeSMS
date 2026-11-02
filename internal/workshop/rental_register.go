@@ -130,9 +130,10 @@ func checkPurpose(purpose string) (string, error) {
 	return purpose, nil
 }
 
-// RentalRegister reads the register over a period -- every rental whose
-// booked or actual time touches it -- for one unit or one registration if
-// the filter names it. Whoever runs the shop, with Rental on or off; the
+// RentalRegister reads the register over a period -- every rental that
+// was out, from its check-out to its check-in or still, at some time in
+// it; one booked and never handed over had nobody -- for one unit or one
+// registration if the filter names it. Whoever runs the shop, with Rental on or off; the
 // read is recorded with its purpose.
 func RentalRegister(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, f RegisterFilter, purpose string) ([]RegisterEntry, error) {
 	if !scope.Role.RunsTheShop() {
@@ -153,10 +154,10 @@ func RentalRegister(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		out, err = registerTx(ctx, tx, scope, `
-			tstzrange(least(b.starts_at, ho.at), greatest(b.ends_at, coalesce(hi.at, CASE WHEN ho.at IS NOT NULL THEN 'infinity'::timestamptz END))) && tstzrange($1, $2)
+			ho.at IS NOT NULL AND tstzrange(ho.at, coalesce(hi.at, 'infinity')) && tstzrange($1, $2)
 			AND ($3 = '' OR b.unit_id::text = $3)
 			AND ($4 = '' OR EXISTS (SELECT 1 FROM vehicle_registrations g WHERE g.vehicle_id = r.vehicle_id AND g.normalised = $4
-			                         AND tstzrange(g.valid_from, g.valid_to) && tstzrange(least(b.starts_at, ho.at), greatest(b.ends_at, coalesce(hi.at, CASE WHEN ho.at IS NOT NULL THEN 'infinity'::timestamptz END)))))`,
+			                         AND tstzrange(g.valid_from, g.valid_to) && tstzrange(ho.at, coalesce(hi.at, 'infinity'))))`,
 			[]any{f.From, f.To, f.UnitID, reg}, purpose,
 			map[string]any{"from": f.From, "to": f.To, "unit_id": f.UnitID, "registration": reg})
 		return err

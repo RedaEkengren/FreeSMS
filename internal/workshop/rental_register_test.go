@@ -72,6 +72,7 @@ func TestTheRentalRegisterSaysWhoHadTheVehicleWhen(t *testing.T) {
 		t.Fatal(err)
 	}
 	third, err := v.book(pool, in2031(25, 9), in2031(26, 9))
+	_ = third
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,18 +81,21 @@ func TestTheRentalRegisterSaysWhoHadTheVehicleWhen(t *testing.T) {
 	}
 
 	register, err := workshop.RentalRegister(ctx, pool, rentalOwner(), workshop.RegisterFilter{From: time.Now().AddDate(0, 0, -1), To: in2031(31, 0)}, "Transportstyrelsens tillsyn")
-	if err != nil || len(register) != 3 {
+	// Who had it: the cancelled rental, and one booked and not yet out,
+	// had nothing (review r6, #5).
+	if _, err := v.book(pool, in2031(27, 9), in2031(28, 9)); err != nil {
+		t.Fatal(err)
+	}
+	register, err = workshop.RentalRegister(ctx, pool, rentalOwner(), workshop.RegisterFilter{From: time.Now().AddDate(0, 0, -1), To: in2031(31, 0)}, "Transportstyrelsens tillsyn")
+	if err != nil || len(register) != 2 {
 		t.Fatalf("the register: %+v, %v", register, err)
 	}
-	a, b, c := register[0], register[1], register[2]
+	a, b := register[0], register[1]
 	if a.BookingID != first || a.Registration != "ABC 12D" || a.Out == nil || a.In == nil || a.Open() || !a.Ends.Equal(in2031(13, 9)) || len(a.Drivers) != 2 || a.State != workshop.RentalReturned {
 		t.Errorf("the first rental: %+v", a)
 	}
 	if b.BookingID != second || b.Registration != "XYZ 99A" || !b.Open() || b.State != workshop.RentalCheckedOut {
 		t.Errorf("the second rental, out: %+v", b)
-	}
-	if c.BookingID != third || c.Out != nil || c.State != workshop.RentalCancelled {
-		t.Errorf("the cancelled rental: %+v", c)
 	}
 	if one, _ := workshop.RentalRegister(ctx, pool, rentalOwner(), workshop.RegisterFilter{From: time.Now().AddDate(0, 0, -1), To: in2031(31, 0), Registration: "abc12d"}, "Polisen"); len(one) != 1 || one[0].BookingID != first {
 		t.Errorf("by the old plate: %+v", one)
@@ -123,8 +127,8 @@ func TestTheRentalRegisterSaysWhoHadTheVehicleWhen(t *testing.T) {
 			reads++
 		}
 	}
-	if err != nil || reads != 5 {
-		t.Errorf("%d reads recorded, want 5: %v", reads, err)
+	if err != nil || reads != 6 {
+		t.Errorf("%d reads recorded, want 6: %v", reads, err)
 	}
 	// Switched off, the register is still there for the owner.
 	off := rentalOwner()
