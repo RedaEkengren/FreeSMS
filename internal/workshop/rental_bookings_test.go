@@ -23,8 +23,15 @@ type rentable struct {
 
 func rentableVan(t *testing.T, pool *pgxpool.Pool) rentable {
 	t.Helper()
+	return rentableVanWith(t, pool, "ABC 12D")
+}
+
+// rentableVanWith is rentableVan with a registration of its own: a van
+// that is not vehicle A, which may be in stock elsewhere in the test.
+func rentableVanWith(t *testing.T, pool *pgxpool.Pool, registration string) rentable {
+	t.Helper()
 	ctx := context.Background()
-	unit := addUnit(t, pool, workshop.NewRentalUnit{Registration: "ABC 12D", FleetNumber: "V1", Category: "Small van"})
+	unit := addUnit(t, pool, workshop.NewRentalUnit{Registration: registration, FleetNumber: "V1", Category: "Small van"})
 	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), unit, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
 		t.Fatal(err)
 	}
@@ -344,9 +351,11 @@ func TestAChangedPriceSaysWhoAndWhy(t *testing.T) {
 
 // rentalAudited makes Rental's audited transitions happen, for
 // TestEveryAuditedTransitionLeavesAnEvent, and says what each was about.
+// Its van is not vehicle A, which Dealer's part of that test has in
+// stock: a car is not in the fleet and in stock at once.
 func rentalAudited(t *testing.T, pool *pgxpool.Pool, made func(event, kind, id string)) {
 	t.Helper()
-	v := rentableVan(t, pool)
+	v := rentableVanWith(t, pool, "RNT 100")
 	id, err := workshop.BookRental(context.Background(), pool, rentalDesk(), workshop.NewRentalBooking{UnitID: v.unit, RenterID: v.renter,
 		From: in2031(10, 9), To: in2031(11, 9), Overrides: []workshop.PriceOverride{{Position: 1, UnitPriceMinor: 1, Reason: "Prov"}}})
 	if err != nil {

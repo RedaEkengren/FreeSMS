@@ -8412,6 +8412,8 @@
     "Another way, in the note": {"other": "Annat sätt, i anteckningen"},
     "Note, with no licence or identity number": {"other": "Anteckning, utan körkorts- eller personnummer"},
     "a driver's licence does not last until the new end; check it again before extending": {"other": "en förares körkort gäller inte till det nya slutet; kontrollera det igen innan hyran förlängs"},
-    "that is more than a licence check can say; shorten the note": {"other": "det är mer än en körkortskontroll kan rymma; korta anteckningen"}
+    "that is more than a licence check can say; shorten the note": {"other": "det är mer än en körkortskontroll kan rymma; korta anteckningen"},
+    "that car is in stock for sale then; it joins the fleet once its cycle in stock has ended": {"other": "bilen finns i lager för försäljning då; den kommer in i hyrflottan när dess lagervarv har avslutats"},
+    "that car is in the rental fleet; end its time in the fleet before it comes into stock": {"other": "bilen finns i hyrflottan; avsluta dess tid i hyrflottan innan den tas in i lager"}
   }
 }

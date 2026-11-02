@@ -87,6 +87,7 @@ var stockMoves = map[StockStatus][]StockStatus{
 var (
 	errStockNoIdentity = fmt.Errorf("%w: a car in stock needs its chassis number or its registration, because the margin scheme is accounted car by car", ErrInvalid)
 	errStockOpen       = fmt.Errorf("%w: that car is already in stock; finish its cycle before starting another", ErrInvalid)
+	errStockInFleet    = fmt.Errorf("%w: that car is in the rental fleet; end its time in the fleet before it comes into stock", ErrInvalid)
 	errStockReason     = fmt.Errorf("%w: that is not a way a car comes into stock", ErrInvalid)
 	errStockNotTaken   = fmt.Errorf("%w: a car bought, consigned or imported comes into stock through its purchase, its agreement or its import", ErrInvalid)
 	errStockMove       = fmt.Errorf("%w: a car cannot go straight from there to there", ErrInvalid)
@@ -199,6 +200,9 @@ func openStockUnitTx(ctx context.Context, tx pgx.Tx, scope access.Scope, vehicle
 	var pg *pgconn.PgError
 	if errors.As(err, &pg) && pg.ConstraintName == "stock_units_one_cycle_at_a_time" {
 		return StockUnit{}, errStockOpen
+	}
+	if errors.As(err, &pg) && pg.ConstraintName == "vehicle_fleet_or_stock" {
+		return StockUnit{}, errStockInFleet
 	}
 	if err != nil {
 		return StockUnit{}, fmt.Errorf("open the stock unit: %w", err)
