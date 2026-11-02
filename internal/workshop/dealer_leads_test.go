@@ -3,6 +3,8 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -325,5 +327,37 @@ func TestALeadThatNeverBecameADealForgetsThePerson(t *testing.T) {
 	}
 	if got, _ := workshop.LeadByID(ctx, pool, anna, fresh.ID); got.Erased || got.Name == "" {
 		t.Errorf("a fresh lead was erased: %+v", got)
+	}
+}
+
+// The same enquiry sent several times at once -- a double tap, a form
+// resent by a phone -- is one lead, and every sending is told it.
+func TestTheSameEnquirySentAtOnceIsOneLead(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	anna := salesperson(t, pool, "Anna Säljare", "anna.s@example.test")
+	for _, alongside := range []bool{false, true} {
+		n := walkIn("Kim Köpare", "0701234567")
+		n.Alongside = alongside
+		n.Key = fmt.Sprintf("form-%v", alongside)
+		n.Email = fmt.Sprintf("kim-%v@example.test", alongside)
+		n.Phone = map[bool]string{false: "0701234567", true: "0731234567"}[alongside]
+		var wg sync.WaitGroup
+		ids := make([]string, 6)
+		errs := make([]error, 6)
+		for i := range ids {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				l, err := workshop.CreateLead(ctx, pool, anna, n)
+				ids[i], errs[i] = l.ID, err
+			}()
+		}
+		wg.Wait()
+		for i, err := range errs {
+			if err != nil || ids[i] != ids[0] {
+				t.Errorf("alongside %v, sending %d: %s, %v; want the one lead", alongside, i, ids[i], err)
+			}
+		}
 	}
 }

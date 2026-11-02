@@ -362,7 +362,11 @@ func CreateLead(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n N
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if n.Key != "" {
 			// The same enquiry sent again: the lead it made, whatever it
-			// says now.
+			// says now. The key is locked first, so a sending still in
+			// flight has committed by the time it is looked for.
+			if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('leadkey:' || $1, 0))`, n.Key); err != nil {
+				return err
+			}
 			var id, unit string
 			err := tx.QueryRow(ctx, `SELECT id, coalesce(stock_unit_id::text, '') FROM leads WHERE request_key = $1`, n.Key).Scan(&id, &unit)
 			if err == nil {
