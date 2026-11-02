@@ -1132,7 +1132,7 @@ func SalesContractTemplates(ctx context.Context, pool *pgxpool.Pool, scope acces
 }
 
 // ProduceSalesContract freezes the contract for a deal's terms as they
-// stand from a template version, with its buyers as parties, in one
+// stand from a template version -- the shipped one when none is given -- with its buyers as parties, in one
 // transaction with the deal locked. replacing is the contract the caller
 // saw, or empty for none: made again, the new one supersedes it; when the
 // deal's contract has moved on meanwhile, nothing is made
@@ -1150,7 +1150,7 @@ func ProduceSalesContract(ctx context.Context, pool *pgxpool.Pool, scope access.
 	if err := mayDocument(scope.Role, scope, DocSalesContract, true); err != nil {
 		return "", nil, err
 	}
-	if !looksLikeUUID(saleID) || !looksLikeUUID(templateVersionID) || (replacing != "" && !looksLikeUUID(replacing)) {
+	if !looksLikeUUID(saleID) || (templateVersionID != "" && !looksLikeUUID(templateVersionID)) || (replacing != "" && !looksLikeUUID(replacing)) {
 		return "", nil, ErrNotFound
 	}
 	var doc string
@@ -1171,6 +1171,18 @@ func ProduceSalesContract(ctx context.Context, pool *pgxpool.Pool, scope access.
 		}
 		if d.Completed() {
 			return errDealComplete
+		}
+		// None chosen: the shipped contract, made here the first time --
+		// in a write, never when a page is read.
+		if templateVersionID == "" {
+			if err := ensureSalesContractTemplateTx(ctx, tx, scope.ShopID); err != nil {
+				return err
+			}
+			if err := tx.QueryRow(ctx, `
+				SELECT v.id FROM document_templates t JOIN document_template_versions v ON v.template_id = t.id
+				WHERE t.kind = 'sales_contract' ORDER BY t.created_at, t.id, v.version DESC LIMIT 1`).Scan(&templateVersionID); err != nil {
+				return fmt.Errorf("read the shipped contract: %w", err)
+			}
 		}
 		var body, kind string
 		if err := tx.QueryRow(ctx, `SELECT v.body, t.kind FROM document_template_versions v JOIN document_templates t ON t.id = v.template_id

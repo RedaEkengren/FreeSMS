@@ -226,7 +226,9 @@ func (s *Server) dealPage(w http.ResponseWriter, r *http.Request, status int, ms
 		d.Warnings = workshop.SalesContractWarnings(d.Contract.Body, d.Deal.Terms.BuyerKind)
 	}
 	if d.Deal.State != workshop.DealCancelled {
-		if d.Templates, err = workshop.SalesContractTemplates(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		// Read only: the shipped contract is made when a contract is first
+		// made from it, as reading a page writes nothing.
+		if d.Templates, err = workshop.DocumentTemplates(r.Context(), s.pool, session.Scope, workshop.DocSalesContract); s.handoverError(w, r, err) {
 			return
 		}
 	}

@@ -4,10 +4,12 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
+
+	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
@@ -55,12 +57,10 @@ func TestASalespersonSellsACarOnThePages(t *testing.T) {
 	post("/defects", url.Values{"description": {"Stenskott i vindrutan"}})
 	post("/terms", url.Values{"version": {"1"}, "buyer": {kim}, "buyer_kind": {"consumer"}, "price": {"125000"}, "tax": {"ordinary"},
 		"line_desc": {"Vinterhjul"}, "line_qty": {"1"}, "line_price": {"8000"}, "line_vat": {"25"}})
-	page = get(t, seller, ts.URL+where, http.StatusOK)
-	tpl := regexp.MustCompile(`name="template"><option value="([0-9a-f-]{36})"`).FindStringSubmatch(page)
-	if tpl == nil {
-		t.Fatalf("no template offered:\n%s", visibleText(page))
+	if page := get(t, seller, ts.URL+where, http.StatusOK); !strings.Contains(page, "From the shipped contract") {
+		t.Fatalf("the shipped contract is not offered:\n%s", visibleText(page))
 	}
-	post("/contract", url.Values{"template": {tpl[1]}})
+	post("/contract", url.Values{"template": {""}})
 	deal, _ = workshop.DealByID(ctx, pool, owner, deal.ID)
 	doc, err := workshop.DocumentRecordByID(ctx, pool, owner, deal.ContractID)
 	if err != nil {
@@ -105,5 +105,40 @@ func TestARefusedDealKeepsWhatWasTyped(t *testing.T) {
 		if !strings.Contains(page, want) {
 			t.Errorf("the form came back without %q", want)
 		}
+	}
+}
+
+// Reading a deal writes nothing: the shipped contract template is made when
+// a contract is first made from it, not when a page is looked at.
+func TestReadingADealWritesNothing(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	unit, err := workshop.TakeIntoStock(ctx, pool, owner, vehicleA, workshop.StockFromDefleet, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.MoveStockUnit(ctx, pool, owner, unit.ID, workshop.StockForSale, ""); err != nil {
+		t.Fatal(err)
+	}
+	seller := signIn(t, ts, salesEmail)
+	resp := postResponse(t, seller, ts.URL+"/cars/deals", url.Values{"unit": {unit.ID}, "name": {"Kim Köpare"},
+		"phone": {"0701234567"}, "buyer_kind": {"consumer"}, "price": {"125000"}, "key": {"read-1"}})
+	where := resp.Header.Get("Location")
+	if resp.StatusCode != http.StatusSeeOther || !strings.HasPrefix(where, "/cars/deals/") {
+		t.Fatalf("opening the deal answered %d, %q", resp.StatusCode, where)
+	}
+	get(t, seller, ts.URL+where, http.StatusOK)
+	var n int
+	if err := database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT count(*) FROM document_templates WHERE kind = 'sales_contract'`).Scan(&n)
+	}); err != nil || n != 0 {
+		t.Errorf("reading the deal made %d templates (%v)", n, err)
+	}
+	if resp := postResponse(t, seller, ts.URL+where+"/contract", url.Values{"template": {""}}); resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("making the contract from the shipped template answered %d", resp.StatusCode)
+	}
+	if d, _ := workshop.DealByID(ctx, pool, owner, strings.TrimPrefix(where, "/cars/deals/")); d.ContractID == "" {
+		t.Error("no contract was made from the shipped template")
 	}
 }

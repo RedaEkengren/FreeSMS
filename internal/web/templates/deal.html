@@ -117,10 +117,11 @@
     </form>{{end}}</span></div>
   {{end}}
 {{end}}
-{{if $d.Templates}}
+{{if not $x.Completed}}
 <form method="post" action="/cars/deals/{{$x.ID}}/contract">
   <input type="hidden" name="replacing" value="{{$x.ContractID}}">
-  <label><span>{{.T "Template"}}</span><select name="template">{{range $d.Templates}}<option value="{{.VersionID}}">{{.Name}}</option>{{end}}</select></label>
+  {{if $d.Templates}}<label><span>{{.T "Template"}}</span><select name="template">{{range $d.Templates}}<option value="{{.VersionID}}">{{.Name}}</option>{{end}}</select></label>
+  {{else}}<input type="hidden" name="template" value=""><p class="waiting">{{.T "From the shipped contract, a draft that needs legal review."}}</p>{{end}}
   <button type="submit" class="secondary">{{if $x.ContractID}}{{.T "Make it again from the terms as they stand"}}{{else}}{{.T "Make the contract"}}{{end}}</button>
 </form>
 {{end}}
