@@ -7,11 +7,14 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/testsupport"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // "Slow" is the commonest complaint about every system FreeSMS is meant to
@@ -54,8 +57,9 @@ var queryBudgets = map[string]int{
 	// 24 to 26: Rental's cards, counted in one statement beside the
 	// workshop's, and the rental desk's part of the queue in one more
 	// (#192). 26 to 29: the fleet's paperwork (#202) -- reports,
-	// insurances and the bookings ahead in one statement, then the
-	// shop's zone and its permits to see whether the permit ends soon.
+	// insurances and what every booking ahead lacks in one statement
+	// (seedRentalsAhead books five, so a loop over them would show), then
+	// the shop's zone and its permits to see whether the permit ends soon.
 	"desk GET /":      17,
 	"owner GET /":     29,
 	"desk GET /board": 21,
@@ -277,4 +281,43 @@ func seedHistory(t *testing.T, pool *pgxpool.Pool) {
 		 SELECT '` + shopA + `', '` + tech + `', current_date - n, '10:00', '18:00', '` + tech + `'
 		 FROM generate_series(-14, 700) n`,
 	})
+	seedRentalsAhead(t, pool)
+}
+
+// seedRentalsAhead books a van five times in the next weeks, each lacking
+// what a handover needs, so the rental desk's queue has bookings ahead to
+// ask about (#202) -- in one statement, whatever their number.
+func seedRentalsAhead(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	ctx := context.Background()
+	owner := access.Scope{ShopID: shopA, UserID: "aaaaaaaa-0000-0000-0000-000000000011", Role: access.Of(access.RoleOwner), Modules: access.Modules}
+	profiles, err := workshop.RentalProfiles(ctx, pool, owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unit, err := workshop.AddRentalUnit(ctx, pool, owner, workshop.NewRentalUnit{Registration: "RNT 001", FleetNumber: "R1", Category: "Bil", ProfileID: profiles[0].ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.StartFleetMembership(ctx, pool, owner, unit, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := workshop.CreateRatePlan(ctx, pool, owner, workshop.NewRatePlan{Name: "Bil", Category: "Bil", VATRateBp: 2500, SeasonRule: "at_start"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	price := int64(40000)
+	if _, err := workshop.AddRateSeason(ctx, pool, owner, plan, workshop.RateSeason{ValidFrom: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), Day: &price}); err != nil {
+		t.Fatal(err)
+	}
+	renter, err := workshop.CreateParty(ctx, pool, owner, workshop.NewParty{Kind: "private", Name: "Rita", Role: workshop.PartyRenter})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		from := time.Now().AddDate(0, 0, 2+3*i)
+		if _, err := workshop.BookRental(ctx, pool, owner, workshop.NewRentalBooking{UnitID: unit, RenterID: renter, From: from, To: from.Add(24 * time.Hour)}); err != nil {
+			t.Fatal(err)
+		}
+	}
 }

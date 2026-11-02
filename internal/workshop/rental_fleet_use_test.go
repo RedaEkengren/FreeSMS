@@ -139,7 +139,18 @@ func TestTheFleetsPaperworkIsOnTheRentalDesksList(t *testing.T) {
 	v := rentableVan(t, pool)
 	kinds := func() []string {
 		t.Helper()
-		items, err := workshop.RentalDay(ctx, pool, rentalDesk())
+		// Today's page is today's handovers; the paperwork is in the
+		// queue (review r5, #7).
+		day, err := workshop.RentalDay(ctx, pool, rentalDesk())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, it := range day {
+			if it.SubjectKind != "rental_booking" || it.Kind == "rental_gaps" {
+				t.Errorf("paperwork on today's page: %+v", it)
+			}
+		}
+		items, err := workshop.WaitingFor(ctx, pool, rentalDesk())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -171,6 +182,53 @@ func TestTheFleetsPaperworkIsOnTheRentalDesksList(t *testing.T) {
 	k := kinds()
 	if slices.Contains(k, "rental_report_in") || !slices.Contains(k, "rental_insurance_ends") || !slices.Contains(k, "rental_gaps") {
 		t.Errorf("reported, insured for ten days more, booked in five with no permit: %v", k)
+	}
+	// Run out, the insurance stays on the list as ended (review r5, #6).
+	if _, err := pool.Exec(ctx, `UPDATE fleet_insurances SET valid_from = '2024-01-01', valid_to = current_date - 2`); err != nil {
+		t.Fatal(err)
+	}
+	if k := kinds(); !slices.Contains(k, "rental_insurance_ended") {
+		t.Errorf("an insurance that has ended: %v", k)
+	}
+}
+
+// A booking ahead with nothing missing is not on the list; the same one
+// whose insurance is gone is (review r5, #3: the list asks every booking
+// in one statement, and must agree with the counter).
+func TestOnlyABookingAheadThatLacksSomethingIsListed(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v, _ := handoverReady(t, pool)
+	soon, err := v.book(pool, time.Now().AddDate(0, 0, 5), time.Now().AddDate(0, 0, 6))
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, _ := workshop.AddRentalDriver(ctx, pool, rentalDesk(), soon, v.renter, true)
+	if _, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), d, workshop.LicenceShown{Shown: true, Categories: []string{"B"},
+		ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}); err != nil {
+		t.Fatal(err)
+	}
+	listed := func() bool {
+		t.Helper()
+		items, err := workshop.WaitingFor(ctx, pool, rentalDesk())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, it := range items {
+			if it.Kind == "rental_gaps" && it.SubjectID == soon {
+				return true
+			}
+		}
+		return false
+	}
+	if gaps, _ := workshop.RentalBookingGaps(ctx, pool, rentalDesk(), soon); len(gaps) != 0 || listed() {
+		t.Errorf("a booking with nothing missing (%v) is listed: %v", gapCodes(t, gaps), listed())
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM fleet_insurances`); err != nil {
+		t.Fatal(err)
+	}
+	if gaps, _ := workshop.RentalBookingGaps(ctx, pool, rentalDesk(), soon); len(gaps) != 1 || !listed() {
+		t.Errorf("a booking with its insurance gone (%v) is not listed", gapCodes(t, gaps))
 	}
 }
 

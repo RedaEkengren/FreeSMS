@@ -74,13 +74,7 @@ func rentalWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 			}
 			out = append(out, it)
 		}
-		if err := rows.Err(); err != nil {
-			return err
-		}
-		rows.Close()
-		fleet, err := fleetUseWaitingTx(ctx, tx)
-		out = append(out, fleet...)
-		return err
+		return rows.Err()
 	})
 	return out, err
 }

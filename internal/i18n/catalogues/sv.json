@@ -8513,6 +8513,7 @@
     "keep the register between 1 and 240 months, and say on what basis": {"other": "spara registret mellan 1 och 240 månader, och ange på vilken grund"},
     "Insured for rental use for the whole rental": {"other": "Försäkrad för uthyrning under hela hyran"},
     "Whether a trailer or a machine must be insured for rental use, beyond its ordinary insurance, is not confirmed. It is required by default.": {"other": "Om ett släp eller en maskin måste vara försäkrad för uthyrning, utöver sin vanliga försäkring, är inte bekräftat. Det krävs som standard."},
-    "the unit is not insured for rental use for the longer rental; record the insurance first": {"other": "enheten är inte försäkrad för uthyrning under den längre hyran; registrera försäkringen först"}
+    "the unit is not insured for rental use for the longer rental; record the insurance first": {"other": "enheten är inte försäkrad för uthyrning under den längre hyran; registrera försäkringen först"},
+    "Its insurance for rental use has ended: %s": {"other": "Försäkringen för uthyrning har upphört: %s"}
   }
 }
