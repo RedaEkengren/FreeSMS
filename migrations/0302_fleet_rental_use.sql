@@ -1,5 +1,6 @@
 -- rollback: safe
--- Three new tables, written and read only by this release. The previous
+-- Three new tables, written and read only by this release, and a profile
+-- rule with a default the previous release's inserts take. The previous
 -- release neither writes nor reads them, and refuses no handover for what
 -- they say: rolled back, a car not reported into rental use, or not
 -- insured for it, can be handed over again, as it could before this.
@@ -53,6 +54,14 @@ CREATE TABLE rental_gap_overrides (
     at         timestamptz NOT NULL DEFAULT clock_timestamp(),
     UNIQUE (booking_id, code)
 );
+
+-- Whether a profile requires the insurance: a rule of its own, as the
+-- report is. A version the previous release writes does not name it and
+-- requires it -- the safe reading; the shipped equipment profile's
+-- versions do not, as a tent is no vehicle.
+ALTER TABLE rental_profile_versions ADD COLUMN insurance_required boolean NOT NULL DEFAULT true;
+UPDATE rental_profile_versions v SET insurance_required = false
+FROM rental_profiles p WHERE p.id = v.profile_id AND p.base = 'equipment';
 
 DO $$
 DECLARE

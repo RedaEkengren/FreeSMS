@@ -227,6 +227,7 @@ const (
 	RuleLicenceCheck = "licence_check_required"
 	RuleCategories   = "licence_categories"
 	RuleReporting    = "reporting_required"
+	RuleInsurance    = "insurance_required"
 )
 
 // RentalRules are one version of a profile's rules.
@@ -237,6 +238,8 @@ type RentalRules struct {
 	LicenceCheckRequired bool
 	LicenceCategories    []string
 	ReportingRequired    bool
+	// Insured for rental use on every day of the rental (#202).
+	InsuranceRequired bool
 	// How the shop works.
 	CheckOutTemplateID  string
 	CheckInTemplateID   string
@@ -256,15 +259,15 @@ func shippedRules(base string) (RentalRules, []string) {
 	switch base {
 	case ProfileCar:
 		return RentalRules{PermitRequired: true, RegistrationRequired: true, LicenceCheckRequired: true,
-			LicenceCategories: []string{"B"}, ReportingRequired: true, CleaningBuffer: time.Hour,
+			LicenceCategories: []string{"B"}, ReportingRequired: true, InsuranceRequired: true, CleaningBuffer: time.Hour,
 			MileageAllowance: true, MinimumAge: 18, SubletBanned: true}, []string{RuleReporting}
 	case ProfileTrailer:
 		return RentalRules{RegistrationRequired: true, LicenceCheckRequired: true, LicenceCategories: []string{"B", "BE"},
-				CleaningBuffer: 30 * time.Minute, MinimumAge: 18, SubletBanned: true},
-			[]string{RulePermit, RuleLicenceCheck, RuleCategories, RuleReporting}
+				InsuranceRequired: true, CleaningBuffer: 30 * time.Minute, MinimumAge: 18, SubletBanned: true},
+			[]string{RulePermit, RuleLicenceCheck, RuleCategories, RuleReporting, RuleInsurance}
 	case ProfileMachine:
-		return RentalRules{CleaningBuffer: time.Hour, MinimumAge: 18, SubletBanned: true},
-			[]string{RulePermit, RuleRegistration, RuleLicenceCheck, RuleReporting}
+		return RentalRules{InsuranceRequired: true, CleaningBuffer: time.Hour, MinimumAge: 18, SubletBanned: true},
+			[]string{RulePermit, RuleRegistration, RuleLicenceCheck, RuleReporting, RuleInsurance}
 	}
 	return RentalRules{SubletBanned: true}, nil
 }
@@ -273,6 +276,8 @@ func shippedRules(base string) (RentalRules, []string) {
 // presented as the law, as a catalogue key; "" for none.
 func UnconfirmedReason(base, rule string) string {
 	switch {
+	case rule == RuleInsurance:
+		return "Whether a trailer or a machine must be insured for rental use, beyond its ordinary insurance, is not confirmed. It is required by default."
 	case rule == RuleReporting:
 		return "Whether the rental marking in the vehicle register is needed before the first rental, and for which kinds of vehicle, is not confirmed."
 	case base == ProfileTrailer && rule == RulePermit:
@@ -348,12 +353,13 @@ func insertRulesTx(ctx context.Context, tx pgx.Tx, shopID, userID, profileID str
 	err := tx.QueryRow(ctx, `
 		INSERT INTO rental_profile_versions (shop_id, profile_id, version, permit_required, registration_required,
 			licence_check_required, licence_categories, reporting_required, check_out_template_id, check_in_template_id,
-			cleaning_buffer, mileage_allowance, default_deposit_minor, minimum_age, sublet_banned, unconfirmed, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, '')::uuid, NULLIF($10, '')::uuid, $11, $12, $13, $14, $15, $16, NULLIF($17, '')::uuid)
+			cleaning_buffer, mileage_allowance, default_deposit_minor, minimum_age, sublet_banned, unconfirmed, created_by,
+			insurance_required)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, '')::uuid, NULLIF($10, '')::uuid, $11, $12, $13, $14, $15, $16, NULLIF($17, '')::uuid, $18)
 		RETURNING id`,
 		shopID, profileID, version, r.PermitRequired, r.RegistrationRequired, r.LicenceCheckRequired, cats,
 		r.ReportingRequired, r.CheckOutTemplateID, r.CheckInTemplateID, r.CleaningBuffer, r.MileageAllowance,
-		r.DefaultDepositMinor, age, r.SubletBanned, unconfirmed, userID).Scan(&id)
+		r.DefaultDepositMinor, age, r.SubletBanned, unconfirmed, userID, r.InsuranceRequired).Scan(&id)
 	if err != nil {
 		return "", fmt.Errorf("record the profile's rules: %w", err)
 	}
@@ -364,7 +370,7 @@ const profileColumns = `
 	p.id, p.base, p.name, p.created_by IS NULL, v.id, v.version, v.permit_required, v.registration_required, v.licence_check_required,
 	v.licence_categories, v.reporting_required, coalesce(v.check_out_template_id::text, ''),
 	coalesce(v.check_in_template_id::text, ''), v.cleaning_buffer, v.mileage_allowance, v.default_deposit_minor,
-	coalesce(v.minimum_age, 0), v.sublet_banned, v.unconfirmed, v.created_at, coalesce(pe.display_name, '')`
+	coalesce(v.minimum_age, 0), v.sublet_banned, v.unconfirmed, v.created_at, coalesce(pe.display_name, ''), v.insurance_required`
 
 func scanProfile(row pgx.Row) (RentalProfile, error) {
 	var p RentalProfile
@@ -372,7 +378,7 @@ func scanProfile(row pgx.Row) (RentalProfile, error) {
 	err := row.Scan(&p.ID, &p.Base, &p.Name, &p.Shipped, &p.VersionID, &p.Version, &r.PermitRequired, &r.RegistrationRequired,
 		&r.LicenceCheckRequired, &r.LicenceCategories, &r.ReportingRequired, &r.CheckOutTemplateID, &r.CheckInTemplateID,
 		&r.CleaningBuffer, &r.MileageAllowance, &r.DefaultDepositMinor, &r.MinimumAge, &r.SubletBanned,
-		&p.Unconfirmed, &p.ChangedAt, &p.ChangedBy)
+		&p.Unconfirmed, &p.ChangedAt, &p.ChangedBy, &r.InsuranceRequired)
 	return p, err
 }
 
@@ -531,6 +537,7 @@ func stillUnconfirmed(old RentalProfile, r RentalRules) []string {
 		RuleLicenceCheck: old.Rules.LicenceCheckRequired == r.LicenceCheckRequired,
 		RuleCategories:   slices.Equal(old.Rules.LicenceCategories, r.LicenceCategories),
 		RuleReporting:    old.Rules.ReportingRequired == r.ReportingRequired,
+		RuleInsurance:    old.Rules.InsuranceRequired == r.InsuranceRequired,
 	}
 	var out []string
 	for _, u := range old.Unconfirmed {
@@ -592,6 +599,7 @@ func sameRules(a, b RentalRules) bool {
 	return slices.Equal(a.LicenceCategories, b.LicenceCategories) &&
 		a.PermitRequired == b.PermitRequired && a.RegistrationRequired == b.RegistrationRequired &&
 		a.LicenceCheckRequired == b.LicenceCheckRequired && a.ReportingRequired == b.ReportingRequired &&
+		a.InsuranceRequired == b.InsuranceRequired &&
 		a.CheckOutTemplateID == b.CheckOutTemplateID && a.CheckInTemplateID == b.CheckInTemplateID &&
 		a.CleaningBuffer == b.CleaningBuffer && a.MileageAllowance == b.MileageAllowance &&
 		a.DefaultDepositMinor == b.DefaultDepositMinor && a.MinimumAge == b.MinimumAge && a.SubletBanned == b.SubletBanned

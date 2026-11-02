@@ -252,18 +252,16 @@ func insuranceCovers(ins []FleetInsurance, first, last time.Time) bool {
 }
 
 // fleetUseGapsTx is what the booking's unit lacks for its period in the
-// fleet: a report into rental use where the profile requires one, and for
-// a vehicle an insurance covering rental use on every day of the rental.
+// fleet: a report into rental use where the profile requires one, and an
+// insurance covering rental use on every day of the rental where it
+// requires that.
 // Gaps a person let go are left out.
 func fleetUseGapsTx(ctx context.Context, tx pgx.Tx, bookingID string, p RentalProfile, starts, ends time.Time) ([]HandoverGap, error) {
 	var membership *string
-	var vehicle bool
 	if err := tx.QueryRow(ctx, `
 		SELECT (SELECT m.id::text FROM fleet_memberships m WHERE m.unit_id = b.unit_id AND m.joined_at <= greatest(b.starts_at, clock_timestamp())
-		          ORDER BY m.joined_at DESC LIMIT 1),
-		       r.vehicle_id IS NOT NULL
-		FROM rental_bookings b JOIN rental_units u ON u.id = b.unit_id JOIN resources r ON r.id = u.resource_id
-		WHERE b.id = $1`, bookingID).Scan(&membership, &vehicle); err != nil {
+		          ORDER BY m.joined_at DESC LIMIT 1)
+		FROM rental_bookings b WHERE b.id = $1`, bookingID).Scan(&membership); err != nil {
 		return nil, fmt.Errorf("read the unit: %w", err)
 	}
 	var use FleetUse
@@ -282,7 +280,7 @@ func fleetUseGapsTx(ctx context.Context, tx pgx.Tx, bookingID string, p RentalPr
 		gaps = append(gaps, HandoverGap{Code: GapNotReported, Overridable: true,
 			Sentence: "The unit has not been reported into rental use in the vehicle register."})
 	}
-	if vehicle && !insuranceCovers(use.Insurances, starts.In(loc), ends.Add(-time.Nanosecond).In(loc)) {
+	if p.Rules.InsuranceRequired && !insuranceCovers(use.Insurances, starts.In(loc), ends.Add(-time.Nanosecond).In(loc)) {
 		gaps = append(gaps, HandoverGap{Code: GapInsurance, Overridable: true,
 			Sentence: "No insurance covering rental use is recorded for every day of the rental."})
 	}

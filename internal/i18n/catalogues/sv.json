@@ -8510,6 +8510,8 @@
     "say why the register is read, in 300 characters or fewer": {"other": "ange varför registret läses, med högst 300 tecken"},
     "a register is read over a period, from a day to a later one": {"other": "ett register läses över en period, från en dag till en senare"},
     "give the registration and the moment": {"other": "ange registreringsnummer och tidpunkt"},
-    "keep the register between 1 and 240 months, and say on what basis": {"other": "spara registret mellan 1 och 240 månader, och ange på vilken grund"}
+    "keep the register between 1 and 240 months, and say on what basis": {"other": "spara registret mellan 1 och 240 månader, och ange på vilken grund"},
+    "Insured for rental use for the whole rental": {"other": "Försäkrad för uthyrning under hela hyran"},
+    "Whether a trailer or a machine must be insured for rental use, beyond its ordinary insurance, is not confirmed. It is required by default.": {"other": "Om ett släp eller en maskin måste vara försäkrad för uthyrning, utöver sin vanliga försäkring, är inte bekräftat. Det krävs som standard."}
   }
 }

@@ -98,7 +98,7 @@ var exportQueries = map[string]string{
 	"rental_profile_versions": `SELECT id, shop_id, profile_id, version, permit_required, registration_required,
 		licence_check_required, licence_categories, reporting_required, check_out_template_id, check_in_template_id,
 		extract(epoch FROM cleaning_buffer)::bigint AS cleaning_buffer_seconds, mileage_allowance, default_deposit_minor,
-		minimum_age, sublet_banned, unconfirmed, created_at, created_by FROM rental_profile_versions`,
+		minimum_age, sublet_banned, unconfirmed, created_at, created_by, insurance_required FROM rental_profile_versions`,
 }
 
 // exportExcluded are the tables that do not go, and why.

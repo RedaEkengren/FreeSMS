@@ -173,3 +173,36 @@ func TestTheFleetsPaperworkIsOnTheRentalDesksList(t *testing.T) {
 		t.Errorf("reported, insured for ten days more, booked in five with no permit: %v", k)
 	}
 }
+
+// Whether a unit must be insured for rental is its profile's rule, not
+// whether it has a registration: a profile of vehicles may not ask it, and
+// one of equipment may (review r5, #9).
+func TestInsuranceIsAProfilesRule(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	if car := profileFor(t, pool, workshop.ProfileCar); !car.Rules.InsuranceRequired {
+		t.Error("the car profile does not require insurance by default")
+	}
+	equipment := profileFor(t, pool, workshop.ProfileEquipment)
+	if equipment.Rules.InsuranceRequired {
+		t.Error("the equipment profile requires insurance by default")
+	}
+	rules := equipment.Rules
+	rules.InsuranceRequired = true
+	if _, err := workshop.SaveRentalProfile(ctx, pool, rentalOwner(), equipment.ID, rules); err != nil {
+		t.Fatal(err)
+	}
+	tent := addUnit(t, pool, workshop.NewRentalUnit{Name: "Tält", FleetNumber: "T1", Category: "Tent", ProfileID: equipment.ID})
+	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), tent, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
+		t.Fatal(err)
+	}
+	dayPlan(t, pool, "Tent", 10000, "at_start")
+	renter, _ := workshop.CreateParty(ctx, pool, rentalDesk(), workshop.NewParty{Kind: "private", Name: "Tina", Role: workshop.PartyRenter})
+	id, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: tent, RenterID: renter, From: in2031(10, 9), To: in2031(11, 9)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gaps, _ := workshop.RentalBookingGaps(ctx, pool, rentalDesk(), id); !slices.Equal(gapCodes(t, gaps), []string{workshop.GapInsurance}) {
+		t.Errorf("a tent whose profile requires insurance: %v", gapCodes(t, gaps))
+	}
+}

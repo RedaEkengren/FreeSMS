@@ -65,6 +65,8 @@
     </div>
     <label class="check"><input type="checkbox" name="reporting_required" value="1"{{if .Rules.ReportingRequired}} checked{{end}}> {{$.T "Reported for rental use in the vehicle register"}}</label>
     {{with $.Rental.Unconfirmed $p "reporting_required"}}<p class="waiting"><span class="tag late">{{$.T "not confirmed"}}</span> {{$.T .}}</p>{{end}}
+    <label class="check"><input type="checkbox" name="insurance_required" value="1"{{if .Rules.InsuranceRequired}} checked{{end}}> {{$.T "Insured for rental use for the whole rental"}}</label>
+    {{with $.Rental.Unconfirmed $p "insurance_required"}}<p class="waiting"><span class="tag late">{{$.T "not confirmed"}}</span> {{$.T .}}</p>{{end}}
     <div class="pair">
       <label><span>{{$.T "Check-out checklist"}}</span><select name="check_out_template"><option value="">{{$.T "None"}}</option>
         {{range $.Rental.Checklists}}{{if and .Active (.UsedFor "check_out")}}<option value="{{.ID}}"{{if eq .ID $p.Rules.CheckOutTemplateID}} selected{{end}}>{{.Name}}</option>{{end}}{{end}}</select></label>

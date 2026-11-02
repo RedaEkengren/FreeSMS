@@ -305,7 +305,7 @@ func (s *Server) handleRentalProfileSave(w http.ResponseWriter, r *http.Request)
 	_, err := workshop.SaveRentalProfile(r.Context(), s.pool, session.Scope, r.PathValue("id"), workshop.RentalRules{
 		PermitRequired: on("permit_required"), RegistrationRequired: on("registration_required"),
 		LicenceCheckRequired: on("licence_check_required"), LicenceCategories: r.Form["licence_categories"],
-		ReportingRequired: on("reporting_required"), CheckOutTemplateID: r.FormValue("check_out_template"),
+		ReportingRequired: on("reporting_required"), InsuranceRequired: on("insurance_required"), CheckOutTemplateID: r.FormValue("check_out_template"),
 		CheckInTemplateID: r.FormValue("check_in_template"), CleaningBuffer: time.Duration(minutes) * time.Minute,
 		MileageAllowance: on("mileage_allowance"), DefaultDepositMinor: deposit, MinimumAge: age,
 		SubletBanned: on("sublet_banned")})
