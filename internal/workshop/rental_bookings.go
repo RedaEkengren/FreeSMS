@@ -816,7 +816,7 @@ func perDayExtrasTx(ctx context.Context, tx pgx.Tx, bookingID string, days, adde
 			return nil, err
 		}
 		// As many as were taken, as the line says; a line from before
-		// 0307 says it through its quantity and the days.
+		// 0107 says it through its quantity and the days.
 		if count == 0 {
 			count = qty / (days * 1000)
 		}

@@ -245,7 +245,7 @@ type LicenceCheckResult struct {
 	CheckedAt time.Time
 	CheckedBy string
 	// Until when the licence is valid; nil for a check made before it
-	// was kept (0305), which does not pass.
+	// was kept (0105), which does not pass.
 	ValidUntil *time.Time
 }
 

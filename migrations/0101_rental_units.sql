@@ -3,7 +3,7 @@
 --
 -- What a shop rents out (#190). A rental unit is a resource (0070) -- a
 -- vehicle, or a thing with a name of its own -- with the rule profile it is
--- rented under (0300), a fleet number and a category its prices are set by.
+-- rented under (0100), a fleet number and a category its prices are set by.
 -- When it was in the rental fleet is a series of periods, so a car that
 -- leaves the fleet, is sold and comes back has one unbroken history.
 CREATE TABLE rental_units (

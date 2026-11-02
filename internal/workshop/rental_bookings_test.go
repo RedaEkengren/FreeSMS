@@ -356,7 +356,7 @@ func rentalAudited(t *testing.T, pool *pgxpool.Pool, made func(event, kind, id s
 }
 
 // After every migration, audit_events takes a subject Core had and
-// Rental's (0303, through widen_text_check), and refuses one nobody added:
+// Rental's (0103, through widen_text_check), and refuses one nobody added:
 // a list widened into nothing would let every value in.
 func TestAuditSubjectsWidenedKeepWhatWasThere(t *testing.T) {
 	pool := setup(t)
