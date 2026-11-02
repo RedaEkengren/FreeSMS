@@ -62,7 +62,11 @@ type CardSource struct {
 	// may see is counted in one statement, one FILTER each: one round trip
 	// on the workshop's wifi, not one per card.
 	JobsWhere string
-	Money     bool
+	// RentalWhere is JobsWhere for Rental: a count of the rental bookings
+	// where it holds, a condition on rental_bookings b, its block k and
+	// the shop's today t (rentalToday), every one in one statement.
+	RentalWhere string
+	Money       bool
 }
 
 // cardSources are the home page's cards, in the order they come. The
@@ -85,6 +89,13 @@ var cardSources = []CardSource{
 		May: access.Roles.RunsTheShop, JobsWhere: openJob},
 	{Module: access.Workshop, Kind: CardInformation, Title: "Work ready to invoice, before VAT",
 		May: access.Roles.RunsTheShop, Read: readyToInvoiceMinor, Money: true},
+	// Rental
+	{Module: access.Rental, Kind: CardAction, Title: "%d rental to hand over today", Link: "/rental",
+		May: access.Roles.HandsOverRentals, RentalWhere: rentalHandoverToday},
+	{Module: access.Rental, Kind: CardAction, Title: "%d rental due back today", Link: "/rental",
+		May: access.Roles.HandsOverRentals, RentalWhere: rentalReturnToday},
+	{Module: access.Rental, Kind: CardAction, Title: "%d rental out past its return", Link: "/rental",
+		May: access.Roles.HandsOverRentals, RentalWhere: rentalOverdue},
 }
 
 // countJobs counts the workshop's jobs for every card that counts them, in
@@ -155,7 +166,7 @@ const homeWaiting = 5
 func HomeFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (Home, []error) {
 	var h Home
 	var failed []error
-	var shown, counted []CardSource
+	var shown, counted, rented []CardSource
 	for _, c := range cardSources {
 		if !scope.Uses(c.Module) || !c.May(scope.Role) {
 			continue
@@ -164,17 +175,23 @@ func HomeFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (Home,
 		if c.JobsWhere != "" {
 			counted = append(counted, c)
 		}
+		if c.RentalWhere != "" {
+			rented = append(rented, c)
+		}
 	}
-	var jobs []int
-	if len(counted) > 0 {
+	var jobs, rentals []int
+	if len(counted) > 0 || len(rented) > 0 {
 		err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 			var err error
-			jobs, err = countJobs(ctx, tx, counted)
+			if jobs, err = countJobs(ctx, tx, counted); err != nil {
+				return err
+			}
+			rentals, err = countRentals(ctx, tx, rented)
 			return err
 		})
 		if err != nil {
-			jobs = nil
-			failed = append(failed, fmt.Errorf("the workshop's cards: %w", err))
+			jobs, rentals = nil, nil
+			failed = append(failed, fmt.Errorf("the cards counted together: %w", err))
 		}
 	}
 	for _, c := range shown {
@@ -186,6 +203,11 @@ func HomeFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (Home,
 				continue
 			}
 			n, jobs = jobs[0], jobs[1:]
+		} else if c.RentalWhere != "" {
+			if len(rentals) == 0 {
+				continue
+			}
+			n, rentals = rentals[0], rentals[1:]
 		} else {
 			err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 				var err error

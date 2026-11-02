@@ -195,6 +195,8 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	made["stock_checks.overridden"] = subject{"stock_unit", bought.StockUnitID}
+	// Rental
+	rentalAudited(t, pool, func(event, kind, id string) { made[event] = subject{kind, id} })
 
 	for _, tr := range workshop.AuditedTransitions {
 		s, ok := made[tr.Event]

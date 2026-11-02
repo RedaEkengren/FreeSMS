@@ -326,6 +326,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux := routeMux{ServeMux: http.NewServeMux(), s: s, table: &s.routeTable}
 	workshopMux := mux.in(access.Workshop)
 	dealerMux := mux.in(access.Dealer)
+	rentalMux := mux.in(access.Rental)
 
 	// Health is outside the session middleware on purpose: a health check must
 	// not depend on authentication working.
@@ -423,6 +424,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /account/theme", s.requireSession(s.handleMyTheme))
 	// Checklists are Core (owner decision on #143, #147): a job's check, a
 	// purchase appraisal and a rental's check-out are made from the same.
+	s.rentalRoutes(rentalMux)
 	mux.HandleFunc("GET /checklists", s.requireSession(s.handleChecklists))
 	mux.HandleFunc("POST /checklists", s.requireSession(s.handleSaveChecklist))
 	mux.HandleFunc("GET /checklists/{id}", s.requireSession(s.handleChecklists))

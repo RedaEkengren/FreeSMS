@@ -1,0 +1,100 @@
+{{define "content"}}
+<h1>{{.T "Rental settings"}}</h1>
+{{$runs := .Session.Scope.Role.RunsTheShop}}
+
+<h2>{{.T "Rental permit"}}</h2>
+<p class="waiting">{{.T "The rental permit (biluthyrningstillstånd) is your business's, granted by Transportstyrelsen. FreeSMS records it and refuses to hand over a unit whose profile needs one when none stands for the whole rental."}}</p>
+{{if .Rental.Permits}}
+<ul class="lines">
+  {{range .Rental.Permits}}
+  <li>
+    <div class="row"><span>{{.Reference}}</span>
+      <span class="tag{{if .RevokedOn}} late{{end}}">{{if .RevokedOn}}{{$.T "revoked from %s" ($.Date .RevokedOn "2 Jan 2006")}}{{else if .ExpiresOn}}{{$.T "until %s" ($.Date .ExpiresOn "2 Jan 2006")}}{{else}}{{$.T "until revoked"}}{{end}}</span></div>
+    <div class="waiting">{{$.T "Decided on %s" ($.Date .DecidedOn "2 Jan 2006")}} &middot; {{$.T "Responsible: %s" .Responsible}}{{with .Note}} &middot; {{.}}{{end}}</div>
+    {{with .Revocation}}<div class="waiting">{{.}}</div>{{end}}
+    {{if and $runs (not .RevokedOn)}}
+    <details><summary>{{$.T "Record that it was revoked"}}</summary>
+    <form method="post" action="/rental/permits/{{.ID}}/revoke">
+      <div class="pair">
+        <label><span>{{$.T "Revoked from"}}</span><input type="date" name="revoked_on" value="{{$.Today}}" required></label>
+        <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="300" required></label>
+      </div>
+      <button type="submit" class="secondary">{{$.T "Record the revocation"}}</button>
+    </form>
+    </details>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p>{{.T "No permit recorded. A profile that needs one cannot be handed over."}}</p>
+{{end}}
+{{if $runs}}
+<details><summary>{{.T "Record a permit or a renewal"}}</summary>
+<form method="post" action="/rental/permits">
+  <div class="pair">
+    <label><span>{{.T "Permit reference"}}</span><input name="reference" maxlength="100" required></label>
+    <label><span>{{.T "Responsible person"}}</span><input name="responsible" maxlength="200" required></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "Decided on"}}</span><input type="date" name="decided_on" required></label>
+    <label><span>{{.T "Expires on, if it does"}}</span><input type="date" name="expires_on"></label>
+  </div>
+  <label><span>{{.T "Note"}}</span><input name="note" maxlength="300"></label>
+  <button type="submit">{{.T "Record the permit"}}</button>
+</form>
+</details>
+{{end}}
+
+<h2>{{.T "What each kind of unit needs"}}</h2>
+<p class="waiting">{{.T "A booking keeps the rules it was made under. Changing a profile changes the bookings made after it, never one already made."}}</p>
+{{range .Rental.Profiles}}
+{{$p := .}}
+<section class="card">
+  <h3>{{if .Shipped}}{{$.T .Name}}{{else}}{{.Name}}{{end}} <span class="waiting">{{$.T "version %d" .Version}}</span></h3>
+  <form method="post" action="/rental/profiles/{{.ID}}">
+    <fieldset{{if not $runs}} disabled{{end}}>
+    <label class="check"><input type="checkbox" name="permit_required" value="1"{{if .Rules.PermitRequired}} checked{{end}}> {{$.T "A rental permit is required"}}</label>
+    {{with $.Rental.Unconfirmed $p "permit_required"}}<p class="waiting"><span class="tag late">{{$.T "not confirmed"}}</span> {{$.T .}}</p>{{end}}
+    <label class="check"><input type="checkbox" name="registration_required" value="1"{{if .Rules.RegistrationRequired}} checked{{end}}> {{$.T "A registered vehicle is required"}}</label>
+    {{with $.Rental.Unconfirmed $p "registration_required"}}<p class="waiting"><span class="tag late">{{$.T "not confirmed"}}</span> {{$.T .}}</p>{{end}}
+    <label class="check"><input type="checkbox" name="licence_check_required" value="1"{{if .Rules.LicenceCheckRequired}} checked{{end}}> {{$.T "Every driver's licence is checked before handover"}}</label>
+    {{with $.Rental.Unconfirmed $p "licence_check_required"}}<p class="waiting"><span class="tag late">{{$.T "not confirmed"}}</span> {{$.T .}}</p>{{end}}
+    <div class="choices"><span>{{$.T "Licence categories accepted"}}</span>
+      {{range $.Rental.LicenceCategories}}<label class="check"><input type="checkbox" name="licence_categories" value="{{.}}"{{if $.Rental.HasCategory $p .}} checked{{end}}> {{.}}</label> {{end}}
+    </div>
+    <label class="check"><input type="checkbox" name="reporting_required" value="1"{{if .Rules.ReportingRequired}} checked{{end}}> {{$.T "Reported for rental use in the vehicle register"}}</label>
+    {{with $.Rental.Unconfirmed $p "reporting_required"}}<p class="waiting"><span class="tag late">{{$.T "not confirmed"}}</span> {{$.T .}}</p>{{end}}
+    <div class="pair">
+      <label><span>{{$.T "Check-out checklist"}}</span><select name="check_out_template"><option value="">{{$.T "None"}}</option>
+        {{range $.Rental.Checklists}}{{if and .Active (.UsedFor "check_out")}}<option value="{{.ID}}"{{if eq .ID $p.Rules.CheckOutTemplateID}} selected{{end}}>{{.Name}}</option>{{end}}{{end}}</select></label>
+      <label><span>{{$.T "Check-in checklist"}}</span><select name="check_in_template"><option value="">{{$.T "None"}}</option>
+        {{range $.Rental.Checklists}}{{if and .Active (.UsedFor "check_in")}}<option value="{{.ID}}"{{if eq .ID $p.Rules.CheckInTemplateID}} selected{{end}}>{{.Name}}</option>{{end}}{{end}}</select></label>
+    </div>
+    <div class="pair">
+      <label><span>{{$.T "Cleaning buffer, minutes"}}</span><input name="buffer_minutes" inputmode="numeric" value="{{$.Rental.Minutes .Rules.CleaningBuffer}}" required></label>
+      <label><span>{{$.T "Default deposit, kr"}}</span><input name="deposit" inputmode="decimal" value="{{if .Rules.DefaultDepositMinor}}{{$.Money .Rules.DefaultDepositMinor}}{{end}}"></label>
+    </div>
+    <label class="check"><input type="checkbox" name="mileage_allowance" value="1"{{if .Rules.MileageAllowance}} checked{{end}}> {{$.T "A mileage allowance applies"}}</label>
+    <p class="waiting">{{$.T "Your terms, not the law:"}}</p>
+    <div class="pair">
+      <label><span>{{$.T "Minimum age of a driver"}}</span><input name="minimum_age" inputmode="numeric" value="{{if .Rules.MinimumAge}}{{.Rules.MinimumAge}}{{end}}"></label>
+      <label class="check"><input type="checkbox" name="sublet_banned" value="1"{{if .Rules.SubletBanned}} checked{{end}}> {{$.T "The renter may not lend it on"}}</label>
+    </div>
+    {{if $runs}}<button type="submit" class="secondary">{{$.T "Save as a new version"}}</button>{{end}}
+    </fieldset>
+  </form>
+</section>
+{{end}}
+{{if $runs}}
+<details><summary>{{.T "Add a profile of your own"}}</summary>
+<form method="post" action="/rental/profiles">
+  <div class="pair">
+    <label><span>{{.T "Name"}}</span><input name="name" maxlength="80" required placeholder="{{.T "Minibus"}}"></label>
+    <label><span>{{.T "Starting from"}}</span><select name="base">{{range .Rental.ProfileBases}}<option value="{{.}}">{{$.T ($.Rental.BaseLabel .)}}</option>{{end}}</select></label>
+  </div>
+  <button type="submit">{{.T "Add the profile"}}</button>
+</form>
+</details>
+{{end}}
+{{end}}

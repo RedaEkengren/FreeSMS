@@ -14,8 +14,9 @@ test.describe.serial('a morning, from an empty database', () => {
     await page.fill('input[name=email]', owner.email);
     await page.fill('input[name=password]', owner.password);
     // Workshop only, as every journey after this one assumes (#142, #143).
-    await expect(page.locator('input[name=module]')).toHaveCount(1);
+    // Rental is offered (#189), and left unchosen.
     await expect(page.locator('input[name=module][value=workshop]')).toBeChecked();
+    await expect(page.locator('input[name=module][value=rental]')).not.toBeChecked();
     await page.getByRole('button', { name: 'Create the workshop' }).click();
     await expect(page).not.toHaveURL(/\/setup|\/login/);
     await expect(page.getByRole('link', { name: 'Staff' })).toBeVisible();
