@@ -60,3 +60,32 @@ func TestAWalkInTestDriveOnThePage(t *testing.T) {
 		t.Error("a technician was shown a test drive")
 	}
 }
+
+// The test-drive agreement is made from the shipped template when none is
+// chosen, made in that write; reading the page makes nothing.
+func TestATestDriveAgreementFromTheShippedTemplate(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	unit, err := workshop.TakeIntoStock(ctx, pool, owner, vehicleA, workshop.StockFromDefleet, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.MoveStockUnit(ctx, pool, owner, unit.ID, workshop.StockForSale, ""); err != nil {
+		t.Fatal(err)
+	}
+	seller := signIn(t, ts, salesEmail)
+	when := time.Now().UTC().Add(3 * time.Hour).Format("2006-01-02T15:04")
+	resp := postResponse(t, seller, ts.URL+"/cars/test-drives", url.Values{"unit": {unit.ID}, "name": {"Kim Köpare"},
+		"phone": {"0701234567"}, "from": {when}, "minutes": {"30"}, "key": {"td-tpl"}})
+	where := resp.Header.Get("Location")
+	if page := get(t, seller, ts.URL+where, http.StatusOK); !strings.Contains(page, "From the shipped agreement") {
+		t.Fatalf("the shipped agreement is not offered:\n%s", visibleText(page))
+	}
+	if resp := postResponse(t, seller, ts.URL+where+"/agreement", url.Values{"template": {""}}); resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("making the agreement answered %d", resp.StatusCode)
+	}
+	if d, _ := workshop.TestDriveByID(ctx, pool, owner, strings.TrimPrefix(where, "/cars/test-drives/")); d.AgreementID == "" {
+		t.Error("no agreement was made")
+	}
+}

@@ -8622,6 +8622,7 @@
     "Open a deal": {"other": "Öppna en affär"},
     "out of date: the terms or the known defects have changed since": {"other": "inaktuellt: villkoren eller de kända felen har ändrats sedan dess"},
     "the contract is complete and states everything; change the terms or state a defect first": {"other": "avtalet är klart och anger allt; ändra villkoren eller ange ett fel först"},
-    "From the shipped contract, a draft that needs legal review.": {"other": "Från det medföljande avtalet, ett utkast som behöver juridisk granskning."}
+    "From the shipped contract, a draft that needs legal review.": {"other": "Från det medföljande avtalet, ett utkast som behöver juridisk granskning."},
+    "From the shipped agreement, a draft that needs legal review.": {"other": "Från det medföljande avtalet, ett utkast som behöver juridisk granskning."}
   }
 }

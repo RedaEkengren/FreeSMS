@@ -178,7 +178,9 @@ func (s *Server) handleTestDrive(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if d.Drive.State == workshop.DriveBooked {
-		if d.Templates, err = workshop.TestDriveTemplates(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		// Read only: the shipped agreement is made when one is first made
+		// from it, as reading a page writes nothing.
+		if d.Templates, err = workshop.DocumentTemplates(r.Context(), s.pool, session.Scope, workshop.DocTestDriveAgreement); s.handoverError(w, r, err) {
 			return
 		}
 	}

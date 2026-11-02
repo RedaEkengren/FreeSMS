@@ -64,13 +64,12 @@
 
 {{if not $t.Signed}}
 <details><summary>{{.T "Agreement"}}</summary>
-{{if $d.Templates}}
 <form method="post" action="/cars/test-drives/{{$t.ID}}/agreement">
   <input type="hidden" name="replacing" value="{{$t.AgreementID}}">
-  <label><span>{{.T "Template"}}</span><select name="template">{{range $d.Templates}}<option value="{{.VersionID}}">{{.Name}}</option>{{end}}</select></label>
+  {{if $d.Templates}}<label><span>{{.T "Template"}}</span><select name="template">{{range $d.Templates}}<option value="{{.VersionID}}">{{.Name}}</option>{{end}}</select></label>
+  {{else}}<input type="hidden" name="template" value=""><p class="waiting">{{.T "From the shipped agreement, a draft that needs legal review."}}</p>{{end}}
   <button type="submit" class="secondary">{{if $t.AgreementID}}{{.T "Make it again"}}{{else}}{{.T "Make the agreement"}}{{end}}</button>
 </form>
-{{end}}
 {{with $d.DriverPartyID}}
 <form method="post" action="/cars/test-drives/{{$t.ID}}/signed">
   <input type="hidden" name="party" value="{{.}}">

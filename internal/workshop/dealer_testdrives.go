@@ -820,7 +820,7 @@ func ProduceTestDriveAgreement(ctx context.Context, pool *pgxpool.Pool, scope ac
 	if err := mayDocument(scope.Role, scope, DocTestDriveAgreement, true); err != nil {
 		return "", err
 	}
-	if !looksLikeUUID(driveID) || !looksLikeUUID(templateVersionID) || (replacing != "" && !looksLikeUUID(replacing)) {
+	if !looksLikeUUID(driveID) || (templateVersionID != "" && !looksLikeUUID(templateVersionID)) || (replacing != "" && !looksLikeUUID(replacing)) {
 		return "", ErrNotFound
 	}
 	var doc string
@@ -834,6 +834,18 @@ func ProduceTestDriveAgreement(ctx context.Context, pool *pgxpool.Pool, scope ac
 		}
 		if d.AgreementID != replacing {
 			return ErrMadeMeanwhile
+		}
+		// None chosen: the shipped agreement, made here the first time --
+		// in a write, never when a page is read.
+		if templateVersionID == "" {
+			if err := ensureTestDriveTemplateTx(ctx, tx, scope.ShopID); err != nil {
+				return err
+			}
+			if err := tx.QueryRow(ctx, `
+				SELECT v.id FROM document_templates t JOIN document_template_versions v ON v.template_id = t.id
+				WHERE t.kind = 'test_drive_agreement' ORDER BY t.created_at, t.id, v.version DESC LIMIT 1`).Scan(&templateVersionID); err != nil {
+				return fmt.Errorf("read the shipped agreement: %w", err)
+			}
 		}
 		var shop, org string
 		if err := tx.QueryRow(ctx, `SELECT name, coalesce(org_number, '') FROM shops`).Scan(&shop, &org); err != nil {
