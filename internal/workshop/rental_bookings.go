@@ -555,16 +555,18 @@ func lockRentalTx(ctx context.Context, tx pgx.Tx, id string) (lockedRental, erro
 	b := lockedRental{id: id}
 	// The unit first, then the booking and its block: the one order every
 	// rental write takes, so two never wait on each other.
-	var resource string
-	err := tx.QueryRow(ctx, `SELECT k.resource_id FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id WHERE b.id = $1`, id).Scan(&resource)
+	// Found and locked in one statement; the booking's block, and so its
+	// unit, never changes.
+	var one int
+	err := tx.QueryRow(ctx, `
+		SELECT 1 FROM resources
+		WHERE id = (SELECT k.resource_id FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id WHERE b.id = $1)
+		FOR UPDATE`, id).Scan(&one)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return b, ErrNotFound
 	}
 	if err != nil {
-		return b, fmt.Errorf("read booking: %w", err)
-	}
-	if err := lockUnitResourceTx(ctx, tx, resource); err != nil {
-		return b, err
+		return b, fmt.Errorf("lock the unit: %w", err)
 	}
 	err = tx.QueryRow(ctx, `
 		SELECT b.unit_id, k.resource_id, b.block_id, `+rentalState+`, b.starts_at, b.ends_at, k.buffer_after, k.status
@@ -781,7 +783,17 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 				return err
 			}
 			lines = append(lines, extras...)
-			if quote.IncludedKm != nil && quote.Days > 0 {
+			switch {
+			case quote.IncludedKm == nil:
+				// The added days include unlimited kilometres. The
+				// odometer is read when the unit goes out and comes back,
+				// not each day, so the added days' kilometres cannot be
+				// told from the rest: the whole booking is unlimited from
+				// here, the renter's side of the doubt.
+				if _, err := tx.Exec(ctx, `UPDATE rental_bookings SET included_km = NULL WHERE id = $1`, id); err != nil {
+					return fmt.Errorf("lift the kilometre limit: %w", err)
+				}
+			case quote.Days > 0:
 				perDay := *quote.IncludedKm / int(quote.Days)
 				if _, err := tx.Exec(ctx, `UPDATE rental_bookings SET included_km = included_km + $2 WHERE id = $1 AND included_km IS NOT NULL`,
 					id, perDay*int(added)); err != nil {
@@ -795,15 +807,21 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 
 // perDayExtrasTx is the extras a booking took by the day, for the days an
 // extension adds: as many of each as it took, at the price it was agreed
-// at.
+// at. One extra may be on several lines of the same booking or extension
+// -- a seat, and another seat -- so the lines are added up within each,
+// and an extension's lines, which repeat the number, are not added to the
+// booking's.
 func perDayExtrasTx(ctx context.Context, tx pgx.Tx, bookingID string, days, added int64) ([]frozenLine, error) {
 	rows, err := tx.Query(ctx, `
-		SELECT l.extra_id::text, l.unit, l.description, sum(l.quantity_milli), l.unit_price_minor, l.vat_rate_bp, l.vat_category, l.unconfirmed,
-		       coalesce(max(l.extra_count), 0)
-		FROM rental_booking_lines l JOIN rental_extras e ON e.id = l.extra_id
-		WHERE l.booking_id = $1 AND e.per = 'day'
-		GROUP BY l.extra_id, l.unit, l.description, l.unit_price_minor, l.vat_rate_bp, l.vat_category, l.unconfirmed
-		ORDER BY min(l.position)`, bookingID)
+		SELECT extra_id::text, unit, description, sum(quantity_milli), unit_price_minor, vat_rate_bp, vat_category, unconfirmed,
+		       coalesce(max(taken), 0)
+		FROM (SELECT l.extra_id, l.unit, l.description, l.unit_price_minor, l.vat_rate_bp, l.vat_category, l.unconfirmed,
+		             sum(l.quantity_milli) AS quantity_milli, sum(l.extra_count) AS taken, min(l.position) AS position
+		      FROM rental_booking_lines l JOIN rental_extras e ON e.id = l.extra_id
+		      WHERE l.booking_id = $1 AND e.per = 'day'
+		      GROUP BY l.extra_id, l.unit, l.description, l.unit_price_minor, l.vat_rate_bp, l.vat_category, l.unconfirmed, l.event_id) per_event
+		GROUP BY extra_id, unit, description, unit_price_minor, vat_rate_bp, vat_category, unconfirmed
+		ORDER BY min(position)`, bookingID)
 	if err != nil {
 		return nil, fmt.Errorf("read the extras: %w", err)
 	}
@@ -816,7 +834,7 @@ func perDayExtrasTx(ctx context.Context, tx pgx.Tx, bookingID string, days, adde
 			return nil, err
 		}
 		// As many as were taken, as the line says; a line from before
-		// 0307 says it through its quantity and the days.
+		// 0107 says it through its quantity and the days.
 		if count == 0 {
 			count = qty / (days * 1000)
 		}

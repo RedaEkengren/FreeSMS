@@ -95,12 +95,14 @@ func (s *Server) paymentError(w http.ResponseWriter, r *http.Request, err error)
 // is whatever arrived, part of it as often as not.
 func (s *Server) handleRecordPaymentByReference(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
-	if strings.TrimSpace(r.FormValue("amount")) == "" {
-		s.renderError(w, r, http.StatusBadRequest, "Not recorded", "Say how much arrived, as the bank's line has it.")
-		return
-	}
+	// The lookup checks the role first, so a role that records no payment
+	// is refused as such whatever else the form lacks.
 	id, reference, err := workshop.InvoiceByPaymentReference(r.Context(), s.pool, session.Scope, r.FormValue("ocr"))
 	if s.paymentError(w, r, err) {
+		return
+	}
+	if strings.TrimSpace(r.FormValue("amount")) == "" {
+		s.renderError(w, r, http.StatusBadRequest, "Not recorded", "Say how much arrived, as the bank's line has it.")
 		return
 	}
 	if r.FormValue("reference") == "" {

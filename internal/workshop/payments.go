@@ -688,6 +688,7 @@ func knownMethod(m string) bool {
 var (
 	errReferenceCheck   = fmt.Errorf("%w: that reference's check digit is wrong; check it against the invoice", ErrInvalid)
 	errReferenceShape   = fmt.Errorf("%w: a payment reference is 2 to 25 digits", ErrInvalid)
+	errReferenceLength  = fmt.Errorf("%w: that reference's length digit is wrong, so part of it is missing; check it against the invoice", ErrInvalid)
 	errReferenceUnknown = fmt.Errorf("%w: no invoice has that payment reference", ErrInvalid)
 )
 
@@ -704,6 +705,8 @@ func InvoiceByPaymentReference(ctx context.Context, pool *pgxpool.Pool, scope ac
 	switch {
 	case errors.Is(err, payref.ErrCheckDigit):
 		return "", "", errReferenceCheck
+	case errors.Is(err, payref.ErrLengthDigit):
+		return "", "", errReferenceLength
 	case err != nil:
 		return "", "", errReferenceShape
 	}

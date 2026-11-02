@@ -57,9 +57,13 @@ type TechnicianException struct {
 	Person string
 	Field  string
 	Reason string
-	By     string
-	At     time.Time
-	Until  *time.Time
+	// The reason was taken away by an erasure (0092): the exception
+	// stands, why it was given can name somebody who asked to be
+	// forgotten.
+	ReasonErased bool
+	By           string
+	At           time.Time
+	Until        *time.Time
 }
 
 // Label is the field in words, as a catalogue key.
@@ -126,7 +130,8 @@ func TechnicianView(ctx context.Context, pool *pgxpool.Pool, scope access.Scope)
 		}
 
 		rows, err = tx.Query(ctx, `
-			SELECT e.user_id::text, coalesce(tp.display_name, ''), e.field, coalesce(e.reason, ''), coalesce(bp.display_name, ''), e.at, e.until
+			SELECT e.user_id::text, coalesce(tp.display_name, ''), e.field, coalesce(e.reason, ''), e.reason_erased_at IS NOT NULL,
+			       coalesce(bp.display_name, ''), e.at, e.until
 			FROM (SELECT DISTINCT ON (user_id, field) * FROM technician_view_exceptions ORDER BY user_id, field, seq DESC) e
 			JOIN users tu ON tu.id = e.user_id LEFT JOIN people tp ON tp.id = tu.person_id
 			LEFT JOIN users bu ON bu.id = e.by_user LEFT JOIN people bp ON bp.id = bu.person_id
@@ -137,7 +142,7 @@ func TechnicianView(ctx context.Context, pool *pgxpool.Pool, scope access.Scope)
 		}
 		for rows.Next() {
 			var e TechnicianException
-			if err := rows.Scan(&e.UserID, &e.Person, &e.Field, &e.Reason, &e.By, &e.At, &e.Until); err != nil {
+			if err := rows.Scan(&e.UserID, &e.Person, &e.Field, &e.Reason, &e.ReasonErased, &e.By, &e.At, &e.Until); err != nil {
 				rows.Close()
 				return err
 			}

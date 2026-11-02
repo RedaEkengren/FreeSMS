@@ -104,6 +104,21 @@
   {{end}}
 {{end}}
 
+{{if .StockUnits}}
+<h2>{{.T "In stock"}}</h2>
+<ul class="lines">
+  {{range .StockUnits}}
+  <li>
+    <div class="row">
+      <span>{{$.T .ReasonLabel}} {{$.Date ($.Local .OpenedAt) "2 Jan 2006"}}{{with .ClosedAt}} &ndash; {{$.Date ($.Local .) "2 Jan 2006"}}{{end}}</span>
+      <span class="tag">{{$.T .Status.Label}}</span>
+    </div>
+    {{if not .Owned}}<div class="waiting">{{$.T "Sold on behalf of its owner; not the dealer's car"}}</div>{{end}}
+  </li>
+  {{end}}
+</ul>
+{{end}}
+
 {{if .Vehicle.Readings}}
 <h2>{{.T "Odometer"}}</h2>
 <ul class="lines">

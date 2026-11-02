@@ -23,8 +23,15 @@ type rentable struct {
 
 func rentableVan(t *testing.T, pool *pgxpool.Pool) rentable {
 	t.Helper()
+	return rentableVanWith(t, pool, "ABC 12D")
+}
+
+// rentableVanWith is rentableVan with a registration of its own: a van
+// that is not vehicle A, which may be in stock elsewhere in the test.
+func rentableVanWith(t *testing.T, pool *pgxpool.Pool, registration string) rentable {
+	t.Helper()
 	ctx := context.Background()
-	unit := addUnit(t, pool, workshop.NewRentalUnit{Registration: "ABC 12D", FleetNumber: "V1", Category: "Small van"})
+	unit := addUnit(t, pool, workshop.NewRentalUnit{Registration: registration, FleetNumber: "V1", Category: "Small van"})
 	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), unit, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
 		t.Fatal(err)
 	}
@@ -344,9 +351,11 @@ func TestAChangedPriceSaysWhoAndWhy(t *testing.T) {
 
 // rentalAudited makes Rental's audited transitions happen, for
 // TestEveryAuditedTransitionLeavesAnEvent, and says what each was about.
+// Its van is not vehicle A, which Dealer's part of that test has in
+// stock: a car is not in the fleet and in stock at once.
 func rentalAudited(t *testing.T, pool *pgxpool.Pool, made func(event, kind, id string)) {
 	t.Helper()
-	v := rentableVan(t, pool)
+	v := rentableVanWith(t, pool, "RNT 100")
 	id, err := workshop.BookRental(context.Background(), pool, rentalDesk(), workshop.NewRentalBooking{UnitID: v.unit, RenterID: v.renter,
 		From: in2031(10, 9), To: in2031(11, 9), Overrides: []workshop.PriceOverride{{Position: 1, UnitPriceMinor: 1, Reason: "Prov"}}})
 	if err != nil {
@@ -356,7 +365,7 @@ func rentalAudited(t *testing.T, pool *pgxpool.Pool, made func(event, kind, id s
 }
 
 // After every migration, audit_events takes a subject Core had and
-// Rental's (0303, through widen_text_check), and refuses one nobody added:
+// Rental's (0103, through widen_text_check), and refuses one nobody added:
 // a list widened into nothing would let every value in.
 func TestAuditSubjectsWidenedKeepWhatWasThere(t *testing.T) {
 	pool := setup(t)
@@ -729,5 +738,86 @@ func TestADailyExtraKeepsItsCountAcrossTheChangeOfHour(t *testing.T) {
 	}
 	if seats != 4000 {
 		t.Errorf("one seat for two days and two more: %d seat-days", seats/1000)
+	}
+}
+
+// A daily extra taken on two lines -- a seat, and another seat -- is
+// charged for both on an extension, and a second extension charges the
+// same two again rather than the lines of the first counted on top
+// (review 3 #4).
+func TestADailyExtraOnTwoLinesIsChargedForBothWhenExtended(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	seat, _ := workshop.AddRentalExtra(ctx, pool, rentalOwner(), workshop.NewRentalExtra{Kind: "child_seat", Name: "Barnstol", Per: "day",
+		PriceMinor: 5000, VATRateBp: 2500, VATCategory: "S"})
+	id, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: v.unit, RenterID: v.renter,
+		From: in2031(10, 9), To: in2031(11, 9), Extras: []workshop.ExtraChoice{{ExtraID: seat, Count: 1}, {ExtraID: seat, Count: 1}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seatDays := func() int64 {
+		t.Helper()
+		b, err := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var n int64
+		for _, l := range b.Lines {
+			if l.ExtraID == seat {
+				n += l.QuantityMilli
+			}
+		}
+		return n / 1000
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, in2031(13, 9), ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := seatDays(); got != 2*3 {
+		t.Errorf("two seats for three days: %d seat-days", got)
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, in2031(14, 9), ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := seatDays(); got != 2*4 {
+		t.Errorf("two seats for four days: %d seat-days", got)
+	}
+}
+
+// A booking with a kilometre limit, extended into a season that includes
+// unlimited kilometres, is unlimited from the extension on. The odometer
+// is read when the unit goes out and comes back, not each day, so the
+// kilometres of the added days cannot be told from the others: the whole
+// booking becomes unlimited, the renter's side of the doubt, rather than
+// charging every kilometre of the added days (review 3 #7).
+func TestALimitedBookingExtendedIntoUnlimitedKilometresBecomesUnlimited(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := addUnit(t, pool, workshop.NewRentalUnit{Registration: "ABC 12D", FleetNumber: "V1", Category: "Bil"})
+	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), unit, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
+		t.Fatal(err)
+	}
+	plan, _ := workshop.CreateRatePlan(ctx, pool, rentalOwner(), workshop.NewRatePlan{Name: "Bil", Category: "Bil", VATRateBp: 2500, SeasonRule: "at_start"})
+	km := 100
+	if _, err := workshop.AddRateSeason(ctx, pool, rentalOwner(), plan, workshop.RateSeason{ValidFrom: day("2020-01-01"), Day: kr(40000),
+		IncludedKmPerDay: &km, ExtraKmMinor: kr(300)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.AddRateSeason(ctx, pool, rentalOwner(), plan, workshop.RateSeason{ValidFrom: day("2031-05-11"), Day: kr(40000)}); err != nil {
+		t.Fatal(err)
+	}
+	renter, _ := workshop.CreateParty(ctx, pool, rentalDesk(), workshop.NewParty{Kind: "private", Name: "R", Role: workshop.PartyRenter})
+	id, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: unit, RenterID: renter, From: in2031(10, 9), To: in2031(11, 9)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id); b.IncludedKm == nil || *b.IncludedKm != 100 {
+		t.Fatalf("one day at 100 km: %v", b.IncludedKm)
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, in2031(13, 9), ""); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id); b.IncludedKm != nil {
+		t.Errorf("extended into unlimited kilometres, still limited to %d km", *b.IncludedKm)
 	}
 }

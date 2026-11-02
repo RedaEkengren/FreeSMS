@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -582,9 +583,16 @@ func electronicArgs(s Seller, b Buyer, ocr string) []any {
 // paymentOCR is an invoice's payment reference: the number alone in the
 // default series, as it always was, and with the series in it in any
 // other, so the same number in two series is two references and a payment
-// finds the one it pays (payref.OCRFor).
+// finds the one it pays (payref.OCRFor). A series no reference can be
+// made for -- not capital letters and digits, or too long -- gives none:
+// the invoice is issued without a reference, as invoices before #234 were,
+// rather than not at all, and is paid by its number.
 func paymentOCR(series string, number int64) (string, error) {
 	ocr, err := payref.OCRFor(series, number)
+	if err != nil && series != DefaultSeries {
+		slog.Warn("invoice issued without a payment reference", "series", series, "number", number, "why", err)
+		return "", nil
+	}
 	if err != nil {
 		return "", fmt.Errorf("make the payment reference: %w", err)
 	}

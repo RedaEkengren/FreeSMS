@@ -36,8 +36,10 @@ BEGIN
     IF def !~ ('\m' || col || '\M') THEN
         RAISE EXCEPTION 'widen_text_check: % on % is not about %', con, tbl, col;
     END IF;
-    -- 'a'::text, as an IN list or an ARRAY[...] prints.
-    SELECT array_agg(m[1]) INTO vals
+    -- 'a'::text, as an IN list or an ARRAY[...] prints. Unescaped as the
+    -- array literal below is, so a value with an apostrophe is read as
+    -- itself and not written back doubled.
+    SELECT array_agg(replace(m[1], '''''', '''')) INTO vals
       FROM regexp_matches(def, '''((?:[^'']|'''')*)''::text(?!\[)', 'g') m;
     -- '{a,b}'::text[], as an array literal prints.
     FOR lit IN SELECT m FROM regexp_matches(def, '''((?:[^'']|'''')*)''::text\[\]', 'g') m LOOP

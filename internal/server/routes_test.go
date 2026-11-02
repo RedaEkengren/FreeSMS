@@ -242,6 +242,10 @@ var swept = map[string]string{
 	"POST /checklists/{id}":                       "sweep",
 	"POST /checklists/{id}/active":                "sweep",
 	"POST /checklists/{id}/subjects":              "sweep",
+
+	// Dealer
+	"GET /cars/calculations/new": "", "POST /cars/calculations": "",
+	"GET /cars/calculations/{id}": "sweep", "POST /cars/calculations/{id}/accept": "sweep",
 }
 
 // fill substitutes shop B's identifiers into a pattern.
@@ -279,6 +283,10 @@ func fill(pattern string) (method, path string) {
 		"{version}":           "1",
 		"{quoteID}":           "cccccccc-0000-0000-0000-0000000000cc",
 		"{key}":               photoB,
+		// Dealer: shop A runs no car sales here, so these are not found
+		// whoever asks; TestNoCarSalesRouteServesAnotherShopsRow asks them
+		// in a shop that does.
+		"/cars/calculations/{id}": "/cars/calculations/bbbbbbbb-0000-0000-0000-0000000000ca",
 		// Rental: ids that are nobody's.
 		"/rental/permits/{id}":     "/rental/permits/bbbbbbbb-0000-0000-0000-0000000000e1",
 		"/rental/profiles/{id}":    "/rental/profiles/bbbbbbbb-0000-0000-0000-0000000000e2",

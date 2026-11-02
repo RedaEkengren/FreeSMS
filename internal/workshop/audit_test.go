@@ -117,10 +117,7 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	made["payment.applied"], made["payment.refunded"] = subject{"deposit", dep}, subject{"deposit", dep}
-	payout, err := workshop.CreatePayout(ctx, pool, everything, workshop.NewHolding{PartyID: theSeller(t, pool), Purpose: "purchase"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	payout := purchasePayout(t, pool, everything, theSeller(t, pool))
 	if _, err := workshop.RecordPayout(ctx, pool, everything, payout, workshop.NewPayment{AmountMinor: minor(5000000), Method: "bank", PaidOn: time.Now()}); err != nil {
 		t.Fatal(err)
 	}
@@ -182,6 +179,22 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 	}
 	made["technician_view.granted"], made["technician_view.ended"] = subject{"user", staff}, subject{"user", staff}
 
+	// Dealer
+	// A car's cycle through stock (#160).
+	unit := takeIn(t, pool, workshop.StockFromDefleet)
+	moveStock(t, pool, unit.ID, workshop.StockForSale)
+	made["stock_unit.opened"], made["stock_unit.moved"] = subject{"stock_unit", unit.ID}, subject{"stock_unit", unit.ID}
+	// A car bought (#161), its eligibility corrected.
+	bought := boughtCar(t, pool)
+	if _, err := workshop.CorrectVATEligibility(ctx, pool, buyerScope(), bought.ID, workshop.SellerCompanyChargedVAT, nil, "Säljaren var ett företag"); err != nil {
+		t.Fatal(err)
+	}
+	made["purchase.recorded"], made["vat_eligibility.corrected"] = subject{"purchase", bought.ID}, subject{"purchase", bought.ID}
+	// Money let leave for it before its checks passed (#162).
+	if err := workshop.OverrideStockChecks(ctx, pool, everything, bought.StockUnitID, "Kontrollerat per telefon"); err != nil {
+		t.Fatal(err)
+	}
+	made["stock_checks.overridden"] = subject{"stock_unit", bought.StockUnitID}
 	// Rental
 	rentalAudited(t, pool, func(event, kind, id string) { made[event] = subject{kind, id} })
 

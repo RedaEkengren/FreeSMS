@@ -113,4 +113,14 @@ var core = map[string]string{
 	"ReadinessFor": "getting started", "ReadinessStatus": "getting started", "InvoiceExample": "getting started",
 	"PreviewImport": "bringing records in", "ApplyImport": "bringing records in", "DiscardImport": "bringing records in",
 	"ImportBatches": "bringing records in", "ImportBatchByID": "bringing records in",
+
+	// Dealer
+	// A car's cycles through stock (#160): read whatever is switched on, so
+	// a shop that stops selling cars keeps the history it made.
+	"StockUnitByID": "a car's history in stock", "StockUnitsOfVehicle": "a car's history in stock",
+	"PurchaseOfUnit": "a car's history in stock", "VATEligibilityOfUnit": "a car's history in stock",
+	"StockChecks": "a car's history in stock", "ChecksOutstanding": "a car's history in stock",
+	"StockCheckSettings": "a car's history in stock", "PurchaseSplitOf": "a car's history in stock",
+	"CalculationByID": "a car's history in stock", "CalculationsForVehicle": "a car's history in stock",
+	"CostsOfUnit": "a car's history in stock", "InternalLabourRate": "a car's history in stock",
 }

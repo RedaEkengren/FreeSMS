@@ -173,29 +173,39 @@ func CreateResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 			return tx.QueryRow(ctx, `INSERT INTO resources (shop_id, kind, name, created_by) VALUES ($1, 'item', $2, NULLIF($3, '')::uuid) RETURNING id`,
 				scope.ShopID, n.Name, scope.UserID).Scan(&id)
 		}
-		err := tx.QueryRow(ctx, `
-			INSERT INTO resources (shop_id, kind, vehicle_id, created_by)
-			SELECT $1, 'vehicle', v.id, NULLIF($3, '')::uuid FROM vehicles v WHERE v.id = $2 AND v.merged_into IS NULL
-			ON CONFLICT (vehicle_id) DO NOTHING RETURNING id`, scope.ShopID, n.VehicleID, scope.UserID).Scan(&id)
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		var retired bool
-		err = tx.QueryRow(ctx, `SELECT id, retired_at IS NOT NULL FROM resources WHERE vehicle_id = $1 FOR UPDATE`, n.VehicleID).Scan(&id, &retired)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNotFound
-		}
-		if err != nil || !retired {
-			return err
-		}
-		if _, err := tx.Exec(ctx, `
-			UPDATE resource_retirements SET returned_at = clock_timestamp(), returned_by = NULLIF($2, '')::uuid
-			WHERE resource_id = $1 AND returned_at IS NULL`, id, scope.UserID); err != nil {
-			return fmt.Errorf("bring back into use: %w", err)
-		}
-		_, err = tx.Exec(ctx, `UPDATE resources SET retired_at = NULL, retired_by = NULL WHERE id = $1`, id)
+		var err error
+		id, err = vehicleResourceTx(ctx, tx, scope, n.VehicleID)
 		return err
 	})
+	return id, err
+}
+
+// vehicleResourceTx is CreateResource for a vehicle, in the caller's
+// transaction: the vehicle's one resource, made or brought back into use.
+// A stock unit opens with it (#160).
+func vehicleResourceTx(ctx context.Context, tx pgx.Tx, scope access.Scope, vehicleID string) (string, error) {
+	var id string
+	err := tx.QueryRow(ctx, `
+		INSERT INTO resources (shop_id, kind, vehicle_id, created_by)
+		SELECT $1, 'vehicle', v.id, NULLIF($3, '')::uuid FROM vehicles v WHERE v.id = $2 AND v.merged_into IS NULL
+		ON CONFLICT (vehicle_id) DO NOTHING RETURNING id`, scope.ShopID, vehicleID, scope.UserID).Scan(&id)
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return id, err
+	}
+	var retired bool
+	err = tx.QueryRow(ctx, `SELECT id, retired_at IS NOT NULL FROM resources WHERE vehicle_id = $1 FOR UPDATE`, vehicleID).Scan(&id, &retired)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil || !retired {
+		return id, err
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE resource_retirements SET returned_at = clock_timestamp(), returned_by = NULLIF($2, '')::uuid
+		WHERE resource_id = $1 AND returned_at IS NULL`, id, scope.UserID); err != nil {
+		return "", fmt.Errorf("bring back into use: %w", err)
+	}
+	_, err = tx.Exec(ctx, `UPDATE resources SET retired_at = NULL, retired_by = NULL WHERE id = $1`, id)
 	return id, err
 }
 
@@ -212,38 +222,44 @@ func RetireResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		return ErrNotFound
 	}
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		var retired bool
-		err := tx.QueryRow(ctx, `SELECT retired_at IS NOT NULL FROM resources WHERE id = $1 FOR UPDATE`, id).Scan(&retired)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNotFound
-		}
-		if err != nil {
-			return fmt.Errorf("read resource: %w", err)
-		}
-		if retired {
-			return nil
-		}
-		if _, err := tx.Exec(ctx, `SELECT release_expired_holds($1, tstzrange(clock_timestamp(), NULL))`, id); err != nil {
-			return fmt.Errorf("release expired holds: %w", err)
-		}
-		var ahead int
-		if err := tx.QueryRow(ctx, `
-			SELECT count(*) FROM resource_blocks
-			WHERE resource_id = $1 AND status IN ('held', 'confirmed') AND period && tstzrange(clock_timestamp(), NULL)`, id).Scan(&ahead); err != nil {
-			return fmt.Errorf("read what is booked: %w", err)
-		}
-		if ahead > 0 {
-			return fmt.Errorf("%w: something is still booked on it; release or replan that first", ErrInvalid)
-		}
-		// The period out of use is the row; the column is what it says now,
-		// which booking and the job trigger read.
-		if _, err := tx.Exec(ctx, `INSERT INTO resource_retirements (shop_id, resource_id, retired_by) VALUES ($1, $2, NULLIF($3, '')::uuid)`,
-			scope.ShopID, id, scope.UserID); err != nil {
-			return fmt.Errorf("take out of use: %w", err)
-		}
-		_, err = tx.Exec(ctx, `UPDATE resources SET retired_at = now(), retired_by = NULLIF($2, '')::uuid WHERE id = $1`, id, scope.UserID)
-		return err
+		return retireResourceTx(ctx, tx, scope, id)
 	})
+}
+
+// retireResourceTx is RetireResource in the caller's transaction: a stock
+// unit's cycle ends with it (#160).
+func retireResourceTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id string) error {
+	var retired bool
+	err := tx.QueryRow(ctx, `SELECT retired_at IS NOT NULL FROM resources WHERE id = $1 FOR UPDATE`, id).Scan(&retired)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("read resource: %w", err)
+	}
+	if retired {
+		return nil
+	}
+	if _, err := tx.Exec(ctx, `SELECT release_expired_holds($1, tstzrange(clock_timestamp(), NULL))`, id); err != nil {
+		return fmt.Errorf("release expired holds: %w", err)
+	}
+	var ahead int
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*) FROM resource_blocks
+		WHERE resource_id = $1 AND status IN ('held', 'confirmed') AND period && tstzrange(clock_timestamp(), NULL)`, id).Scan(&ahead); err != nil {
+		return fmt.Errorf("read what is booked: %w", err)
+	}
+	if ahead > 0 {
+		return fmt.Errorf("%w: something is still booked on it; release or replan that first", ErrInvalid)
+	}
+	// The period out of use is the row; the column is what it says now,
+	// which booking and the job trigger read.
+	if _, err := tx.Exec(ctx, `INSERT INTO resource_retirements (shop_id, resource_id, retired_by) VALUES ($1, $2, NULLIF($3, '')::uuid)`,
+		scope.ShopID, id, scope.UserID); err != nil {
+		return fmt.Errorf("take out of use: %w", err)
+	}
+	_, err = tx.Exec(ctx, `UPDATE resources SET retired_at = now(), retired_by = NULLIF($2, '')::uuid WHERE id = $1`, id, scope.UserID)
+	return err
 }
 
 // ResourceBooking is a use to block a resource for. From and To are the use itself;
@@ -315,6 +331,20 @@ func BookResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, b
 
 	var id string
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// The resource first, locked, then its blocks: the order every
+		// write to it takes. Letting a hold go before taking the resource
+		// waits on a rental that holds the resource and wants the hold.
+		var retired bool
+		err := tx.QueryRow(ctx, `SELECT retired_at IS NOT NULL FROM resources WHERE id = $1 FOR UPDATE`, b.ResourceID).Scan(&retired)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("read resource: %w", err)
+		}
+		// The request read once the resource is held: the same request
+		// still in flight has committed by then, and its block is the
+		// answer.
 		if key != "" {
 			err := tx.QueryRow(ctx, `SELECT id FROM resource_blocks WHERE request_key = $1`, key).Scan(&id)
 			if err == nil {
@@ -323,14 +353,6 @@ func BookResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, b
 			if !errors.Is(err, pgx.ErrNoRows) {
 				return fmt.Errorf("read the request: %w", err)
 			}
-		}
-		var retired bool
-		err := tx.QueryRow(ctx, `SELECT retired_at IS NOT NULL FROM resources WHERE id = $1`, b.ResourceID).Scan(&retired)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNotFound
-		}
-		if err != nil {
-			return fmt.Errorf("read resource: %w", err)
 		}
 		if retired {
 			return fmt.Errorf("%w: that has been taken out of use", ErrInvalid)
@@ -386,8 +408,14 @@ func BookResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, b
 	return id, err
 }
 
-// blockKindTx reads a block's kind and state, locked.
+// blockKindTx reads a block's kind and state, locked: its resource first,
+// then the block, the order every write to a resource takes. A block's
+// resource never changes, so reading which one unlocked is safe.
 func blockKindTx(ctx context.Context, tx pgx.Tx, id string) (kind, status string, expired bool, err error) {
+	if _, err = tx.Exec(ctx, `
+		SELECT 1 FROM resources WHERE id = (SELECT resource_id FROM resource_blocks WHERE id = $1) FOR UPDATE`, id); err != nil {
+		return "", "", false, fmt.Errorf("lock the resource: %w", err)
+	}
 	err = tx.QueryRow(ctx, `
 		SELECT kind, status, status = 'held' AND expires_at <= clock_timestamp()
 		FROM resource_blocks WHERE id = $1 FOR UPDATE`, id).Scan(&kind, &status, &expired)

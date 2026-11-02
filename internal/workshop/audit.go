@@ -62,6 +62,16 @@ var AuditedTransitions = []AuditTransition{
 	{"technician_view.changed", "shop", "technician_view_changes", true},
 	{"technician_view.granted", "user", "technician_view_exceptions", true},
 	{"technician_view.ended", "user", "technician_view_exceptions", true},
+	// Dealer
+	// A car's cycle through stock (#160): opened, and every move of its
+	// deal; ending one without a sale says why (MoveStockUnit).
+	{"stock_unit.opened", "stock_unit", "audit_events", false},
+	{"stock_unit.moved", "stock_unit", "audit_events", false},
+	// A car bought (#161), and its VAT eligibility assessed again.
+	{"purchase.recorded", "purchase", "audit_events", false},
+	{"vat_eligibility.corrected", "purchase", "audit_events", true},
+	// Money let leave for a car before its checks passed (#162).
+	{"stock_checks.overridden", "stock_unit", "audit_events", true},
 	// Rental
 	{"rental.price_overridden", "rental_booking", "audit_events", true},
 }
@@ -133,6 +143,14 @@ type AuditEvent struct {
 var detailSeen = map[string]func(access.Roles) bool{
 	"purchase_price_minor": access.Roles.SeesPurchasePrice,
 	"margin_minor":         access.Roles.SeesMargin,
+	// Dealer: the checks money was let leave over (#162).
+	"outstanding": access.Roles.SeesPurchasePrice,
+}
+
+// reasonSeen is which events' reasons need what: why money was let leave
+// for a car can say what it cost and what was owed on it (#162).
+var reasonSeen = map[string]func(access.Roles) bool{
+	"stock_checks.overridden": access.Roles.SeesPurchasePrice,
 }
 
 // AuditTrail is a subject's events, in the order they happened, for
@@ -141,8 +159,10 @@ var detailSeen = map[string]func(access.Roles) bool{
 // payout's for those who may make one; money's, a
 // customer's, a vehicle's and a party's for those who see customers; a
 // job's for those who work on or follow jobs; a booked resource's for those
-// who book it, with why only for those who run the shop. What a role may not
-// see of the detail is left out.
+// who book it, with why only for those who run the shop; a car's cycle
+// through stock for whoever buys or sells cars, a purchase's for whoever
+// may see what the car cost. What a role may not see of the detail is left
+// out.
 func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, subjectKind, subjectID string) ([]AuditEvent, error) {
 	if !looksLikeUUID(subjectID) {
 		return nil, ErrNotFound
@@ -178,6 +198,14 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 			return nil, access.ErrForbidden
 		}
 	case "document", "deposit", "payout":
+	case "stock_unit":
+		if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+			return nil, access.ErrForbidden
+		}
+	case "purchase":
+		if !scope.Role.SeesPurchasePrice() {
+			return nil, access.ErrForbidden
+		}
 	case "rental_booking":
 		if !scope.Role.HandsOverRentals() {
 			return nil, access.ErrForbidden
@@ -229,7 +257,7 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 			if err := rows.Scan(&e.Event, &e.From, &e.To, &e.Actor, &e.At, &e.Reason, &e.ReasonErased, &e.Detail, &e.KeptIn); err != nil {
 				return fmt.Errorf("scan event: %w", err)
 			}
-			if !reasons {
+			if may, ok := reasonSeen[e.Event]; !reasons || (ok && !may(scope.Role)) {
 				e.Reason = ""
 			}
 			for k, may := range detailSeen {

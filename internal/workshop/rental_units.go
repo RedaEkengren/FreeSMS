@@ -126,6 +126,7 @@ var (
 	errJoinedHow       = fmt.Errorf("%w: say how it joins the fleet", ErrInvalid)
 	errLeftHow         = fmt.Errorf("%w: say how it leaves the fleet", ErrInvalid)
 	errInFleetAlready  = fmt.Errorf("%w: it is in the fleet then already", ErrInvalid)
+	errFleetInStock    = fmt.Errorf("%w: that car is in stock for sale then; it joins the fleet once its cycle in stock has ended", ErrInvalid)
 	errLeftBeforeJoin  = fmt.Errorf("%w: it leaves the fleet after it joined", ErrInvalid)
 	errLeftAlready     = fmt.Errorf("%w: that period in the fleet has already ended", ErrInvalid)
 	errWhenJoined      = fmt.Errorf("%w: say when it joins the fleet", ErrInvalid)
@@ -261,9 +262,12 @@ func StartFleetMembership(ctx context.Context, pool *pgxpool.Pool, scope access.
 	}
 	var id string
 	err = inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// The unit held, as a booking holds it while it reads the fleet:
+		// the order every rental write takes.
 		var vehicle *string
 		err := tx.QueryRow(ctx, `
-			SELECT r.vehicle_id::text FROM rental_units u JOIN resources r ON r.id = u.resource_id WHERE u.id = $1`, unitID).Scan(&vehicle)
+			SELECT r.vehicle_id::text FROM rental_units u JOIN resources r ON r.id = u.resource_id WHERE u.id = $1
+			FOR UPDATE OF r`, unitID).Scan(&vehicle)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
@@ -275,7 +279,10 @@ func StartFleetMembership(ctx context.Context, pool *pgxpool.Pool, scope access.
 			VALUES ($1, $2, $3, $4, $5, NULLIF($6, '')::uuid, nullif($7, '')) RETURNING id`,
 			scope.ShopID, unitID, vehicle, from, how, scope.UserID, note).Scan(&id)
 		var pg *pgconn.PgError
-		if errors.As(err, &pg) && pg.Code == "23P01" {
+		switch {
+		case errors.As(err, &pg) && pg.ConstraintName == "vehicle_fleet_or_stock":
+			return errFleetInStock
+		case errors.As(err, &pg) && pg.Code == "23P01":
 			return errInFleetAlready
 		}
 		return err
@@ -304,21 +311,18 @@ func EndFleetMembership(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		var joined time.Time
 		var left *time.Time
 		var resource string
-		// The unit first, then the period: the order every rental write
-		// takes.
-		if err := tx.QueryRow(ctx, `SELECT u.resource_id FROM fleet_memberships m JOIN rental_units u ON u.id = m.unit_id WHERE m.id = $1`,
-			membershipID).Scan(&resource); err != nil {
+		// The unit first, found and locked in one statement, then the
+		// period: the order every rental write takes.
+		if err := tx.QueryRow(ctx, `
+			SELECT id FROM resources
+			WHERE id = (SELECT u.resource_id FROM fleet_memberships m JOIN rental_units u ON u.id = m.unit_id WHERE m.id = $1)
+			FOR UPDATE`, membershipID).Scan(&resource); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrNotFound
 			}
-			return fmt.Errorf("read membership: %w", err)
+			return fmt.Errorf("lock the unit: %w", err)
 		}
-		if err := lockUnitResourceTx(ctx, tx, resource); err != nil {
-			return err
-		}
-		err := tx.QueryRow(ctx, `
-			SELECT m.joined_at, m.left_at, u.resource_id FROM fleet_memberships m JOIN rental_units u ON u.id = m.unit_id
-			WHERE m.id = $1 FOR UPDATE OF m`, membershipID).Scan(&joined, &left, &resource)
+		err := tx.QueryRow(ctx, `SELECT joined_at, left_at FROM fleet_memberships WHERE id = $1 FOR UPDATE`, membershipID).Scan(&joined, &left)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}

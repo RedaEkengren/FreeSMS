@@ -89,6 +89,22 @@ func Share(minor int64, basisPoints int) int64 {
 // one part of a whole that is being cut down to a ceiling.
 func Scale(minor, numerator, denominator int64) int64 { return divRound(minor*numerator, denominator) }
 
+// MarginSchemeVAT is the VAT in a sale under the margin scheme
+// (vinstmarginalbeskattning, mervärdesskattelagen chapter 20): the margin
+// is the sale price, VAT included, less the tax purchase price, worked out
+// for each car on its own, and the VAT is the part of it the rate makes up
+// -- 20 per cent of the margin at 25 per cent. A car sold at a loss has a
+// margin of nothing and so no VAT, and that loss is not set against any
+// other car's margin: there is no total to set it against here. Rounded
+// half away from zero, as every amount is.
+func MarginSchemeVAT(salePriceGrossMinor, taxPurchasePriceMinor int64, rateBasisPoints int) int64 {
+	margin := salePriceGrossMinor - taxPurchasePriceMinor
+	if margin <= 0 || rateBasisPoints <= 0 {
+		return 0
+	}
+	return divRound(margin*int64(rateBasisPoints), 10000+int64(rateBasisPoints))
+}
+
 // WithMarkup is a cost plus a markup in basis points (4500 = 45%), rounded
 // half away from zero like every other amount here. Truncating instead loses
 // an öre on half the parts in the catalogue, always in the customer's favour,
