@@ -386,10 +386,13 @@ func OverrideHandoverGap(ctx context.Context, pool *pgxpool.Pool, scope access.S
 // records what they did.
 func fleetUseWaitingTx(ctx context.Context, tx pgx.Tx) ([]ActionItem, error) {
 	var out []ActionItem
+	// One statement for the units' paperwork and the bookings ahead to
+	// ask about: the home page reads this on every visit.
 	rows, err := tx.Query(ctx, `
 		WITH last AS (
 		    SELECT DISTINCT ON (membership_id) membership_id, direction
-		    FROM fleet_rental_reports ORDER BY membership_id, reported_on DESC, recorded_at DESC)
+		    FROM fleet_rental_reports ORDER BY membership_id, reported_on DESC, recorded_at DESC),
+		t AS (SELECT (clock_timestamp() AT TIME ZONE timezone)::date AS today FROM shops)
 		SELECT CASE WHEN m.left_at IS NULL THEN 'rental_report_in' ELSE 'rental_report_out' END,
 		       u.id::text, u.fleet_number || coalesce(' · ' || reg.registration, ' · ' || r.name, ''), coalesce(m.left_at, m.joined_at)
 		FROM fleet_memberships m
@@ -400,43 +403,43 @@ func fleetUseWaitingTx(ctx context.Context, tx pgx.Tx) ([]ActionItem, error) {
 		LEFT JOIN last ON last.membership_id = m.id
 		WHERE (m.left_at IS NULL AND p.reporting_required AND last.direction IS DISTINCT FROM 'in')
 		   OR (m.left_at IS NOT NULL AND last.direction = 'in')
-		ORDER BY 4, u.fleet_number`)
+		UNION ALL
+		-- An insurance ending soon with none after it, on a vehicle in the fleet.
+		SELECT 'rental_insurance_ends', u.id::text, u.fleet_number || coalesce(' · ' || reg.registration, ''), max(i.valid_to)::timestamptz
+		FROM fleet_memberships m
+		JOIN rental_units u ON u.id = m.unit_id
+		JOIN resources r ON r.id = u.resource_id AND r.vehicle_id IS NOT NULL
+		LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = r.vehicle_id AND reg.valid_to IS NULL
+		JOIN fleet_insurances i ON i.membership_id = m.id AND i.covers_rental = 'yes'
+		CROSS JOIN t
+		WHERE m.left_at IS NULL
+		GROUP BY u.id, u.fleet_number, reg.registration, t.today
+		HAVING bool_and(i.valid_to IS NOT NULL) AND max(i.valid_to) >= t.today AND max(i.valid_to) < t.today + $1::int
+		UNION ALL
+		-- A confirmed booking within the warning, to ask what it lacks.
+		SELECT 'ahead', b.id::text, u.fleet_number || coalesce(' · ' || reg.registration, ' · ' || r.name, ''), b.starts_at
+		FROM rental_bookings b
+		JOIN resource_blocks k ON k.id = b.block_id
+		JOIN rental_units u ON u.id = b.unit_id
+		JOIN resources r ON r.id = u.resource_id
+		LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = r.vehicle_id AND reg.valid_to IS NULL
+		WHERE `+rentalState+` = 'confirmed' AND b.starts_at < clock_timestamp() + $2::interval
+		ORDER BY 4, 3`, int(ExpiryWarning/(24*time.Hour)), ExpiryWarning)
 	if err != nil {
-		return nil, fmt.Errorf("read the fleet's reports: %w", err)
+		return nil, fmt.Errorf("read the fleet's paperwork: %w", err)
 	}
+	var ids []string
+	var labels []string
+	var starts []time.Time
 	for rows.Next() {
 		it := ActionItem{Module: access.Rental, SubjectKind: "rental_unit", Urgency: UrgencySoon}
 		if err := rows.Scan(&it.Kind, &it.SubjectID, &it.Text, &it.Due); err != nil {
 			rows.Close()
 			return nil, err
 		}
-		out = append(out, it)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	// An insurance ending soon with none after it, on a vehicle in the fleet.
-	rows, err = tx.Query(ctx, `
-		SELECT u.id::text, u.fleet_number || coalesce(' · ' || reg.registration, ''), max(i.valid_to)
-		FROM fleet_memberships m
-		JOIN rental_units u ON u.id = m.unit_id
-		JOIN resources r ON r.id = u.resource_id AND r.vehicle_id IS NOT NULL
-		LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = r.vehicle_id AND reg.valid_to IS NULL
-		JOIN fleet_insurances i ON i.membership_id = m.id AND i.covers_rental = 'yes'
-		CROSS JOIN (SELECT (clock_timestamp() AT TIME ZONE timezone)::date AS today FROM shops) t
-		WHERE m.left_at IS NULL
-		GROUP BY u.id, u.fleet_number, reg.registration, t.today
-		HAVING bool_and(i.valid_to IS NOT NULL) AND max(i.valid_to) >= t.today AND max(i.valid_to) < t.today + $1::int
-		ORDER BY 3`, int(ExpiryWarning/(24*time.Hour)))
-	if err != nil {
-		return nil, fmt.Errorf("read the insurances: %w", err)
-	}
-	for rows.Next() {
-		it := ActionItem{Kind: "rental_insurance_ends", Module: access.Rental, SubjectKind: "rental_unit", Urgency: UrgencySoon}
-		if err := rows.Scan(&it.SubjectID, &it.Text, &it.Due); err != nil {
-			rows.Close()
-			return nil, err
+		if it.Kind == "ahead" {
+			ids, labels, starts = append(ids, it.SubjectID), append(labels, it.Text), append(starts, it.Due)
+			continue
 		}
 		out = append(out, it)
 	}
@@ -462,35 +465,6 @@ func fleetUseWaitingTx(ctx context.Context, tx pgx.Tx) ([]ActionItem, error) {
 			}
 		}
 		out = append(out, it)
-	}
-	// A confirmed booking within the warning that lacks something now.
-	var ids []string
-	var labels []string
-	var starts []time.Time
-	brows, err := tx.Query(ctx, `
-		SELECT b.id::text, u.fleet_number || coalesce(' · ' || reg.registration, ' · ' || r.name, ''), b.starts_at
-		FROM rental_bookings b
-		JOIN resource_blocks k ON k.id = b.block_id
-		JOIN rental_units u ON u.id = b.unit_id
-		JOIN resources r ON r.id = u.resource_id
-		LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = r.vehicle_id AND reg.valid_to IS NULL
-		WHERE `+rentalState+` = 'confirmed' AND b.starts_at < clock_timestamp() + $1::interval
-		ORDER BY b.starts_at LIMIT 200`, ExpiryWarning)
-	if err != nil {
-		return nil, fmt.Errorf("read the bookings ahead: %w", err)
-	}
-	for brows.Next() {
-		var id, label string
-		var at time.Time
-		if err := brows.Scan(&id, &label, &at); err != nil {
-			brows.Close()
-			return nil, err
-		}
-		ids, labels, starts = append(ids, id), append(labels, label), append(starts, at)
-	}
-	brows.Close()
-	if err := brows.Err(); err != nil {
-		return nil, err
 	}
 	for i, id := range ids {
 		gaps, err := rentalBookingGapsTx(ctx, tx, id)

@@ -53,9 +53,11 @@ var queryBudgets = map[string]int{
 	// 20 to 17 and 28 to 24: the workshop's job counts in one statement.
 	// 24 to 26: Rental's cards, counted in one statement beside the
 	// workshop's, and the rental desk's part of the queue in one more
-	// (#192).
+	// (#192). 26 to 29: the fleet's paperwork (#202) -- reports,
+	// insurances and the bookings ahead in one statement, then the
+	// shop's zone and its permits to see whether the permit ends soon.
 	"desk GET /":      17,
-	"owner GET /":     26,
+	"owner GET /":     29,
 	"desk GET /board": 21,
 	// 35: the quote the customer was shown and what they answered to it
 	// (two statements), which the counter reads on every live refresh.
