@@ -1108,8 +1108,9 @@ var disputeClauses = map[string]map[string]string{
 func ShippedSalesContract(locale string) string { return shippedSalesContracts[locale] }
 
 // ensureSalesContractTemplateTx is the shipped contract template's newest version: the
-// one named as shipped in the shop's language, made the first time when
-// the shop has none of the kind. A shop with only its own templates is
+// one marked as shipped (0210), whatever it is called now, made the first
+// time -- named in the shop's language -- when the shop has none of the
+// kind. A shop with only its own templates is
 // asked which to use, never handed one of them unasked.
 func ensureSalesContractTemplateTx(ctx context.Context, tx pgx.Tx, shopID string) (string, error) {
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('shipped:sales_contract:' || $1::text, 0))`, shopID); err != nil {
@@ -1132,7 +1133,7 @@ func ensureSalesContractTemplateTx(ctx context.Context, tx pgx.Tx, shopID string
 	var version string
 	err := tx.QueryRow(ctx, `
 		SELECT v.id FROM document_templates t JOIN document_template_versions v ON v.template_id = t.id
-		WHERE t.kind = 'sales_contract' AND t.name = $1 ORDER BY v.version DESC LIMIT 1`, name).Scan(&version)
+		WHERE t.shipped = 'sales_contract' ORDER BY v.version DESC LIMIT 1`).Scan(&version)
 	switch {
 	case err == nil:
 		return version, nil
@@ -1143,7 +1144,7 @@ func ensureSalesContractTemplateTx(ctx context.Context, tx pgx.Tx, shopID string
 		return "", errDealChooseTemplate
 	}
 	var id string
-	if err := tx.QueryRow(ctx, `INSERT INTO document_templates (shop_id, kind, name) VALUES ($1, 'sales_contract', $2) RETURNING id`,
+	if err := tx.QueryRow(ctx, `INSERT INTO document_templates (shop_id, kind, name, shipped) VALUES ($1, 'sales_contract', $2, 'sales_contract') RETURNING id`,
 		shopID, name).Scan(&id); err != nil {
 		return "", fmt.Errorf("make the shipped template: %w", err)
 	}

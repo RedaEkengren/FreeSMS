@@ -759,8 +759,9 @@ var shippedTestDriveNames = map[string]string{"sv": "Provkörningsavtal (behöve
 func ShippedTestDriveTemplate(locale string) string { return shippedTestDriveTemplates[locale] }
 
 // ensureTestDriveTemplateTx is the shipped agreement template's newest version: the
-// one named as shipped in the shop's language, made the first time when
-// the shop has none of the kind. A shop with only its own templates is
+// one marked as shipped (0210), whatever it is called now, made the first
+// time -- named in the shop's language -- when the shop has none of the
+// kind. A shop with only its own templates is
 // asked which to use, never handed one of them unasked.
 func ensureTestDriveTemplateTx(ctx context.Context, tx pgx.Tx, shopID string) (string, error) {
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('shipped:test_drive_agreement:' || $1::text, 0))`, shopID); err != nil {
@@ -783,7 +784,7 @@ func ensureTestDriveTemplateTx(ctx context.Context, tx pgx.Tx, shopID string) (s
 	var version string
 	err := tx.QueryRow(ctx, `
 		SELECT v.id FROM document_templates t JOIN document_template_versions v ON v.template_id = t.id
-		WHERE t.kind = 'test_drive_agreement' AND t.name = $1 ORDER BY v.version DESC LIMIT 1`, name).Scan(&version)
+		WHERE t.shipped = 'test_drive_agreement' ORDER BY v.version DESC LIMIT 1`).Scan(&version)
 	switch {
 	case err == nil:
 		return version, nil
@@ -794,7 +795,7 @@ func ensureTestDriveTemplateTx(ctx context.Context, tx pgx.Tx, shopID string) (s
 		return "", errDriveChooseTemplate
 	}
 	var id string
-	if err := tx.QueryRow(ctx, `INSERT INTO document_templates (shop_id, kind, name) VALUES ($1, 'test_drive_agreement', $2) RETURNING id`,
+	if err := tx.QueryRow(ctx, `INSERT INTO document_templates (shop_id, kind, name, shipped) VALUES ($1, 'test_drive_agreement', $2, 'test_drive_agreement') RETURNING id`,
 		shopID, name).Scan(&id); err != nil {
 		return "", fmt.Errorf("make the shipped template: %w", err)
 	}

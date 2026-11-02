@@ -788,3 +788,32 @@ func TestALeadShowsOnlyADealItsReaderMaySee(t *testing.T) {
 		t.Errorf("the owner's view of the lead: deal %q", mine.DealID)
 	}
 }
+
+// The shipped contract is known as the shipped one whatever the shop's
+// language becomes or whatever it is renamed: a later contract with none
+// chosen uses it, and no second is made.
+func TestTheShippedContractIsKnownWhateverItIsCalled(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx, `UPDATE shops SET locale = 'sv' WHERE id = $1`, shopID); err != nil {
+		t.Fatal(err)
+	}
+	first := completedDeal(t, pool)
+	if _, err := pool.Exec(ctx, `UPDATE shops SET locale = 'en' WHERE id = $1`, shopID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE document_templates SET name = 'Vårt köpeavtal' WHERE kind = 'sales_contract'`); err != nil {
+		t.Fatal(err)
+	}
+	d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: carForSale(t, pool), Terms: consumerTerms(first.Buyers[0].PartyID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := workshop.ProduceSalesContract(ctx, pool, sales(), d.ID, "", ""); err != nil {
+		t.Errorf("a contract from the shipped template after the shop's language changed: %v", err)
+	}
+	var n int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM document_templates WHERE kind = 'sales_contract'`).Scan(&n); err != nil || n != 1 {
+		t.Errorf("%d contract templates (%v); want the one shipped", n, err)
+	}
+}
