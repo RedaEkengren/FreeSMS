@@ -323,21 +323,28 @@ func RemoveRentalDriver(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		return err
 	}
 	return inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// Which rental, unlocked; then the unit, and only then the driver:
+		// the order every rental write takes. A driver locked first waits
+		// on the unit while a licence check holding the unit waits on the
+		// driver.
 		var booking string
-		var removed bool
-		err := tx.QueryRow(ctx, `SELECT booking_id, removed_at IS NOT NULL FROM rental_drivers WHERE id = $1 FOR UPDATE`, driverID).Scan(&booking, &removed)
+		err := tx.QueryRow(ctx, `SELECT booking_id FROM rental_drivers WHERE id = $1`, driverID).Scan(&booking)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
 		if err != nil {
 			return fmt.Errorf("read driver: %w", err)
 		}
-		if removed {
-			return nil
-		}
 		b, err := lockRentalTx(ctx, tx, booking)
 		if err != nil {
 			return err
+		}
+		var removed bool
+		if err := tx.QueryRow(ctx, `SELECT removed_at IS NOT NULL FROM rental_drivers WHERE id = $1 FOR UPDATE`, driverID).Scan(&removed); err != nil {
+			return fmt.Errorf("read driver: %w", err)
+		}
+		if removed {
+			return nil
 		}
 		if b.state != RentalHeld && b.state != RentalConfirmed {
 			return errDriverState
