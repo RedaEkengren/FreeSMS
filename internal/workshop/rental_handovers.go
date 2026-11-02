@@ -120,28 +120,56 @@ func StartHandover(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		if err == nil || !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
-		if h.templateID == "" {
-			return errHandoverNoList
-		}
+		// The checklist of the profile; a check-in with none, or with one
+		// taken out of use since, walks the check-out's own checkpoints --
+		// a unit that went out can always come back.
 		var name string
-		if err := tx.QueryRow(ctx, `SELECT name FROM inspection_templates WHERE id = $1 AND active AND $2 = ANY(subjects)`,
-			h.templateID, kind).Scan(&name); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+		var template *string
+		if h.templateID != "" {
+			err := tx.QueryRow(ctx, `SELECT name FROM inspection_templates WHERE id = $1 AND active AND $2 = ANY(subjects)`,
+				h.templateID, kind).Scan(&name)
+			switch {
+			case err == nil:
+				template = &h.templateID
+			case !errors.Is(err, pgx.ErrNoRows):
+				return fmt.Errorf("read template: %w", err)
+			}
+		}
+		var outProtocol string
+		if template == nil {
+			if kind == HandoverOut {
 				return errHandoverNoList
 			}
-			return fmt.Errorf("read template: %w", err)
+			err := tx.QueryRow(ctx, `
+				SELECT i.id::text, i.template_name FROM rental_handovers h JOIN inspections i ON i.id = h.protocol_id
+				WHERE h.booking_id = $1 AND h.kind = 'check_out'`, bookingID).Scan(&outProtocol, &name)
+			switch {
+			case errors.Is(err, pgx.ErrNoRows):
+				name = "Check-in"
+			case err != nil:
+				return fmt.Errorf("read the check-out: %w", err)
+			}
 		}
 		if err := tx.QueryRow(ctx, `
 			INSERT INTO inspections (shop_id, subject, `+subjectColumns[kind]+`, vehicle_id, resource_id, template_id, template_name, performed_by)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-			scope.ShopID, kind, bookingID, h.vehicle, h.resource, h.templateID, name, scope.UserID).Scan(&id); err != nil {
+			scope.ShopID, kind, bookingID, h.vehicle, h.resource, template, name, scope.UserID).Scan(&id); err != nil {
 			return fmt.Errorf("start the protocol: %w", err)
 		}
-		_, err = tx.Exec(ctx, `
-			INSERT INTO inspection_items (shop_id, inspection_id, position, label, item_key)
-			SELECT $1, $2, ti.position, ti.label, ti.item_key
-			FROM inspection_template_items ti WHERE ti.template_id = $3 ORDER BY ti.position`,
-			scope.ShopID, id, h.templateID)
+		err = nil
+		if template != nil {
+			_, err = tx.Exec(ctx, `
+				INSERT INTO inspection_items (shop_id, inspection_id, position, label, item_key)
+				SELECT $1, $2, ti.position, ti.label, ti.item_key
+				FROM inspection_template_items ti WHERE ti.template_id = $3 ORDER BY ti.position`,
+				scope.ShopID, id, *template)
+		} else if outProtocol != "" {
+			_, err = tx.Exec(ctx, `
+				INSERT INTO inspection_items (shop_id, inspection_id, position, label, item_key)
+				SELECT $1, $2, it.position, it.label, it.item_key
+				FROM inspection_items it WHERE it.inspection_id = $3 ORDER BY it.position`,
+				scope.ShopID, id, outProtocol)
+		}
 		if err != nil {
 			return fmt.Errorf("copy the checklist: %w", err)
 		}

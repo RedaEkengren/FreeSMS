@@ -251,3 +251,50 @@ func TestEquipmentIsHandedOverWithNoOdometer(t *testing.T) {
 }
 
 func km64(n int64) *int64 { return &n }
+
+// checkedOut is handoverReady handed over: the check-out finished.
+func checkedOut(t *testing.T, pool *pgxpool.Pool) (rentable, string, string) {
+	t.Helper()
+	ctx := context.Background()
+	v, id := handoverReady(t, pool)
+	out, err := workshop.StartHandover(ctx, pool, rentalDesk(), id, workshop.HandoverOut)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recordFound(t, pool, out, nil)
+	if err := workshop.FinishHandover(ctx, pool, rentalDesk(), out, workshop.HandoverReading{OdometerKm: km64(12000), FuelEighths: ptr(8), RenterPresent: true}); err != nil {
+		t.Fatal(err)
+	}
+	return v, id, out
+}
+
+// A unit that went out always comes back: with no check-in checklist on
+// its profile, or the one there taken out of use since, the check-in
+// walks the check-out's own checkpoints (review of R6, #1).
+func TestACheckInNeedsNoChecklistOfItsOwn(t *testing.T) {
+	ctx := context.Background()
+	for name, take := range map[string]string{
+		"none on the profile":    `UPDATE rental_profile_versions SET check_in_template_id = NULL`,
+		"taken out of use since": `UPDATE inspection_templates SET active = false`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			pool := setup(t)
+			_, id, out := checkedOut(t, pool)
+			if _, err := pool.Exec(ctx, take); err != nil {
+				t.Fatal(err)
+			}
+			in, err := workshop.StartHandover(ctx, pool, rentalDesk(), id, workshop.HandoverIn)
+			if err != nil {
+				t.Fatalf("checking in: %v", err)
+			}
+			was, _ := workshop.ProtocolByID(ctx, pool, rentalDesk(), out)
+			p := recordFound(t, pool, in, nil)
+			if len(p.Items) != len(was.Items) || p.Items[0].Key != was.Items[0].Key {
+				t.Errorf("the check-in's checkpoints %+v, the check-out's %+v", p.Items, was.Items)
+			}
+			if err := workshop.FinishHandover(ctx, pool, rentalDesk(), in, workshop.HandoverReading{OdometerKm: km64(12100), RenterPresent: true}); err != nil {
+				t.Errorf("finishing the check-in: %v", err)
+			}
+		})
+	}
+}
