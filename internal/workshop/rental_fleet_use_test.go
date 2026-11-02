@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -398,5 +399,22 @@ func TestAPermitEndingSoonIsOnTheList(t *testing.T) {
 	}
 	if listed() {
 		t.Error("a permit renewed from the day after is still on the list")
+	}
+}
+
+// Extended past both a licence and the insurance, the desk is told about
+// the licence first, as before the insurance was asked (review r8, #3).
+func TestAnExtensionPastBothNamesTheLicence(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	_, id, _ := checkedOut(t, pool)
+	for _, s := range []string{`DELETE FROM fleet_insurances`, `UPDATE rental_licence_checks SET valid_until = '2031-05-13'`} {
+		if _, err := pool.Exec(ctx, s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, in2031(20, 9), "")
+	if err == nil || !strings.Contains(err.Error(), "licence") {
+		t.Errorf("extended past a licence and the insurance: %v", err)
 	}
 }

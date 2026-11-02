@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -1068,13 +1069,16 @@ func lastsTheExtensionTx(ctx context.Context, tx pgx.Tx, bookingID string, start
 	if err != nil {
 		return err
 	}
-	for _, g := range gaps[bookingID] {
-		switch g.Code {
-		case GapLicence:
-			return errExtendLicence
-		case GapInsurance:
-			return errExtendInsurance
-		}
+	// Only these two are the extension's to ask -- the rest were settled
+	// at the handover -- and a licence first, as it always was.
+	has := func(code string) bool {
+		return slices.ContainsFunc(gaps[bookingID], func(g HandoverGap) bool { return g.Code == code })
+	}
+	switch {
+	case has(GapLicence):
+		return errExtendLicence
+	case has(GapInsurance):
+		return errExtendInsurance
 	}
 	return nil
 }
