@@ -8541,6 +8541,7 @@
     "A test drive is not back: %s": {"other": "En provkörning har inte kommit tillbaka: %s"},
     "Test-drive agreement (needs legal review)": {"other": "Provkörningsavtal (behöver juridisk granskning)"},
     "Say who drives: their name and phone number.": {"other": "Ange vem som kör: namn och telefonnummer."},
-    "Say when it starts and for how many minutes.": {"other": "Ange när den börjar och hur många minuter."}
+    "Say when it starts and for how many minutes.": {"other": "Ange när den börjar och hur många minuter."},
+    "say who drives: a name of up to 200 characters and a phone number": {"other": "ange vem som kör: ett namn på högst 200 tecken och ett telefonnummer"}
   }
 }

@@ -326,3 +326,40 @@ func TestLeadsAndTestDrivesAreInAPersonsExportAndErasure(t *testing.T) {
 		t.Errorf("the licence check's note after the erasure: %v, %v", note, err)
 	}
 }
+
+// A walk-in driver is a party made with the drive, in its transaction:
+// the booking sent twice makes one driver, and a booking refused makes
+// none, so no stranger's details are left behind with nothing to show why.
+func TestAWalkInDriverIsMadeWithTheDrive(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := carForSale(t, pool)
+	parties := func() int {
+		var n int
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM parties`).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	before := parties()
+	n := workshop.NewTestDrive{StockUnitID: unit, NewDriver: &workshop.NewParty{Name: "Lo Letare", Phone: "0731234567"},
+		From: time.Now(), To: time.Now().Add(time.Hour), Key: "walk-in-1"}
+	first, err := workshop.BookTestDrive(ctx, pool, sales(), n)
+	if err != nil || first.Driver != "Lo Letare" {
+		t.Fatalf("the walk-in drive: %+v, %v", first, err)
+	}
+	if again, err := workshop.BookTestDrive(ctx, pool, sales(), n); err != nil || again.ID != first.ID {
+		t.Errorf("sent again: %+v, %v", again, err)
+	}
+	if got := parties(); got != before+1 {
+		t.Errorf("%d parties made for one walk-in driver", got-before)
+	}
+	moveStock(t, pool, unit, workshop.StockReserved, workshop.StockSold)
+	n.Key, n.From, n.To = "walk-in-2", time.Now().Add(2*time.Hour), time.Now().Add(3*time.Hour)
+	if _, err := workshop.BookTestDrive(ctx, pool, sales(), n); !errors.Is(err, workshop.ErrInvalid) {
+		t.Fatalf("a sold car booked: %v", err)
+	}
+	if got := parties(); got != before+1 {
+		t.Errorf("a refused booking left %d parties behind", got-before-1)
+	}
+}

@@ -120,24 +120,17 @@ func (s *Server) handleTestDriveBook(w http.ResponseWriter, r *http.Request) {
 			form["name"], form["phone"] = firstNonEmpty(form["name"], l.Name), firstNonEmpty(form["phone"], l.Phone)
 		}
 	}
+	var walkIn *workshop.NewParty
 	if driver == "" {
 		if form["name"] == "" {
 			back(http.StatusBadRequest, "Say who drives: their name and phone number.", false)
 			return
 		}
-		driver, err = workshop.CreateParty(r.Context(), s.pool, session.Scope, workshop.NewParty{Kind: "private", Name: form["name"],
-			Phone: form["phone"], Role: workshop.PartyBuyer})
-		if errors.Is(err, workshop.ErrInvalid) {
-			back(http.StatusBadRequest, trimInvalid(err), false)
-			return
-		}
-		if s.handoverError(w, r, err) {
-			return
-		}
-		form["driver"] = driver
+		// Made with the drive, in its transaction (BookTestDrive).
+		walkIn = &workshop.NewParty{Name: form["name"], Phone: form["phone"]}
 	}
 	d, err := workshop.BookTestDrive(r.Context(), s.pool, session.Scope, workshop.NewTestDrive{StockUnitID: form["unit"],
-		DriverPartyID: driver, LeadID: form["lead"], From: from, To: from.Add(time.Duration(minutes) * time.Minute), Area: form["area"],
+		DriverPartyID: driver, NewDriver: walkIn, LeadID: form["lead"], From: from, To: from.Add(time.Duration(minutes) * time.Minute), Area: form["area"],
 		Key: key, DespiteReservation: r.FormValue("despite") == "1"})
 	if errors.Is(err, workshop.ErrDriveReserved) {
 		back(http.StatusConflict, trimInvalid(err), true)

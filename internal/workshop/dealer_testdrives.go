@@ -99,6 +99,11 @@ type NewTestDrive struct {
 	// Booked knowing the car is reserved for someone else, where the shop
 	// lets that be done with a warning.
 	DespiteReservation bool
+	// A walk-in driver who is not a party yet: a private person, by name
+	// and phone, made in the booking's own transaction, so a booking sent
+	// twice makes one and a booking refused makes none. Instead of
+	// DriverPartyID.
+	NewDriver *NewParty
 }
 
 var (
@@ -115,6 +120,7 @@ var (
 	errDriveNote      = fmt.Errorf("%w: a note is at most 300 characters on a check and 500 on a drive", ErrInvalid)
 	errDriveAge       = fmt.Errorf("%w: the youngest driver is from 16 to 99", ErrInvalid)
 	errDriveAgreement = fmt.Errorf("%w: that is not this drive's agreement", ErrInvalid)
+	errDriveDriver    = fmt.Errorf("%w: say who drives: a name of up to 200 characters and a phone number", ErrInvalid)
 	// ErrDriveReserved is a car reserved for somebody else: booked again
 	// with DespiteReservation it is let through, unless the shop blocks it.
 	ErrDriveReserved = fmt.Errorf("%w: the car is reserved for another customer", ErrInvalid)
@@ -207,7 +213,23 @@ func BookTestDrive(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if err := scope.Require(access.Dealer); err != nil {
 		return TestDrive{}, err
 	}
-	if !looksLikeUUID(n.StockUnitID) || !looksLikeUUID(n.DriverPartyID) || (n.LeadID != "" && !looksLikeUUID(n.LeadID)) {
+	if n.NewDriver != nil {
+		if n.DriverPartyID != "" {
+			return TestDrive{}, errDriveDriver
+		}
+		d := *n.NewDriver
+		d.Kind, d.Role, d.Name = "private", PartyBuyer, strings.TrimSpace(d.Name)
+		if d.Name == "" || utf8.RuneCountInString(d.Name) > 200 || utf8.RuneCountInString(d.Phone) > 40 {
+			return TestDrive{}, errDriveDriver
+		}
+		if err := mayRecordPartyRole(scope.Role, scope, d.Role); err != nil {
+			return TestDrive{}, err
+		}
+		n.NewDriver = &d
+	} else if !looksLikeUUID(n.DriverPartyID) {
+		return TestDrive{}, ErrNotFound
+	}
+	if !looksLikeUUID(n.StockUnitID) || (n.LeadID != "" && !looksLikeUUID(n.LeadID)) {
 		return TestDrive{}, ErrNotFound
 	}
 	n.Area, n.Key = strings.TrimSpace(n.Area), strings.TrimSpace(n.Key)
@@ -265,7 +287,11 @@ func BookTestDrive(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 				return ErrDriveReserved
 			}
 		}
-		if err := partySeenTx(ctx, tx, scope, n.DriverPartyID); err != nil {
+		if n.NewDriver != nil {
+			if n.DriverPartyID, err = createPartyTx(ctx, tx, scope, *n.NewDriver, ""); err != nil {
+				return err
+			}
+		} else if err := partySeenTx(ctx, tx, scope, n.DriverPartyID); err != nil {
 			return err
 		}
 		if n.LeadID != "" {
