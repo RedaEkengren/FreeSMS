@@ -36,9 +36,10 @@ import (
 // already reads. "The workshop is unchanged" is measured here rather than
 // asserted: the seeded shop (scripts/seed.sql), taken to an issued invoice, a
 // payment and a credit note, is rendered page by page and compared with
-// files kept in testdata/golden. Ids, instants, dates, the drawing of a
-// payment code (which encodes the dates) and the static files' version
-// strings are normalised; nothing else is.
+// files kept in testdata/golden. Ids, instants, dates and the static files'
+// version strings are normalised; nothing else is. The documents are dated
+// on a fixed day (goldenIssued), so the invoice's payment code, which
+// encodes its dates, is compared as drawn.
 //
 // A difference fails. If it is meant, the files are written again with
 //
@@ -398,7 +399,47 @@ func goldenScenario(t *testing.T, pool *pgxpool.Pool) goldenWorld {
 	if err != nil {
 		t.Fatalf("credit: %v", err)
 	}
+	pinGoldenDates(t, pool, inv.ID, credit.ID)
 	return goldenWorld{invoice: inv.ID, credit: credit.ID}.withPeriod(t, pool)
+}
+
+// goldenIssued is the moment the golden invoice is dated, and its payment
+// and credit note with it. The invoice's payment code encodes its date
+// and due date, so an invoice dated the day the test runs draws a
+// different code every day; dated here, the code is the same on every run
+// and is compared module for module. A day far ahead, so the invoice is
+// never overdue and the waiting lists never change with the calendar.
+var goldenIssued = time.Date(2099, time.June, 1, 10, 0, 0, 0, time.UTC)
+
+// pinGoldenDates dates the scenario's documents at goldenIssued. An issued
+// invoice is immutable by trigger, and rightly; the test's own superuser
+// connection steps round it, the way a restore would, and nothing the
+// application runs can.
+func pinGoldenDates(t *testing.T, pool *pgxpool.Pool, invoice, credit string) {
+	t.Helper()
+	ctx := context.Background()
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx)
+	for _, st := range []struct {
+		sql  string
+		args []any
+	}{
+		{`SET LOCAL session_replication_role = replica`, nil},
+		{`UPDATE invoices SET issued_at = $1::timestamptz WHERE id = $2`, []any{goldenIssued, invoice}},
+		{`UPDATE invoices SET issued_at = $1::timestamptz + interval '1 hour' WHERE id = $2`, []any{goldenIssued, credit}},
+		{`UPDATE invoice_payments SET paid_on = ($1::timestamptz AT TIME ZONE 'Europe/Stockholm')::date,
+		        recorded_at = $1::timestamptz + interval '30 minutes' WHERE invoice_id = $2`, []any{goldenIssued, invoice}},
+	} {
+		if _, err := tx.Exec(ctx, st.sql, st.args...); err != nil {
+			t.Fatalf("pin the golden dates: %s: %v", st.sql, err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // withPeriod is the window the figures and the export are asked for: from a
@@ -410,7 +451,7 @@ func (w goldenWorld) withPeriod(t *testing.T, pool *pgxpool.Pool) goldenWorld {
 	var from, to time.Time
 	if err := pool.QueryRow(context.Background(),
 		`SELECT (min(issued_at) AT TIME ZONE 'Europe/Stockholm')::date - 7,
-		        (now() AT TIME ZONE 'Europe/Stockholm')::date
+		        (greatest(max(issued_at), now()) AT TIME ZONE 'Europe/Stockholm')::date
 		   FROM invoices`).Scan(&from, &to); err != nil {
 		t.Fatalf("period: %v", err)
 	}
@@ -457,7 +498,6 @@ func compareGolden(t *testing.T, pool *pgxpool.Pool, world goldenWorld, issuedBe
 			t.Errorf("%s: %v (write it with -golden.update)", p.file, err)
 			continue
 		}
-		want = goldenQR.ReplaceAll(want, []byte("${1}<modules>${2}"))
 		if issuedBefore0091 {
 			want = goldenPaymentCode.ReplaceAll(want, nil)
 			// The electronic invoice is paid with its number instead,
@@ -554,11 +594,6 @@ var (
 		`jan|feb|mar|apr|maj|jun|jul|aug|sep|okt|nov|dec)\b( \d{4})?`)
 	goldenWeekday = regexp.MustCompile(`(^|[^\pL])(Mon|Tue|Wed|Thu|Fri|Sat|Sun|mån|tis|ons|tor|fre|lör|sön)( \d{1,2})?([^\pL]|$)`)
 	goldenAsset   = regexp.MustCompile(`\?v=[0-9a-f]+`)
-	// The modules of a payment code: it encodes the invoice's date and due
-	// date, so it is drawn differently every day, as a date is written.
-	// What it says is paycode_test.go's and payref's to check; the page
-	// keeps its kind, size and caption.
-	goldenQR = regexp.MustCompile(`(<figure class="paycode"><svg[^>]*>.*?<path fill="#000" d=")[^"]*(")`)
 	// The payment reference and code on an invoice (#234), in Swedish.
 	goldenDocumentID  = regexp.MustCompile(`\n  <cbc:ID>([A-Z]+-[0-9]+)</cbc:ID>`)
 	goldenPaymentID   = regexp.MustCompile(`<cbc:PaymentID>[0-9]+</cbc:PaymentID>`)
@@ -567,7 +602,7 @@ var (
 
 // normaliseGolden replaces what varies between two runs of the same release
 // -- ids, instants, dates in any of the ways a page writes them, times of
-// day, a payment code's drawing, the static files' versions -- and
+// day, the static files' versions -- and
 // nothing else. Each distinct id keeps its own placeholder, so a link that
 // pointed at the invoice still points at the same thing as the invoice.
 func normaliseGolden(s string) string {
@@ -586,7 +621,6 @@ func normaliseGolden(s string) string {
 	s = goldenDay.ReplaceAllString(s, "<day>")
 	s = goldenWeekday.ReplaceAllString(s, "$1<weekday>$4")
 	s = goldenAsset.ReplaceAllString(s, "?v=<version>")
-	s = goldenQR.ReplaceAllString(s, "${1}<modules>${2}")
 	return s
 }
 
