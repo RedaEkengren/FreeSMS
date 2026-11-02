@@ -47,15 +47,6 @@ type RentalPermit struct {
 	RecordedBy  string
 }
 
-// ValidOn reports whether the permit stands on day, a date in the shop's
-// zone: decided by then, not expired, not revoked.
-func (p RentalPermit) ValidOn(day time.Time) bool {
-	d := dateOnly(day)
-	return !d.Before(dateOnly(p.DecidedOn)) &&
-		(p.ExpiresOn == nil || !d.After(dateOnly(*p.ExpiresOn))) &&
-		(p.RevokedOn == nil || d.Before(dateOnly(*p.RevokedOn)))
-}
-
 func dateOnly(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }

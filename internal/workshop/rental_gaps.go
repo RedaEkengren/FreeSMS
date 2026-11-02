@@ -89,15 +89,20 @@ func lastDay(to, zone string) string {
 	return "((" + to + " - interval '1 microsecond') AT TIME ZONE " + zone + ")::date"
 }
 
-// permitStandsOn is whether a rental permit stands on a day, an SQL date
-// expression: decided by then, not expired, not revoked. The one test of
-// it, for the gaps, a profile's gaps before a booking, and the warning
-// that the permit ends.
-func permitStandsOn(day string) string {
-	return strings.ReplaceAll(`EXISTS (
-	    SELECT 1 FROM rental_permits p LEFT JOIN rental_permit_revocations x ON x.permit_id = p.id
-	    WHERE p.decided_on <= {day} AND (p.expires_on IS NULL OR {day} <= p.expires_on)
+// permitValidOn is whether the permit p, with its revocation x, stands on
+// a day, an SQL date expression: decided by then, not expired, not
+// revoked. The one test of a permit, for the gaps, a profile's gaps
+// before a booking, the warning that it ends, and the permit an agreement
+// names.
+func permitValidOn(day string) string {
+	return strings.ReplaceAll(`(p.decided_on <= {day} AND (p.expires_on IS NULL OR {day} <= p.expires_on)
 	      AND (x.revoked_on IS NULL OR {day} < x.revoked_on))`, "{day}", day)
+}
+
+// permitStandsOn is whether any permit stands on a day.
+func permitStandsOn(day string) string {
+	return `EXISTS (SELECT 1 FROM rental_permits p LEFT JOIN rental_permit_revocations x ON x.permit_id = p.id
+	    WHERE ` + permitValidOn(day) + `)`
 }
 
 // gapSentences are what each gap says, as catalogue keys.

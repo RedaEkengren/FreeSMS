@@ -75,12 +75,6 @@ type FleetInsurance struct {
 	RecordedAt   time.Time
 }
 
-// ValidOn reports whether it covers rental use on day.
-func (i FleetInsurance) ValidOn(day time.Time) bool {
-	d := dateOnly(day)
-	return i.CoversRental == "yes" && !d.Before(dateOnly(i.ValidFrom)) && (i.ValidTo == nil || !d.After(dateOnly(*i.ValidTo)))
-}
-
 // FleetUse is what a period in the fleet has on record.
 type FleetUse struct {
 	MembershipID string
@@ -238,17 +232,6 @@ func fleetUseTx(ctx context.Context, tx pgx.Tx, membershipID string) (FleetUse, 
 		u.Insurances = append(u.Insurances, i)
 	}
 	return u, rows.Err()
-}
-
-// insuranceCovers reports whether the insurances between them cover rental
-// use on every day from first to last.
-func insuranceCovers(ins []FleetInsurance, first, last time.Time) bool {
-	for d := dateOnly(first); !d.After(dateOnly(last)); d = d.AddDate(0, 0, 1) {
-		if !slices.ContainsFunc(ins, func(i FleetInsurance) bool { return i.ValidOn(d) }) {
-			return false
-		}
-	}
-	return true
 }
 
 // GapOverride is a handover gap let go, by whom and why.

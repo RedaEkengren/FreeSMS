@@ -802,16 +802,15 @@ func ProduceRentalAgreement(ctx context.Context, pool *pgxpool.Pool, scope acces
 		if err != nil {
 			return err
 		}
-		permits, err := rentalPermitsTx(ctx, tx)
-		if err != nil {
-			return err
-		}
+		// The permit standing on the day the rental starts, by the one
+		// test of a permit (permitValidOn).
 		permit := "-"
-		for _, p := range permits {
-			if p.ValidOn(b.starts.In(loc)) {
-				permit = p.Reference
-				break
-			}
+		if err := tx.QueryRow(ctx, `
+			SELECT coalesce((SELECT p.reference FROM rental_permits p LEFT JOIN rental_permit_revocations x ON x.permit_id = p.id
+			                 WHERE `+permitValidOn(firstDay("$1::timestamptz", "s.timezone"))+`
+			                 ORDER BY p.decided_on DESC, p.recorded_at DESC LIMIT 1), '-')
+			FROM shops s`, b.starts).Scan(&permit); err != nil {
+			return fmt.Errorf("read the permit: %w", err)
 		}
 		lines, err := rentalLinesTx(ctx, tx, bookingID)
 		if err != nil {
