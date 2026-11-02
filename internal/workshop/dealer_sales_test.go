@@ -519,3 +519,46 @@ func TestADefectAddedAfterTheContractMakesItOutOfDate(t *testing.T) {
 		t.Errorf("completed again: %+v, %v", again, err)
 	}
 }
+
+// A salesperson sees and works their own deals, as with leads; another's
+// are not found, asked for directly or acted on, and nothing of them is
+// handed over. Whoever runs the shop sees every deal.
+func TestASalespersonSeesTheirOwnDeals(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	anna := salesperson(t, pool, "Anna Säljare", "anna.s@example.test")
+	bo := salesperson(t, pool, "Bo Säljare", "bo.s@example.test")
+	unit := carForSale(t, pool)
+	d, err := workshop.CreateDeal(ctx, pool, anna, workshop.NewDeal{UnitID: unit, Terms: consumerTerms(driver(t, pool))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := workshop.DealByID(ctx, pool, bo, d.ID)
+	if !errors.Is(err, workshop.ErrNotFound) {
+		t.Errorf("another's deal, asked for directly: %v", err)
+	}
+	if handed := testsupport.Handed(got, "ID", "Buyers", "Terms"); len(handed) != 0 {
+		t.Errorf("handed %v", handed)
+	}
+	if list, err := workshop.Deals(ctx, pool, bo, true); err != nil || len(list) != 0 {
+		t.Errorf("Bo's deals: %d, %v", len(list), err)
+	}
+	if _, err := workshop.AddDefect(ctx, pool, bo, d.ID, "Rost", ""); !errors.Is(err, workshop.ErrNotFound) {
+		t.Errorf("a defect on another's deal: %v", err)
+	}
+	if err := workshop.CancelDeal(ctx, pool, bo, d.ID, "Fel"); !errors.Is(err, workshop.ErrNotFound) {
+		t.Errorf("another's deal cancelled: %v", err)
+	}
+	if _, err := workshop.CompleteDeal(ctx, pool, bo, d.ID); !errors.Is(err, workshop.ErrNotFound) {
+		t.Errorf("another's deal completed: %v", err)
+	}
+	if _, err := workshop.ReviseDeal(ctx, pool, bo, d.ID, 1, consumerTerms(d.Buyers[0].PartyID)); !errors.Is(err, workshop.ErrNotFound) {
+		t.Errorf("another's deal revised: %v", err)
+	}
+	if list, err := workshop.Deals(ctx, pool, anna, false); err != nil || len(list) != 1 {
+		t.Errorf("Anna's deals: %d, %v", len(list), err)
+	}
+	if list, err := workshop.Deals(ctx, pool, everything(owner()), false); err != nil || len(list) != 1 {
+		t.Errorf("the owner's deals: %d, %v", len(list), err)
+	}
+}

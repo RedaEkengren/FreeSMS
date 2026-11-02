@@ -421,7 +421,7 @@ func CreateDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n N
 				if unit != unitID {
 					return errDealKey
 				}
-				out, err = dealTx(ctx, tx, id)
+				out, err = dealTx(ctx, tx, scope, id)
 				return err
 			}
 			if !errors.Is(err, pgx.ErrNoRows) {
@@ -484,7 +484,7 @@ func CreateDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n N
 				}
 			}
 		}
-		out, err = dealTx(ctx, tx, id)
+		out, err = dealTx(ctx, tx, scope, id)
 		return err
 	})
 	return out, err
@@ -513,7 +513,7 @@ func ReviseDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sal
 		if err := lockDealTx(ctx, tx, saleID); err != nil {
 			return err
 		}
-		d, err := dealTx(ctx, tx, saleID)
+		d, err := dealTx(ctx, tx, scope, saleID)
 		if err != nil {
 			return err
 		}
@@ -526,7 +526,7 @@ func ReviseDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sal
 		if err := insertTermsTx(ctx, tx, scope, saleID, d.StockUnitID, d.Version+1, t); err != nil {
 			return err
 		}
-		out, err = dealTx(ctx, tx, saleID)
+		out, err = dealTx(ctx, tx, scope, saleID)
 		return err
 	})
 	return out, err
@@ -555,7 +555,7 @@ func AddDefect(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sale
 		if err := lockDealTx(ctx, tx, saleID); err != nil {
 			return err
 		}
-		d, err := dealTx(ctx, tx, saleID)
+		d, err := dealTx(ctx, tx, scope, saleID)
 		if err != nil {
 			return err
 		}
@@ -598,7 +598,7 @@ func AnswerDefect(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d
 		if err := lockDealTx(ctx, tx, saleID); err != nil {
 			return err
 		}
-		d, err := dealTx(ctx, tx, saleID)
+		d, err := dealTx(ctx, tx, scope, saleID)
 		if err != nil {
 			return err
 		}
@@ -640,7 +640,7 @@ func CompleteDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, s
 		if err := lockDealTx(ctx, tx, saleID); err != nil {
 			return err
 		}
-		d, err := dealTx(ctx, tx, saleID)
+		d, err := dealTx(ctx, tx, scope, saleID)
 		if err != nil {
 			return err
 		}
@@ -675,7 +675,7 @@ func CompleteDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, s
 				return err
 			}
 		}
-		out, err = dealTx(ctx, tx, saleID)
+		out, err = dealTx(ctx, tx, scope, saleID)
 		return err
 	})
 	return out, err
@@ -702,7 +702,7 @@ func CancelDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sal
 		if err := lockDealTx(ctx, tx, saleID); err != nil {
 			return err
 		}
-		d, err := dealTx(ctx, tx, saleID)
+		d, err := dealTx(ctx, tx, scope, saleID)
 		if err != nil {
 			return err
 		}
@@ -739,7 +739,7 @@ func DealByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id st
 	var out Deal
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
-		out, err = dealTx(ctx, tx, id)
+		out, err = dealTx(ctx, tx, scope, id)
 		return err
 	})
 	return out, err
@@ -755,8 +755,9 @@ func Deals(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, all bool
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT s.id FROM vehicle_sales s
-			WHERE $1 OR NOT EXISTS (SELECT 1 FROM vehicle_sale_events e WHERE e.sale_id = s.id AND e.kind = 'cancelled')
-			ORDER BY s.created_at DESC LIMIT 200`, all)
+			WHERE ($1 OR NOT EXISTS (SELECT 1 FROM vehicle_sale_events e WHERE e.sale_id = s.id AND e.kind = 'cancelled'))
+			  AND ($2 = '' OR s.salesperson_id::text = $2)
+			ORDER BY s.created_at DESC LIMIT 200`, all, dealSeer(scope))
 		if err != nil {
 			return fmt.Errorf("list deals: %w", err)
 		}
@@ -765,7 +766,7 @@ func Deals(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, all bool
 			return err
 		}
 		for _, id := range ids {
-			d, err := dealTx(ctx, tx, id)
+			d, err := dealTx(ctx, tx, scope, id)
 			if err != nil {
 				return err
 			}
@@ -776,9 +777,19 @@ func Deals(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, all bool
 	return out, err
 }
 
-// dealTx reads a deal with its terms in force, buyers, extras, defects and
+// dealSeer is the salesperson whose deals the caller may see, or empty for
+// all: a salesperson their own, as with leads; whoever runs the shop, and a
+// buyer reading what a sale is taxed at, every deal.
+func dealSeer(scope access.Scope) string {
+	if scope.Role.RunsTheShop() || !scope.Role.SellsVehicles() {
+		return ""
+	}
+	return scope.UserID
+}
+
+// dealTx reads a deal the caller may see, with its terms in force, buyers, extras, defects and
 // newest contract.
-func dealTx(ctx context.Context, tx pgx.Tx, id string) (Deal, error) {
+func dealTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id string) (Deal, error) {
 	var d Deal
 	var on *time.Time
 	err := tx.QueryRow(ctx, `
@@ -802,6 +813,9 @@ func dealTx(ctx context.Context, tx pgx.Tx, id string) (Deal, error) {
 	}
 	if err != nil {
 		return Deal{}, fmt.Errorf("read deal: %w", err)
+	}
+	if seer := dealSeer(scope); seer != "" && d.Salesperson != seer {
+		return Deal{}, ErrNotFound
 	}
 	d.Terms.DeliveryOn = on
 	rows, err := tx.Query(ctx, `
@@ -1061,7 +1075,7 @@ func ProduceSalesContract(ctx context.Context, pool *pgxpool.Pool, scope access.
 		if err := lockDealTx(ctx, tx, saleID); err != nil {
 			return err
 		}
-		d, err := dealTx(ctx, tx, saleID)
+		d, err := dealTx(ctx, tx, scope, saleID)
 		if err != nil {
 			return err
 		}
@@ -1167,7 +1181,7 @@ func SaleTaxOfDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	}
 	var out SaleTax
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		d, err := dealTx(ctx, tx, saleID)
+		d, err := dealTx(ctx, tx, scope, saleID)
 		if err != nil {
 			return err
 		}
