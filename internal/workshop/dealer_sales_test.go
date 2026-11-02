@@ -360,3 +360,79 @@ func TestANewBuyerIsMadeWithTheDeal(t *testing.T) {
 		t.Errorf("%d people made for one new buyer", got-before)
 	}
 }
+
+// eligibleCar is a car in stock for sale, bought from a private seller for
+// 85 000 kr, with the purchase agreement as evidence: eligible for the
+// margin scheme.
+func eligibleCar(t *testing.T, pool *pgxpool.Pool) string {
+	t.Helper()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	if _, err := workshop.CorrectVATEligibility(context.Background(), pool, buyerScope(), p.ID, workshop.SellerPrivate,
+		[]string{contractFor(t, pool, p.ID)}, "Köpeavtalet upprättat"); err != nil {
+		t.Fatal(err)
+	}
+	moveStock(t, pool, p.StockUnitID, workshop.StockForSale)
+	return p.StockUnitID
+}
+
+// A deal sold under the margin scheme records the eligibility it relied
+// on, and its VAT is that car's margin alone: the price against the tax
+// purchase price, never the car's costs. Ordinary VAT is a fifth of the
+// price. Only whoever may see what a car cost reads it.
+func TestADealsTaxIsItsCarsMarginAlone(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := eligibleCar(t, pool)
+	kim := driver(t, pool)
+	terms := consumerTerms(kim)
+	terms.TaxTreatment = workshop.TaxMarginScheme
+	d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: unit, Terms: terms})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.EligibilityID == "" {
+		t.Errorf("the deal does not say which eligibility it relied on: %+v", d)
+	}
+	tax, err := workshop.SaleTaxOfDeal(ctx, pool, buyerScope(), d.ID)
+	// 125 000 kr against 85 000 kr: a margin of 40 000 kr, 8 000 kr of VAT.
+	if err != nil || tax.Treatment != workshop.TaxMarginScheme || tax.MarginMinor != 4_000_000 || tax.VATMinor != 800_000 ||
+		tax.BaseMinor != 3_200_000 {
+		t.Fatalf("the margin-scheme tax: %+v, %v", tax, err)
+	}
+	if _, err := workshop.RecordStockCost(ctx, pool, buyerScope(), unit, cost(workshop.CostReconditioning, 1_500_000)); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := workshop.SaleTaxOfDeal(ctx, pool, buyerScope(), d.ID); again != tax {
+		t.Errorf("the tax moved with a cost: %+v, then %+v", tax, again)
+	}
+	got, err := workshop.SaleTaxOfDeal(ctx, pool, sales(), d.ID)
+	if !errors.Is(err, access.ErrForbidden) {
+		t.Errorf("a salesperson read the margin: %v", err)
+	}
+	if handed := testsupport.Handed(got, "MarginMinor", "VATMinor", "BaseMinor"); len(handed) != 0 {
+		t.Errorf("a salesperson was handed %v", handed)
+	}
+	terms.TaxTreatment = workshop.TaxOrdinary
+	if _, err := workshop.ReviseDeal(ctx, pool, sales(), d.ID, 1, terms); err != nil {
+		t.Fatal(err)
+	}
+	if tax, err := workshop.SaleTaxOfDeal(ctx, pool, buyerScope(), d.ID); err != nil || tax.VATMinor != 2_500_000 || tax.MarginMinor != 0 {
+		t.Errorf("the ordinary tax: %+v, %v", tax, err)
+	}
+}
+
+// The database itself refuses the margin scheme for a car its purchase
+// does not make eligible, whatever writes the terms.
+func TestTheDatabaseRefusesTheMarginSchemeForACarNotEligible(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := carForSale(t, pool)
+	d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: unit, Terms: consumerTerms(driver(t, pool))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := asApp(ctx, pool, `INSERT INTO vehicle_sale_terms (shop_id, sale_id, version, buyer_kind, price_minor, sale_tax_treatment)
+		VALUES ('`+shopID+`', '`+d.ID+`', 2, 'consumer', 1, 'margin_scheme')`); err == nil {
+		t.Error("the margin scheme was written for a car not eligible")
+	}
+}

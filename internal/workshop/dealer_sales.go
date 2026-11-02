@@ -148,6 +148,9 @@ type Deal struct {
 	ContractedTermsID string
 	// The car may be sold under the margin scheme (vat_eligibility).
 	MarginSchemeEligible bool
+	// The eligibility assessment the margin scheme relied on, when the
+	// terms chose it (0205).
+	EligibilityID string
 }
 
 // TotalMinor is what the buyer pays: the car and the extras, VAT included.
@@ -767,7 +770,8 @@ func dealTx(ctx context.Context, tx pgx.Tx, id string) (Deal, error) {
 		       coalesce(s.lead_id::text, ''), s.salesperson_id, coalesce(sp.display_name, ''), s.created_at,
 		       coalesce((SELECT e.kind FROM vehicle_sale_events e WHERE e.sale_id = s.id ORDER BY e.seq DESC LIMIT 1), 'draft'),
 		       t.id, t.version, t.buyer_kind, t.price_minor, coalesce(t.sale_tax_treatment, ''), coalesce(t.warranty, ''),
-		       t.delivery_on, coalesce(t.delivery_place, ''), t.odometer_km, coalesce(t.payment_terms, ''), coalesce(t.note, '')
+		       t.delivery_on, coalesce(t.delivery_place, ''), t.odometer_km, coalesce(t.payment_terms, ''), coalesce(t.note, ''),
+		       coalesce(t.eligibility_id::text, '')
 		FROM vehicle_sales s
 		JOIN stock_units u ON u.id = s.stock_unit_id JOIN vehicles v ON v.id = u.vehicle_id
 		LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = v.id AND reg.valid_to IS NULL
@@ -775,7 +779,7 @@ func dealTx(ctx context.Context, tx pgx.Tx, id string) (Deal, error) {
 		JOIN LATERAL (SELECT * FROM vehicle_sale_terms t WHERE t.sale_id = s.id ORDER BY t.version DESC LIMIT 1) t ON true
 		WHERE s.id = $1`, id).Scan(&d.ID, &d.Number, &d.StockUnitID, &d.Car, &d.LeadID, &d.Salesperson, &d.SalespersonName,
 		&d.CreatedAt, &d.State, &d.TermsID, &d.Version, &d.Terms.BuyerKind, &d.Terms.PriceMinor, &d.Terms.TaxTreatment,
-		&d.Terms.Warranty, &on, &d.Terms.DeliveryPlace, &d.Terms.OdometerKm, &d.Terms.PaymentTerms, &d.Terms.Note)
+		&d.Terms.Warranty, &on, &d.Terms.DeliveryPlace, &d.Terms.OdometerKm, &d.Terms.PaymentTerms, &d.Terms.Note, &d.EligibilityID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Deal{}, ErrNotFound
 	}
@@ -1105,4 +1109,63 @@ func ProduceSalesContract(ctx context.Context, pool *pgxpool.Pool, scope access.
 		return err
 	})
 	return doc, warnings, err
+}
+
+// SaleTax is how a deal's car is taxed as its terms stand: under the
+// margin scheme, the car's tax margin, the VAT in it and the base, against
+// the tax purchase price the eligibility it relied on belongs to; under
+// ordinary VAT, the VAT in its price and the price without it. The extras
+// are taxed as ordinary lines on the invoice (#177). Never shown to the
+// buyer: the margin is the dealer's.
+type SaleTax struct {
+	Treatment     string
+	EligibilityID string
+	MarginMinor   int64
+	VATMinor      int64
+	BaseMinor     int64
+}
+
+// saleVATRate is the rate a car is sold at in Sweden.
+const saleVATRate = 2500
+
+// SaleTaxOfDeal works out how the deal's car is taxed, one car alone
+// (money.MarginScheme): for whoever may see what a car cost (#145), never a
+// salesperson. Not chosen yet, it is nothing. Reading is Core's.
+//
+// A default pending the accountant (gate G2, #221): the rate is 25 per
+// cent, and how the result is posted -- accounts, the VAT return's boxes --
+// is not decided here.
+func SaleTaxOfDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, saleID string) (SaleTax, error) {
+	if !scope.Role.SeesPurchasePrice() {
+		return SaleTax{}, access.ErrForbidden
+	}
+	if !looksLikeUUID(saleID) {
+		return SaleTax{}, ErrNotFound
+	}
+	var out SaleTax
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		d, err := dealTx(ctx, tx, saleID)
+		if err != nil {
+			return err
+		}
+		out = SaleTax{Treatment: d.Terms.TaxTreatment, EligibilityID: d.EligibilityID}
+		switch d.Terms.TaxTreatment {
+		case TaxMarginScheme:
+			var purchase int64
+			if err := tx.QueryRow(ctx, `SELECT p.tax_purchase_price_minor FROM vat_eligibility e JOIN vehicle_purchases p ON p.id = e.purchase_id
+				WHERE e.id = $1`, d.EligibilityID).Scan(&purchase); err != nil {
+				return fmt.Errorf("read the purchase price: %w", err)
+			}
+			r, err := money.MarginScheme(d.Terms.PriceMinor, purchase, saleVATRate)
+			if err != nil {
+				return fmt.Errorf("%w: %v", ErrInvalid, err)
+			}
+			out.MarginMinor, out.VATMinor, out.BaseMinor = r.MarginMinor, r.VATMinor, r.BaseMinor
+		case TaxOrdinary:
+			out.VATMinor = money.Scale(d.Terms.PriceMinor, saleVATRate, 10000+saleVATRate)
+			out.BaseMinor = d.Terms.PriceMinor - out.VATMinor
+		}
+		return nil
+	})
+	return out, err
 }
