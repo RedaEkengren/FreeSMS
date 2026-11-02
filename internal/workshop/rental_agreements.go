@@ -474,6 +474,9 @@ func holdsIdentifier(note string) bool {
 	// counted towards a run of digits either: 12/2031 is six figures.
 	masked := []byte(s)
 	for _, m := range aDate.FindAllStringSubmatchIndex(s, -1) {
+		if m[1] < len(s) && s[m[1]] >= '0' && s[m[1]] <= '9' {
+			continue // ends inside a longer number: not two whole figures
+		}
 		first, _ := strconv.Atoi(s[m[2]:m[3]])
 		second, _ := strconv.Atoi(s[m[6]:m[7]])
 		firstYear, secondYear := m[3]-m[2] == 4, m[7]-m[6] == 4
@@ -495,13 +498,13 @@ func holdsIdentifier(note string) bool {
 			// 12/2031, 12/31, 2019-04: a month and a year, which is not a
 			// date of birth -- the year's shape is read before a day's.
 			// tank 3/4: a fraction.
-			for i := m[0]; i < m[1]; i++ {
+			for i := m[2]; i < m[1]; i++ {
 				masked[i] = 'x'
 			}
 		case sep == "-":
 			// 3-4: a range. A date without its year is written with a dot
 			// or a slash.
-		case aClock.MatchString(s[:m[0]]):
+		case aClock.MatchString(s[:m[2]]):
 			// kl 14.30
 		case dayAndMonth(first, second) || dayAndMonth(second, first):
 			return true
@@ -537,8 +540,10 @@ func dayAndMonth(day, month int) bool { return day >= 1 && day <= 31 && month >=
 // 01.01.1985, 1985-01-01, 12.3 -- and as a month and a year or a fraction
 // are, which holdsIdentifier tells apart. The groups are the first number,
 // the separator, the second number and the third. Whole numbers only, so
-// 12/2031 is not read as 12/20.
-var aDate = regexp.MustCompile(`\b(\d{1,4})\s*([./-])\s*(\d{1,4})(\s*[./-]\s*\d{1,4})?\b`)
+// 12/2031 is not read as 12/20: a match starts after anything but a digit
+// -- a letter too, so "född1/1" is read -- and one that ends inside a
+// longer number is passed over.
+var aDate = regexp.MustCompile(`(?:^|\D)(\d{1,4})\s*([./-])\s*(\d{1,4})(\s*[./-]\s*\d{1,4})?`)
 
 // aClock is what a clock time is written after: kl 14.30, klockan 9.05.
 var aClock = regexp.MustCompile(`(?i)\b(?:kl\.?|klockan)\s*$`)

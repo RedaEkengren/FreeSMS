@@ -41,6 +41,10 @@ func TestWhatALicenceNoteMayHold(t *testing.T) {
 		{"DOB March 05", true},
 		{"DOB 3/12/1990", true},
 		{"född 5/3", true},
+		// Figures glued to the word before them.
+		{"född1/1", true},
+		{"f12.3", true},
+		{"DOB01.01.1985", true},
 		// Not identifiers.
 		{"", false},
 		{"Tyskt körkort, giltigt i Sverige", false},
@@ -61,6 +65,7 @@ func TestWhatALicenceNoteMayHold(t *testing.T) {
 		{"giltigt till 12/2031", false},
 		{"giltigt till 12/31", false},
 		{"utfärdat 2019-04", false},
+		{"tank3/4", false},
 	} {
 		if got := holdsIdentifier(c.note); got != c.refused {
 			t.Errorf("%q: refused %v, want %v", c.note, got, c.refused)
