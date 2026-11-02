@@ -716,3 +716,30 @@ func TestTermsWithoutTheirEligibilityAreReadWithTheStandingOne(t *testing.T) {
 		t.Errorf("the tax of terms with no eligibility recorded: %+v, %v", tax, err)
 	}
 }
+
+// A contract made before contracts said what they were made from is read
+// as made from its terms and the defects known when it was made: a deal
+// completed then is still complete, and a defect found later still makes
+// it out of date.
+func TestAContractWithoutItsBasisIsReadAsMadeFromItsTime(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	d := completedDeal(t, pool)
+	for _, q := range []string{`ALTER TABLE document_records DISABLE TRIGGER document_records_are_frozen`,
+		`UPDATE document_records SET data = data - 'basis' WHERE id = '` + d.ContractID + `'`,
+		`ALTER TABLE document_records ENABLE TRIGGER document_records_are_frozen`} {
+		if _, err := pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := workshop.DealByID(ctx, pool, sales(), d.ID)
+	if err != nil || !got.Completed() {
+		t.Fatalf("a deal completed on a contract with no basis: completed %v, missing %v, %v", got.Completed(), got.Missing(), err)
+	}
+	if _, err := workshop.AddDefect(ctx, pool, sales(), d.ID, "Buckla i dörren", ""); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := workshop.DealByID(ctx, pool, sales(), d.ID); got.Completed() {
+		t.Error("a defect found after the old contract does not make it out of date")
+	}
+}

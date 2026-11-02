@@ -938,7 +938,12 @@ func dealTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id string) (Deal
 	// The newest contract, which terms it was made from (its data says),
 	// and whether every party it names has signed.
 	err = tx.QueryRow(ctx, `
-		SELECT r.id, coalesce(r.data->>'terms_id', ''), coalesce(r.data->>'basis', ''),
+		SELECT r.id, coalesce(r.data->>'terms_id', ''),
+		       -- A contract made before contracts said what they were made
+		       -- from: its terms and the defects known when it was made.
+		       coalesce(r.data->>'basis', (r.data->>'terms_id') || ':' ||
+		                coalesce((SELECT string_agg(f.id::text, ',' ORDER BY f.recorded_at, f.id) FROM vehicle_sale_defects f
+		                          WHERE f.sale_id = $1 AND f.recorded_at <= r.created_at), ''), ''),
 		       NOT EXISTS (SELECT 1 FROM document_record_parties dp WHERE dp.document_id = r.id
 		                   AND NOT EXISTS (SELECT 1 FROM document_signatures sg WHERE sg.document_party_id = dp.id))
 		FROM document_records r
