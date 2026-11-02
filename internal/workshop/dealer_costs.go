@@ -251,7 +251,10 @@ func ReverseStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 	}
 	var out StockCost
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('cost:' || $1::text, 0))`, entryID); err != nil {
+		// The key is the id as the database prints it, lower case, the way
+		// the trigger in 0099 builds it: an id sent in capitals is the same
+		// cost and must be the same lock.
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('cost:' || $1::uuid::text, 0))`, entryID); err != nil {
 			return err
 		}
 		c, err := stockCostTx(ctx, tx, entryID)

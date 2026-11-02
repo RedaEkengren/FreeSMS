@@ -3,6 +3,7 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -258,6 +259,15 @@ func refTo(n int64) *int64 { return &n }
 // noted is reversed once: the hand waits for the invoice, finds the cost
 // already taken back, and is told so rather than failing.
 func TestACostReversedByHandWhileItsInvoiceIsCorrectedIsReversedOnce(t *testing.T) {
+	// The entry's id as the page sent it, and in capitals: both are the
+	// same cost, and so the same lock.
+	for name, spell := range map[string]func(string) string{"as stored": func(s string) string { return s },
+		"in capitals": strings.ToUpper} {
+		t.Run(name, func(t *testing.T) { reversedOnceWhileCorrected(t, spell) })
+	}
+}
+
+func reversedOnceWhileCorrected(t *testing.T, spell func(string) string) {
 	pool := setup(t)
 	ctx := context.Background()
 	buy(t, pool, workshop.StockFromPurchase)
@@ -281,7 +291,7 @@ func TestACostReversedByHandWhileItsInvoiceIsCorrectedIsReversedOnce(t *testing.
 	}
 	done := make(chan error, 1)
 	go func() {
-		_, err := workshop.ReverseStockCost(ctx, pool, buyerScope(), entry, "Fel bil")
+		_, err := workshop.ReverseStockCost(ctx, pool, buyerScope(), spell(entry), "Fel bil")
 		done <- err
 	}()
 	for deadline := time.Now().Add(10 * time.Second); ; {
