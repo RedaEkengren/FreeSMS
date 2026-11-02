@@ -399,3 +399,91 @@ func TestABookingsProtocolsAreFoundByAnIndex(t *testing.T) {
 		}
 	}
 }
+
+// Handed over before the time it was booked from, the unit's block starts
+// when it went out: the calendar does not show it free while it is gone.
+// A check-out that would run into another booking that early is refused
+// (review of R6, #3).
+func TestAnEarlyCheckOutBlocksTheUnitFromThen(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v, id := handoverReady(t, pool)
+	before, err := v.book(pool, in2031(1, 9), in2031(2, 9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.StartHandover(ctx, pool, rentalDesk(), id, workshop.HandoverOut); !errors.Is(err, workshop.ErrResourceTaken) {
+		t.Errorf("checked out early over another booking: %v", err)
+	}
+	if err := workshop.CancelRentalBooking(ctx, pool, rentalDesk(), before, "Avbokad", false); err != nil {
+		t.Fatal(err)
+	}
+	out, err := workshop.StartHandover(ctx, pool, rentalDesk(), id, workshop.HandoverOut)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recordFound(t, pool, out, nil)
+	if err := workshop.FinishHandover(ctx, pool, rentalDesk(), out, workshop.HandoverReading{OdometerKm: km64(12000), RenterPresent: true}); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id)
+	view, _ := workshop.RentalHandovers(ctx, pool, rentalDesk(), id)
+	blocks := activeBlocks(t, pool, b.ResourceID, time.Now().Add(-time.Hour))
+	if len(blocks) != 1 || !blocks[0].From.Equal(view.Out.At) {
+		t.Errorf("the block after an early check-out at %v: %+v", view.Out.At, blocks)
+	}
+	if _, err := v.book(pool, time.Now().Add(time.Hour), time.Now().Add(2*time.Hour)); !errors.Is(err, workshop.ErrResourceTaken) {
+		t.Errorf("the unit booked while it is out early: %v", err)
+	}
+}
+
+// Back late, the block runs to the return and its cleaning where nothing
+// else is booked: the time it was out over was the unit's.
+func TestALateReturnHoldsTheBlockToTheReturn(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	_, id, _ := checkedOut(t, pool)
+	// The rental's end put in the past, as if it had run over.
+	end := time.Now().Add(-3 * time.Hour)
+	if _, err := pool.Exec(ctx, `UPDATE rental_bookings SET starts_at = $2::timestamptz - interval '2 days', ends_at = $2 WHERE id = $1`, id, end); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE resource_blocks SET period = tstzrange($2::timestamptz - interval '2 days', $2::timestamptz + interval '1 hour') WHERE id = (SELECT block_id FROM rental_bookings WHERE id = $1)`,
+		id, end); err != nil {
+		t.Fatal(err)
+	}
+	in, err := workshop.StartHandover(ctx, pool, rentalDesk(), id, workshop.HandoverIn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recordFound(t, pool, in, nil)
+	if err := workshop.FinishHandover(ctx, pool, rentalDesk(), in, workshop.HandoverReading{OdometerKm: km64(12100), RenterPresent: true}); err != nil {
+		t.Fatal(err)
+	}
+	view, _ := workshop.RentalHandovers(ctx, pool, rentalDesk(), id)
+	b, _ := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id)
+	blocks := activeBlocks(t, pool, b.ResourceID, time.Now().Add(-24*time.Hour))
+	if len(blocks) != 1 || blocks[0].To == nil || !blocks[0].To.Equal(view.In.At.Add(time.Hour)) {
+		t.Errorf("the block after a return at %v, three hours late: %+v", view.In.At, blocks)
+	}
+	if len(view.Proposed) == 0 || view.Proposed[len(view.Proposed)-1].Kind != workshop.ChargeLate {
+		t.Errorf("a late return proposes no late charge: %+v", view.Proposed)
+	}
+}
+
+// activeBlocks are the blocks on a resource from a moment that still
+// hold it.
+func activeBlocks(t *testing.T, pool *pgxpool.Pool, resource string, from time.Time) []workshop.Block {
+	t.Helper()
+	all, err := workshop.ResourceBlocks(context.Background(), pool, rentalDesk(), resource, from, time.Time{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []workshop.Block
+	for _, b := range all {
+		if b.Status == workshop.BlockConfirmed {
+			out = append(out, b)
+		}
+	}
+	return out
+}

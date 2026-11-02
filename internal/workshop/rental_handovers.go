@@ -203,6 +203,17 @@ func handoverMayTx(ctx context.Context, tx pgx.Tx, h handoverBooking, kind strin
 	if out {
 		return errUnitStillOut
 	}
+	// Out before the time it was booked from, the unit is blocked from
+	// then: refused if anything else holds it in between, or it is not in
+	// the fleet then.
+	if now := time.Now(); now.Before(h.starts) {
+		if err := inFleetTx(ctx, tx, h.unit, now, h.ends.Add(h.buffer)); err != nil {
+			return err
+		}
+		if err := takenTx(ctx, tx, h.resource, blockRange(now, h.starts), h.block); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -329,15 +340,33 @@ func FinishHandover(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 			return fmt.Errorf("record the handover: %w", err)
 		}
 		event := "checked_out"
+		if kind == HandoverOut {
+			// Out early, the block starts when it went out; the ledger's
+			// own constraint has the last word on what else is there.
+			if _, err := tx.Exec(ctx, `UPDATE resource_blocks SET period = tstzrange($2, upper(period)) WHERE id = $1 AND $2 < lower(period)`,
+				h.block, at); err != nil {
+				return blockConflict(err)
+			}
+		}
 		if kind == HandoverIn {
 			event = "returned"
 			// Back early: the rest of the time is the unit's again, from
-			// the return and its cleaning on. Back late, the block stays
-			// as it was: the time it was out over is gone, and the next
-			// rental's own block was never moved for it.
-			// Back before the time it was booked from even began -- handed
-			// over early and returned early -- the whole block goes.
-			if until := at.Add(h.buffer); until.Before(h.ends.Add(h.buffer)) {
+			// the return and its cleaning on. Back before the time it was
+			// booked from even began -- handed over early and returned
+			// early -- the whole block goes. Back late, the block runs to
+			// the return and its cleaning where nothing else is booked;
+			// where something is, it stays as it was, and that booking was
+			// shown as at risk while the unit was out.
+			if until := at.Add(h.buffer); until.After(h.ends.Add(h.buffer)) {
+				if err := takenTx(ctx, tx, h.resource, blockRange(h.ends.Add(h.buffer), until), h.block); err == nil {
+					if _, err := tx.Exec(ctx, `UPDATE resource_blocks SET period = tstzrange(lower(period), $2) WHERE id = $1 AND upper(period) < $2`,
+						h.block, until); err != nil {
+						return blockConflict(err)
+					}
+				} else if !errors.Is(err, ErrResourceTaken) {
+					return err
+				}
+			} else if until.Before(h.ends.Add(h.buffer)) {
 				if _, err := tx.Exec(ctx, `
 					UPDATE resource_blocks
 					SET period = CASE WHEN $2 > lower(period) THEN tstzrange(lower(period), $2) ELSE period END,
