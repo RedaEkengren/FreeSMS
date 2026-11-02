@@ -189,6 +189,19 @@ sign_in() {
         "http://localhost:$PORT/login" || fail "could not sign in as the seeded owner"
 }
 
+# ROLLBACK_FROM=<version> tests only the migrations from that version on:
+# every pair is a build and a start of each release, and the whole walk
+# takes over half an hour, so a change can test the migrations it brings.
+# Unset, every one is tested, as CI does.
+ROLLBACK_FROM="${ROLLBACK_FROM:-0}"
+[[ "$ROLLBACK_FROM" =~ ^[0-9]+$ ]] || fail "ROLLBACK_FROM is a migration's version, such as 0200"
+ROLLBACK_FROM=$((10#$ROLLBACK_FROM))
+# ROLLBACK_RELEASES=<ref> is the line releases are cut from, when this is a
+# branch off it (dms, for a module branch): the release before a migration
+# that line already has is found on it. Unset, it is this branch.
+RELEASES="${ROLLBACK_RELEASES:-HEAD}"
+git -C "$ROOT" rev-parse --verify -q "$RELEASES^{commit}" >/dev/null || fail "ROLLBACK_RELEASES=$RELEASES is not a commit"
+
 # This tree is the newer release of every pair below, so it is built once.
 build_release m6-tree ""
 
@@ -196,6 +209,7 @@ m6=0
 for file in migrations/*.sql; do
     version=$((10#$(basename "$file" | cut -c1-4)))
     [ "$version" -gt "$LAST_BEFORE_M6" ] || continue
+    [ "$version" -ge "$ROLLBACK_FROM" ] || continue
     grep -Eq '^--[[:space:]]*rollback:[[:space:]]*safe[[:space:]]*$' "$file" || continue
     m6=$((m6 + 1))
     name="$(basename "$file")"
@@ -211,12 +225,29 @@ for file in migrations/*.sql; do
     # before it -- it would apply it a second time, or call the versions
     # between deleted -- so the walk goes back, along first parents, to
     # the first release that holds none of it under any number.
-    added="$(git -C "$ROOT" log --no-renames --diff-filter=A --format=%H -- "$file" 2>/dev/null | tail -1 || true)"
+    #
+    # Where it was added is read along the first parents of the line the
+    # releases are cut from (ROLLBACK_RELEASES, this branch unless said):
+    # a file brought by a merge was added by that merge, not by a commit
+    # on the branch it came from, which was never a release and may hold
+    # it, or its neighbours, under the numbers they had there. A migration
+    # that line does not have yet is this branch's own, and is read along
+    # this branch. The latest add is the one that counts: a migration
+    # removed and added again was not there in between.
+    added="$(git -C "$ROOT" log --first-parent --no-renames --diff-filter=A --format=%H -1 "$RELEASES" -- "$file" 2>/dev/null || true)"
+    if [ -z "$added" ]; then
+        added="$(git -C "$ROOT" log --first-parent --no-renames --diff-filter=A --format=%H -1 -- "$file" 2>/dev/null || true)"
+    fi
     if [ -n "$added" ]; then
         previous_commit="$(git -C "$ROOT" rev-parse "$added^")"
         suffix="${name#[0-9][0-9][0-9][0-9]_}"
-        while git -C "$ROOT" ls-tree --name-only "$previous_commit" migrations/ \
-                | grep -Eq "^migrations/[0-9]{4}_$(printf '%s' "$suffix" | sed 's/[.]/[.]/g')\$"; do
+        pattern="^migrations/[0-9]{4}_$(printf '%s' "$suffix" | sed 's/[.]/[.]/g')\$"
+        # The listing is read whole before it is searched. Piped into
+        # grep -q, grep stops at the first match, ls-tree dies of SIGPIPE
+        # writing the rest, and pipefail reads that as a miss: the walk
+        # would stop, now and then, at a release that still holds it.
+        while listing="$(git -C "$ROOT" ls-tree --name-only "$previous_commit" migrations/)" \
+                && grep -Eq "$pattern" <<<"$listing"; do
             previous_commit="$(git -C "$ROOT" rev-parse "$previous_commit^")" || fail "no release before $name"
         done
     else
@@ -224,7 +255,9 @@ for file in migrations/*.sql; do
     fi
     nexts=(tree)
     if [ -n "$added" ] && [ -z "$(git -C "$ROOT" status --porcelain -- "$file")" ]; then
-        changed="$(git -C "$ROOT" log --format=%H -1 -- "$file")"
+        # Along first parents as well: a commit on a branch merged since
+        # may lack migrations the releases around it have.
+        changed="$(git -C "$ROOT" log --first-parent --format=%H -1 -- "$file")"
         if [ "$changed" != "$(git -C "$ROOT" rev-parse HEAD)" ] || [ -n "$(git -C "$ROOT" status --porcelain)" ]; then
             nexts=("$changed" tree)
         fi
@@ -270,6 +303,6 @@ for file in migrations/*.sql; do
         echo "the release before $name runs over what $label wrote, and shows it"
     done
 done
-[ "$m6" -gt 0 ] || echo "no migration after $(printf '%04d' "$LAST_BEFORE_M6") is marked safe yet"
+[ "$m6" -gt 0 ] || echo "no migration after $(printf '%04d' "$LAST_BEFORE_M6") from $(printf '%04d' "$ROLLBACK_FROM") on is marked safe yet"
 
 say "rollback verified: safe migrations roll back by image, the rest by the pre-deploy dump"
