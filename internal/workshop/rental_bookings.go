@@ -784,6 +784,10 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 			}
 			lines = append(lines, extras...)
 			switch {
+			case plan == "":
+				// Not known what plan it was agreed under: the plan
+				// pricing the unit today was never agreed, and does not
+				// change the kilometres that were.
 			case quote.IncludedKm == nil:
 				// The added days include unlimited kilometres. The
 				// odometer is read when the unit goes out and comes back,
