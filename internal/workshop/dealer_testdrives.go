@@ -139,7 +139,7 @@ var (
 )
 
 const testDriveColumns = `
-	SELECT d.id, d.stock_unit_id, coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), nullif(btrim(v.vin), ''), ''),
+	SELECT d.id, d.stock_unit_id, ` + carNameSQL + `,
 	       d.driver_party_id, coalesce(dn.name, ''), coalesce(d.lead_id::text, ''), d.block_id, d.starts_at, d.ends_at,
 	       coalesce(d.area, ''), coalesce(d.agreement_id::text, ''),
 	       d.agreement_id IS NOT NULL AND EXISTS (SELECT 1 FROM document_record_parties dp JOIN document_signatures s ON s.document_party_id = dp.id
@@ -706,7 +706,7 @@ func TestDriveRules(ctx context.Context, pool *pgxpool.Pool, scope access.Scope)
 // end, in the shape dealerWaiting reads, for everyone who sells cars.
 const testDrivesOverdue = `
 	SELECT 'test_drive_overdue', 'test_drive', d.id::text,
-	       coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), nullif(btrim(v.vin), ''), ''), d.ends_at, d.ends_at
+	       ` + carNameSQL + `, d.ends_at, d.ends_at
 	FROM test_drives d
 	JOIN stock_units u ON u.id = d.stock_unit_id JOIN vehicles v ON v.id = u.vehicle_id
 	LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = v.id AND reg.valid_to IS NULL

@@ -759,34 +759,67 @@ func DealByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id st
 	return out, err
 }
 
-// Deals lists the deals, newest first; cancelled ones only with all. For
-// whoever sells cars. Reading is Core's.
+// Deals lists the deals the caller may see, newest first, as a list shows
+// them -- the car, where it stands, the buyers, the price and extras, not
+// the defects or the contract; cancelled ones only with all. For whoever
+// sells cars. Reading is Core's.
 func Deals(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, all bool) ([]Deal, error) {
 	if !scope.Role.SellsVehicles() {
 		return nil, access.ErrForbidden
 	}
 	var out []Deal
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// One statement for the list, however long: what a list shows of
+		// each deal -- its car, where it stands, its buyers, its price and
+		// extras -- and nothing it does not.
 		rows, err := tx.Query(ctx, `
-			SELECT s.id FROM vehicle_sales s
+			SELECT s.id, s.number, s.stock_unit_id, `+carNameSQL+`, coalesce(s.lead_id::text, ''), s.salesperson_id,
+			       coalesce(sp.display_name, ''), s.created_at,
+			       coalesce((SELECT e.kind FROM vehicle_sale_events e WHERE e.sale_id = s.id ORDER BY e.seq DESC LIMIT 1), 'draft'),
+			       t.id, t.version, t.buyer_kind, t.price_minor, coalesce(t.sale_tax_treatment, ''),
+			       ARRAY(SELECT b.party_id::text FROM vehicle_sale_buyers b WHERE b.terms_id = t.id ORDER BY b.position),
+			       ARRAY(SELECT coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END,
+			                             cp.display_name, pp.display_name, '')
+			             FROM vehicle_sale_buyers b JOIN parties pa ON pa.id = b.party_id
+			             LEFT JOIN customers c ON c.id = pa.customer_id LEFT JOIN people cp ON cp.id = c.person_id
+			             LEFT JOIN people pp ON pp.id = pa.person_id
+			             WHERE b.terms_id = t.id ORDER BY b.position),
+			       ARRAY(SELECT l.description FROM vehicle_sale_lines l WHERE l.terms_id = t.id ORDER BY l.position),
+			       ARRAY(SELECT l.quantity_milli FROM vehicle_sale_lines l WHERE l.terms_id = t.id ORDER BY l.position),
+			       ARRAY(SELECT l.unit_price_minor FROM vehicle_sale_lines l WHERE l.terms_id = t.id ORDER BY l.position),
+			       ARRAY(SELECT l.vat_rate_basis FROM vehicle_sale_lines l WHERE l.terms_id = t.id ORDER BY l.position)
+			FROM vehicle_sales s
+			JOIN stock_units u ON u.id = s.stock_unit_id JOIN vehicles v ON v.id = u.vehicle_id
+			LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = v.id AND reg.valid_to IS NULL
+			JOIN users su ON su.id = s.salesperson_id LEFT JOIN people sp ON sp.id = su.person_id
+			JOIN LATERAL (SELECT * FROM vehicle_sale_terms t WHERE t.sale_id = s.id ORDER BY t.version DESC LIMIT 1) t ON true
 			WHERE ($1 OR NOT EXISTS (SELECT 1 FROM vehicle_sale_events e WHERE e.sale_id = s.id AND e.kind = 'cancelled'))
 			  AND ($2 = '' OR s.salesperson_id::text = $2)
 			ORDER BY s.created_at DESC LIMIT 200`, all, dealSeer(scope))
 		if err != nil {
 			return fmt.Errorf("list deals: %w", err)
 		}
-		ids, err := pgx.CollectRows(rows, pgx.RowTo[string])
-		if err != nil {
-			return err
-		}
-		for _, id := range ids {
-			d, err := dealTx(ctx, tx, scope, id)
-			if err != nil {
+		defer rows.Close()
+		for rows.Next() {
+			var d Deal
+			var names, descs []string
+			var qtys, prices []int64
+			var rates []int32
+			if err := rows.Scan(&d.ID, &d.Number, &d.StockUnitID, &d.Car, &d.LeadID, &d.Salesperson, &d.SalespersonName, &d.CreatedAt,
+				&d.State, &d.TermsID, &d.Version, &d.Terms.BuyerKind, &d.Terms.PriceMinor, &d.Terms.TaxTreatment, &d.Terms.Buyers,
+				&names, &descs, &qtys, &prices, &rates); err != nil {
 				return err
+			}
+			for i, p := range d.Terms.Buyers {
+				d.Buyers = append(d.Buyers, DealBuyer{PartyID: p, Name: names[i]})
+			}
+			for i := range descs {
+				d.Terms.Lines = append(d.Terms.Lines, SaleLine{Description: descs[i], QuantityMilli: qtys[i], UnitPriceMinor: prices[i],
+					VATRateBasis: int(rates[i])})
 			}
 			out = append(out, d)
 		}
-		return nil
+		return rows.Err()
 	})
 	return out, err
 }
@@ -808,7 +841,7 @@ func dealTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id string) (Deal
 	var on *time.Time
 	err := tx.QueryRow(ctx, `
 		SELECT s.id, s.number, s.stock_unit_id,
-		       coalesce(reg.registration, nullif(btrim(concat_ws(' ', v.make, v.model)), ''), nullif(btrim(v.vin), ''), ''),
+		       `+carNameSQL+`,
 		       coalesce(s.lead_id::text, ''), s.salesperson_id, coalesce(sp.display_name, ''), s.created_at,
 		       coalesce((SELECT e.kind FROM vehicle_sale_events e WHERE e.sale_id = s.id ORDER BY e.seq DESC LIMIT 1), 'draft'),
 		       t.id, t.version, t.buyer_kind, t.price_minor, coalesce(t.sale_tax_treatment, ''), coalesce(t.warranty, ''),
