@@ -1,0 +1,22 @@
+{{define "content"}}
+{{$d := .Dealer}}{{$r := $d.Results}}
+<h1>{{.T "What the cars sold earned"}}</h1>
+<p><a href="/cars/results?month={{index $d.Form "previous"}}">{{.T "Month before"}}</a> &middot; <strong>{{index $d.Form "month"}}</strong> &middot; <a href="/cars/results?month={{index $d.Form "next"}}">{{.T "Month after"}}</a></p>
+<p class="waiting">{{.T "Business margin: what each car earned after every cost. It is not the margin the margin scheme taxes, which counts no costs."}}</p>
+{{if $r.Rows}}
+<ul class="lines">
+  {{range $r.Rows}}
+  <li><div class="row"><a href="/cars/deals/{{.SaleID}}">{{.Car}}</a>
+      <strong>{{if .Complete}}{{$.Money .MarginMinor}}{{else}}{{$.T "Purchase price missing"}}{{end}}</strong></div>
+    <div class="waiting">{{.Salesperson}} &middot; {{$.Date ($.Local .InvoicedOn) "2 Jan"}} &middot; {{$.N "%d day in stock" .StockDays}}
+      {{if .Complete}}&middot; {{$.T "At delivery %s" ($.Money .MarginAtDeliveryMinor)}}{{end}}
+      {{with .TargetMarginMinor}}&middot; {{$.T "Calculated %s" ($.MoneyOrBlank .)}}{{end}}</div></li>
+  {{end}}
+</ul>
+<h2>{{.T "By salesperson"}}</h2>
+<ul class="lines">{{range $r.BySalesperson}}<li><div class="row"><span>{{.Key}}</span><strong>{{$.Money .MarginMinor}}</strong></div><div class="waiting">{{$.N "%d car" .Cars}}</div></li>{{end}}</ul>
+{{if $r.Incomplete}}<p class="waiting">{{.N "%d car has no purchase price, and is left out of the totals" $r.Incomplete}}</p>{{end}}
+{{else}}
+<p class="empty">{{.T "No cars sold this month."}}</p>
+{{end}}
+{{end}}

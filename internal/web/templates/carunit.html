@@ -21,6 +21,23 @@
 </section>
 {{end}}
 
+{{with $d.Consignments}}{{$c := index . 0}}
+<section>
+  <h2>{{$.T "On consignment for %s" $c.PrincipalName}}</h2>
+  <p>{{if eq $c.Model "own_name"}}{{$.T "Sold in our own name, on the principal's behalf"}}{{else}}{{$.T "Sold in the principal's name"}}{{end}}
+    &middot; {{$.T "Version %d" $c.Version}} &middot; {{$.T "Until %s" ($.Date $c.EndsOn "2 Jan 2006")}}</p>
+  <p class="waiting">{{with $c.MinimumPriceMinor}}{{$.T "Lowest price %s" ($.MoneyOrBlank .)}}{{end}}{{with $c.NetPayoutMinor}}{{$.T "Net to the principal %s" ($.MoneyOrBlank .)}}{{end}}
+    {{if $c.PrincipalCosts}} &middot; {{$c.PrincipalCosts}}{{end}}{{if $c.EndKind}} &middot; <span class="tag">{{$.T $c.EndKind}}</span>{{end}}</p>
+  {{if and $c.Standing $.Session.Scope.Role.BuysVehicles}}
+  <form method="post" action="/cars/stock/{{$u.ID}}/consignment/{{$c.ID}}/end">
+    <label><span>{{$.T "How it ends"}}</span><select name="how"><option value="withdrawn">{{$.T "The principal takes it back"}}</option><option value="expired">{{$.T "The period has run out"}}</option></select></label>
+    <label><span>{{$.T "Why it ends"}}</span><input name="consign_reason" value="{{index $d.Form "consign_reason"}}" maxlength="300" required></label>
+    <button type="submit" class="secondary">{{$.T "End the consignment"}}</button>
+  </form>
+  {{end}}
+</section>
+{{end}}
+
 {{if $d.ShowReservations}}
 <section>
   <h2>{{.T "Reservation"}}</h2>

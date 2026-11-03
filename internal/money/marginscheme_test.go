@@ -76,3 +76,22 @@ func TestVATInGross(t *testing.T) {
 		}
 	}
 }
+
+// The business margin is not the tax margin: it counts the costs, and a
+// loss is a loss, where the margin scheme's margin ignores costs and its
+// VAT never goes below nothing (#182).
+func TestTheBusinessMarginIsNotTheTaxMargin(t *testing.T) {
+	// Bought for 85 000, sold for 100 000 gross under the scheme (VAT
+	// 3 000), 20 000 spent on it.
+	tax, err := MarginScheme(10_000_000, 8_500_000, 2500)
+	if err != nil {
+		t.Fatal(err)
+	}
+	net := int64(10_000_000) - tax.VATMinor
+	if got := BusinessMargin(net, 8_500_000, 2_000_000, 0); got != -800_000 {
+		t.Errorf("business margin: %d, want a loss of 8 000 kr", got)
+	}
+	if tax.MarginMinor != 1_500_000 || tax.VATMinor != 300_000 {
+		t.Errorf("the tax margin moved with the costs: %+v", tax)
+	}
+}

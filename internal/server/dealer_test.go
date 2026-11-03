@@ -424,3 +424,54 @@ func TestASalespersonReservesACarOnItsPage(t *testing.T) {
 		t.Error("the buyer was offered to reserve the car")
 	}
 }
+
+// A buyer takes a car in on consignment on the page; the car's page says
+// in whose name it is sold, and the principal taking it back ends the
+// agreement and the car's cycle (#166).
+func TestABuyerTakesACarInOnConsignment(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	buyer := signIn(t, ts, buyerEmail)
+	resp := postResponse(t, buyer, ts.URL+"/cars/consign", url.Values{"registration": {"KLM 456"}, "make": {"Volvo"},
+		"model_name": {"V70"}, "principal_kind": {"private"}, "principal_name": {"Pia Principal"}, "seller_type": {workshop.SellerPrivate},
+		"model": {"principal_name"}, "minimum": {"95 000"}, "commission_share": {"8"}, "insured_by": {"principal"},
+		"starts_on": {time.Now().Format(time.DateOnly)}, "ends_on": {time.Now().AddDate(0, 2, 0).Format(time.DateOnly)},
+		"key": {"consign-page-1"}})
+	where := resp.Header.Get("Location")
+	if resp.StatusCode != http.StatusSeeOther || !strings.HasPrefix(where, "/cars/stock/") {
+		t.Fatalf("taking the car in answered %d to %q", resp.StatusCode, where)
+	}
+	page := strings.ReplaceAll(visibleText(get(t, buyer, ts.URL+where, http.StatusOK)), " ", " ")
+	if !strings.Contains(page, "On consignment for Pia Principal") || !strings.Contains(page, "Sold in the principal") ||
+		!strings.Contains(page, "95,000.00") {
+		t.Errorf("the consigned car's page:\n%s", page)
+	}
+	cs, err := workshop.ConsignmentsOfUnit(ctx, pool, owner, strings.TrimPrefix(where, "/cars/stock/"))
+	if err != nil || len(cs) != 1 {
+		t.Fatalf("the agreement: %+v, %v", cs, err)
+	}
+	if status := postStatus(t, buyer, ts.URL+where+"/consignment/"+cs[0].ID+"/end", url.Values{"how": {"withdrawn"},
+		"consign_reason": {"Sålde den själv"}}); status != http.StatusSeeOther {
+		t.Errorf("ending the consignment answered %d", status)
+	}
+	if u, _ := workshop.StockUnitByID(ctx, pool, owner, cs[0].StockUnitID); u.Status != workshop.StockClosed {
+		t.Errorf("the car after the principal took it back: %s", u.Status)
+	}
+	if status, _ := getBody(t, signIn(t, ts, salesEmail), ts.URL+"/cars/consign"); status != http.StatusForbidden {
+		t.Errorf("a salesperson was given the consignment form: %d", status)
+	}
+}
+
+// What the cars sold earned is for whoever may see margins: the buyer
+// reads it, the salesperson does not (#182, #145).
+func TestTheResultsAreOnlyForWhoMaySeeMargins(t *testing.T) {
+	ts, pool := testServer(t)
+	dealerShop(t, pool)
+	if page := visibleText(get(t, signIn(t, ts, buyerEmail), ts.URL+"/cars/results", http.StatusOK)); !strings.Contains(page, "Business margin") {
+		t.Errorf("the buyer's results page:\n%s", page)
+	}
+	if status, _ := getBody(t, signIn(t, ts, salesEmail), ts.URL+"/cars/results"); status != http.StatusForbidden {
+		t.Errorf("a salesperson read the results: %d", status)
+	}
+}

@@ -144,6 +144,7 @@ var waitingSays = map[string]string{
 	"test_drive_overdue":   "A test drive is not back: %s",
 	"reservation_expiring": "A reservation runs out within a day: %s",
 	"reservation_lapsed":   "A reservation has run out: end it and decide on the deposit: %s",
+	"complaint_stalled":    "A complaint has had nothing done for a week: %s",
 	// Rental
 	"rental_handover": "To hand over today: %s",
 	"rental_return":   "Due back today: %s",
@@ -191,6 +192,8 @@ func (w ActionItem) Link() string {
 		return "/cars/test-drives/" + w.SubjectID
 	case w.SubjectKind == "stock_unit":
 		return "/cars/stock/" + w.SubjectID
+	case w.SubjectKind == "vehicle_sale":
+		return "/cars/deals/" + w.SubjectID
 	case w.SubjectKind == "rental_booking":
 		return "/rental/bookings/" + w.SubjectID
 	case w.SubjectKind == "rental_unit":

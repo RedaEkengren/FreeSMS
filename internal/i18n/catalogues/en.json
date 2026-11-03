@@ -213,6 +213,15 @@
     "%d more open lead is another salesperson's": {"one": "%d more open lead is another salesperson's", "other": "%d more open leads are other salespeople's"},
     "%d car has no purchase price yet": {"one": "%d car has no purchase price yet", "other": "%d cars have no purchase price yet"},
     "%d day in stock": {"one": "%d day in stock", "other": "%d days in stock"},
-    "%d day for sale": {"one": "%d day for sale", "other": "%d days for sale"}
+    "%d day for sale": {"one": "%d day for sale", "other": "%d days for sale"},
+    "remedy_offered": {"other": "remedy offered"},
+    "remedy_accepted": {"other": "remedy accepted"},
+    "remedy_refused": {"other": "remedy refused"},
+    "remedy_done": {"other": "remedy done"},
+    "referred_arn": {"other": "referred to the National Board for Consumer Disputes"},
+    "price_reduction": {"other": "price reduction"},
+    "in_person": {"other": "in person"},
+    "%d car": {"one": "%d car", "other": "%d cars"},
+    "%d car has no purchase price, and is left out of the totals": {"one": "%d car has no purchase price, and is left out of the totals", "other": "%d cars have no purchase price, and are left out of the totals"}
   }
 }

@@ -155,6 +155,17 @@ func MarginScheme(salePriceGrossMinor, taxPurchasePriceMinor int64, rateBasisPoi
 	return r, nil
 }
 
+// BusinessMargin is what one car sold actually earned (#182): its net
+// revenue -- what was invoiced less every VAT on it, the margin scheme's
+// included, credits counted -- less what it was bought for, less every
+// cost spent on it, plus income the sale brought besides. It is the
+// owner's figure, not the tax margin (MarginScheme), which counts no costs
+// and is floored at nothing; this one is not, so a loss shows as one. The
+// two are kept apart by name and by function.
+func BusinessMargin(netRevenueMinor, purchaseMinor, costsMinor, otherIncomeMinor int64) int64 {
+	return netRevenueMinor - purchaseMinor - costsMinor + otherIncomeMinor
+}
+
 // WithMarkup is a cost plus a markup in basis points (4500 = 45%), rounded
 // half away from zero like every other amount here. Truncating instead loses
 // an öre on half the parts in the catalogue, always in the customer's favour,

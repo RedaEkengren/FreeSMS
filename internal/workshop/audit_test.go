@@ -213,6 +213,19 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 		}
 		made["reservation.ended"] = subject{"stock_unit", bought.StockUnitID}
 	}
+	// A sold car handed over unpaid, on the owner's word (#179).
+	{
+		// The car the reservation above let go, for sale again; its
+		// purchase was reassessed as not eligible, so ordinary VAT.
+		d := completedDealOn(t, pool, bought.StockUnitID, workshop.TaxOrdinary)
+		if _, err := workshop.IssueDealInvoice(ctx, pool, sales(), d.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := workshop.DeliverCar(ctx, pool, func() access.Scope { s := owner(); s.Modules = access.Modules; return s }(), d.ID, workshop.NewDelivery{At: time.Now(), Override: "Banken betalar"}); err != nil {
+			t.Fatal(err)
+		}
+		made["vehicle_sale.delivered_early"] = subject{"vehicle_sale", d.ID}
+	}
 	// Rental
 	rentalAudited(t, pool, func(event, kind, id string) { made[event] = subject{kind, id} })
 

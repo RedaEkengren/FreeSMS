@@ -385,3 +385,110 @@ func TestATradeInIsTypedOnTheDealAndReceivedByTheBuyer(t *testing.T) {
 		t.Error("a salesperson was given the trade-ins to take in")
 	}
 }
+
+// Delivered on the deal's page (#179): refused with what is missing while
+// the sale is unpaid, then recorded once paid, with the consumer law's
+// dates shown.
+func TestASoldCarIsDeliveredOnTheDealsPage(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	unit, err := workshop.TakeIntoStock(ctx, pool, owner, vehicleA, workshop.StockFromDefleet, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.MoveStockUnit(ctx, pool, owner, unit.ID, workshop.StockForSale, ""); err != nil {
+		t.Fatal(err)
+	}
+	seller := signIn(t, ts, salesEmail)
+	resp := postResponse(t, seller, ts.URL+"/cars/deals", url.Values{"unit": {unit.ID}, "name": {"Kim Köpare"}, "phone": {"0701234567"},
+		"buyer_kind": {"consumer"}, "price": {"125000"}, "tax": {"ordinary"}, "key": {"deliver-1"}})
+	where := resp.Header.Get("Location")
+	post := func(path string, form url.Values) {
+		t.Helper()
+		if resp := postResponse(t, seller, ts.URL+where+path, form); resp.StatusCode != http.StatusSeeOther {
+			t.Fatalf("%s answered %d", path, resp.StatusCode)
+		}
+	}
+	post("/contract", url.Values{"template": {""}})
+	deal, err := workshop.DealByID(ctx, pool, owner, strings.TrimPrefix(where, "/cars/deals/"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := workshop.DocumentRecordByID(ctx, pool, owner, deal.ContractID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	post("/signed", url.Values{"party": {doc.Parties[0].ID}, "hash": {doc.Hash}, "method": {"in_person_click"}})
+	post("/complete", nil)
+	post("/invoice", nil)
+	now := time.Now().Format("2006-01-02T15:04")
+	status, page := postBody(t, seller, ts.URL+where+"/deliver", url.Values{"at": {now}, "odometer": {"125 000"}})
+	if status != http.StatusBadRequest || !strings.Contains(page, "The invoice is paid.") {
+		t.Fatalf("delivering unpaid: %d\n%s", status, visibleText(page))
+	}
+	deal, _ = workshop.DealByID(ctx, pool, owner, deal.ID)
+	if _, err := workshop.RecordPayment(ctx, pool, owner, deal.InvoiceID, workshop.NewPayment{Method: "bank", PaidOn: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	post("/deliver", url.Values{"at": {now}, "odometer": {"125000"}})
+	if page := visibleText(get(t, seller, ts.URL+where, http.StatusOK)); !strings.Contains(page, "Handed over") ||
+		!strings.Contains(page, "A defect is presumed to have been there at delivery until") {
+		t.Errorf("the deal after delivery:\n%s", page)
+	}
+}
+
+// A complaint through the deal's page (#181): recorded once the car is
+// delivered, shown with where it stands against the presumption, and
+// moved on.
+func TestAComplaintIsRecordedOnTheDealsPage(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	unit, err := workshop.TakeIntoStock(ctx, pool, owner, vehicleA, workshop.StockFromDefleet, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.MoveStockUnit(ctx, pool, owner, unit.ID, workshop.StockForSale, ""); err != nil {
+		t.Fatal(err)
+	}
+	seller := signIn(t, ts, salesEmail)
+	resp := postResponse(t, seller, ts.URL+"/cars/deals", url.Values{"unit": {unit.ID}, "name": {"Kim Köpare"}, "phone": {"0701234567"},
+		"buyer_kind": {"consumer"}, "price": {"125000"}, "tax": {"ordinary"}, "key": {"complaint-deal-1"}})
+	where := ts.URL + resp.Header.Get("Location")
+	d, err := workshop.DealByID(ctx, pool, owner, strings.TrimPrefix(resp.Header.Get("Location"), "/cars/deals/"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	post := func(path string, form url.Values) {
+		t.Helper()
+		if resp := postResponse(t, seller, where+path, form); resp.StatusCode != http.StatusSeeOther {
+			t.Fatalf("%s answered %d", path, resp.StatusCode)
+		}
+	}
+	post("/contract", url.Values{"template": {""}})
+	d, _ = workshop.DealByID(ctx, pool, owner, d.ID)
+	doc, err := workshop.DocumentRecordByID(ctx, pool, owner, d.ContractID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	post("/signed", url.Values{"party": {doc.Parties[0].ID}, "hash": {doc.Hash}, "method": {"in_person_click"}})
+	post("/complete", nil)
+	post("/invoice", nil)
+	d, _ = workshop.DealByID(ctx, pool, owner, d.ID)
+	if _, err := workshop.RecordPayment(ctx, pool, owner, d.InvoiceID, workshop.NewPayment{Method: "bank", PaidOn: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	post("/deliver", url.Values{"at": {time.Now().Add(-time.Hour).Format("2006-01-02T15:04")}})
+	post("/complaints", url.Values{"channel": {"phone"}, "description": {"Växellådan slirar"}, "key": {"complaint-page-1"}})
+	cs, err := workshop.ComplaintsOfSale(ctx, pool, owner, d.ID)
+	if err != nil || len(cs) != 1 {
+		t.Fatalf("the complaints: %+v, %v", cs, err)
+	}
+	post("/complaints/"+cs[0].ID, url.Values{"status": {"remedy_offered"}, "remedy": {"repair"}, "note": {"Vi byter kopplingen"}})
+	page := visibleText(get(t, seller, where, http.StatusOK))
+	if !strings.Contains(page, "Växellådan slirar") || !strings.Contains(page, "Received within the two years") ||
+		!strings.Contains(page, "remedy offered (repair)") {
+		t.Errorf("the deal's complaints:\n%s", page)
+	}
+}

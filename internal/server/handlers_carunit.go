@@ -35,6 +35,8 @@ type carUnitData struct {
 	Reservations     []workshop.Reservation
 	Standing         *workshop.Reservation
 	Deposit          workshop.DepositBalance
+	// A consigned car's agreement, every version, newest first.
+	Consignments []workshop.Consignment
 	// The reservation's terms in force, a document, or "".
 	TermsID string
 	Key     string
@@ -102,6 +104,11 @@ func (s *Server) carUnitPage(w http.ResponseWriter, r *http.Request, status int,
 		}
 		if d.Outstanding, d.Overridden, err = workshop.ChecksOutstanding(r.Context(), s.pool, scope, unit.ID); err != nil {
 			s.log.Error("read outstanding checks", "error", err)
+		}
+	}
+	if !unit.Owned() {
+		if d.Consignments, err = workshop.ConsignmentsOfUnit(r.Context(), s.pool, scope, unit.ID); err != nil {
+			s.log.Error("read the consignment", "error", err)
 		}
 	}
 	if scope.Role.SellsVehicles() {
@@ -292,6 +299,16 @@ func (s *Server) handleReservationTerms(w http.ResponseWriter, r *http.Request) 
 	http.Redirect(w, r, "/contracts/"+doc, http.StatusSeeOther)
 }
 
+// handleEndConsignment ends a consignment withdrawn or run out.
+func (s *Server) handleEndConsignment(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	err := workshop.EndConsignment(r.Context(), s.pool, session.Scope, r.PathValue("agreement"), r.FormValue("how"), r.FormValue("consign_reason"))
+	if s.carUnitRefused(w, r, err, map[string]string{"consign_reason": r.FormValue("consign_reason")}) {
+		return
+	}
+	s.carUnitDone(w, r)
+}
+
 // carUnitRoutes registers the pages of one car in stock.
 func (s *Server) carUnitRoutes(m routeMux) {
 	m.HandleFunc("GET /cars/stock/{id}", s.requireSession(s.handleCarUnit))
@@ -305,4 +322,5 @@ func (s *Server) carUnitRoutes(m routeMux) {
 	m.HandleFunc("POST /cars/stock/{id}/reservations/{res}/deposit", s.requireSession(s.handleReservationDeposit))
 	m.HandleFunc("POST /cars/stock/{id}/reservations/{res}/end", s.requireSession(s.handleEndReservation))
 	m.HandleFunc("POST /cars/stock/{id}/reservations/{res}/terms", s.requireSession(s.handleReservationTerms))
+	m.HandleFunc("POST /cars/stock/{id}/consignment/{agreement}/end", s.requireSession(s.handleEndConsignment))
 }

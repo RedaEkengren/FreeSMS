@@ -18,7 +18,9 @@ import (
 type dealerData struct {
 	Stock workshop.StockList
 	// Trade-ins waiting to be received or credited, for whoever buys cars.
-	TradeIns    []workshop.ExpectedTradeIn
+	TradeIns []workshop.ExpectedTradeIn
+	// What the cars sold in a period earned (#182), and the period.
+	Results     workshop.Results
 	Calculation workshop.Calculation
 	Result      workshop.CalculationResult
 	Vehicle     workshop.Vehicle
@@ -396,4 +398,118 @@ func (s *Server) handleBuyCar(w http.ResponseWriter, r *http.Request) {
 	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/cars/stock", http.StatusSeeOther)
+}
+
+// handleConsignForm is the form a buyer takes a car in on consignment on.
+func (s *Server) handleConsignForm(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	if !session.Scope.Role.BuysVehicles() {
+		s.renderError(w, r, http.StatusForbidden, "Not for your role", "Taking a car in is the buyer's.")
+		return
+	}
+	today := time.Now().In(s.shopLocation(r))
+	s.render(w, r, http.StatusOK, "carconsign", pageData{Title: "Take a car in on consignment", Session: session,
+		Dealer: &dealerData{Key: newFormKey(), Form: map[string]string{"model": workshop.ConsignOwnName, "principal_kind": "private",
+			"insured_by": "principal", "starts_on": today.Format(time.DateOnly), "ends_on": today.AddDate(0, 2, 0).Format(time.DateOnly)}}})
+}
+
+// handleConsign takes the car in under the agreement typed.
+func (s *Server) handleConsign(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	form := map[string]string{}
+	for _, k := range []string{"registration", "vin", "make", "model_name", "model", "principal_kind", "principal_name", "principal_phone",
+		"principal_email", "seller_type", "minimum", "net", "commission", "commission_share", "costs", "insured_by", "starts_on",
+		"ends_on", "terms"} {
+		form[k] = strings.TrimSpace(r.FormValue(k))
+	}
+	key := r.FormValue("key")
+	refuse := func(msg string) {
+		s.render(w, r, http.StatusBadRequest, "carconsign", pageData{Title: "Take a car in on consignment", Session: session,
+			Dealer: &dealerData{Form: form, Key: key}, Error: msg})
+	}
+	if !session.Scope.Role.BuysVehicles() {
+		s.renderError(w, r, http.StatusForbidden, "Not for your role", "Taking a car in is the buyer's.")
+		return
+	}
+	t := workshop.ConsignmentTerms{Model: form["model"], PrincipalCosts: form["costs"], InsuredBy: form["insured_by"],
+		SellerType: form["seller_type"], Terms: form["terms"]}
+	amount := func(field string) (*int64, bool) {
+		if form[field] == "" {
+			return nil, true
+		}
+		n, err := parseMinorUnits(form[field])
+		return &n, err == nil
+	}
+	var ok bool
+	if t.MinimumPriceMinor, ok = amount("minimum"); !ok {
+		refuse("Amounts are in kronor.")
+		return
+	}
+	if t.NetPayoutMinor, ok = amount("net"); !ok {
+		refuse("Amounts are in kronor.")
+		return
+	}
+	if t.CommissionMinor, ok = amount("commission"); !ok {
+		refuse("Amounts are in kronor.")
+		return
+	}
+	if v := strings.TrimSuffix(form["commission_share"], "%"); strings.TrimSpace(v) != "" {
+		n, err := parseMinorSigned(strings.TrimSpace(v))
+		if err != nil {
+			refuse("The commission's share is a percentage.")
+			return
+		}
+		basis := int(n)
+		t.CommissionBasis = &basis
+	}
+	var err error
+	if t.StartsOn, err = time.ParseInLocation(time.DateOnly, form["starts_on"], s.shopLocation(r)); err != nil {
+		refuse("Say when the agreement starts and ends.")
+		return
+	}
+	if t.EndsOn, err = time.ParseInLocation(time.DateOnly, form["ends_on"], s.shopLocation(r)); err != nil {
+		refuse("Say when the agreement starts and ends.")
+		return
+	}
+	vehicle, err := workshop.CarForPurchase(r.Context(), s.pool, session.Scope, workshop.CarToBuy{
+		Registration: form["registration"], VIN: form["vin"], Make: form["make"], Model: form["model_name"]})
+	if errors.Is(err, workshop.ErrInvalid) {
+		refuse(trimInvalid(err))
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	c, err := workshop.ConsignCar(r.Context(), s.pool, session.Scope, workshop.NewConsignment{VehicleID: vehicle,
+		NewPrincipal: &workshop.NewParty{Kind: form["principal_kind"], Name: form["principal_name"], Phone: form["principal_phone"],
+			Email: form["principal_email"]}, ConsignmentTerms: t, Key: key})
+	if errors.Is(err, workshop.ErrInvalid) {
+		refuse(trimInvalid(err))
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/cars/stock/"+c.StockUnitID, http.StatusSeeOther)
+}
+
+// handleCarResults is what the cars sold in a month earned (#182), for
+// whoever may see margins: by car, salesperson and month.
+func (s *Server) handleCarResults(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	loc := s.shopLocation(r)
+	month := r.URL.Query().Get("month")
+	start, err := time.ParseInLocation("2006-01", month, loc)
+	if err != nil {
+		now := time.Now().In(loc)
+		start = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, loc)
+	}
+	res, err := workshop.SaleResults(r.Context(), s.pool, session.Scope, start, start.AddDate(0, 1, 0))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "carresults", pageData{Title: "What the cars sold earned", Session: session,
+		Dealer: &dealerData{Results: res, Form: map[string]string{"month": start.Format("2006-01"),
+			"previous": start.AddDate(0, -1, 0).Format("2006-01"), "next": start.AddDate(0, 1, 0).Format("2006-01")}}})
 }
