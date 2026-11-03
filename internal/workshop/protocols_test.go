@@ -45,7 +45,7 @@ func rentalChecklist(t *testing.T, pool *pgxpool.Pool) string {
 }
 
 // seedRental writes a booking with this id, as a protocol of a rental must
-// be of one (0301). Only the row: these tests are about protocols, so its
+// be of one (0122). Only the row: these tests are about protocols, so its
 // own references are not checked on this connection.
 func seedRental(t *testing.T, pool *pgxpool.Pool, id string) {
 	t.Helper()
