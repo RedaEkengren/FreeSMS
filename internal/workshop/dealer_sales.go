@@ -696,6 +696,9 @@ func CompleteDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, s
 			if err := endReservationOnSaleTx(ctx, tx, scope, d.StockUnitID, buyers); err != nil {
 				return err
 			}
+			if err := endConsignmentOnSaleTx(ctx, tx, scope, d.StockUnitID); err != nil {
+				return err
+			}
 			if err := moveStockUnitTx(ctx, tx, scope, d.StockUnitID, StockSold, ""); err != nil {
 				return err
 			}
