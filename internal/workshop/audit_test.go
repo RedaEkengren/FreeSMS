@@ -225,6 +225,18 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 			t.Fatal(err)
 		}
 		made["vehicle_sale.delivered_early"] = subject{"vehicle_sale", d.ID}
+		// Its ownership confirmed (#180).
+		f, err := workshop.FilingOf(ctx, pool, sales(), "sale", d.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := workshop.RecordFilingFiled(ctx, pool, sales(), f.ID, workshop.FilingChecklist{ControlNumberInHand: true}); err != nil {
+			t.Fatal(err)
+		}
+		if err := workshop.ConfirmFiling(ctx, pool, sales(), f.ID, "TS-1"); err != nil {
+			t.Fatal(err)
+		}
+		made["ownership.confirmed"] = subject{"ownership_filing", f.ID}
 	}
 	// Rental
 	rentalAudited(t, pool, func(event, kind, id string) { made[event] = subject{kind, id} })

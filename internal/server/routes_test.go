@@ -256,7 +256,7 @@ var swept = map[string]string{
 	"POST /checklists/{id}/subjects":              "sweep",
 
 	// Dealer
-	"GET /cars/stock": "", "GET /cars/stock/new": "", "GET /cars/consign": "", "GET /cars/results": "", "POST /cars/consign": "", "POST /cars/stock": "",
+	"GET /cars/stock": "", "GET /cars/stock/new": "", "GET /cars/consign": "", "GET /cars/results": "", "POST /cars/feed": "", "GET /feed/v1/stock.json": "", "POST /cars/consign": "", "POST /cars/stock": "",
 	"GET /cars/stock/{id}": "sweep", "POST /cars/stock/{id}/move": "sweep", "POST /cars/stock/{id}/checks": "sweep",
 	"POST /cars/stock/{id}/checks/override": "sweep", "POST /cars/stock/{id}/costs": "sweep",
 	"POST /cars/stock/{id}/costs/{cost}/reverse": "sweep",
@@ -265,7 +265,11 @@ var swept = map[string]string{
 	"POST /cars/stock/{id}/reservations/{res}/terms": "sweep",
 	"POST /cars/trade-ins/{sale}/receive":            "sweep", "POST /cars/trade-ins/{sale}/credit": "sweep",
 	"POST /cars/stock/{id}/consignment/{agreement}/end": "sweep",
-	"GET /cars/calculations/new":                        "", "POST /cars/calculations": "",
+	"POST /cars/stock/{id}/card/{what}":                 "sweep",
+	"POST /cars/stock/{id}/listing":                     "sweep", "POST /cars/stock/{id}/photos": "sweep", "GET /cars/stock/{id}/photos/{photo}": "sweep",
+	"POST /cars/stock/{id}/photos/{photo}/cover": "sweep", "POST /cars/stock/{id}/photos/{photo}/remove": "sweep",
+	"GET /feed/v1/photos/{photo}": "sweep",
+	"GET /cars/calculations/new":  "", "POST /cars/calculations": "",
 	"GET /cars/calculations/{id}": "sweep", "POST /cars/calculations/{id}/accept": "sweep",
 	"GET /cars/leads": "", "POST /cars/leads": "", "POST /cars/leads/settings": "", "POST /cars/leads/reassign": "",
 	"GET /cars/leads/{id}": "sweep", "POST /cars/leads/{id}/contacts": "sweep", "POST /cars/leads/{id}/status": "sweep",
@@ -280,7 +284,7 @@ var swept = map[string]string{
 	"POST /cars/deals/{id}/defects/{defect}/answer": "sweep", "POST /cars/deals/{id}/contract": "sweep",
 	"POST /cars/deals/{id}/signed": "sweep", "POST /cars/deals/{id}/complete": "sweep", "POST /cars/deals/{id}/cancel": "sweep",
 	"POST /cars/deals/{id}/invoice": "sweep", "POST /cars/deals/{id}/deliver": "sweep",
-	"POST /cars/deals/{id}/complaints": "sweep", "POST /cars/deals/{id}/complaints/{complaint}": "sweep",
+	"POST /cars/deals/{id}/complaints": "sweep", "POST /cars/filings/{filing}": "sweep", "POST /cars/deals/{id}/complaints/{complaint}": "sweep",
 }
 
 // fill substitutes shop B's identifiers into a pattern.
@@ -331,6 +335,9 @@ func fill(pattern string) (method, path string) {
 		"{res}":                   "bbbbbbbb-0000-0000-0000-0000000000d2",
 		"{agreement}":             "bbbbbbbb-0000-0000-0000-0000000000d3",
 		"{complaint}":             "bbbbbbbb-0000-0000-0000-0000000000d4",
+		"{filing}":                "bbbbbbbb-0000-0000-0000-0000000000d5",
+		"{photo}":                 "bbbbbbbb-0000-0000-0000-0000000000d6",
+		"{what}":                  "damage",
 		"/cars/trade-ins/{sale}":  "/cars/trade-ins/bbbbbbbb-0000-0000-0000-0000000000cd",
 		// Rental: ids that are nobody's.
 		"/rental/permits/{id}":     "/rental/permits/bbbbbbbb-0000-0000-0000-0000000000e1",

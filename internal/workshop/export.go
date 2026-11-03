@@ -67,6 +67,14 @@ var ExportTables = []string{
 	"vehicle_sale_deliveries",
 	// Buyers' complaints and what happened to each (#181).
 	"vehicle_sale_complaints", "vehicle_sale_complaint_events",
+	// Changes of ownership filed, and each step (#180).
+	"ownership_filings", "ownership_filing_events",
+	// How each stock car is offered, a row per change, and how the stock
+	// feed is published (#167, #183).
+	"stock_listings", "stock_feed_settings",
+	// A car's damage and repairs, keys and where they went, and service
+	// book (#167).
+	"vehicle_damages", "vehicle_damage_repairs", "vehicle_keys", "vehicle_key_movements", "vehicle_service_entries",
 	// Rental
 	"rental_permits", "rental_permit_revocations", "rental_profiles", "rental_units", "fleet_memberships",
 	"rate_plans", "rate_plan_seasons", "rental_extras", "rental_bookings", "rental_booking_events", "rental_booking_lines",
@@ -97,6 +105,9 @@ var exportQueries = map[string]string{
 		encode(content_sha256, 'hex') AS content_sha256, supersedes_id, created_at, created_by, erased_at FROM document_records`,
 	"document_signatures": `SELECT id, shop_id, document_id, document_party_id, method, signed_at, recorded_by, provider_ref,
 		evidence_key, witnessed_by, encode(document_sha256, 'hex') AS document_sha256 FROM document_signatures`,
+	// Whether the feed is behind a token, never the token's hash (#183).
+	"stock_feed_settings": `SELECT id, shop_id, published, open, token_sha256 IS NOT NULL AS protected, include_reserved,
+		changed_at, changed_by FROM stock_feed_settings`,
 	"document_record_links": `SELECT id, shop_id, document_id, created_by, created_at, expires_at, revoked_at, revoked_by,
 		first_opened_at, last_opened_at, opens FROM document_record_links`,
 	// Sealed as they are held, never opened: the export is not a way round

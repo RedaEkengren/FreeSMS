@@ -882,6 +882,8 @@ func dealerWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 			`+reservationsWaiting+`
 			UNION ALL
 			`+complaintsWaiting+`
+			UNION ALL
+			`+filingsWaiting+`
 			ORDER BY 5, 6`, scope.UserID)
 		if err != nil {
 			return fmt.Errorf("read the leads waiting: %w", err)

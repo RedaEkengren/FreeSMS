@@ -433,8 +433,25 @@ func TestASoldCarIsDeliveredOnTheDealsPage(t *testing.T) {
 	}
 	post("/deliver", url.Values{"at": {now}, "odometer": {"125000"}})
 	if page := visibleText(get(t, seller, ts.URL+where, http.StatusOK)); !strings.Contains(page, "Handed over") ||
-		!strings.Contains(page, "A defect is presumed to have been there at delivery until") {
+		!strings.Contains(page, "A defect is presumed to have been there at delivery until") || !strings.Contains(page, "Change of ownership") {
 		t.Errorf("the deal after delivery:\n%s", page)
+	}
+	// Its change of ownership, filed and confirmed on the same page (#180).
+	f, err := workshop.FilingOf(ctx, pool, owner, "sale", deal.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, step := range []url.Values{
+		{"step": {"filed"}, "control_number": {"yes"}, "back": {where}},
+		{"step": {"confirmed"}, "reference": {"TS-42"}, "back": {where}},
+	} {
+		if resp := postResponse(t, seller, ts.URL+"/cars/filings/"+f.ID, step); resp.StatusCode != http.StatusSeeOther ||
+			resp.Header.Get("Location") != where {
+			t.Fatalf("%s answered %d to %q", step.Get("step"), resp.StatusCode, resp.Header.Get("Location"))
+		}
+	}
+	if f, _ := workshop.FilingOf(ctx, pool, owner, "sale", deal.ID); f.Status != "confirmed" || f.Reference != "TS-42" {
+		t.Errorf("the filing after the page: %+v", f)
 	}
 }
 

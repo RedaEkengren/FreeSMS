@@ -43,6 +43,8 @@ type dealData struct {
 	Missing []string
 	// The sale's complaints, newest first (#181).
 	Complaints []workshop.Complaint
+	// The sale's change of ownership, once prepared at delivery (#180).
+	Filing *workshop.OwnershipFiling
 }
 
 // ComplaintChannels, ComplaintStatuses and ComplaintRemedies are what a
@@ -274,6 +276,7 @@ func (s *Server) dealRoutes(m routeMux) {
 	m.HandleFunc("POST /cars/deals/{id}/invoice", s.requireSession(s.handleDealInvoice))
 	m.HandleFunc("POST /cars/deals/{id}/deliver", s.requireSession(s.handleDealDeliver))
 	m.HandleFunc("POST /cars/deals/{id}/complaints", s.requireSession(s.handleOpenComplaint))
+	m.HandleFunc("POST /cars/filings/{filing}", s.requireSession(s.handleFiling))
 	m.HandleFunc("POST /cars/deals/{id}/complaints/{complaint}", s.requireSession(s.handleMoveComplaint))
 }
 
@@ -507,6 +510,11 @@ func (s *Server) dealPageWith(w http.ResponseWriter, r *http.Request, status int
 		if d.Complaints, err = workshop.ComplaintsOfSale(r.Context(), s.pool, session.Scope, d.Deal.ID); err != nil {
 			s.log.Error("read complaints", "error", err)
 		}
+		if f, err := workshop.FilingOf(r.Context(), s.pool, session.Scope, "sale", d.Deal.ID); err == nil {
+			d.Filing = &f
+		} else if !errors.Is(err, workshop.ErrNotFound) {
+			s.log.Error("read the ownership filing", "error", err)
+		}
 	} else if !errors.Is(err, workshop.ErrNotFound) {
 		s.log.Error("read the delivery", "error", err)
 	}
@@ -691,4 +699,45 @@ func (s *Server) handleMoveComplaint(w http.ResponseWriter, r *http.Request) {
 	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/cars/deals/"+r.PathValue("id"), http.StatusSeeOther)
+}
+
+// handleFiling records a step of an ownership filing (#180): filed by
+// hand, confirmed with Transportstyrelsen's reference, or rejected. Back
+// to the page it was taken on.
+func (s *Server) handleFiling(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id := r.PathValue("filing")
+	var err error
+	switch r.FormValue("step") {
+	case "filed":
+		c := workshop.FilingChecklist{ControlNumberInHand: r.FormValue("control_number") != "", Note: r.FormValue("note")}
+		if v := r.FormValue("leasing_consent"); v != "" {
+			b := v == "yes"
+			c.LeasingConsent = &b
+		}
+		if r.FormValue("retention_of_title") != "" {
+			b := true
+			c.RetentionOfTitle = &b
+		}
+		err = workshop.RecordFilingFiled(r.Context(), s.pool, session.Scope, id, c)
+	case "confirmed":
+		err = workshop.ConfirmFiling(r.Context(), s.pool, session.Scope, id, r.FormValue("reference"))
+	case "rejected":
+		err = workshop.RejectFiling(r.Context(), s.pool, session.Scope, id, r.FormValue("note"))
+	default:
+		err = fmt.Errorf("%w: no such step", workshop.ErrInvalid)
+	}
+	if errors.Is(err, workshop.ErrInvalid) {
+		s.renderError(w, r, http.StatusBadRequest, "Not recorded", trimInvalid(err))
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	back := r.FormValue("back")
+	if !strings.HasPrefix(back, "/cars/") {
+		back = "/cars/stock"
+	}
+	http.Redirect(w, r, back, http.StatusSeeOther)
 }

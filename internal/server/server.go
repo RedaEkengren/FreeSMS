@@ -596,6 +596,7 @@ func (s *Server) routes() (http.Handler, error) {
 	dealerMux.HandleFunc("GET /cars/consign", s.requireSession(s.handleConsignForm))
 	dealerMux.HandleFunc("POST /cars/consign", s.requireSession(s.handleConsign))
 	s.carUnitRoutes(dealerMux)
+	s.listingRoutes(dealerMux)
 	dealerMux.HandleFunc("POST /cars/trade-ins/{sale}/receive", s.requireSession(s.handleReceiveTradeIn))
 	dealerMux.HandleFunc("POST /cars/trade-ins/{sale}/credit", s.requireSession(s.handleCreditTradeIn))
 	dealerMux.HandleFunc("GET /cars/calculations/new", s.requireSession(s.handleCalculationForm))

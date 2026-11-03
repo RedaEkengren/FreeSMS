@@ -352,11 +352,22 @@ func TestACarInStockIsWorkedOnItsPage(t *testing.T) {
 		"incurred_on": {time.Now().Format(time.DateOnly)}}); status != http.StatusSeeOther {
 		t.Errorf("recording a cost answered %d", status)
 	}
+	// The card (#167): a damage, a key out, a service entry.
+	for what, form := range map[string]url.Values{
+		"damage":  {"zone": {"left"}, "description": {"Buckla i bakdörren"}, "severity": {"minor"}},
+		"key":     {"kind": {"remote"}, "label": {"Huvudnyckel"}},
+		"service": {"on": {"2025-05-01"}, "km": {"98000"}, "done_by": {"Märkesverkstad"}, "what_done": {"Stor service"}},
+	} {
+		if status := postStatus(t, buyer, page+"/card/"+what, form); status != http.StatusSeeOther {
+			t.Errorf("recording the %s answered %d", what, status)
+		}
+	}
 	if status := postStatus(t, buyer, page+"/move", url.Values{"to": {string(workshop.StockForSale)}}); status != http.StatusSeeOther {
 		t.Errorf("offering it for sale answered %d", status)
 	}
 	text = strings.ReplaceAll(visibleText(get(t, buyer, page, http.StatusOK)), "\u00a0", " ")
-	if !strings.Contains(text, "1,234.50") || !strings.Contains(text, "No driving ban") {
+	if !strings.Contains(text, "1,234.50") || !strings.Contains(text, "No driving ban") || !strings.Contains(text, "Buckla i bakdörren") ||
+		!strings.Contains(text, "Huvudnyckel") || !strings.Contains(text, "Stor service") {
 		t.Errorf("the buyer's page after the check and the cost:\n%s", text)
 	}
 	sales := get(t, signIn(t, ts, salesEmail), page, http.StatusOK)
@@ -473,5 +484,49 @@ func TestTheResultsAreOnlyForWhoMaySeeMargins(t *testing.T) {
 	}
 	if status, _ := getBody(t, signIn(t, ts, salesEmail), ts.URL+"/cars/results"); status != http.StatusForbidden {
 		t.Errorf("a salesperson read the results: %d", status)
+	}
+}
+
+// The stock feed over HTTP (#183): a 404 until the owner publishes it,
+// then the cars for sale as JSON to anyone, with an ETag a site can send
+// back to be told nothing changed.
+func TestTheStockFeedIsServedOnceItIsPublished(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	p, err := workshop.RecordPurchase(ctx, pool, owner, workshop.NewPurchase{VehicleID: vehicleA, Reason: workshop.StockFromPurchase,
+		NewSeller: &workshop.NewParty{Kind: "private", Name: "Sam Säljare"}, PurchasedOn: time.Now(), PriceMinor: 8_543_210,
+		SellerType: workshop.SellerPrivate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.MoveStockUnit(ctx, pool, owner, p.StockUnitID, workshop.StockForSale, ""); err != nil {
+		t.Fatal(err)
+	}
+	seller := signIn(t, ts, salesEmail)
+	if status := postStatus(t, seller, ts.URL+"/cars/stock/"+p.StockUnitID+"/listing", url.Values{"asking_price": {"129 900"},
+		"variant": {"D4"}, "equipment": {"Dragkrok\nVärmare"}}); status != http.StatusSeeOther {
+		t.Fatalf("saving the listing answered %d", status)
+	}
+	anyone := noRedirects()
+	if resp, err := anyone.Get(ts.URL + "/feed/v1/stock.json"); err != nil || resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("an unpublished feed: %v, %v", resp, err)
+	}
+	if status := postStatus(t, signIn(t, ts, ownerEmail), ts.URL+"/cars/feed", url.Values{"published": {"yes"}, "open": {"yes"}}); status != http.StatusSeeOther {
+		t.Fatalf("publishing the feed answered %d", status)
+	}
+	resp, err := anyone.Get(ts.URL + "/feed/v1/stock.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := readBody(t, resp)
+	if resp.StatusCode != http.StatusOK || !strings.Contains(body, `"price_minor_including_vat":12990000`) || !strings.Contains(body, "Dragkrok") ||
+		strings.Contains(body, "8543210") || strings.Contains(body, "Sam") {
+		t.Fatalf("the feed: %d\n%s", resp.StatusCode, body)
+	}
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/feed/v1/stock.json", nil)
+	req.Header.Set("If-None-Match", resp.Header.Get("ETag"))
+	if again, err := anyone.Do(req); err != nil || again.StatusCode != http.StatusNotModified {
+		t.Errorf("the same feed asked for with its ETag: %v, %v", again, err)
 	}
 }

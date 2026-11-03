@@ -21,6 +21,67 @@
 </section>
 {{end}}
 
+{{if $d.ShowListing}}
+<section>
+  <h2>{{.T "Offered as"}}</h2>
+  {{with $d.Photos}}<div class="photos">{{range .}}<figure><img src="/cars/stock/{{$u.ID}}/photos/{{.ID}}" alt="" loading="lazy" width="160">
+    <figcaption>{{if eq .Position 1}}<span class="tag">{{$.T "Cover"}}</span>{{else}}<form method="post" action="/cars/stock/{{$u.ID}}/photos/{{.ID}}/cover"><button type="submit" class="secondary">{{$.T "Make it the cover"}}</button></form>{{end}}
+    <form method="post" action="/cars/stock/{{$u.ID}}/photos/{{.ID}}/remove"><button type="submit" class="secondary">{{$.T "Remove"}}</button></form></figcaption></figure>{{end}}</div>{{end}}
+  {{if not $u.Status.Ended}}
+  <form method="post" action="/cars/stock/{{$u.ID}}/photos" enctype="multipart/form-data" data-online-only>
+    <label><span>{{.T "Add a photograph"}}</span><input type="file" name="photo" accept="image/*" capture="environment" required></label>
+    <button type="submit" class="secondary">{{.T "Upload"}}</button>
+  </form>
+  {{$l := $d.Listing}}
+  <form method="post" action="/cars/stock/{{$u.ID}}/listing">
+    <label><span>{{.T "Price, VAT included, in kronor"}}</span><input name="asking_price" inputmode="decimal" value="{{with index $d.Form "asking_price"}}{{.}}{{else}}{{$d.AskingPrice}}{{end}}"></label>
+    <label><span>{{.T "Variant"}}</span><input name="variant" maxlength="100" value="{{$l.Variant}}"></label>
+    <label><span>{{.T "Fuel"}}</span><input name="fuel" maxlength="40" value="{{$l.Fuel}}"></label>
+    <label><span>{{.T "Gearbox"}}</span><input name="gearbox" maxlength="40" value="{{$l.Gearbox}}"></label>
+    <label><span>{{.T "Colour"}}</span><input name="colour" maxlength="60" value="{{$l.Colour}}"></label>
+    <label class="check"><input type="checkbox" name="vat_deductible" value="yes"{{if $l.VATDeductible}} checked{{end}}> <span>{{.T "A business buyer may deduct the VAT"}}</span></label>
+    <label><span>{{.T "Equipment, one per line"}}</span><textarea name="equipment" rows="4">{{range $l.Equipment}}{{.}}
+{{end}}</textarea></label>
+    <label><span>{{.T "Description"}}</span><textarea name="description" maxlength="4000" rows="4">{{$l.Description}}</textarea></label>
+    <button type="submit">{{.T "Save how it is offered"}}</button>
+  </form>
+  {{end}}
+</section>
+{{end}}
+
+{{if $d.ShowListing}}{{$c := $d.Card}}
+<section>
+  <h2>{{.T "Damage"}}</h2>
+  {{range $c.Damages}}<div class="row"><span>{{$.T .Zone}} &middot; {{.Description}} <span class="tag">{{$.T .Severity}}</span></span>
+    <span>{{if .RepairedOn}}{{$.T "Repaired %s" ($.Date .RepairedOn "2 Jan 2006")}}{{else}}<form method="post" action="/cars/stock/{{$u.ID}}/card/repair"><input type="hidden" name="damage" value="{{.ID}}"><button type="submit" class="secondary">{{$.T "Repaired today"}}</button></form>{{end}}</span></div>{{else}}<p class="empty">{{.T "No damage recorded."}}</p>{{end}}
+  {{if not $u.Status.Ended}}<form method="post" action="/cars/stock/{{$u.ID}}/card/damage">
+    <label><span>{{.T "Where"}}</span><select name="zone">{{range $d.DamageZones}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+    <label><span>{{.T "What"}}</span><input name="description" maxlength="500" required></label>
+    <label><span>{{.T "How bad"}}</span><select name="severity">{{range $d.DamageSeverities}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+    <button type="submit" class="secondary">{{.T "Record the damage"}}</button></form>{{end}}
+  <h2>{{.T "Keys"}}</h2>
+  {{range $c.Keys}}{{$k := .}}<div class="row"><span>{{$.T .Kind}}{{if .Label}} &middot; {{.Label}}{{end}}</span>
+    <span>{{if eq .Where "out"}}{{$.T "With %s" .Holder}}{{else if eq .Where "lost"}}<span class="tag late">{{$.T "lost"}}</span>{{else}}{{$.T "Here"}}{{end}}</span></div>
+    {{if not $u.Status.Ended}}<form method="post" action="/cars/stock/{{$u.ID}}/card/key-move"><input type="hidden" name="key" value="{{$k.ID}}">
+      <label><span>{{$.T "Move"}}</span><select name="move">{{range $d.KeyMoves}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+      <label><span>{{$.T "To whom, when it goes out"}}</span><input name="holder" maxlength="200"></label>
+      <button type="submit" class="secondary">{{$.T "Record it"}}</button></form>{{end}}
+  {{end}}
+  {{if not $u.Status.Ended}}<form method="post" action="/cars/stock/{{$u.ID}}/card/key">
+    <label><span>{{.T "Kind"}}</span><select name="kind">{{range $d.KeyKinds}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+    <label><span>{{.T "Label"}}</span><input name="label" maxlength="100"></label>
+    <button type="submit" class="secondary">{{.T "Add a key"}}</button></form>{{end}}
+  <h2>{{.T "Service book"}}</h2>
+  {{range $c.Service}}<div class="waiting">{{$.Date .DoneOn "2 Jan 2006"}}{{with .OdometerKm}} &middot; {{$.Num (print .)}} km{{end}} &middot; {{.DoneBy}} &middot; {{.What}}</div>{{end}}
+  {{if not $u.Status.Ended}}<form method="post" action="/cars/stock/{{$u.ID}}/card/service">
+    <label><span>{{.T "Done on"}}</span><input type="date" name="on" required></label>
+    <label><span>{{.T "Odometer, km"}}</span><input name="km" inputmode="numeric"></label>
+    <label><span>{{.T "Done by"}}</span><input name="done_by" maxlength="200" required></label>
+    <label><span>{{.T "What was done"}}</span><input name="what_done" maxlength="1000" required></label>
+    <button type="submit" class="secondary">{{.T "Add to the service book"}}</button></form>{{end}}
+</section>
+{{end}}
+
 {{with $d.Consignments}}{{$c := index . 0}}
 <section>
   <h2>{{$.T "On consignment for %s" $c.PrincipalName}}</h2>
@@ -101,6 +162,36 @@
   <p>{{$.T "Bought for %s on %s" ($.Money .TaxPurchasePriceMinor) ($.Date .PurchasedOn "2 Jan 2006")}}</p>
   <p class="waiting">{{$.T ($d.SellerTypeLabel .Eligibility.SellerType)}} &middot;
     {{if .Eligibility.Eligible}}{{$.T "May be sold under the margin scheme"}}{{else}}{{$.T "Not eligible for the margin scheme"}}{{end}}</p>
+</section>
+{{end}}
+
+{{with $d.Filing}}{{$f := .}}
+<section>
+  <h2>{{$.T "Change of ownership"}}</h2>
+  <p>{{if $f.From}}{{$f.From}}{{else}}{{$.T "Us"}}{{end}} &rarr; {{if $f.To}}{{$f.To}}{{else}}{{$.T "Us"}}{{end}} &middot; {{$.Date $f.PassesOn "2 Jan 2006"}} &middot; <span class="tag">{{$.T $f.Status}}</span>{{if $f.Reference}} &middot; {{$f.Reference}}{{end}}</p>
+  {{if ne $f.Status "confirmed"}}
+  <p class="waiting">{{$.T "File it at Transportstyrelsen with the control number from the registration certificate. The number is not kept here."}}</p>
+  {{if ne $f.Status "filed"}}
+  <form method="post" action="/cars/filings/{{$f.ID}}">
+    <input type="hidden" name="step" value="filed"><input type="hidden" name="back" value="/cars/stock/{{$u.ID}}">
+    <label class="check"><input type="checkbox" name="control_number" value="yes" required> <span>{{$.T "I had the control number"}}</span></label>
+    <label><span>{{$.T "Leasing consent"}}</span><select name="leasing_consent"><option value="">{{$.T "Not leased"}}</option><option value="yes">{{$.T "Given"}}</option><option value="no">{{$.T "Not given"}}</option></select></label>
+    <label class="check"><input type="checkbox" name="retention_of_title" value="yes"> <span>{{$.T "Retention of title on a credit sale"}}</span></label>
+    <button type="submit">{{$.T "Record it filed"}}</button>
+  </form>
+  {{else}}
+  <form method="post" action="/cars/filings/{{$f.ID}}">
+    <input type="hidden" name="step" value="confirmed"><input type="hidden" name="back" value="/cars/stock/{{$u.ID}}">
+    <label><span>{{$.T "Transportstyrelsen's reference"}}</span><input name="reference" maxlength="100" required></label>
+    <button type="submit">{{$.T "Record it confirmed"}}</button>
+  </form>
+  <form method="post" action="/cars/filings/{{$f.ID}}">
+    <input type="hidden" name="step" value="rejected"><input type="hidden" name="back" value="/cars/stock/{{$u.ID}}">
+    <label><span>{{$.T "Why it was rejected"}}</span><input name="note" maxlength="500" required></label>
+    <button type="submit" class="secondary">{{$.T "Record it rejected"}}</button>
+  </form>
+  {{end}}
+  {{end}}
 </section>
 {{end}}
 

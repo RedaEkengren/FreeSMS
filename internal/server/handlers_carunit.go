@@ -35,12 +35,36 @@ type carUnitData struct {
 	Reservations     []workshop.Reservation
 	Standing         *workshop.Reservation
 	Deposit          workshop.DepositBalance
+	// How it is offered and its photographs (#167), for whoever buys or
+	// sells cars.
+	ShowListing bool
+	Listing     workshop.Listing
+	Photos      []workshop.StockPhoto
+	// The car's damage, keys and service book (#167).
+	Card workshop.VehicleCard
+	// The purchase's change of ownership, for whoever buys cars (#180).
+	Filing *workshop.OwnershipFiling
 	// A consigned car's agreement, every version, newest first.
 	Consignments []workshop.Consignment
 	// The reservation's terms in force, a document, or "".
 	TermsID string
 	Key     string
 }
+
+// AskingPrice is the listing's price as the form holds it, or "".
+func (d carUnitData) AskingPrice() string {
+	if d.Listing.AskingPriceMinor == nil {
+		return ""
+	}
+	return plainAmount(*d.Listing.AskingPriceMinor)
+}
+
+// DamageZones, DamageSeverities, KeyKinds and KeyMoves are what the card's
+// forms offer.
+func (carUnitData) DamageZones() []string      { return workshop.DamageZones }
+func (carUnitData) DamageSeverities() []string { return workshop.DamageSeverities }
+func (carUnitData) KeyKinds() []string         { return workshop.KeyKinds }
+func (carUnitData) KeyMoves() []string         { return workshop.KeyMoves }
 
 // Methods are the ways money arrives, for the deposit form.
 func (carUnitData) Methods() []string { return workshop.PaymentMethods }
@@ -91,6 +115,13 @@ func (s *Server) carUnitPage(w http.ResponseWriter, r *http.Request, status int,
 		} else if !errors.Is(err, workshop.ErrNotFound) {
 			s.log.Error("read purchase", "error", err)
 		}
+		if d.Purchase != nil && scope.Role.BuysVehicles() {
+			if f, err := workshop.FilingOf(r.Context(), s.pool, scope, "purchase", d.Purchase.ID); err == nil {
+				d.Filing = &f
+			} else if !errors.Is(err, workshop.ErrNotFound) {
+				s.log.Error("read the ownership filing", "error", err)
+			}
+		}
 		if c, err := workshop.CostsOfUnit(r.Context(), s.pool, scope, unit.ID); err == nil {
 			d.Costs = &c
 		} else {
@@ -105,6 +136,16 @@ func (s *Server) carUnitPage(w http.ResponseWriter, r *http.Request, status int,
 		if d.Outstanding, d.Overridden, err = workshop.ChecksOutstanding(r.Context(), s.pool, scope, unit.ID); err != nil {
 			s.log.Error("read outstanding checks", "error", err)
 		}
+	}
+	d.ShowListing = true
+	if d.Card, err = workshop.CardOf(r.Context(), s.pool, scope, unit.VehicleID); err != nil {
+		s.log.Error("read the card", "error", err)
+	}
+	if d.Listing, err = workshop.ListingOf(r.Context(), s.pool, scope, unit.ID); err != nil {
+		s.log.Error("read the listing", "error", err)
+	}
+	if d.Photos, err = workshop.StockPhotos(r.Context(), s.pool, scope, unit.ID); err != nil {
+		s.log.Error("read the photos", "error", err)
 	}
 	if !unit.Owned() {
 		if d.Consignments, err = workshop.ConsignmentsOfUnit(r.Context(), s.pool, scope, unit.ID); err != nil {
@@ -309,6 +350,60 @@ func (s *Server) handleEndConsignment(w http.ResponseWriter, r *http.Request) {
 	s.carUnitDone(w, r)
 }
 
+// cardDay reads a form's day, today when it is empty.
+func (s *Server) cardDay(r *http.Request, field string) (time.Time, bool) {
+	v := strings.TrimSpace(r.FormValue(field))
+	if v == "" {
+		return time.Now(), true
+	}
+	t, err := time.ParseInLocation(time.DateOnly, v, s.shopLocation(r))
+	return t, err == nil
+}
+
+// handleCarCard records something on the car's card: a damage, a repair,
+// a key, a key's move or a service entry.
+func (s *Server) handleCarCard(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	unit, err := workshop.StockUnitByID(r.Context(), s.pool, session.Scope, r.PathValue("id"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	day, ok := s.cardDay(r, "on")
+	if !ok {
+		s.carUnitPage(w, r, http.StatusBadRequest, nil, "That date did not parse")
+		return
+	}
+	switch r.PathValue("what") {
+	case "damage":
+		_, err = workshop.RecordDamage(r.Context(), s.pool, session.Scope, unit.VehicleID, r.FormValue("zone"), r.FormValue("description"),
+			r.FormValue("severity"), day)
+	case "repair":
+		err = workshop.RepairDamage(r.Context(), s.pool, session.Scope, r.FormValue("damage"), day, r.FormValue("note"))
+	case "key":
+		_, err = workshop.AddKey(r.Context(), s.pool, session.Scope, unit.VehicleID, r.FormValue("kind"), r.FormValue("label"))
+	case "key-move":
+		err = workshop.MoveKey(r.Context(), s.pool, session.Scope, r.FormValue("key"), r.FormValue("move"), r.FormValue("holder"), r.FormValue("note"))
+	case "service":
+		var km *int64
+		if v := strings.ReplaceAll(strings.TrimSpace(r.FormValue("km")), " ", ""); v != "" {
+			n, perr := strconv.ParseInt(v, 10, 64)
+			if perr != nil {
+				s.carUnitPage(w, r, http.StatusBadRequest, nil, "The odometer is a whole number of kilometres.")
+				return
+			}
+			km = &n
+		}
+		err = workshop.AddServiceEntry(r.Context(), s.pool, session.Scope, unit.VehicleID, day, km, r.FormValue("done_by"), r.FormValue("what_done"))
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	if s.carUnitRefused(w, r, err, nil) {
+		return
+	}
+	s.carUnitDone(w, r)
+}
+
 // carUnitRoutes registers the pages of one car in stock.
 func (s *Server) carUnitRoutes(m routeMux) {
 	m.HandleFunc("GET /cars/stock/{id}", s.requireSession(s.handleCarUnit))
@@ -323,4 +418,5 @@ func (s *Server) carUnitRoutes(m routeMux) {
 	m.HandleFunc("POST /cars/stock/{id}/reservations/{res}/end", s.requireSession(s.handleEndReservation))
 	m.HandleFunc("POST /cars/stock/{id}/reservations/{res}/terms", s.requireSession(s.handleReservationTerms))
 	m.HandleFunc("POST /cars/stock/{id}/consignment/{agreement}/end", s.requireSession(s.handleEndConsignment))
+	m.HandleFunc("POST /cars/stock/{id}/card/{what}", s.requireSession(s.handleCarCard))
 }
