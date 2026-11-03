@@ -35,6 +35,8 @@ type carUnitData struct {
 	Reservations     []workshop.Reservation
 	Standing         *workshop.Reservation
 	Deposit          workshop.DepositBalance
+	// The purchase's change of ownership, for whoever buys cars (#180).
+	Filing *workshop.OwnershipFiling
 	// A consigned car's agreement, every version, newest first.
 	Consignments []workshop.Consignment
 	// The reservation's terms in force, a document, or "".
@@ -90,6 +92,13 @@ func (s *Server) carUnitPage(w http.ResponseWriter, r *http.Request, status int,
 			d.Purchase = &p
 		} else if !errors.Is(err, workshop.ErrNotFound) {
 			s.log.Error("read purchase", "error", err)
+		}
+		if d.Purchase != nil && scope.Role.BuysVehicles() {
+			if f, err := workshop.FilingOf(r.Context(), s.pool, scope, "purchase", d.Purchase.ID); err == nil {
+				d.Filing = &f
+			} else if !errors.Is(err, workshop.ErrNotFound) {
+				s.log.Error("read the ownership filing", "error", err)
+			}
 		}
 		if c, err := workshop.CostsOfUnit(r.Context(), s.pool, scope, unit.ID); err == nil {
 			d.Costs = &c

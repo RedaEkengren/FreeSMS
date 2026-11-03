@@ -104,6 +104,36 @@
 </section>
 {{end}}
 
+{{with $d.Filing}}{{$f := .}}
+<section>
+  <h2>{{$.T "Change of ownership"}}</h2>
+  <p>{{if $f.From}}{{$f.From}}{{else}}{{$.T "Us"}}{{end}} &rarr; {{if $f.To}}{{$f.To}}{{else}}{{$.T "Us"}}{{end}} &middot; {{$.Date $f.PassesOn "2 Jan 2006"}} &middot; <span class="tag">{{$.T $f.Status}}</span>{{if $f.Reference}} &middot; {{$f.Reference}}{{end}}</p>
+  {{if ne $f.Status "confirmed"}}
+  <p class="waiting">{{$.T "File it at Transportstyrelsen with the control number from the registration certificate. The number is not kept here."}}</p>
+  {{if ne $f.Status "filed"}}
+  <form method="post" action="/cars/filings/{{$f.ID}}">
+    <input type="hidden" name="step" value="filed"><input type="hidden" name="back" value="/cars/stock/{{$u.ID}}">
+    <label class="check"><input type="checkbox" name="control_number" value="yes" required> <span>{{$.T "I had the control number"}}</span></label>
+    <label><span>{{$.T "Leasing consent"}}</span><select name="leasing_consent"><option value="">{{$.T "Not leased"}}</option><option value="yes">{{$.T "Given"}}</option><option value="no">{{$.T "Not given"}}</option></select></label>
+    <label class="check"><input type="checkbox" name="retention_of_title" value="yes"> <span>{{$.T "Retention of title on a credit sale"}}</span></label>
+    <button type="submit">{{$.T "Record it filed"}}</button>
+  </form>
+  {{else}}
+  <form method="post" action="/cars/filings/{{$f.ID}}">
+    <input type="hidden" name="step" value="confirmed"><input type="hidden" name="back" value="/cars/stock/{{$u.ID}}">
+    <label><span>{{$.T "Transportstyrelsen's reference"}}</span><input name="reference" maxlength="100" required></label>
+    <button type="submit">{{$.T "Record it confirmed"}}</button>
+  </form>
+  <form method="post" action="/cars/filings/{{$f.ID}}">
+    <input type="hidden" name="step" value="rejected"><input type="hidden" name="back" value="/cars/stock/{{$u.ID}}">
+    <label><span>{{$.T "Why it was rejected"}}</span><input name="note" maxlength="500" required></label>
+    <button type="submit" class="secondary">{{$.T "Record it rejected"}}</button>
+  </form>
+  {{end}}
+  {{end}}
+</section>
+{{end}}
+
 {{if $d.ShowChecks}}
 <section>
   <h2>{{.T "Checks before money leaves"}}</h2>

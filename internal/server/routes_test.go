@@ -280,7 +280,7 @@ var swept = map[string]string{
 	"POST /cars/deals/{id}/defects/{defect}/answer": "sweep", "POST /cars/deals/{id}/contract": "sweep",
 	"POST /cars/deals/{id}/signed": "sweep", "POST /cars/deals/{id}/complete": "sweep", "POST /cars/deals/{id}/cancel": "sweep",
 	"POST /cars/deals/{id}/invoice": "sweep", "POST /cars/deals/{id}/deliver": "sweep",
-	"POST /cars/deals/{id}/complaints": "sweep", "POST /cars/deals/{id}/complaints/{complaint}": "sweep",
+	"POST /cars/deals/{id}/complaints": "sweep", "POST /cars/filings/{filing}": "sweep", "POST /cars/deals/{id}/complaints/{complaint}": "sweep",
 }
 
 // fill substitutes shop B's identifiers into a pattern.
@@ -331,6 +331,7 @@ func fill(pattern string) (method, path string) {
 		"{res}":                   "bbbbbbbb-0000-0000-0000-0000000000d2",
 		"{agreement}":             "bbbbbbbb-0000-0000-0000-0000000000d3",
 		"{complaint}":             "bbbbbbbb-0000-0000-0000-0000000000d4",
+		"{filing}":                "bbbbbbbb-0000-0000-0000-0000000000d5",
 		"/cars/trade-ins/{sale}":  "/cars/trade-ins/bbbbbbbb-0000-0000-0000-0000000000cd",
 		// Rental: ids that are nobody's.
 		"/rental/permits/{id}":     "/rental/permits/bbbbbbbb-0000-0000-0000-0000000000e1",
