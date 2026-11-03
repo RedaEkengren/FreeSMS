@@ -19,7 +19,7 @@ import (
 
 // rentalPages are the templates Rental adds.
 var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "rentalprices", "rentalbooking", "rentalhandover", "rentalregister",
-	"rentaldamage"}
+	"rentaldamage", "rentalfines"}
 
 // rentalData is what Rental's pages are given.
 type rentalData struct {
@@ -60,6 +60,10 @@ type rentalData struct {
 	Deposit workshop.RentalDeposit
 	// A booking's return charges, and how each kind is taxed (#195).
 	Charges []workshop.RentalCharge
+	// Charges for vehicles (#198), and an import's preview and its file.
+	Fines       []workshop.Fine
+	FinePreview []workshop.Fine
+	FineFile    string
 	// A booking's invoices and credit notes (#199).
 	Invoices      []workshop.RentalInvoice
 	ChargeClasses []workshop.ChargeClass
@@ -224,6 +228,7 @@ func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("POST /rental/register/retention", s.requireSession(s.handleRegisterRetention))
 	s.rentalHandoverRoutes(m)
 	s.chargeRoutes(m)
+	s.fineRoutes(m)
 }
 
 // handleRentalSettings shows the permit and the rule profiles: the rental

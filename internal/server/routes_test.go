@@ -268,6 +268,8 @@ var swept = map[string]string{
 	"POST /rental/charge-classes":               "sweep", "POST /rental/bookings/{id}/charges": "sweep",
 	"POST /rental/bookings/{id}/charges/{charge}/{what}": "sweep",
 	"POST /rental/bookings/{id}/invoice":                 "sweep", "POST /rental/bookings/{id}/deposit-apply": "sweep",
+	"GET /rental/fines": "sweep", "POST /rental/fines": "sweep", "POST /rental/fines/import": "sweep",
+	"POST /rental/fines/{id}/{what}":      "sweep",
 	"POST /cars/trade-ins/{sale}/receive": "sweep", "POST /cars/trade-ins/{sale}/credit": "sweep",
 	"POST /cars/stock/{id}/consignment/{agreement}/end": "sweep",
 	"POST /cars/stock/{id}/card/{what}":                 "sweep",
@@ -358,6 +360,7 @@ func fill(pattern string) (method, path string) {
 		"/rental/drivers/{id}":     "/rental/drivers/bbbbbbbb-0000-0000-0000-0000000000e8",
 		"/rental/agreements/{id}":  "/rental/agreements/bbbbbbbb-0000-0000-0000-0000000000e9",
 		"/rental/handovers/{id}":   "/rental/handovers/bbbbbbbb-0000-0000-0000-0000000000ea",
+		"/rental/fines/{id}":       "/rental/fines/bbbbbbbb-0000-0000-0000-0000000000ec",
 	} {
 		path = strings.ReplaceAll(path, from, to)
 	}

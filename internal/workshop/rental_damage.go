@@ -285,6 +285,18 @@ func damageWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 			                  AND NOT EXISTS (SELECT 1 FROM damage_case_steps s WHERE s.case_id = c.id AND s.step = 'outcome'
 			                                  AND s.seq > coalesce((SELECT max(r.seq) FROM damage_case_steps r WHERE r.case_id = c.id AND r.step = 'reopened'), 0))
 			                  AND NOT EXISTS (SELECT 1 FROM damage_case_steps s WHERE s.case_id = c.id AND s.step = 'pre_existing'))
+			UNION ALL
+			-- Charges for a vehicle (#198): due within a week and not paid
+			-- to the authority, whoever pays the shop; or nobody has
+			-- decided whose they are a day after they were recorded.
+			SELECT CASE WHEN f.due_on IS NOT NULL AND f.due_on <= current_date + 7 AND NOT x.paid THEN 'fine_due' ELSE 'fine_undecided' END,
+			       '', f.issuer || ' ' || f.reference, coalesce(f.due_on::timestamptz, f.created_at + interval '1 day')
+			FROM vehicle_fines f
+			CROSS JOIN LATERAL (SELECT
+				EXISTS (SELECT 1 FROM vehicle_fine_events e WHERE e.fine_id = f.id AND e.kind = 'paid') AS paid,
+				EXISTS (SELECT 1 FROM vehicle_fine_events e WHERE e.fine_id = f.id AND e.kind IN ('renter', 'shop')) AS decided) x
+			WHERE (f.due_on IS NOT NULL AND f.due_on <= current_date + 7 AND NOT x.paid)
+			   OR (NOT x.decided AND f.created_at < clock_timestamp() - interval '1 day')
 			ORDER BY 4`)
 		if err != nil {
 			return fmt.Errorf("read damage and deposits waiting: %w", err)
@@ -294,6 +306,9 @@ func damageWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 			it := ActionItem{Module: access.Rental, SubjectKind: "rental_booking", Urgency: UrgencySoon}
 			if err := rows.Scan(&it.Kind, &it.SubjectID, &it.Text, &it.Due); err != nil {
 				return err
+			}
+			if it.Kind == "fine_due" || it.Kind == "fine_undecided" {
+				it.SubjectKind = "rental_fines"
 			}
 			out = append(out, it)
 		}

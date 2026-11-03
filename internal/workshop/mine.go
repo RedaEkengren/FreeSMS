@@ -162,6 +162,8 @@ var waitingSays = map[string]string{
 	"damage_to_assess":       "Damage found two days ago and not assessed: %s",
 	"deposit_to_return":      "A rental is over and its deposit is still held: %s",
 	"deposit_hold_open":      "A rental is over and the hold on the card is not released: %s",
+	"fine_due":               "A charge the shop owes the authority is due: %s",
+	"fine_undecided":         "A charge for a vehicle nobody has decided on: %s",
 }
 
 // Says is the item's catalogue key.
@@ -205,6 +207,8 @@ func (w ActionItem) Link() string {
 		return "/rental/units/" + w.SubjectID
 	case w.SubjectKind == "rental_settings":
 		return "/rental/settings"
+	case w.SubjectKind == "rental_fines":
+		return "/rental/fines"
 	}
 	return "/jobs/" + w.SubjectID
 }

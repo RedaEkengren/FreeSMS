@@ -214,6 +214,19 @@ func ConfirmCharge(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	}
 	var id string
 	err := inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		id, err = confirmChargeTx(ctx, tx, scope, bookingID, n)
+		return err
+	})
+	return id, err
+}
+
+// confirmChargeTx is ConfirmCharge in the caller's transaction, its role,
+// module and the charge's own details checked: for a fine passed to the
+// renter (#198).
+func confirmChargeTx(ctx context.Context, tx pgx.Tx, scope access.Scope, bookingID string, n NewCharge) (string, error) {
+	var id string
+	err := func() error {
 		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('rental_charges:' || $1::text, 0))`, bookingID); err != nil {
 			return fmt.Errorf("lock the charges: %w", err)
 		}
@@ -292,7 +305,7 @@ func ConfirmCharge(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 			scope.ShopID, bookingID, n.Kind, n.Description, qty, unit, gross, class.VATRateBp, class.VATCategory, class.ID, class.Confirmed,
 			n.DamageCaseID, n.Proposed, n.Key, scope.UserID).Scan(&id)
 		return err
-	})
+	}()
 	return id, err
 }
 
