@@ -220,6 +220,8 @@
     "remedy_done": {"other": "remedy done"},
     "referred_arn": {"other": "referred to the National Board for Consumer Disputes"},
     "price_reduction": {"other": "price reduction"},
-    "in_person": {"other": "in person"}
+    "in_person": {"other": "in person"},
+    "%d car": {"one": "%d car", "other": "%d cars"},
+    "%d car has no purchase price, and is left out of the totals": {"one": "%d car has no purchase price, and is left out of the totals", "other": "%d cars have no purchase price, and are left out of the totals"}
   }
 }

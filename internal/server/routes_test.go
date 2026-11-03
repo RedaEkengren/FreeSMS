@@ -256,7 +256,7 @@ var swept = map[string]string{
 	"POST /checklists/{id}/subjects":              "sweep",
 
 	// Dealer
-	"GET /cars/stock": "", "GET /cars/stock/new": "", "GET /cars/consign": "", "POST /cars/consign": "", "POST /cars/stock": "",
+	"GET /cars/stock": "", "GET /cars/stock/new": "", "GET /cars/consign": "", "GET /cars/results": "", "POST /cars/consign": "", "POST /cars/stock": "",
 	"GET /cars/stock/{id}": "sweep", "POST /cars/stock/{id}/move": "sweep", "POST /cars/stock/{id}/checks": "sweep",
 	"POST /cars/stock/{id}/checks/override": "sweep", "POST /cars/stock/{id}/costs": "sweep",
 	"POST /cars/stock/{id}/costs/{cost}/reverse": "sweep",

@@ -49,7 +49,8 @@
     {{end}}<a href="/rota" class="nav">{{.T "Rota"}}</a>
     {{if and .Session.Scope.Role.SeesCustomerPersonalData (.Runs "workshop")}}<a href="/labour" class="nav">{{.T "Labour times"}}</a>{{end}}{{if and (or .Session.Scope.Role.BuysVehicles .Session.Scope.Role.SellsVehicles) (.Runs "dealer")}}
     <a href="/cars/stock" class="nav">{{.T "Cars in stock"}}</a>{{end}}{{if and .Session.Scope.Role.SeesPurchasePrice (.Runs "dealer")}}
-    <a href="/cars/calculations/new" class="nav">{{.T "Before the bid"}}</a>{{end}}{{if and .Session.Scope.Role.SellsVehicles (.Runs "dealer")}}
+    <a href="/cars/calculations/new" class="nav">{{.T "Before the bid"}}</a>
+    <a href="/cars/results" class="nav">{{.T "What the cars earned"}}</a>{{end}}{{if and .Session.Scope.Role.SellsVehicles (.Runs "dealer")}}
     <a href="/cars/leads" class="nav">{{.T "Leads"}}</a>
     <a href="/cars/deals" class="nav">{{.T "Deals"}}</a>{{end}}
     <a href="/help" class="nav">{{.T "Help"}}</a>

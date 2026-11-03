@@ -18,7 +18,9 @@ import (
 type dealerData struct {
 	Stock workshop.StockList
 	// Trade-ins waiting to be received or credited, for whoever buys cars.
-	TradeIns    []workshop.ExpectedTradeIn
+	TradeIns []workshop.ExpectedTradeIn
+	// What the cars sold in a period earned (#182), and the period.
+	Results     workshop.Results
 	Calculation workshop.Calculation
 	Result      workshop.CalculationResult
 	Vehicle     workshop.Vehicle
@@ -490,4 +492,24 @@ func (s *Server) handleConsign(w http.ResponseWriter, r *http.Request) {
 	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/cars/stock/"+c.StockUnitID, http.StatusSeeOther)
+}
+
+// handleCarResults is what the cars sold in a month earned (#182), for
+// whoever may see margins: by car, salesperson and month.
+func (s *Server) handleCarResults(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	loc := s.shopLocation(r)
+	month := r.URL.Query().Get("month")
+	start, err := time.ParseInLocation("2006-01", month, loc)
+	if err != nil {
+		now := time.Now().In(loc)
+		start = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, loc)
+	}
+	res, err := workshop.SaleResults(r.Context(), s.pool, session.Scope, start, start.AddDate(0, 1, 0))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "carresults", pageData{Title: "What the cars sold earned", Session: session,
+		Dealer: &dealerData{Results: res, Form: map[string]string{"month": start.Format("2006-01"),
+			"previous": start.AddDate(0, -1, 0).Format("2006-01"), "next": start.AddDate(0, 1, 0).Format("2006-01")}}})
 }

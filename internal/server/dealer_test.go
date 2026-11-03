@@ -462,3 +462,16 @@ func TestABuyerTakesACarInOnConsignment(t *testing.T) {
 		t.Errorf("a salesperson was given the consignment form: %d", status)
 	}
 }
+
+// What the cars sold earned is for whoever may see margins: the buyer
+// reads it, the salesperson does not (#182, #145).
+func TestTheResultsAreOnlyForWhoMaySeeMargins(t *testing.T) {
+	ts, pool := testServer(t)
+	dealerShop(t, pool)
+	if page := visibleText(get(t, signIn(t, ts, buyerEmail), ts.URL+"/cars/results", http.StatusOK)); !strings.Contains(page, "Business margin") {
+		t.Errorf("the buyer's results page:\n%s", page)
+	}
+	if status, _ := getBody(t, signIn(t, ts, salesEmail), ts.URL+"/cars/results"); status != http.StatusForbidden {
+		t.Errorf("a salesperson read the results: %d", status)
+	}
+}
