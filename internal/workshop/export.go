@@ -72,6 +72,9 @@ var ExportTables = []string{
 	// How each stock car is offered, a row per change, and how the stock
 	// feed is published (#167, #183).
 	"stock_listings", "stock_feed_settings",
+	// A car's damage and repairs, keys and where they went, and service
+	// book (#167).
+	"vehicle_damages", "vehicle_damage_repairs", "vehicle_keys", "vehicle_key_movements", "vehicle_service_entries",
 	// Rental
 	"rental_permits", "rental_permit_revocations", "rental_profiles", "rental_units", "fleet_memberships",
 	"rate_plans", "rate_plan_seasons", "rental_extras", "rental_bookings", "rental_booking_events", "rental_booking_lines",
