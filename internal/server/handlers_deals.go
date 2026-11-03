@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -131,6 +132,76 @@ func (d dealData) LineRows() []lineRow {
 	return append(rows, lineRow{VAT: "25"}, lineRow{VAT: "25"})
 }
 
+// tradeInRow is a trade-in as the terms form holds it, every field as typed.
+type tradeInRow struct {
+	Reg, VIN, Make, Model, Km, Credit, Loan, Lender, SellerType string
+}
+
+// tradeInFields are a trade-in row's fields, by the name the form sends
+// them as (ti_<field>, one per row) and keeps them as when refused
+// (ti_<n>_<field>).
+var tradeInFields = []string{"reg", "vin", "make", "model", "km", "credit", "loan", "lender", "seller_type"}
+
+func (r *tradeInRow) set(field, v string) {
+	switch field {
+	case "reg":
+		r.Reg = v
+	case "vin":
+		r.VIN = v
+	case "make":
+		r.Make = v
+	case "model":
+		r.Model = v
+	case "km":
+		r.Km = v
+	case "credit":
+		r.Credit = v
+	case "loan":
+		r.Loan = v
+	case "lender":
+		r.Lender = v
+	case "seller_type":
+		r.SellerType = v
+	}
+}
+
+// TradeInRows are the trade-in rows a terms form offers: what was typed,
+// or the deal's trade-ins, and one empty row.
+func (d dealData) TradeInRows() []tradeInRow {
+	var rows []tradeInRow
+	if d.Typed {
+		for n := 0; ; n++ {
+			if _, ok := d.Form[fmt.Sprintf("ti_%d_reg", n)]; !ok {
+				break
+			}
+			var row tradeInRow
+			for _, f := range tradeInFields {
+				row.set(f, d.Form[fmt.Sprintf("ti_%d_%s", n, f)])
+			}
+			rows = append(rows, row)
+		}
+	} else {
+		for _, t := range d.Deal.Terms.TradeIns {
+			row := tradeInRow{Reg: t.Registration, VIN: t.VIN, Make: t.Make, Model: t.Model, Credit: plainAmount(t.CreditMinor),
+				Lender: t.Lender, SellerType: t.SellerType}
+			if t.OdometerKm != nil {
+				row.Km = strconv.FormatInt(*t.OdometerKm, 10)
+			}
+			if t.LoanMinor > 0 {
+				row.Loan = plainAmount(t.LoanMinor)
+			}
+			rows = append(rows, row)
+		}
+	}
+	return append(rows, tradeInRow{SellerType: workshop.SellerPrivate})
+}
+
+// SellerTypes are the kinds of seller a trade-in row offers.
+func (dealData) SellerTypes() []string { return workshop.SellerTypes }
+
+// SellerTypeLabel is a kind of seller in words, a catalogue key.
+func (dealData) SellerTypeLabel(t string) string { return workshop.SellerTypeLabel(t) }
+
 // Qty is a line's quantity as typed.
 func (dealData) Qty(milli int64) string {
 	if milli == 0 {
@@ -245,7 +316,51 @@ func (s *Server) readTerms(r *http.Request) (workshop.SaleTerms, map[string]stri
 		}
 		t.Lines = append(t.Lines, workshop.SaleLine{Description: d, QuantityMilli: qty, UnitPriceMinor: unit, VATRateBasis: rate * 100})
 	}
-	return t, form, ""
+	// Trade-ins (#165): a row with a plate or a chassis number is one, kept
+	// in the form as typed so a refusal gives it back.
+	n := 0
+	var msg string
+	for i := range r.Form["ti_reg"] {
+		get := func(field string) string {
+			if xs := r.Form["ti_"+field]; i < len(xs) {
+				return strings.TrimSpace(xs[i])
+			}
+			return ""
+		}
+		if get("reg") == "" && get("vin") == "" {
+			continue
+		}
+		for _, f := range tradeInFields {
+			form[fmt.Sprintf("ti_%d_%s", n, f)] = get(f)
+		}
+		n++
+		ti := workshop.TradeIn{Registration: get("reg"), VIN: get("vin"), Make: get("make"), Model: get("model"),
+			Lender: get("lender"), SellerType: get("seller_type")}
+		credit, err := parseMinorUnits(get("credit"))
+		if err != nil || get("credit") == "" {
+			msg = "Say what each trade-in is credited at, in kronor."
+			continue
+		}
+		ti.CreditMinor = credit
+		if v := get("loan"); v != "" {
+			loan, err := parseMinorUnits(v)
+			if err != nil {
+				msg = "A loan on a trade-in is an amount in kronor."
+				continue
+			}
+			ti.LoanMinor = loan
+		}
+		if v := get("km"); v != "" {
+			km, err := strconv.ParseInt(strings.ReplaceAll(v, " ", ""), 10, 64)
+			if err != nil {
+				msg = "Say what the odometer shows, in whole kilometres."
+				continue
+			}
+			ti.OdometerKm = &km
+		}
+		t.TradeIns = append(t.TradeIns, ti)
+	}
+	return t, form, msg
 }
 
 func (s *Server) dealsPage(w http.ResponseWriter, r *http.Request, status int, d dealData, msg string) {

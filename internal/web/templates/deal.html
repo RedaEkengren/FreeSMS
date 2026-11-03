@@ -27,6 +27,22 @@
   </div>
   {{end}}
   </fieldset>
+  <fieldset><legend>{{.T "Traded in"}}</legend>
+  {{range $d.TradeInRows}}
+  <div class="pair">
+    <label><span>{{$.T "Registration"}}</span><input name="ti_reg" maxlength="20" value="{{.Reg}}" autocapitalize="characters"></label>
+    <label><span>{{$.T "Chassis number (VIN)"}}</span><input name="ti_vin" maxlength="40" value="{{.VIN}}" autocapitalize="characters"></label>
+    <label><span>{{$.T "Make"}}</span><input name="ti_make" maxlength="100" value="{{.Make}}"></label>
+    <label><span>{{$.T "Model"}}</span><input name="ti_model" maxlength="100" value="{{.Model}}"></label>
+    <label><span>{{$.T "Odometer, km"}}</span><input name="ti_km" inputmode="numeric" value="{{.Km}}"></label>
+    <label><span>{{$.T "Credited at, in kronor"}}</span><input name="ti_credit" inputmode="decimal" value="{{.Credit}}"></label>
+    <label><span>{{$.T "Of which settles a loan, in kronor"}}</span><input name="ti_loan" inputmode="decimal" value="{{.Loan}}"></label>
+    <label><span>{{$.T "With which lender"}}</span><input name="ti_lender" maxlength="200" value="{{.Lender}}"></label>
+    <label><span>{{$.T "What kind of seller"}}</span>
+      <select name="ti_seller_type">{{$st := .SellerType}}{{range $d.SellerTypes}}<option value="{{.}}"{{if eq . $st}} selected{{end}}>{{$.T ($d.SellerTypeLabel .)}}</option>{{end}}</select></label>
+  </div>
+  {{end}}
+  </fieldset>
   <label><span>{{.T "Note"}}</span><textarea name="note" maxlength="1000" rows="2">{{$d.Field "note"}}</textarea></label>
 {{end}}
 {{define "content"}}

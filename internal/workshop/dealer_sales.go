@@ -88,6 +88,9 @@ type SaleTerms struct {
 	PaymentTerms  string
 	Note          string
 	Lines         []SaleLine
+	// Cars the buyer trades in (#165): a settlement of what is owed,
+	// never a reduction of the price.
+	TradeIns []TradeIn
 }
 
 // DealBuyer is a buyer as the deal names them.
@@ -269,6 +272,9 @@ func checkTerms(t *SaleTerms) error {
 	if t.OdometerKm != nil && (*t.OdometerKm < 0 || *t.OdometerKm > 9_999_999) {
 		return errDealOdometer
 	}
+	if err := checkTradeIns(t.TradeIns); err != nil {
+		return err
+	}
 	if len(t.Lines) > 50 {
 		return errDealLine
 	}
@@ -354,7 +360,7 @@ func insertTermsTx(ctx context.Context, tx pgx.Tx, scope access.Scope, saleID, u
 			return fmt.Errorf("record the extras: %w", err)
 		}
 	}
-	return nil
+	return insertTradeInsTx(ctx, tx, scope, terms, t.TradeIns)
 }
 
 // lockDealTx takes a deal's lock: every change to it is one at a time.
@@ -925,6 +931,9 @@ func dealTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id string) (Deal
 		d.Terms.Lines = append(d.Terms.Lines, l)
 	}
 	rows.Close()
+	if d.Terms.TradeIns, err = tradeInsTx(ctx, tx, id, d.TermsID); err != nil {
+		return Deal{}, err
+	}
 	rows, err = tx.Query(ctx, `SELECT id, description, coalesce(photo_key, ''), recorded_at FROM vehicle_sale_defects
 		WHERE sale_id = $1 ORDER BY recorded_at, id`, id)
 	if err != nil {
@@ -1265,7 +1274,7 @@ func ProduceSalesContract(ctx context.Context, pool *pgxpool.Pool, scope access.
 			Title: fmt.Sprintf("%d %s", d.Number, d.Car),
 			Data: map[string]string{"number": strconv.FormatInt(d.Number, 10), "shop": shop, "shop_org": dash(org),
 				"buyers": strings.Join(names, ", "), "car": d.Car, "vin": dash(vin), "odometer": odometer,
-				"price": money.Format(d.Terms.PriceMinor), "lines": dash(strings.Join(lines, "\n")), "total": money.Format(d.TotalMinor()),
+				"price": money.Format(d.Terms.PriceMinor), "lines": dash(strings.Join(lines, "\n")), "total": tradeInSettlement(d.TotalMinor(), d.Terms.TradeIns, locale == "sv"),
 				"payment_terms": dash(d.Terms.PaymentTerms), "delivery": delivery, "warranty": dash(d.Terms.Warranty),
 				"defects": dash(strings.Join(defects, "\n")), "dispute": clauses[d.Terms.BuyerKind], "note": d.Terms.Note,
 				"terms_id": d.TermsID, "basis": d.Basis()}})
@@ -1423,7 +1432,7 @@ func IssueDealInvoice(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 		if inv, err = issueSourcedTx(ctx, tx, scope, of, lines); err != nil {
 			return err
 		}
-		return applyReservationDepositTx(ctx, tx, scope, d.StockUnitID, inv.ID)
+		return applySaleDepositsTx(ctx, tx, scope, saleID, d.StockUnitID, inv.ID)
 	})
 	return inv, err
 }
