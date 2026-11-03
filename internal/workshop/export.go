@@ -65,6 +65,8 @@ var ExportTables = []string{
 	"consignment_agreements",
 	// Sold cars handed over (#179).
 	"vehicle_sale_deliveries",
+	// Buyers' complaints and what happened to each (#181).
+	"vehicle_sale_complaints", "vehicle_sale_complaint_events",
 	// Rental
 	"rental_permits", "rental_permit_revocations", "rental_profiles", "rental_units", "fleet_memberships",
 	"rate_plans", "rate_plan_seasons", "rental_extras", "rental_bookings", "rental_booking_events", "rental_booking_lines",
