@@ -352,11 +352,22 @@ func TestACarInStockIsWorkedOnItsPage(t *testing.T) {
 		"incurred_on": {time.Now().Format(time.DateOnly)}}); status != http.StatusSeeOther {
 		t.Errorf("recording a cost answered %d", status)
 	}
+	// The card (#167): a damage, a key out, a service entry.
+	for what, form := range map[string]url.Values{
+		"damage":  {"zone": {"left"}, "description": {"Buckla i bakdörren"}, "severity": {"minor"}},
+		"key":     {"kind": {"remote"}, "label": {"Huvudnyckel"}},
+		"service": {"on": {"2025-05-01"}, "km": {"98000"}, "done_by": {"Märkesverkstad"}, "what_done": {"Stor service"}},
+	} {
+		if status := postStatus(t, buyer, page+"/card/"+what, form); status != http.StatusSeeOther {
+			t.Errorf("recording the %s answered %d", what, status)
+		}
+	}
 	if status := postStatus(t, buyer, page+"/move", url.Values{"to": {string(workshop.StockForSale)}}); status != http.StatusSeeOther {
 		t.Errorf("offering it for sale answered %d", status)
 	}
 	text = strings.ReplaceAll(visibleText(get(t, buyer, page, http.StatusOK)), "\u00a0", " ")
-	if !strings.Contains(text, "1,234.50") || !strings.Contains(text, "No driving ban") {
+	if !strings.Contains(text, "1,234.50") || !strings.Contains(text, "No driving ban") || !strings.Contains(text, "Buckla i bakdörren") ||
+		!strings.Contains(text, "Huvudnyckel") || !strings.Contains(text, "Stor service") {
 		t.Errorf("the buyer's page after the check and the cost:\n%s", text)
 	}
 	sales := get(t, signIn(t, ts, salesEmail), page, http.StatusOK)

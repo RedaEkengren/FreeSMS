@@ -49,6 +49,39 @@
 </section>
 {{end}}
 
+{{if $d.ShowListing}}{{$c := $d.Card}}
+<section>
+  <h2>{{.T "Damage"}}</h2>
+  {{range $c.Damages}}<div class="row"><span>{{$.T .Zone}} &middot; {{.Description}} <span class="tag">{{$.T .Severity}}</span></span>
+    <span>{{if .RepairedOn}}{{$.T "Repaired %s" ($.Date .RepairedOn "2 Jan 2006")}}{{else}}<form method="post" action="/cars/stock/{{$u.ID}}/card/repair"><input type="hidden" name="damage" value="{{.ID}}"><button type="submit" class="secondary">{{$.T "Repaired today"}}</button></form>{{end}}</span></div>{{else}}<p class="empty">{{.T "No damage recorded."}}</p>{{end}}
+  {{if not $u.Status.Ended}}<form method="post" action="/cars/stock/{{$u.ID}}/card/damage">
+    <label><span>{{.T "Where"}}</span><select name="zone">{{range $d.DamageZones}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+    <label><span>{{.T "What"}}</span><input name="description" maxlength="500" required></label>
+    <label><span>{{.T "How bad"}}</span><select name="severity">{{range $d.DamageSeverities}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+    <button type="submit" class="secondary">{{.T "Record the damage"}}</button></form>{{end}}
+  <h2>{{.T "Keys"}}</h2>
+  {{range $c.Keys}}{{$k := .}}<div class="row"><span>{{$.T .Kind}}{{if .Label}} &middot; {{.Label}}{{end}}</span>
+    <span>{{if eq .Where "out"}}{{$.T "With %s" .Holder}}{{else if eq .Where "lost"}}<span class="tag late">{{$.T "lost"}}</span>{{else}}{{$.T "Here"}}{{end}}</span></div>
+    {{if not $u.Status.Ended}}<form method="post" action="/cars/stock/{{$u.ID}}/card/key-move"><input type="hidden" name="key" value="{{$k.ID}}">
+      <label><span>{{$.T "Move"}}</span><select name="move">{{range $d.KeyMoves}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+      <label><span>{{$.T "To whom, when it goes out"}}</span><input name="holder" maxlength="200"></label>
+      <button type="submit" class="secondary">{{$.T "Record it"}}</button></form>{{end}}
+  {{end}}
+  {{if not $u.Status.Ended}}<form method="post" action="/cars/stock/{{$u.ID}}/card/key">
+    <label><span>{{.T "Kind"}}</span><select name="kind">{{range $d.KeyKinds}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+    <label><span>{{.T "Label"}}</span><input name="label" maxlength="100"></label>
+    <button type="submit" class="secondary">{{.T "Add a key"}}</button></form>{{end}}
+  <h2>{{.T "Service book"}}</h2>
+  {{range $c.Service}}<div class="waiting">{{$.Date .DoneOn "2 Jan 2006"}}{{with .OdometerKm}} &middot; {{$.Num (print .)}} km{{end}} &middot; {{.DoneBy}} &middot; {{.What}}</div>{{end}}
+  {{if not $u.Status.Ended}}<form method="post" action="/cars/stock/{{$u.ID}}/card/service">
+    <label><span>{{.T "Done on"}}</span><input type="date" name="on" required></label>
+    <label><span>{{.T "Odometer, km"}}</span><input name="km" inputmode="numeric"></label>
+    <label><span>{{.T "Done by"}}</span><input name="done_by" maxlength="200" required></label>
+    <label><span>{{.T "What was done"}}</span><input name="what_done" maxlength="1000" required></label>
+    <button type="submit" class="secondary">{{.T "Add to the service book"}}</button></form>{{end}}
+</section>
+{{end}}
+
 {{with $d.Consignments}}{{$c := index . 0}}
 <section>
   <h2>{{$.T "On consignment for %s" $c.PrincipalName}}</h2>
