@@ -37,10 +37,13 @@ const (
 	DocTestDriveAgreement   = "test_drive_agreement"
 	DocConsignmentAgreement = "consignment_agreement"
 	DocRentalAgreement      = "rental_agreement"
+	// A reservation's terms, given to the customer (#174).
+	DocReservationTerms = "reservation_terms"
 )
 
 // DocumentKinds is every kind, in the order a page lists them.
-var DocumentKinds = []string{DocPurchaseAgreement, DocConsignmentAgreement, DocSalesContract, DocTestDriveAgreement, DocRentalAgreement}
+var DocumentKinds = []string{DocPurchaseAgreement, DocConsignmentAgreement, DocSalesContract, DocReservationTerms, DocTestDriveAgreement,
+	DocRentalAgreement}
 
 // documentKindLabels are the kinds as a page heads them, catalogue keys.
 var documentKindLabels = map[string]string{
@@ -49,6 +52,7 @@ var documentKindLabels = map[string]string{
 	DocTestDriveAgreement:   "Test-drive agreement",
 	DocConsignmentAgreement: "Consignment agreement",
 	DocRentalAgreement:      "Rental agreement",
+	DocReservationTerms:     "Reservation terms",
 }
 
 // DocumentKindLabel is a kind's heading, a catalogue key.
@@ -111,7 +115,7 @@ func mayReadDocument(roles access.Roles, kind string) error {
 	switch kind {
 	case DocPurchaseAgreement, DocConsignmentAgreement:
 		may = roles.BuysVehicles()
-	case DocSalesContract, DocTestDriveAgreement:
+	case DocSalesContract, DocTestDriveAgreement, DocReservationTerms:
 		may = roles.SellsVehicles()
 	case DocRentalAgreement:
 		may = roles.HandsOverRentals()
@@ -257,7 +261,7 @@ type NewDocumentRecord struct {
 	Supersedes string
 }
 
-var documentSubjects = []string{"sale", "purchase", "rental_booking", "consignment", "test_drive"}
+var documentSubjects = []string{"sale", "purchase", "rental_booking", "consignment", "test_drive", "reservation"}
 var documentPartyRoles = []string{"buyer", "seller", "renter", "consignor", "driver", "guarantor"}
 
 // render fills a template's {name} placeholders from data. Deterministic: the
@@ -1030,7 +1034,7 @@ func withoutNames(title string, names []string) string {
 // title, which can carry a person's name.
 func unsignedDocumentsWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ActionItem, error) {
 	var kinds []string
-	for _, k := range []string{DocPurchaseAgreement, DocConsignmentAgreement, DocSalesContract, DocTestDriveAgreement, DocRentalAgreement} {
+	for _, k := range DocumentKinds {
 		if mayDocument(scope.Role, scope, k, true) == nil {
 			kinds = append(kinds, k)
 		}

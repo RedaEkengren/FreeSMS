@@ -13,6 +13,7 @@ import (
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
+	"github.com/RedaEkengren/FreeSMS/internal/money"
 )
 
 // A car reserved for a customer until a stated time (#174). A reservation
@@ -580,4 +581,191 @@ func applyReservationDepositTx(ctx context.Context, tx pgx.Tx, scope access.Scop
 		return nil
 	}
 	return applyDepositTx(ctx, tx, scope, deposit, invoiceID, amount, "")
+}
+
+// ReservationTermsName is the shipped reservation terms' name.
+const ReservationTermsName = "Reservation terms (needs legal review)"
+
+// shippedReservationTerms are the shipped terms by language: the car, the
+// holder, until when, the deposit and whether it is refunded. The blanks
+// are the shop's; the text is a draft until the legal review (#221) has
+// read it, and whether a consumer's deposit may be kept is that review's.
+var shippedReservationTerms = map[string]string{
+	"en": `RESERVATION
+{shop}, {shop_org}, holds the car below for the customer until {until}. It is not sold to anyone else meanwhile.
+
+Customer: {holder}
+Car: {car}
+
+Deposit: {deposit}
+{refund}
+Conditions: {conditions}
+
+If the customer buys the car, the deposit is part of the payment. The reservation ends at {until} unless it is extended in writing.`,
+	"sv": `RESERVATION
+{shop}, {shop_org}, håller bilen nedan åt kunden till {until}. Den säljs inte till någon annan under tiden.
+
+Kund: {holder}
+Bil: {car}
+
+Handpenning: {deposit}
+{refund}
+Villkor: {conditions}
+
+Om kunden köper bilen räknas handpenningen av mot betalningen. Reservationen upphör {until} om den inte förlängs skriftligen.`,
+}
+
+var shippedReservationTermsNames = map[string]string{"sv": "Reservationsvillkor (behöver juridisk granskning)"}
+
+var reservationRefundText = map[string][2]string{
+	"en": {"If the customer does not buy the car, the deposit is refunded.", "The deposit is not refunded if the customer does not buy the car."},
+	"sv": {"Köper kunden inte bilen betalas handpenningen tillbaka.", "Handpenningen betalas inte tillbaka om kunden inte köper bilen."},
+}
+
+// ensureReservationTermsTx is the shipped terms template's newest version,
+// made the first time -- named in the shop's language -- when the shop has
+// none of the kind; a shop with only its own is asked which to use.
+func ensureReservationTermsTx(ctx context.Context, tx pgx.Tx, shopID string) (string, string, error) {
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('shipped:reservation_terms:' || $1::text, 0))`, shopID); err != nil {
+		return "", "", fmt.Errorf("lock templates: %w", err)
+	}
+	var locale string
+	var some bool
+	if err := tx.QueryRow(ctx, `SELECT (SELECT locale FROM shops), EXISTS (SELECT 1 FROM document_templates WHERE kind = 'reservation_terms')`).
+		Scan(&locale, &some); err != nil {
+		return "", "", err
+	}
+	text, ok := shippedReservationTerms[locale]
+	if !ok {
+		locale, text = "en", shippedReservationTerms["en"]
+	}
+	var version string
+	err := tx.QueryRow(ctx, `
+		SELECT v.id FROM document_templates t JOIN document_template_versions v ON v.template_id = t.id
+		WHERE t.shipped = 'reservation_terms' ORDER BY v.version DESC LIMIT 1`).Scan(&version)
+	switch {
+	case err == nil:
+		return version, locale, nil
+	case !errors.Is(err, pgx.ErrNoRows):
+		return "", "", fmt.Errorf("read the shipped template: %w", err)
+	case some:
+		return "", "", fmt.Errorf("%w: choose which of the shop's reservation terms to use", ErrInvalid)
+	}
+	name := ReservationTermsName
+	if n, ok := shippedReservationTermsNames[locale]; ok {
+		name = n
+	}
+	var id string
+	if err := tx.QueryRow(ctx, `INSERT INTO document_templates (shop_id, kind, name, shipped) VALUES ($1, 'reservation_terms', $2, 'reservation_terms') RETURNING id`,
+		shopID, name).Scan(&id); err != nil {
+		return "", "", fmt.Errorf("make the shipped template: %w", err)
+	}
+	err = tx.QueryRow(ctx, `INSERT INTO document_template_versions (shop_id, template_id, version, body) VALUES ($1, $2, 1, $3) RETURNING id`,
+		shopID, id, text).Scan(&version)
+	return version, locale, err
+}
+
+// ProduceReservationTerms freezes a standing reservation's terms as a
+// document given to the holder (#150, #174), about the first reservation
+// of its chain as the deposit is, from the shipped template:
+// the car, until when, the deposit held and whether it is refunded. Made
+// again -- extended, the deposit paid since -- the new one supersedes the
+// last. For whoever sells cars.
+func ProduceReservationTerms(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, reservationID string) (string, error) {
+	if !scope.Role.SellsVehicles() {
+		return "", access.ErrForbidden
+	}
+	if err := mayDocument(scope.Role, scope, DocReservationTerms, true); err != nil {
+		return "", err
+	}
+	if !looksLikeUUID(reservationID) {
+		return "", ErrNotFound
+	}
+	var doc string
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		r, err := lockReservationTx(ctx, tx, reservationID)
+		if err != nil {
+			return err
+		}
+		if !r.Standing() {
+			return errReservationEnded
+		}
+		version, locale, err := ensureReservationTermsTx(ctx, tx, scope.ShopID)
+		if err != nil {
+			return err
+		}
+		var shop, org, car string
+		if err := tx.QueryRow(ctx, `
+			SELECT s.name, coalesce(s.org_number, ''), `+carNameSQL+`
+			FROM shops s, stock_units u JOIN vehicles v ON v.id = u.vehicle_id
+			LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = v.id AND reg.valid_to IS NULL
+			WHERE u.id = $1`, r.StockUnitID).Scan(&shop, &org, &car); err != nil {
+			return fmt.Errorf("read the shop and the car: %w", err)
+		}
+		loc, err := shopLocationTx(ctx, tx)
+		if err != nil {
+			return err
+		}
+		var held int64
+		var deposit string
+		if err := tx.QueryRow(ctx, `SELECT id FROM deposits WHERE subject_kind = 'reservation' AND subject_id = $1 ORDER BY created_at LIMIT 1`,
+			r.RootID).Scan(&deposit); err == nil {
+			b, err := depositTx(ctx, tx, deposit, false)
+			if err != nil {
+				return err
+			}
+			held = b.Held()
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("read the deposit: %w", err)
+		}
+		refund := reservationRefundText[locale][1]
+		if r.Refundable {
+			refund = reservationRefundText[locale][0]
+		}
+		conditions := r.Conditions
+		if conditions == "" {
+			conditions = "-"
+		}
+		var previous string
+		if err := tx.QueryRow(ctx, `
+			SELECT d.id FROM document_records d
+			WHERE d.kind = 'reservation_terms' AND d.subject_kind = 'reservation' AND d.subject_id = $1
+			  AND NOT EXISTS (SELECT 1 FROM document_records n WHERE n.supersedes_id = d.id)
+			ORDER BY d.created_at DESC LIMIT 1`, r.RootID).Scan(&previous); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("read the terms before: %w", err)
+		}
+		doc, err = produceDocumentTx(ctx, tx, scope, NewDocumentRecord{Kind: DocReservationTerms, SubjectKind: "reservation",
+			SubjectID: r.RootID, TemplateVersionID: version, Supersedes: previous,
+			Title:   car + " " + r.ExpiresAt.In(loc).Format("2006-01-02 15:04"),
+			Parties: []DocumentPartyRole{{PartyID: r.PartyID, Role: "buyer"}},
+			Data: map[string]string{"shop": shop, "shop_org": org, "holder": r.HolderName, "car": car,
+				"until": r.ExpiresAt.In(loc).Format("2006-01-02 15:04"), "deposit": money.Format(held), "refund": refund,
+				"conditions": conditions}})
+		return err
+	})
+	return doc, err
+}
+
+// ReservationTermsOf is the document in force for a reservation's terms,
+// or "" when none was made. For whoever sells cars; reading is Core's.
+func ReservationTermsOf(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, reservationID string) (string, error) {
+	if !scope.Role.SellsVehicles() {
+		return "", access.ErrForbidden
+	}
+	if !looksLikeUUID(reservationID) {
+		return "", ErrNotFound
+	}
+	var doc string
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		err := tx.QueryRow(ctx, `
+			SELECT d.id FROM vehicle_reservations r
+			JOIN document_records d ON d.kind = 'reservation_terms' AND d.subject_kind = 'reservation' AND d.subject_id = r.root_id
+			WHERE r.id = $1 AND NOT EXISTS (SELECT 1 FROM document_records n WHERE n.supersedes_id = d.id)
+			ORDER BY d.created_at DESC LIMIT 1`, reservationID).Scan(&doc)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	})
+	return doc, err
 }

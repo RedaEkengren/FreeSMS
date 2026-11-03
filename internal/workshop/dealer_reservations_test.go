@@ -3,6 +3,7 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -328,5 +329,54 @@ func TestTheDepositIsAppliedToTheSaleInvoice(t *testing.T) {
 	}
 	if paid != five || b.Held() != 0 || b.Applied != five {
 		t.Errorf("the invoice was paid %d from the deposit, which holds %d (%+v)", paid, b.Held(), b)
+	}
+}
+
+// A reservation's terms are a frozen document given to the holder: the
+// car, until when, the deposit held and whether it is refunded. Made again
+// after an extension, the new one supersedes the old, which stays (#174).
+func TestAReservationsTermsAreAFrozenDocument(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := eligibleCar(t, pool)
+	r, err := workshop.Reserve(ctx, pool, sales(), workshop.NewReservation{StockUnitID: unit, PartyID: driver(t, pool),
+		ExpiresAt: time.Now().Add(48 * time.Hour), Refundable: false, Conditions: "Hämtas senast på fredag"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	five := int64(500_000)
+	if _, err := workshop.RecordReservationDeposit(ctx, pool, sales(), r.ID, "", workshop.NewPayment{AmountMinor: &five, Method: "cash",
+		PaidOn: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	first, err := workshop.ProduceReservationTerms(ctx, pool, sales(), r.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := workshop.DocumentRecordByID(ctx, pool, sales(), first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"ABC 12D", "Kim Köpare", "5000.00", "Hämtas senast på fredag"} {
+		if !strings.Contains(strings.ReplaceAll(doc.Body, " ", ""), strings.ReplaceAll(want, " ", "")) {
+			t.Errorf("the terms do not say %q:\n%s", want, doc.Body)
+		}
+	}
+	next, err := workshop.ExtendReservation(ctx, pool, sales(), r.ID, time.Now().Add(96*time.Hour), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := workshop.ProduceReservationTerms(ctx, pool, sales(), next.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d, _ := workshop.DocumentRecordByID(ctx, pool, sales(), second); d.SupersedesID != first {
+		t.Errorf("the terms made again supersede %q, want %q", d.SupersedesID, first)
+	}
+	if in, err := workshop.ReservationTermsOf(ctx, pool, sales(), next.ID); err != nil || in != second {
+		t.Errorf("the terms in force: %q, %v; want %q", in, err, second)
+	}
+	if _, err := workshop.ProduceReservationTerms(ctx, pool, buyerScope(), next.ID); !errors.Is(err, access.ErrForbidden) {
+		t.Errorf("the buyer made a reservation's terms: %v", err)
 	}
 }

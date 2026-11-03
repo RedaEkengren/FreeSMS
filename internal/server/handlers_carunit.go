@@ -35,7 +35,9 @@ type carUnitData struct {
 	Reservations     []workshop.Reservation
 	Standing         *workshop.Reservation
 	Deposit          workshop.DepositBalance
-	Key              string
+	// The reservation's terms in force, a document, or "".
+	TermsID string
+	Key     string
 }
 
 // Methods are the ways money arrives, for the deposit form.
@@ -112,6 +114,9 @@ func (s *Server) carUnitPage(w http.ResponseWriter, r *http.Request, status int,
 				d.Standing = &d.Reservations[i]
 				if d.Deposit, err = workshop.ReservationDeposit(r.Context(), s.pool, scope, d.Standing.ID); err != nil {
 					s.log.Error("read the deposit", "error", err)
+				}
+				if d.TermsID, err = workshop.ReservationTermsOf(r.Context(), s.pool, scope, d.Standing.ID); err != nil {
+					s.log.Error("read the terms", "error", err)
 				}
 			}
 		}
@@ -275,6 +280,18 @@ func (s *Server) handleEndReservation(w http.ResponseWriter, r *http.Request) {
 	s.carUnitDone(w, r)
 }
 
+// handleReservationTerms freezes the reservation's terms as a document and
+// opens it, to print or send.
+func (s *Server) handleReservationTerms(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	doc, err := workshop.ProduceReservationTerms(r.Context(), s.pool, session.Scope, r.PathValue("res"))
+	if s.carUnitRefused(w, r, err, nil) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/contracts/"+doc, http.StatusSeeOther)
+}
+
 // carUnitRoutes registers the pages of one car in stock.
 func (s *Server) carUnitRoutes(m routeMux) {
 	m.HandleFunc("GET /cars/stock/{id}", s.requireSession(s.handleCarUnit))
@@ -287,4 +304,5 @@ func (s *Server) carUnitRoutes(m routeMux) {
 	m.HandleFunc("POST /cars/stock/{id}/reservations/{res}/extend", s.requireSession(s.handleExtendReservation))
 	m.HandleFunc("POST /cars/stock/{id}/reservations/{res}/deposit", s.requireSession(s.handleReservationDeposit))
 	m.HandleFunc("POST /cars/stock/{id}/reservations/{res}/end", s.requireSession(s.handleEndReservation))
+	m.HandleFunc("POST /cars/stock/{id}/reservations/{res}/terms", s.requireSession(s.handleReservationTerms))
 }

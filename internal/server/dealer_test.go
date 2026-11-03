@@ -402,6 +402,12 @@ func TestASalespersonReservesACarOnItsPage(t *testing.T) {
 	if !strings.Contains(text, "Reserved for Kim Köpare") || !strings.Contains(text, "Deposit held SEK 5,000.00") {
 		t.Errorf("the reserved car's page:\n%s", text)
 	}
+	if resp := postResponse(t, seller, res+"/terms", url.Values{}); resp.StatusCode != http.StatusSeeOther ||
+		!strings.HasPrefix(resp.Header.Get("Location"), "/contracts/") {
+		t.Errorf("making the terms answered %d to %q", resp.StatusCode, resp.Header.Get("Location"))
+	} else if doc := visibleText(get(t, seller, ts.URL+resp.Header.Get("Location"), http.StatusOK)); !strings.Contains(doc, "Kim Köpare") {
+		t.Errorf("the terms:\n%s", doc)
+	}
 	if status := postStatus(t, seller, res+"/extend", url.Values{"until": {time.Now().Add(120 * time.Hour).Format("2006-01-02T15:04")}}); status != http.StatusSeeOther {
 		t.Errorf("extending answered %d", status)
 	}

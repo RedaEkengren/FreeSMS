@@ -29,6 +29,10 @@
       {{if $d.Lapsed}}<span class="tag late">{{$.T "Run out: end it and decide on the deposit"}}</span>{{end}}</p>
     <p class="waiting">{{if .Refundable}}{{$.T "The deposit is refundable"}}{{else}}{{$.T "The deposit is not refundable"}}{{end}}{{if .Conditions}} &middot; {{.Conditions}}{{end}}
       &middot; {{$.T "Deposit held %s" ($.Money $d.Deposit.Held)}}</p>
+    <form method="post" action="/cars/stock/{{$u.ID}}/reservations/{{.ID}}/terms">
+      {{if $d.TermsID}}<a href="/contracts/{{$d.TermsID}}">{{$.T "The terms given to the customer"}}</a>{{end}}
+      <button type="submit" class="secondary">{{if $d.TermsID}}{{$.T "Make the terms again"}}{{else}}{{$.T "Make the terms for the customer"}}{{end}}</button>
+    </form>
     <form method="post" action="/cars/stock/{{$u.ID}}/reservations/{{.ID}}/deposit">
       <input type="hidden" name="key" value="{{$d.Key}}">
       <label><span>{{$.T "Deposit received, in kronor"}}</span><input name="amount" value="{{index $d.Form "amount"}}" inputmode="decimal" required></label>
