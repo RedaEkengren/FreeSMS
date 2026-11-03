@@ -324,7 +324,7 @@ func VehicleByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 			SELECT w.id, w.number, w.state, w.opened_at, coalesce(w.complaint, ''),
 			       ($2::timestamptz IS NOT NULL AND w.opened_at < $2::timestamptz) AS previous_owner,
 			       coalesce(cp.display_name, c.company_name, ''),
-			       coalesce(i.gross_minor, 0), i.id IS NOT NULL,
+			       CASE WHEN $3 THEN coalesce(i.gross_minor, 0) ELSE 0 END, $3 AND i.id IS NOT NULL,
 			       (SELECT o.km FROM odometer_readings o
 			         WHERE o.vehicle_id = w.vehicle_id AND o.read_at <= w.opened_at
 			         ORDER BY o.read_at DESC LIMIT 1),
@@ -341,7 +341,11 @@ func VehicleByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 			LEFT JOIN invoices i  ON i.work_order_id = w.id AND i.credit_of_id IS NULL
 			WHERE w.vehicle_id = $1
 			ORDER BY w.opened_at DESC`
-		rows, err := tx.Query(ctx, history, id, ownedSince)
+		// A job's total is its prices and says it was invoiced: read only
+		// for whoever is shown both (#225), so a technician's history is the
+		// work, not what it cost.
+		seesTotals := scope.SeesOnJob(access.FieldLinePrices) && scope.SeesOnJob(access.FieldInvoiceStatus)
+		rows, err := tx.Query(ctx, history, id, ownedSince, seesTotals)
 		if err != nil {
 			return fmt.Errorf("read history: %w", err)
 		}

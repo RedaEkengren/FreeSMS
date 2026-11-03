@@ -394,3 +394,44 @@ func TestErasureTakesTheReasonsOfATechniciansExceptions(t *testing.T) {
 		}
 	}
 }
+
+// A vehicle's history hands a technician the work done, not what each job
+// came to: an invoiced job's total is its prices and its invoice status,
+// both fields the technician is not shown by default. Opening the prices
+// and the status shows it.
+func TestAVehiclesHistoryHandsATechnicianNoTotals(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	job, _ := invoicedJob(t, pool)
+	var vehicle string
+	if err := pool.QueryRow(ctx, `SELECT vehicle_id FROM work_orders WHERE id = $1`, job).Scan(&vehicle); err != nil {
+		t.Fatal(err)
+	}
+	totals := func(scope access.Scope) (n int) {
+		t.Helper()
+		v, err := workshop.VehicleByID(ctx, pool, scope, vehicle)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, h := range v.History {
+			if h.TotalMinor() != nil || h.GrossMinor != 0 || h.HasInvoice {
+				n++
+			}
+		}
+		return n
+	}
+	if n := totals(techAs(t, pool, techUserID)); n != 0 {
+		t.Errorf("a technician was handed %d invoiced totals", n)
+	}
+	if n := totals(advisor()); n == 0 {
+		t.Error("the counter lost the invoiced total")
+	}
+	for _, f := range []string{access.FieldLinePrices, access.FieldInvoiceStatus} {
+		if err := workshop.SetTechnicianField(ctx, pool, owner(), f, true, "Ackord"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := totals(techAs(t, pool, techUserID)); n == 0 {
+		t.Error("opened, the prices and status still hide the total")
+	}
+}
