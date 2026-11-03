@@ -58,6 +58,8 @@ type PersonExport struct {
 	// Cars they asked about (#172) and drove (#173).
 	Leads      []ExportedLead      `json:"leads,omitempty"`
 	TestDrives []ExportedTestDrive `json:"test_drives,omitempty"`
+	// Cars reserved for them (#174).
+	Reservations []ExportedReservation `json:"reservations,omitempty"`
 
 	// Written out rather than left for somebody to infer.
 	Notes []string `json:"notes"`
@@ -83,6 +85,19 @@ type ExportedLead struct {
 	Email    string    `json:"email,omitempty"`
 	Status   string    `json:"status"`
 	Contacts []string  `json:"contacts,omitempty"`
+}
+
+// ExportedReservation is a car reserved for the person, as it was agreed
+// and how it ended.
+type ExportedReservation struct {
+	Car             string     `json:"car"`
+	Made            time.Time  `json:"made"`
+	Until           time.Time  `json:"until"`
+	Refundable      bool       `json:"deposit_refundable"`
+	Conditions      string     `json:"conditions,omitempty"`
+	Ended           *time.Time `json:"ended,omitempty"`
+	How             string     `json:"how_it_ended,omitempty"`
+	DepositDecision string     `json:"deposit_decision,omitempty"`
 }
 
 type ExportedTestDrive struct {
@@ -312,6 +327,9 @@ func ExportPerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 		roles.Close()
 
 		// The cars they asked about and drove.
+		if err := exportReservationsTx(ctx, tx, personID, &e); err != nil {
+			return err
+		}
 		if err := exportLeadsAndDrivesTx(ctx, tx, personID, &e); err != nil {
 			return err
 		}

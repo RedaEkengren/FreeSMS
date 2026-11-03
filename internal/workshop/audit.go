@@ -75,6 +75,9 @@ var AuditedTransitions = []AuditTransition{
 	// A stock car's job posting taken back because the job went back to
 	// work after it was ready (#164).
 	{"stock_cost.reversed", "stock_unit", "audit_events", true},
+	// A reservation ended without a sale, and what was decided about its
+	// deposit (#174).
+	{"reservation.ended", "stock_unit", "audit_events", true},
 	// A test drive let start before its agreement was signed (#173).
 	{"test_drive.started_unsigned", "test_drive", "audit_events", true},
 	// Rental

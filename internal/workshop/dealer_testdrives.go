@@ -373,15 +373,6 @@ func driveCarFreeTx(ctx context.Context, tx pgx.Tx, unitID, driver string, statu
 	return nil
 }
 
-// reservedForTx is the party a reserved car is held for, or "" when that
-// is not known. A seam for #174: a reservation and who holds it are not
-// built yet (the design is with the owner), so the status says only that
-// the car is reserved; when they are, this reads the active reservation
-// and its holder drives their own reserved car whatever the shop's block.
-func reservedForTx(ctx context.Context, tx pgx.Tx, unitID string) (string, error) {
-	return "", nil
-}
-
 // workDriveTx reads a drive to change, its car's resource locked first,
 // then the drive.
 func workDriveTx(ctx context.Context, tx pgx.Tx, id string) (TestDrive, error) {

@@ -332,6 +332,19 @@ func moveStockUnitTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id stri
 		if !slices.Contains(stockMoves[from], to) {
 			return errStockMove
 		}
+		// A reserved car with its reservation standing moves on only by
+		// ending the reservation -- which decides its deposit -- or by
+		// selling it to the holder, which ends it first (#174).
+		if from == StockReserved {
+			var standing bool
+			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM vehicle_reservations WHERE stock_unit_id = $1 AND ended_at IS NULL)`,
+				id).Scan(&standing); err != nil {
+				return fmt.Errorf("read the reservation: %w", err)
+			}
+			if standing {
+				return errReservationStanding
+			}
+		}
 		if to.Ended() {
 			if err := retireResourceTx(ctx, tx, scope, resource); err != nil {
 				if errors.Is(err, ErrInvalid) {

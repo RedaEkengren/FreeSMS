@@ -200,6 +200,19 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 	made["stock_checks.overridden"] = subject{"stock_unit", bought.StockUnitID}
 	// A test drive let go before its agreement was signed (#173).
 	made["test_drive.started_unsigned"] = subject{"test_drive", unsignedDrive(t, pool)}
+	// A reservation ended without a sale, the deposit decided (#174).
+	{
+		moveStock(t, pool, bought.StockUnitID, workshop.StockForSale)
+		r, err := workshop.Reserve(ctx, pool, sales(), workshop.NewReservation{StockUnitID: bought.StockUnitID, PartyID: driver(t, pool),
+			ExpiresAt: time.Now().Add(time.Hour), Refundable: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := workshop.EndReservation(ctx, pool, sales(), r.ID, workshop.ReservationCancelled, workshop.DepositNone, "Ångrade sig"); err != nil {
+			t.Fatal(err)
+		}
+		made["reservation.ended"] = subject{"stock_unit", bought.StockUnitID}
+	}
 	// Rental
 	rentalAudited(t, pool, func(event, kind, id string) { made[event] = subject{kind, id} })
 
