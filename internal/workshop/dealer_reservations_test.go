@@ -249,3 +249,44 @@ func TestAPersonsExportHasTheirReservations(t *testing.T) {
 		t.Errorf("the export's reservations: %+v", e.Reservations)
 	}
 }
+
+// A reservation's deposit is held against its chain: paid by somebody else
+// than the holder, it is still the reservation's, an extension keeps it,
+// and nothing more is taken once the reservation has ended.
+func TestAReservationsDepositIsHeldAgainstIt(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := eligibleCar(t, pool)
+	kim, parent := driver(t, pool), driver(t, pool)
+	r, err := workshop.Reserve(ctx, pool, sales(), workshop.NewReservation{StockUnitID: unit, PartyID: kim,
+		ExpiresAt: time.Now().Add(48 * time.Hour), Refundable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	five := int64(500_000)
+	pay := workshop.NewPayment{AmountMinor: &five, Method: "swish", PaidOn: time.Now(), Reference: "Handpenning", Key: "dep-1"}
+	if _, err := workshop.RecordReservationDeposit(ctx, pool, sales(), r.ID, parent, pay); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordReservationDeposit(ctx, pool, sales(), r.ID, parent, pay); err != nil {
+		t.Fatalf("the same payment again: %v", err)
+	}
+	next, err := workshop.ExtendReservation(ctx, pool, sales(), r.ID, time.Now().Add(96*time.Hour), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := workshop.ReservationDeposit(ctx, pool, sales(), next.ID)
+	if err != nil || b.Held() != five || b.Received != five {
+		t.Errorf("the extension's deposit: %+v, %v", b, err)
+	}
+	if got, err := workshop.ReservationDeposit(ctx, pool, rentalDesk(), next.ID); !errors.Is(err, access.ErrForbidden) || got.Received != 0 {
+		t.Errorf("the rental desk read a reservation's deposit: %v", err)
+	}
+	if err := workshop.EndReservation(ctx, pool, sales(), next.ID, workshop.ReservationCancelled, workshop.DepositRefund, "Banken sa nej"); err != nil {
+		t.Fatal(err)
+	}
+	pay.Key = "dep-2"
+	if _, err := workshop.RecordReservationDeposit(ctx, pool, sales(), next.ID, "", pay); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a deposit taken on an ended reservation: %v", err)
+	}
+}

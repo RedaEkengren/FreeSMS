@@ -440,3 +440,89 @@ func exportReservationsTx(ctx context.Context, tx pgx.Tx, personID string, e *Pe
 	}
 	return rows.Err()
 }
+
+// RecordReservationDeposit records money received as a reservation's
+// deposit: held, not income (#152), against the first reservation of its
+// chain so an extension keeps it. payerPartyID is who paid when it is not
+// the holder -- a parent, a company -- or "" for the holder. The deposit is
+// opened with its first payment, in one transaction. For whoever sells
+// cars, while the reservation stands.
+func RecordReservationDeposit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, reservationID, payerPartyID string, p NewPayment) (Payment, error) {
+	if !scope.Role.SellsVehicles() {
+		return Payment{}, access.ErrForbidden
+	}
+	if err := scope.Require(access.Dealer); err != nil {
+		return Payment{}, err
+	}
+	if !looksLikeUUID(reservationID) || (payerPartyID != "" && !looksLikeUUID(payerPartyID)) {
+		return Payment{}, ErrNotFound
+	}
+	if p.AmountMinor == nil || *p.AmountMinor <= 0 {
+		return Payment{}, fmt.Errorf("%w: say how much was received", ErrInvalid)
+	}
+	if err := checkMoney(p); err != nil {
+		return Payment{}, err
+	}
+	var out Payment
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		r, err := lockReservationTx(ctx, tx, reservationID)
+		if err != nil {
+			return err
+		}
+		if !r.Standing() {
+			return errReservationEnded
+		}
+		payer := r.PartyID
+		if payerPartyID != "" {
+			if err := partySeenTx(ctx, tx, scope, payerPartyID); err != nil {
+				return err
+			}
+			payer = payerPartyID
+		}
+		var deposit string
+		err = tx.QueryRow(ctx, `SELECT id FROM deposits WHERE subject_kind = 'reservation' AND subject_id = $1 ORDER BY created_at LIMIT 1`,
+			r.RootID).Scan(&deposit)
+		if errors.Is(err, pgx.ErrNoRows) {
+			err = tx.QueryRow(ctx, `
+				INSERT INTO deposits (shop_id, party_id, purpose, subject_kind, subject_id, created_by)
+				VALUES ($1, party_now($2), 'reservation', 'reservation', $3, $4) RETURNING id`,
+				scope.ShopID, payer, r.RootID, scope.UserID).Scan(&deposit)
+		}
+		if err != nil {
+			return fmt.Errorf("the reservation's deposit: %w", err)
+		}
+		out = Payment{DepositID: deposit, AmountMinor: *p.AmountMinor, Method: p.Method, PaidOn: p.PaidOn,
+			Reference: strings.TrimSpace(p.Reference), Provider: p.Provider, ExternalID: p.ExternalID, Key: p.Key}
+		_, err = insertPaymentOnce(ctx, tx, scope, &out)
+		return err
+	})
+	return out, err
+}
+
+// ReservationDeposit is what is held as the deposit of a reservation's
+// chain: received, applied, refunded. The zero balance when none was paid.
+// For whoever sells cars; reading is Core's.
+func ReservationDeposit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, reservationID string) (DepositBalance, error) {
+	if !scope.Role.SellsVehicles() {
+		return DepositBalance{}, access.ErrForbidden
+	}
+	if !looksLikeUUID(reservationID) {
+		return DepositBalance{}, ErrNotFound
+	}
+	var out DepositBalance
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var deposit string
+		err := tx.QueryRow(ctx, `
+			SELECT d.id FROM vehicle_reservations r JOIN deposits d ON d.subject_kind = 'reservation' AND d.subject_id = r.root_id
+			WHERE r.id = $1 ORDER BY d.created_at LIMIT 1`, reservationID).Scan(&deposit)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("read the deposit: %w", err)
+		}
+		out, err = depositTx(ctx, tx, deposit, false)
+		return err
+	})
+	return out, err
+}
