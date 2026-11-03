@@ -388,3 +388,69 @@ func applySaleDepositsTx(ctx context.Context, tx pgx.Tx, scope access.Scope, sal
 	}
 	return applyReservationDepositTx(ctx, tx, scope, unitID, invoiceID)
 }
+
+// ExpectedTradeIn is a trade-in a contracted deal is waiting for, or one
+// received and not yet credited, for the buyer's list.
+type ExpectedTradeIn struct {
+	SaleID     string
+	SaleNumber int64
+	CarSold    string
+	TradeIn    TradeIn
+}
+
+// ExpectedTradeIns is every trade-in of a contracted deal not yet
+// received, or received and not yet credited: what the buyer has to take
+// in, appraise and check. For whoever buys cars.
+func ExpectedTradeIns(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ExpectedTradeIn, error) {
+	if !scope.Role.BuysVehicles() {
+		return nil, access.ErrForbidden
+	}
+	if err := scope.Require(access.Dealer); err != nil {
+		return nil, err
+	}
+	var out []ExpectedTradeIn
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `
+			SELECT s.id, s.number, `+carNameSQL+`, t.id
+			FROM vehicle_sales s
+			JOIN stock_units u ON u.id = s.stock_unit_id JOIN vehicles v ON v.id = u.vehicle_id
+			LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = v.id AND reg.valid_to IS NULL
+			JOIN LATERAL (SELECT id FROM vehicle_sale_terms t WHERE t.sale_id = s.id ORDER BY t.version DESC LIMIT 1) t ON true
+			WHERE (SELECT e.kind FROM vehicle_sale_events e WHERE e.sale_id = s.id ORDER BY e.seq DESC LIMIT 1) = 'contracted'
+			  AND EXISTS (SELECT 1 FROM vehicle_sale_trade_ins x WHERE x.terms_id = t.id)
+			ORDER BY s.number`)
+		if err != nil {
+			return fmt.Errorf("read deals with trade-ins: %w", err)
+		}
+		type sale struct {
+			id, car, terms string
+			number         int64
+		}
+		var sales []sale
+		for rows.Next() {
+			var x sale
+			if err := rows.Scan(&x.id, &x.number, &x.car, &x.terms); err != nil {
+				rows.Close()
+				return err
+			}
+			sales = append(sales, x)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		for _, x := range sales {
+			ts, err := tradeInsTx(ctx, tx, x.id, x.terms)
+			if err != nil {
+				return err
+			}
+			for _, t := range ts {
+				if !t.Credited {
+					out = append(out, ExpectedTradeIn{SaleID: x.id, SaleNumber: x.number, CarSold: x.car, TradeIn: t})
+				}
+			}
+		}
+		return nil
+	})
+	return out, err
+}

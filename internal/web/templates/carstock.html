@@ -8,6 +8,27 @@
 <p class="waiting">{{$.T "Stock value %s" ($.MoneyOrBlank $d.TotalValueMinor)}}{{if $d.MissingValue}} &middot; {{$.N "%d car has no purchase price yet" $d.MissingValue}}{{end}}</p>
 {{end}}
 
+{{with .Dealer.TradeIns}}
+<section>
+  <h2>{{$.T "Trade-ins to take in"}}</h2>
+  <ul class="lines">
+    {{range .}}
+    <li><div class="row"><span>{{.TradeIn.Car}}</span><span class="tag">{{if .TradeIn.PurchaseID}}{{$.T "Received, not credited"}}{{else}}{{$.T "Not yet received"}}{{end}}</span></div>
+      <div class="waiting">{{$.T "For deal %d, %s" .SaleNumber .CarSold}} &middot; {{$.T "Credited at %s" ($.Money .TradeIn.CreditMinor)}}</div>
+      {{if .TradeIn.PurchaseID}}
+      <form method="post" action="/cars/trade-ins/{{.SaleID}}/credit"><input type="hidden" name="key" value="{{.TradeIn.Key}}">
+        <button type="submit" class="secondary">{{$.T "Credit it now its checks have passed"}}</button></form>
+      {{else}}
+      <form method="post" action="/cars/trade-ins/{{.SaleID}}/receive"><input type="hidden" name="key" value="{{.TradeIn.Key}}">
+        <label><span>{{$.T "Handed over on"}}</span><input type="date" name="received_on" required></label>
+        <button type="submit">{{$.T "Record it received"}}</button></form>
+      {{end}}
+    </li>
+    {{end}}
+  </ul>
+</section>
+{{end}}
+
 {{if $d.Rows}}
 <ul class="lines">
   {{range $d.Rows}}

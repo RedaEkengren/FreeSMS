@@ -16,7 +16,9 @@ import (
 // dealerData is what a car-sales page shows beyond the common page: one
 // field on pageData, so the pages of each module keep to their own.
 type dealerData struct {
-	Stock       workshop.StockList
+	Stock workshop.StockList
+	// Trade-ins waiting to be received or credited, for whoever buys cars.
+	TradeIns    []workshop.ExpectedTradeIn
 	Calculation workshop.Calculation
 	Result      workshop.CalculationResult
 	Vehicle     workshop.Vehicle
@@ -276,7 +278,50 @@ func (s *Server) handleCarStock(w http.ResponseWriter, r *http.Request) {
 	if s.handoverError(w, r, err) {
 		return
 	}
-	s.render(w, r, http.StatusOK, "carstock", pageData{Title: "Cars in stock", Session: session, Dealer: &dealerData{Stock: list}})
+	d := &dealerData{Stock: list}
+	if session.Scope.Role.BuysVehicles() {
+		if d.TradeIns, err = workshop.ExpectedTradeIns(r.Context(), s.pool, session.Scope); err != nil {
+			s.log.Error("read expected trade-ins", "error", err)
+		}
+	}
+	s.render(w, r, http.StatusOK, "carstock", pageData{Title: "Cars in stock", Session: session, Dealer: d})
+}
+
+// handleReceiveTradeIn records a trade-in handed over, and credits it if
+// its checks have passed.
+func (s *Server) handleReceiveTradeIn(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	day, err := time.ParseInLocation(time.DateOnly, r.FormValue("received_on"), s.shopLocation(r))
+	if err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "Not recorded", "Say the day it was handed over.")
+		return
+	}
+	if _, err := workshop.ReceiveTradeIn(r.Context(), s.pool, session.Scope, r.PathValue("sale"), r.FormValue("key"), day); errors.Is(err, workshop.ErrInvalid) {
+		s.renderError(w, r, http.StatusBadRequest, "Not recorded", trimInvalid(err))
+		return
+	} else if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/cars/stock", http.StatusSeeOther)
+}
+
+// handleCreditTradeIn credits a received trade-in whose checks have passed.
+func (s *Server) handleCreditTradeIn(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	credited, err := workshop.CreditTradeIn(r.Context(), s.pool, session.Scope, r.PathValue("sale"), r.FormValue("key"))
+	if errors.Is(err, workshop.ErrInvalid) {
+		s.renderError(w, r, http.StatusBadRequest, "Not recorded", trimInvalid(err))
+		return
+	} else if s.handoverError(w, r, err) {
+		return
+	}
+	if !credited {
+		s.renderError(w, r, http.StatusBadRequest, "Not credited yet", "The trade-in's checks before money leaves have not all passed; record them on the car's page.")
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/cars/stock", http.StatusSeeOther)
 }
 
 // handleBuyCarForm is the form a buyer records a car bought on: the car,

@@ -316,3 +316,72 @@ func TestARevisionOverAnotherShowsTheCurrentTermsAndWhatWasTyped(t *testing.T) {
 		t.Error("what was typed is back in the form, to overwrite theirs when sent again")
 	}
 }
+
+// A trade-in through the pages (#165): typed on the deal's form, kept as
+// typed when the form is refused, stated in the contract; once the deal is
+// contracted the buyer finds it on the stock list and records it received,
+// and with its checks not passed it is not credited yet.
+func TestATradeInIsTypedOnTheDealAndReceivedByTheBuyer(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	unit, err := workshop.TakeIntoStock(ctx, pool, owner, vehicleA, workshop.StockFromDefleet, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.MoveStockUnit(ctx, pool, owner, unit.ID, workshop.StockForSale, ""); err != nil {
+		t.Fatal(err)
+	}
+	seller := signIn(t, ts, salesEmail)
+	form := url.Values{"unit": {unit.ID}, "name": {"Kim Köpare"}, "phone": {"0701234567"}, "buyer_kind": {"consumer"},
+		"price": {"125000"}, "tax": {"ordinary"}, "ti_reg": {"TRD 123"}, "ti_vin": {""}, "ti_make": {"Saab"}, "ti_model": {"9-5"},
+		"ti_km": {"210000"}, "ti_credit": {"10000"}, "ti_loan": {"20000"}, "ti_lender": {"Banken AB"},
+		"ti_seller_type": {workshop.SellerPrivate}, "key": {"deal-trade-1"}}
+	status, page := postBody(t, seller, ts.URL+"/cars/deals", form)
+	if status != http.StatusBadRequest || !strings.Contains(page, "TRD 123") || !strings.Contains(page, "Banken AB") {
+		t.Fatalf("a loan larger than the credit: %d, the form:\n%s", status, visibleText(page))
+	}
+	form.Set("ti_loan", "4000")
+	form.Set("key", "deal-trade-2")
+	resp := postResponse(t, seller, ts.URL+"/cars/deals", form)
+	where := resp.Header.Get("Location")
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("opening the deal answered %d", resp.StatusCode)
+	}
+	post := func(path string, form url.Values) {
+		t.Helper()
+		if resp := postResponse(t, seller, ts.URL+where+path, form); resp.StatusCode != http.StatusSeeOther {
+			t.Fatalf("%s answered %d", path, resp.StatusCode)
+		}
+	}
+	post("/contract", url.Values{"template": {""}})
+	deal, err := workshop.DealByID(ctx, pool, owner, strings.TrimPrefix(where, "/cars/deals/"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := workshop.DocumentRecordByID(ctx, pool, owner, deal.ContractID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(doc.Body, "TRD 123") {
+		t.Errorf("the contract does not state the trade-in:\n%s", doc.Body)
+	}
+	post("/signed", url.Values{"party": {doc.Parties[0].ID}, "hash": {doc.Hash}, "method": {"in_person_click"}})
+	post("/complete", nil)
+
+	buyer := signIn(t, ts, buyerEmail)
+	if list := visibleText(get(t, buyer, ts.URL+"/cars/stock", http.StatusOK)); !strings.Contains(list, "Trade-ins to take in") ||
+		!strings.Contains(list, "TRD 123") || !strings.Contains(list, "Not yet received") {
+		t.Fatalf("the buyer's stock list:\n%s", list)
+	}
+	if resp := postResponse(t, buyer, ts.URL+"/cars/trade-ins/"+deal.ID+"/receive", url.Values{"key": {"TRD123"},
+		"received_on": {time.Now().Format(time.DateOnly)}}); resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("receiving the trade-in answered %d", resp.StatusCode)
+	}
+	if list := visibleText(get(t, buyer, ts.URL+"/cars/stock", http.StatusOK)); !strings.Contains(list, "Received, not credited") {
+		t.Errorf("the buyer's stock list after receiving it:\n%s", list)
+	}
+	if strings.Contains(get(t, seller, ts.URL+"/cars/stock", http.StatusOK), "Trade-ins to take in") {
+		t.Error("a salesperson was given the trade-ins to take in")
+	}
+}
