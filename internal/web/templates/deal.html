@@ -152,6 +152,32 @@
   <p>{{$.T "Handed over %s" ($.Date ($.Local .DeliveredAt) "2 Jan 2006 15:04")}}{{if .AtHome}} &middot; {{$.T "at the buyer's address"}}{{end}}{{with .OdometerKm}} &middot; {{$.T "%s km" ($.Num $d.DeliveryKm)}}{{end}}</p>
   {{if .Consumer}}<p class="waiting">{{$.T "A defect is presumed to have been there at delivery until %s; the dealer answers for defects until %s." ($.Date .PresumptionEnds "2 Jan 2006") ($.Date .LiabilityEnds "2 Jan 2006")}}</p>{{end}}
   {{if .OverrideReason}}<p class="waiting">{{$.T "Let go before every condition was met: %s" .OverrideReason}}</p>{{end}}
+  <h2>{{$.T "Complaints"}}</h2>
+  {{range $d.Complaints}}{{$c := .}}
+  <section class="callout">
+    <p><strong>{{$.T "Complaint %d" .Number}}</strong> &middot; {{$.Date ($.Local .ReceivedAt) "2 Jan 2006"}} &middot; <span class="tag">{{$.T .Status}}</span></p>
+    <p>{{.Description}}</p>
+    <p class="waiting">{{if .Delivery.Consumer}}{{if .WithinPresumption}}{{$.T "Received within the two years in which a defect is presumed to have been there at delivery."}}{{else if .WithinLiability}}{{$.T "Received after the presumption, within the dealer's three years."}}{{else}}{{$.T "Received after the dealer's three years."}}{{end}}{{else}}{{$.T "A business buyer: the contract's terms apply."}}{{end}}
+      {{if .LateAfterNoticing}} {{$.T "Made more than two months after the buyer noticed it."}}{{end}}</p>
+    {{with .AcceptedDefects}}<p class="waiting">{{$.T "Defects the buyer accepted:"}} {{range $i, $f := .}}{{if $i}}; {{end}}{{$f}}{{end}}</p>{{end}}
+    <ul class="lines">{{range .Events}}<li><div class="waiting">{{$.Date ($.Local .At) "2 Jan 2006"}} &middot; {{$.T .Status}}{{if .Remedy}} ({{$.T .Remedy}}){{end}}{{if .By}} &middot; {{.By}}{{end}}{{if .Note}} &middot; {{.Note}}{{end}}</div></li>{{end}}</ul>
+    {{if .Open}}
+    <form method="post" action="/cars/deals/{{$x.ID}}/complaints/{{.ID}}">
+      <label><span>{{$.T "Next step"}}</span><select name="status">{{range $d.ComplaintSteps}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+      <label><span>{{$.T "Remedy"}}</span><select name="remedy"><option value=""></option>{{range $d.ComplaintRemedies}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+      <label><span>{{$.T "Note"}}</span><input name="note" maxlength="1000"></label>
+      <button type="submit" class="secondary">{{$.T "Record the step"}}</button>
+    </form>
+    {{end}}
+  </section>
+  {{end}}
+  <form method="post" action="/cars/deals/{{$x.ID}}/complaints">
+    <input type="hidden" name="key" value="{{$d.Key}}">
+    <label><span>{{$.T "How it came in"}}</span><select name="channel">{{range $d.ComplaintChannels}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+    <label><span>{{$.T "What is wrong"}}</span><textarea name="description" maxlength="2000" required></textarea></label>
+    <label><span>{{$.T "When the buyer noticed it"}}</span><input type="date" name="noticed_on"></label>
+    <button type="submit">{{$.T "Record the complaint"}}</button>
+  </form>
 {{else}}
   {{with $d.Missing}}<ul class="error">{{range .}}<li>{{$.T .}}</li>{{end}}</ul>{{end}}
   <form method="post" action="/cars/deals/{{$x.ID}}/deliver">

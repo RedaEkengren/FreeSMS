@@ -41,7 +41,15 @@ type dealData struct {
 	Delivery *workshop.Delivery
 	// What a delivery refused was missing, as catalogue keys.
 	Missing []string
+	// The sale's complaints, newest first (#181).
+	Complaints []workshop.Complaint
 }
+
+// ComplaintChannels, ComplaintStatuses and ComplaintRemedies are what a
+// complaint form offers.
+func (dealData) ComplaintChannels() []string { return workshop.ComplaintChannels }
+func (dealData) ComplaintSteps() []string    { return workshop.ComplaintStatuses[1:] }
+func (dealData) ComplaintRemedies() []string { return workshop.ComplaintRemedies }
 
 // DeliveryKm is the odometer read at delivery, 0 when none was.
 func (d dealData) DeliveryKm() int64 {
@@ -265,6 +273,8 @@ func (s *Server) dealRoutes(m routeMux) {
 	m.HandleFunc("POST /cars/deals/{id}/cancel", s.requireSession(s.handleDealCancel))
 	m.HandleFunc("POST /cars/deals/{id}/invoice", s.requireSession(s.handleDealInvoice))
 	m.HandleFunc("POST /cars/deals/{id}/deliver", s.requireSession(s.handleDealDeliver))
+	m.HandleFunc("POST /cars/deals/{id}/complaints", s.requireSession(s.handleOpenComplaint))
+	m.HandleFunc("POST /cars/deals/{id}/complaints/{complaint}", s.requireSession(s.handleMoveComplaint))
 }
 
 // termsForm reads the terms a form sends; the buyers are the "buyer"
@@ -494,6 +504,9 @@ func (s *Server) dealPageWith(w http.ResponseWriter, r *http.Request, status int
 	}
 	if del, err := workshop.DeliveryOfSale(r.Context(), s.pool, session.Scope, d.Deal.ID); err == nil {
 		d.Delivery = &del
+		if d.Complaints, err = workshop.ComplaintsOfSale(r.Context(), s.pool, session.Scope, d.Deal.ID); err != nil {
+			s.log.Error("read complaints", "error", err)
+		}
 	} else if !errors.Is(err, workshop.ErrNotFound) {
 		s.log.Error("read the delivery", "error", err)
 	}
@@ -625,6 +638,50 @@ func (s *Server) handleDealDeliver(w http.ResponseWriter, r *http.Request) {
 		s.dealPageWith(w, r, http.StatusBadRequest, "Not ready to deliver yet.", dealData{Missing: refused.Missing})
 		return
 	}
+	if errors.Is(err, workshop.ErrInvalid) {
+		s.dealPage(w, r, http.StatusBadRequest, trimInvalid(err))
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/cars/deals/"+r.PathValue("id"), http.StatusSeeOther)
+}
+
+// handleOpenComplaint records a buyer's complaint about the car (#181).
+func (s *Server) handleOpenComplaint(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	n := workshop.NewComplaint{ReceivedAt: time.Now(), Channel: r.FormValue("channel"), Description: r.FormValue("description"),
+		Key: r.FormValue("key")}
+	if v := strings.TrimSpace(r.FormValue("noticed_on")); v != "" {
+		day, err := time.ParseInLocation(time.DateOnly, v, s.shopLocation(r))
+		if err != nil {
+			s.dealPage(w, r, http.StatusBadRequest, "That date did not parse")
+			return
+		}
+		n.NoticedOn = &day
+	}
+	_, err := workshop.OpenComplaint(r.Context(), s.pool, session.Scope, r.PathValue("id"), n)
+	if errors.Is(err, workshop.ErrInvalid) {
+		s.dealPage(w, r, http.StatusBadRequest, trimInvalid(err))
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/cars/deals/"+r.PathValue("id"), http.StatusSeeOther)
+}
+
+// handleMoveComplaint records the next step of a complaint.
+func (s *Server) handleMoveComplaint(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	remedy := r.FormValue("remedy")
+	if !strings.HasPrefix(r.FormValue("status"), "remedy_") {
+		remedy = ""
+	}
+	err := workshop.MoveComplaint(r.Context(), s.pool, session.Scope, r.PathValue("complaint"), r.FormValue("status"), remedy, r.FormValue("note"))
 	if errors.Is(err, workshop.ErrInvalid) {
 		s.dealPage(w, r, http.StatusBadRequest, trimInvalid(err))
 		return
