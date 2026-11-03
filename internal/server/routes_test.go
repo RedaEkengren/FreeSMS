@@ -1,34 +1,50 @@
 package server
 
 import (
+	"io"
+	"log/slog"
 	"net/http"
-	"os"
-	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/RedaEkengren/FreeSMS/internal/config"
 )
 
-// registeredRoutes reads the patterns out of server.go.
+// registeredRoutes is every pattern the server registers.
 //
-// http.ServeMux does not report what has been registered with it, so the
-// source is the only list there is. Reading it is the point: a route added to
-// the mux and not to the table below becomes a failure here, which is the
-// difference between a sweep and a handful of examples.
+// http.ServeMux does not report what has been registered with it; the
+// server's own router writes each registration down, with its module (#143).
+// A route added to the mux and not to the table below becomes a failure here,
+// which is the difference between a sweep and a handful of examples. It used
+// to read server.go with a pattern, which stopped seeing a route the moment
+// it was registered through anything but a variable named mux.
 func registeredRoutes(t *testing.T) []string {
 	t.Helper()
-	src, err := os.ReadFile("server.go")
-	if err != nil {
-		t.Fatalf("read server.go: %v", err)
-	}
-	re := regexp.MustCompile(`mux\.Handle(?:Func)?\("([A-Z]+ [^"]+)"`)
 	var out []string
-	for _, m := range re.FindAllStringSubmatch(string(src), -1) {
-		out = append(out, m[1])
+	for _, r := range routeTable(t) {
+		out = append(out, r.Pattern)
 	}
 	if len(out) < 40 {
-		t.Fatalf("found only %d routes; the pattern has stopped matching", len(out))
+		t.Fatalf("found only %d routes; the router has stopped writing them down", len(out))
 	}
 	return out
+}
+
+// routeTable is every route with the module it belongs to, from a server
+// that has not been given a database: registering touches none.
+func routeTable(t *testing.T) []registeredRoute {
+	t.Helper()
+	srv, err := New(nil, slog.New(slog.NewTextHandler(io.Discard, nil)), &config.Config{
+		BaseURL: "http://localhost", DefaultLocale: "en", Release: "test",
+		AttachmentsDir: t.TempDir(), ExportDir: t.TempDir(),
+	}, "")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if _, err := srv.routes(); err != nil {
+		t.Fatalf("routes: %v", err)
+	}
+	return srv.routeTable
 }
 
 // swept says what the sweep does with each route.
@@ -42,14 +58,55 @@ var swept = map[string]string{
 	"GET /login": "", "POST /login": "", "POST /logout": "", "GET /{$}": "",
 	"GET /board": "", "GET /jobs/new": "", "POST /jobs/new": "",
 	"GET /jobs/new/lookup": "", "GET /jobs/new/customers": "", "GET /figures": "", "GET /accounting": "",
-	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/charges": "", "POST /shop/final-check": "",
-	"GET /privacy": "", "GET /day": "", "POST /day/settlement": "", "POST /day/review": "", "POST /privacy/export": "", "GET /events": "", "GET /mine": "", "GET /rota": "", "POST /hooks/46elks/{secret}": "", "POST /rota": "", "GET /schedule": "", "GET /mine/count": "", "POST /account/alert": "", "POST /account/theme": "", "GET /calendar": "", "POST /calendar": "", "GET /enquiries": "", "POST /enquiries": "", "POST /calendar/capacity": "", "GET /labour": "", "POST /labour": "",
+	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/modules": "", "POST /shop/charges": "", "POST /shop/final-check": "",
+	"GET /payment-flows": "", "POST /payment-flows": "", "POST /payment-flows/threshold": "",
+	// An invoice by its payment reference (#234), read under the shop's row level security.
+	"POST /payments/by-reference": "",
+	// What technicians see (#225): a person is a form value, read under the
+	// shop's row level security like any other.
+	"GET /technicians": "", "POST /technicians/fields": "", "POST /technicians/exceptions": "", "POST /technicians/exceptions/end": "",
+	"GET /privacy": "", "GET /outbox": "", "GET /day": "", "POST /day/settlement": "", "POST /day/review": "", "POST /privacy/export": "", "GET /events": "", "GET /mine": "", "GET /rota": "", "POST /hooks/46elks/{secret}": "", "POST /rota": "", "GET /schedule": "", "GET /mine/count": "", "POST /account/alert": "", "POST /account/theme": "", "GET /calendar": "", "POST /calendar": "", "GET /enquiries": "", "POST /enquiries": "", "POST /calendar/capacity": "", "GET /labour": "", "POST /labour": "",
 	"POST /labour/rate": "", "GET /time": "", "POST /time/correct": "",
 	"POST /drafts": "", "GET /drafts": "", "DELETE /drafts": "",
 	"GET /search": "", "GET /scan": "", "GET /labels": "", "GET /stock": "",
 	"POST /stock/move": "", "POST /stock/count": "", "GET /stock/parts/new": "", "POST /stock/parts": "",
 	"GET /staff": "", "GET /receivables": "", "POST /staff": "", "GET /account": "", "POST /account/password": "", "POST /account/language": "", "POST /stock/bands": "", "GET /parts": "",
 	"POST /parts/arrived": "", "GET /checklists": "", "POST /checklists": "",
+	// Rental
+	"GET /rental/register":                             "",
+	"POST /rental/register":                            "",
+	"POST /rental/register.csv":                        "",
+	"POST /rental/register/retention":                  "",
+	"GET /rental/settings":                             "",
+	"POST /rental/permits":                             "",
+	"POST /rental/profiles":                            "",
+	"POST /rental/permits/{id}/revoke":                 "sweep",
+	"POST /rental/profiles/{id}":                       "sweep",
+	"GET /rental":                                      "",
+	"POST /rental/units":                               "",
+	"GET /rental/units/{id}":                           "sweep",
+	"POST /rental/units/{id}/fleet":                    "sweep",
+	"POST /rental/memberships/{id}/end":                "sweep",
+	"POST /rental/memberships/{id}/report":             "sweep",
+	"POST /rental/memberships/{id}/insurance":          "sweep",
+	"GET /rental/prices":                               "",
+	"POST /rental/plans":                               "",
+	"POST /rental/extras":                              "",
+	"POST /rental/plans/{id}/seasons":                  "sweep",
+	"POST /rental/plans/{id}/archive":                  "sweep",
+	"POST /rental/extras/{id}/archive":                 "sweep",
+	"POST /rental/bookings":                            "",
+	"GET /rental/bookings/{id}":                        "sweep",
+	"POST /rental/bookings/{id}/{action}":              "sweep",
+	"POST /rental/drivers/{id}/check":                  "sweep",
+	"POST /rental/drivers/{id}/remove":                 "sweep",
+	"POST /rental/agreements/{id}/accepted":            "sweep",
+	"GET /rental/handovers/{id}":                       "sweep",
+	"POST /rental/handovers/{id}/items/{itemID}":       "sweep",
+	"POST /rental/handovers/{id}/items/{itemID}/photo": "sweep",
+	"POST /rental/handovers/{id}/finish":               "sweep",
+	"POST /rental/handovers/{id}/abandon":              "sweep",
+	"GET /rental/photos/{key}":                         "sweep",
 
 	// The customer's link. Not a shop identifier: it is an unguessable token,
 	// and asking for it with a uuid is a different test -- the share tests
@@ -97,6 +154,7 @@ var swept = map[string]string{
 	"GET /jobs/{id}/customer":                        "sweep",
 	"POST /jobs/{id}/customer":                       "sweep",
 	"POST /jobs/{id}/findings":                       "sweep",
+	"POST /jobs/{id}/contact-request":                "sweep",
 	"POST /jobs/{id}/findings/handled":               "sweep",
 	"GET /customers":                                 "",
 	"GET /customers/{id}":                            "sweep",
@@ -130,6 +188,9 @@ var swept = map[string]string{
 	"POST /jobs/{id}/recommendations/{rec}/enquiry":  "sweep",
 	"GET /k/{token}/summary":                         "token, not an identifier",
 	"GET /d/{token}":                                 "token, not an identifier",
+	"GET /contracts/{id}":                            "sweep",
+	"POST /contracts/{id}/link":                      "sweep",
+	"GET /c/{token}":                                 "token, not an identifier",
 	"GET /invoices/{id}/followup":                    "sweep",
 	"GET /invoices/{id}/einvoice.xml":                "sweep",
 	"GET /jobs/{id}/comeback":                        "sweep",
@@ -166,6 +227,11 @@ var swept = map[string]string{
 	"POST /bookings/{id}/contact":                 "sweep",
 	"POST /invoices/{id}/payments":                "sweep",
 	"POST /payments/{id}/reverse":                 "sweep",
+	"POST /payment-flows/{id}/check":              "sweep",
+	"POST /payment-flows/{id}/withdraw":           "sweep",
+	"POST /outbox/{id}/retry":                     "sweep",
+	"POST /outbox/{id}/done":                      "sweep",
+	"POST /outbox/{id}/cancel":                    "sweep",
 	"GET /inspections/{id}":                       "sweep",
 	"POST /inspections/{id}/items/{itemID}":       "sweep",
 	"POST /inspections/{id}/items/{itemID}/photo": "sweep",
@@ -182,10 +248,29 @@ var swept = map[string]string{
 	"POST /staff/{id}/planner":                    "sweep",
 	"POST /jobs/{id}/message":                     "sweep",
 	"POST /staff/{id}/password":                   "sweep",
+	"POST /staff/{id}/roles":                      "sweep",
 	"POST /stock/parts/{id}":                      "sweep",
 	"POST /stock/parts/{id}/active":               "sweep",
 	"POST /checklists/{id}":                       "sweep",
 	"POST /checklists/{id}/active":                "sweep",
+	"POST /checklists/{id}/subjects":              "sweep",
+
+	// Dealer
+	"GET /cars/calculations/new": "", "POST /cars/calculations": "",
+	"GET /cars/calculations/{id}": "sweep", "POST /cars/calculations/{id}/accept": "sweep",
+	"GET /cars/leads": "", "POST /cars/leads": "", "POST /cars/leads/settings": "", "POST /cars/leads/reassign": "",
+	"GET /cars/leads/{id}": "sweep", "POST /cars/leads/{id}/contacts": "sweep", "POST /cars/leads/{id}/status": "sweep",
+	"POST /cars/leads/{id}/assign": "sweep", "POST /cars/leads/{id}/next": "sweep",
+	"GET /cars/test-drives/new": "", "POST /cars/test-drives": "",
+	"GET /cars/test-drives/{id}": "sweep", "POST /cars/test-drives/{id}/licence": "sweep",
+	"POST /cars/test-drives/{id}/agreement": "sweep", "POST /cars/test-drives/{id}/signed": "sweep",
+	"POST /cars/test-drives/{id}/start": "sweep", "POST /cars/test-drives/{id}/return": "sweep",
+	"POST /cars/test-drives/{id}/cancel": "sweep",
+	"GET /cars/deals":                    "", "POST /cars/deals": "",
+	"GET /cars/deals/{id}": "sweep", "POST /cars/deals/{id}/terms": "sweep", "POST /cars/deals/{id}/defects": "sweep",
+	"POST /cars/deals/{id}/defects/{defect}/answer": "sweep", "POST /cars/deals/{id}/contract": "sweep",
+	"POST /cars/deals/{id}/signed": "sweep", "POST /cars/deals/{id}/complete": "sweep", "POST /cars/deals/{id}/cancel": "sweep",
+	"POST /cars/deals/{id}/invoice": "sweep",
 }
 
 // fill substitutes shop B's identifiers into a pattern.
@@ -215,10 +300,34 @@ func fill(pattern string) (method, path string) {
 		"{ret}":               returnB,
 		"/supply/orders/{id}": "/supply/orders/" + orderB,
 		"/import/{id}":        "/import/" + batchB,
+		"/contracts/{id}":     "/contracts/" + contractB,
+		// No other shop's call is seeded: an id that is nobody's.
+		"/outbox/{id}":        "/outbox/bbbbbbbb-0000-0000-0000-0000000000ee",
+		"/payment-flows/{id}": "/payment-flows/bbbbbbbb-0000-0000-0000-0000000000ed",
 		"{row}":               "bbbbbbbb-0000-0000-0000-0000000000ff",
 		"{version}":           "1",
 		"{quoteID}":           "cccccccc-0000-0000-0000-0000000000cc",
 		"{key}":               photoB,
+		// Dealer: shop A runs no car sales here, so these are not found
+		// whoever asks; TestNoCarSalesRouteServesAnotherShopsRow asks them
+		// in a shop that does.
+		"/cars/calculations/{id}": "/cars/calculations/bbbbbbbb-0000-0000-0000-0000000000ca",
+		"/cars/leads/{id}":        "/cars/leads/bbbbbbbb-0000-0000-0000-0000000000cb",
+		"/cars/test-drives/{id}":  "/cars/test-drives/bbbbbbbb-0000-0000-0000-0000000000cc",
+		"/cars/deals/{id}":        "/cars/deals/bbbbbbbb-0000-0000-0000-0000000000cd",
+		"{defect}":                "bbbbbbbb-0000-0000-0000-0000000000ce",
+		// Rental: ids that are nobody's.
+		"/rental/permits/{id}":     "/rental/permits/bbbbbbbb-0000-0000-0000-0000000000e1",
+		"/rental/profiles/{id}":    "/rental/profiles/bbbbbbbb-0000-0000-0000-0000000000e2",
+		"/rental/units/{id}":       "/rental/units/bbbbbbbb-0000-0000-0000-0000000000e3",
+		"/rental/memberships/{id}": "/rental/memberships/bbbbbbbb-0000-0000-0000-0000000000e4",
+		"/rental/plans/{id}":       "/rental/plans/bbbbbbbb-0000-0000-0000-0000000000e5",
+		"/rental/extras/{id}":      "/rental/extras/bbbbbbbb-0000-0000-0000-0000000000e6",
+		"/rental/bookings/{id}":    "/rental/bookings/bbbbbbbb-0000-0000-0000-0000000000e7",
+		"{action}":                 "confirm",
+		"/rental/drivers/{id}":     "/rental/drivers/bbbbbbbb-0000-0000-0000-0000000000e8",
+		"/rental/agreements/{id}":  "/rental/agreements/bbbbbbbb-0000-0000-0000-0000000000e9",
+		"/rental/handovers/{id}":   "/rental/handovers/bbbbbbbb-0000-0000-0000-0000000000ea",
 	} {
 		path = strings.ReplaceAll(path, from, to)
 	}

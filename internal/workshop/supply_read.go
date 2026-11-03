@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
 )
 
@@ -240,11 +239,11 @@ func scanSupplyLine(r pgx.Row, l *SupplyLine) error {
 
 // SupplyDeskFor reads what the parts desk has to act on as of today.
 func SupplyDeskFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, today time.Time) (SupplyDesk, error) {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return SupplyDesk{}, access.ErrForbidden
 	}
 	var d SupplyDesk
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, supplyLineSelect+`
 			WHERE l.cancelled_at IS NULL
 			ORDER BY 10 NULLS LAST, o.placed_on`)
@@ -397,14 +396,14 @@ func returnsTx(ctx context.Context, tx pgx.Tx, where string, args []any) ([]Retu
 
 // OrderByID reads an order with its lines, deliveries and returns.
 func OrderByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id string) (OrderView, error) {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return OrderView{}, access.ErrForbidden
 	}
 	if !looksLikeUUID(id) {
 		return OrderView{}, ErrNotFound
 	}
 	var o OrderView
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := tx.QueryRow(ctx, `
 			SELECT o.id::text, o.supplier, coalesce(o.reference, ''), o.placed_on::timestamptz, coalesce(o.note, ''), coalesce(p.display_name, ''),
 			       o.cancelled_at, coalesce(o.cancel_note, ''), o.supplier_cancel_confirmed_at

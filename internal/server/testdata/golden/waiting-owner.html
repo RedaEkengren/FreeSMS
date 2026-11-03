@@ -1,0 +1,118 @@
+<!doctype html>
+
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Till mig</title>
+<meta name="freesms-user" content="<id-1>">
+<link rel="stylesheet" href="/static/app.css?v=<version>">
+<script src="/static/htmx.min.js?v=<version>" defer></script>
+<script src="/static/keep.js?v=<version>" defer></script>
+<script src="/static/live.js?v=<version>" defer></script>
+</head>
+<body>
+
+<a class="skip" href="#main">Hoppa till innehållet</a>
+
+<header>
+  <nav>
+    <a class="brand" href="/">FreeSMS</a>
+    
+    <a href="/mine" class="nav" data-live-topics="board parts staff actions">Till mig <span id="mine-count" class="count"
+      hx-get="/mine/count" hx-trigger="load" hx-swap="outerHTML" hx-headers='{"X-FreeSMS-Live": "1"}'></span></a>
+    <a href="/parts" class="nav">Delar</a>
+    <a href="/supply" class="nav">Beställningar</a>
+    <a href="/stock" class="nav">Lager</a>
+    <a href="/scan" class="nav">Skanna</a>
+    <a href="/outsourced" class="nav">Hos leverantörer</a>
+    <a href="/shop" class="nav">Verkstaden</a>
+    <a href="/staff" class="nav">Personal</a>
+    <a href="/import" class="nav">Import</a>
+    <a href="/start" class="nav">Komma igång</a>
+    <a href="/customers" class="nav">Kunder</a>
+    <a href="/enquiries" class="nav">Förfrågningar</a>
+    <a href="/calendar" class="nav">Bokningar</a>
+    <a href="/figures" class="nav">Siffror</a>
+    <a href="/receivables" class="nav">Obetalt</a>
+    <a href="/day" class="nav">Dagen</a>
+    <a href="/accounting" class="nav">Bokföring</a>
+    <a href="/privacy" class="nav">Personuppgifter</a>
+    
+    <a href="/time" class="nav">Mina timmar</a>
+    <a href="/rota" class="nav">Schema</a>
+    <a href="/labour" class="nav">Arbetstider</a>
+    <a href="/help" class="nav">Hjälp</a>
+    <a href="/search" class="nav">Sök</a>
+  </nav>
+  <form class="m-0" method="post" action="/logout">
+    
+    <a href="/account" class="who">Ägare</a>
+    <button class="link" type="submit">Logga ut</button>
+  </form>
+</header>
+
+
+<div id="held" class="held" role="status" hidden
+     data-waiting-one="%d sak väntar på att skickas."
+     data-waiting-other="%d saker väntar på att skickas."
+     data-waiting-signin-one="%d sak väntar på att skickas – logga in igen för att skicka den."
+     data-waiting-signin-other="%d saker väntar på att skickas – logga in igen för att skicka dem."
+     data-refused-one="%d sak nekades av servern."
+     data-refused-other="%d saker nekades av servern."
+     data-show="Visa och avfärda"
+     data-refused-title="Nekat av servern:"
+     data-dismiss="Avfärda dessa?"
+     data-held="Ingen anslutning. Det här hålls och skickas när det finns en anslutning."
+     data-needs-connection="Det här kräver en anslutning. Ingenting har skickats och ingenting har sparats."
+     data-updated="Sidan uppdaterades."
+     data-full="Den här enheten har inte plats för mer osänt arbete. Hitta en anslutning innan du fortsätter."></div>
+
+<div id="announce" class="sr-only" role="status" aria-live="polite"></div>
+<main id="main" tabindex="-1">
+
+<h1>Till mig</h1>
+
+<div id="live-mine" data-live="board parts actions">
+
+<ul class="lines">
+  
+  <li><a href="/jobs/<id-2>">
+    <div class="row">
+      <span class="plate">XKR 907</span>
+      <span class="tag">#1002</span>
+    </div>
+    <div class="waiting">Ingen är på det</div>
+  </a></li>
+  
+  <li><a href="/jobs/<id-2>">
+    <div class="row">
+      <span class="plate">XKR 907</span>
+      <span class="tag">#1002</span>
+    </div>
+    <div class="waiting">Förbi utlovad tid</div>
+  </a></li>
+  
+  <li><a href="/jobs/<id-3>">
+    <div class="row">
+      <span class="plate">MLR 224</span>
+      <span class="tag">#1003</span>
+    </div>
+    <div class="waiting">Klar, och kunden har inte fått veta</div>
+  </a></li>
+  
+  <li><a href="/jobs/<id-3>">
+    <div class="row">
+      <span class="plate">MLR 224</span>
+      <span class="tag">#1003</span>
+    </div>
+    <div class="waiting">Ohämtad i 4 dagar</div>
+  </a></li>
+  
+</ul>
+
+</div>
+
+</main>
+</body>
+</html>

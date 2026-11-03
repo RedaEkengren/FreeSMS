@@ -69,20 +69,41 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 		// previous number in front of them, and that is exactly the moment
 		// they need to find the car. What is *displayed* is the current plate,
 		// so the result is not confusing.
+		//
+		// A chassis number is compared as one can be, on both sides: one has
+		// no I, O or Q, so either may hold the digit they are mistaken for,
+		// and a number stored with the letter -- an old car's, not ISO 3779 --
+		// is found typed as stored as well as typed with the digit. And
+		// neither side has spaces or hyphens: the typed number loses them
+		// on the way in, and one imported as "YV1 SW612 ..." is compared
+		// without its own, everywhere it is compared (vin_n).
+		//
+		// The ranking happens before the list is cut: the exact plate is
+		// first however many cars match a part of it.
 		const q = `
+			SELECT id, registration, vin, make, model, model_year, label, matched, owner
+			FROM (
 			SELECT DISTINCT ON (v.id)
-			       v.id, coalesce(cur.registration, ''), coalesce(v.vin, ''),
-			       coalesce(v.make, ''), coalesce(v.model, ''), v.model_year,
-			       coalesce(v.label, ''),
+			       v.id, coalesce(cur.registration, '') AS registration, coalesce(v.vin, '') AS vin,
+			       coalesce(v.make, '') AS make, coalesce(v.model, '') AS model, v.model_year,
+			       coalesce(v.label, '') AS label,
 			       CASE
 			         WHEN m.normalised = $1 AND m.valid_to IS NULL THEN 'registration'
 			         WHEN m.normalised = $1 THEN 'a plate it used to carry'
-			         WHEN $1 <> '' AND upper(coalesce(v.vin, '')) LIKE '%' || $1 || '%' THEN 'chassis number'
+			         WHEN $5 <> '' AND n.vin_n LIKE '%' || $5 || '%' THEN 'chassis number'
 			         WHEN v.label ILIKE '%' || $2 || '%' THEN 'description'
 			         ELSE 'owner'
-			       END,
-			       CASE WHEN $4 THEN coalesce(cp.display_name, c.company_name, '') ELSE '' END
+			       END AS matched,
+			       CASE
+			         WHEN m.normalised = $1 AND m.valid_to IS NULL THEN 0
+			         WHEN m.normalised = $1 THEN 1
+			         WHEN $5 <> '' AND n.vin_n = $5 THEN 2
+			         WHEN $5 <> '' AND n.vin_n LIKE '%' || $5 || '%' THEN 3
+			         ELSE 4
+			       END AS rank,
+			       CASE WHEN $4 THEN coalesce(cp.display_name, c.company_name, '') ELSE '' END AS owner
 			FROM vehicles v
+			CROSS JOIN LATERAL (SELECT translate(upper(regexp_replace(coalesce(v.vin, ''), '[^A-Za-z0-9]', '', 'g')), 'OQI', '001') AS vin_n) n
 			LEFT JOIN vehicle_registrations m ON m.vehicle_id = v.id
 			LEFT JOIN vehicle_registrations cur
 			       ON cur.vehicle_id = v.id AND cur.valid_to IS NULL
@@ -91,16 +112,19 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 			LEFT JOIN customers c ON c.id = o.customer_id
 			LEFT JOIN people cp   ON cp.id = c.person_id
 			WHERE v.merged_into IS NULL AND (($1 <> '' AND m.normalised = $1)
-			   OR ($1 <> '' AND upper(coalesce(v.vin, '')) LIKE '%' || $1 || '%')
+			   OR ($5 <> '' AND n.vin_n LIKE '%' || $5 || '%')
 			   OR ($4 AND (cp.display_name ILIKE '%' || $2 || '%'
 			            OR c.company_name ILIKE '%' || $2 || '%'))
 			   OR ($2 <> '' AND v.label ILIKE '%' || $2 || '%'))
-			-- A vehicle that matches on its current plate sorts above one that
+			-- Of a vehicle's rows, the one that matched best: a vehicle that
+			-- matches on its current plate is reported so above one that
 			-- matches on a plate it gave up, because the current holder is
 			-- almost always the one being looked for.
-			ORDER BY v.id, (m.valid_to IS NULL) DESC NULLS LAST, m.valid_from DESC NULLS LAST
+			ORDER BY v.id, (m.normalised = $1) DESC NULLS LAST, (m.valid_to IS NULL) DESC NULLS LAST, m.valid_from DESC NULLS LAST
+			) found
+			ORDER BY rank, registration, vin, label, id
 			LIMIT $3`
-		rows, err := tx.Query(ctx, q, normalised, query, 25, scope.Role.SeesCustomerPersonalData())
+		rows, err := tx.Query(ctx, q, normalised, query, 25, scope.Role.SeesCustomerPersonalData(), vinLike(normalised))
 		if err != nil {
 			return fmt.Errorf("search: %w", err)
 		}
@@ -116,6 +140,14 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 		return rows.Err()
 	})
 	return out, err
+}
+
+// vinLike is a chassis number as one can be: one has no I, O or Q, so a
+// letter for a digit that looks like it -- O for 0, I for 1 -- is read as
+// the digit (#159). Q is read as 0, which it is mistaken for as often. The
+// search reads the stored number the same way, in SQL.
+func vinLike(normalised string) string {
+	return strings.NewReplacer("O", "0", "Q", "0", "I", "1").Replace(normalised)
 }
 
 // Vehicle is everything known about one car.
@@ -292,7 +324,7 @@ func VehicleByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 			SELECT w.id, w.number, w.state, w.opened_at, coalesce(w.complaint, ''),
 			       ($2::timestamptz IS NOT NULL AND w.opened_at < $2::timestamptz) AS previous_owner,
 			       coalesce(cp.display_name, c.company_name, ''),
-			       coalesce(i.gross_minor, 0), i.id IS NOT NULL,
+			       CASE WHEN $3 THEN coalesce(i.gross_minor, 0) ELSE 0 END, $3 AND i.id IS NOT NULL,
 			       (SELECT o.km FROM odometer_readings o
 			         WHERE o.vehicle_id = w.vehicle_id AND o.read_at <= w.opened_at
 			         ORDER BY o.read_at DESC LIMIT 1),
@@ -309,7 +341,11 @@ func VehicleByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 			LEFT JOIN invoices i  ON i.work_order_id = w.id AND i.credit_of_id IS NULL
 			WHERE w.vehicle_id = $1
 			ORDER BY w.opened_at DESC`
-		rows, err := tx.Query(ctx, history, id, ownedSince)
+		// A job's total is its prices and says it was invoiced: read only
+		// for whoever is shown both (#225), so a technician's history is the
+		// work, not what it cost.
+		seesTotals := scope.SeesOnJob(access.FieldLinePrices) && scope.SeesOnJob(access.FieldInvoiceStatus)
+		rows, err := tx.Query(ctx, history, id, ownedSince, seesTotals)
 		if err != nil {
 			return fmt.Errorf("read history: %w", err)
 		}

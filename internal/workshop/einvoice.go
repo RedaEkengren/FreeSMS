@@ -9,6 +9,7 @@ import (
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
+	"github.com/RedaEkengren/FreeSMS/internal/payref"
 	"github.com/RedaEkengren/FreeSMS/internal/ubl"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -105,6 +106,7 @@ func ublInvoice(d Document, loc *time.Location) (ubl.Invoice, []string) {
 	in := ubl.Invoice{
 		Credit:         d.IsCreditNote(),
 		Reference:      d.Reference(),
+		PaymentID:      d.PaymentOCR,
 		CreditOf:       d.CreditOf,
 		IssueDate:      d.IssuedAt.In(loc),
 		DueDate:        d.DueIn(loc),
@@ -199,11 +201,13 @@ func validOrgNumber(n string) bool {
 }
 
 // paymentAccount is the number out of what the shop typed beside it: "Bankgiro
-// 123-4567" is 1234567. An IBAN keeps its letters.
+// 123-4567" is 1234567, read as the payment code reads it, so a telephone
+// number printed after it is not taken for part of it. An IBAN keeps its
+// letters.
 func paymentAccount(scheme, text string) string {
 	switch scheme {
 	case "bankgiro", "plusgiro":
-		return notDigit.ReplaceAllString(text, "")
+		return strings.ReplaceAll(payref.GiroOf(scheme, text).Account, "-", "")
 	case "iban":
 		t := strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(text), " ", ""))
 		return strings.TrimPrefix(t, "IBAN")

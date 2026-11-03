@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -56,7 +55,7 @@ func AddLine(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 	if err := checkLine(&line); err != nil {
 		return err
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		return addLineTx(ctx, tx, scope, jobID, line, lineSource{})
 	})
 }
@@ -67,6 +66,12 @@ func checkLine(line *NewLine) error {
 		return fmt.Errorf("%w: the line needs a description", ErrInvalid)
 	case line.QuantityMilli < 0:
 		return fmt.Errorf("%w: quantity cannot be negative", ErrInvalid)
+	// A line of nothing prints on the invoice as "0 x 895,00 = 0,00": a
+	// forgotten quantity more often than a meant one, and never something a
+	// customer is better for reading. A line that should not be there is
+	// withdrawn, which keeps why.
+	case line.QuantityMilli == 0:
+		return fmt.Errorf("%w: a line needs a quantity; to take one off, withdraw it", ErrInvalid)
 	case line.UnitPriceMinor < 0:
 		return fmt.Errorf("%w: a negative price is a credit note, not a line", ErrInvalid)
 	case !money.LineWithinLimits(line.QuantityMilli, line.UnitPriceMinor):

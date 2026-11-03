@@ -12,12 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func thisMonth() (time.Time, time.Time) {
-	now := time.Now()
-	from := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	return from, from.AddDate(0, 1, 0)
-}
-
 // One large job moves the average and does not move the middle, which is why
 // both are shown.
 func TestTheAverageAndTheMiddleAreBothReported(t *testing.T) {
@@ -51,7 +45,7 @@ func TestTheAverageAndTheMiddleAreBothReported(t *testing.T) {
 		t.Fatalf("Issue: %v", err)
 	}
 
-	from, to := thisMonth()
+	from, to := period()
 	d, err := workshop.Summary(ctx, pool, advisor(), from, to)
 	if err != nil {
 		t.Fatalf("Summary: %v", err)
@@ -81,7 +75,7 @@ func TestCreditNotesReduceTheTotal(t *testing.T) {
 		t.Fatalf("Issue: %v", err)
 	}
 
-	from, to := thisMonth()
+	from, to := period()
 	before, _ := workshop.Summary(ctx, pool, advisor(), from, to)
 	if before.NetMinor != inv.NetMinor {
 		t.Fatalf("net = %d, want %d", before.NetMinor, inv.NetMinor)
@@ -105,7 +99,7 @@ func TestApprovalRateCountsOnlyTheLatestAnswer(t *testing.T) {
 	if err := workshop.RecordDecision(ctx, pool, shopID, token, itemID, "approved"); err != nil {
 		t.Fatalf("RecordDecision: %v", err)
 	}
-	from, to := thisMonth()
+	from, to := period()
 	d, _ := workshop.Summary(ctx, pool, advisor(), from, to)
 	if d.FindingsDecided != 1 || d.ApprovalRate() != 100 {
 		t.Fatalf("after approving: decided %d, rate %d%%", d.FindingsDecided, d.ApprovalRate())
@@ -126,7 +120,7 @@ func TestApprovalRateCountsOnlyTheLatestAnswer(t *testing.T) {
 // A shop that has not started using inspections should not be shown a nought.
 func TestNoFindingsMeansTheSectionIsNotShown(t *testing.T) {
 	pool := setup(t)
-	from, to := thisMonth()
+	from, to := period()
 	d, err := workshop.Summary(context.Background(), pool, advisor(), from, to)
 	if err != nil {
 		t.Fatalf("Summary: %v", err)
@@ -139,7 +133,7 @@ func TestNoFindingsMeansTheSectionIsNotShown(t *testing.T) {
 func TestTheFiguresAreNotForTechnicians(t *testing.T) {
 	pool := setup(t)
 	addTechnician(t, pool)
-	from, to := thisMonth()
+	from, to := period()
 	if _, err := workshop.Summary(context.Background(), pool, technician(), from, to); !errors.Is(err, access.ErrForbidden) {
 		t.Errorf("a technician read the shop's figures: %v", err)
 	}
@@ -152,18 +146,66 @@ func TestThePeriodIsRespected(t *testing.T) {
 	ctx := context.Background()
 
 	id := readyToInvoice(t, pool)
-	if _, err := workshop.Issue(ctx, pool, advisor(), id); err != nil {
+	inv, err := workshop.Issue(ctx, pool, advisor(), id)
+	if err != nil {
 		t.Fatalf("Issue: %v", err)
 	}
 
-	// Last month.
-	from, _ := thisMonth()
+	from, to := monthOf(inv.IssuedAt)
+	if d, err := workshop.Summary(ctx, pool, advisor(), from, to); err != nil || d.Invoices != 1 {
+		t.Fatalf("the month it was issued in shows %d invoices (%v), want 1", d.Invoices, err)
+	}
+	// The month before.
 	d, err := workshop.Summary(ctx, pool, advisor(), from.AddDate(0, -1, 0), from)
 	if err != nil {
 		t.Fatalf("Summary: %v", err)
 	}
 	if d.Invoices != 0 {
 		t.Errorf("last month shows %d invoices from a job invoiced today", d.Invoices)
+	}
+}
+
+// An invoice issued at half past midnight on 1 November in Stockholm is 23:30
+// on 31 October in UTC. It is November's: in November's figures, in
+// November's accounts and VAT, and not in October's. The month is the shop's,
+// and the server's own zone (UTC, here) must not move it.
+func TestAnInvoiceAtHalfPastMidnightOnTheFirstBelongsToTheNewMonth(t *testing.T) {
+	was := time.Local
+	time.Local = time.UTC
+	t.Cleanup(func() { time.Local = was })
+
+	pool := setup(t)
+	addTechnician(t, pool)
+	ctx := context.Background()
+
+	if _, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool)); err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	// Issued invoices are immutable by trigger; this database is thrown away.
+	if _, err := pool.Exec(ctx, `
+		ALTER TABLE invoices DISABLE TRIGGER invoices_immutable;
+		UPDATE invoices SET issued_at = '2026-10-31T23:30:00Z';
+		ALTER TABLE invoices ENABLE TRIGGER invoices_immutable;`); err != nil {
+		t.Fatalf("move the invoice: %v", err)
+	}
+
+	november := time.Date(2026, 11, 1, 0, 0, 0, 0, stockholm)
+	october := november.AddDate(0, -1, 0)
+	if from, _ := monthOf(time.Date(2026, 10, 31, 23, 30, 0, 0, time.UTC)); !from.Equal(november) {
+		t.Fatalf("00:30 on 1 November in Stockholm falls in the month from %v", from)
+	}
+
+	if d, err := workshop.Summary(ctx, pool, advisor(), november, november.AddDate(0, 1, 0)); err != nil || d.Invoices != 1 {
+		t.Errorf("November's figures show %d invoices (%v), want the one issued at 00:30 on the 1st", d.Invoices, err)
+	}
+	if d, err := workshop.Summary(ctx, pool, advisor(), october, november); err != nil || d.Invoices != 0 {
+		t.Errorf("October's figures show %d invoices (%v), want none", d.Invoices, err)
+	}
+	if _, _, err := workshop.ExportAccounting(ctx, pool, advisor(), october, november, false); !errors.Is(err, workshop.ErrNothingToExport) {
+		t.Errorf("exporting October = %v, want ErrNothingToExport: the invoice is November's", err)
+	}
+	if _, n, err := workshop.ExportAccounting(ctx, pool, advisor(), november, november.AddDate(0, 1, 0), false); err != nil || n != 1 {
+		t.Errorf("exporting November gave %d documents (%v), want 1", n, err)
 	}
 }
 

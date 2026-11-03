@@ -3,6 +3,23 @@
 <p class="waiting">{{.T "Every invoice with something owed either way. Money owed back to a customer is listed first. Following one up changes nothing in what is owed."}}</p>
 <p class="waiting"><a href="/receivables">{{.T "Everybody's"}}</a> &middot; <a href="/receivables?who=me">{{.T "Mine"}}</a></p>
 
+{{/* A payment off the bank's statement, found by the reference it was paid
+     with (#234); a mistyped reference is refused by its check digit. */}}
+<details>
+  <summary>{{.T "A payment, by its reference"}}</summary>
+  <form method="post" action="/payments/by-reference">
+    <div class="pair">
+      <label><span>{{.T "Payment reference (OCR)"}}</span><input name="ocr" inputmode="numeric" maxlength="40" required></label>
+      <label><span>{{.T "Amount"}}</span><input name="amount" inputmode="decimal" required></label>
+    </div>
+    <div class="pair">
+      <label><span>{{.T "Paid on"}}</span><input type="date" name="paid_on" value="{{.Today}}" required></label>
+      <label><span>{{.T "How"}}</span><select name="method"><option value="bank">{{.T "bank"}}</option><option value="swish">{{.T "swish"}}</option></select></label>
+    </div>
+    <button type="submit">{{.T "Record the payment"}}</button>
+  </form>
+</details>
+
 {{if .Undelivered}}
 <h2>{{.T "Documents the customer is not known to have"}}</h2>
 <ul class="lines">
@@ -23,7 +40,7 @@
   <li>
     <div class="row">
       <a href="/invoices/{{.InvoiceID}}">{{.Reference}} &middot; {{.Customer}}</a>
-      <span>{{$.Money .Outstanding}}{{if .Overdue}} <span class="tag late">{{$.T "overdue"}}</span>{{end}}</span>
+      <span>{{$.Money (abs .Outstanding)}}{{if .Overdue}} <span class="tag late">{{$.T "overdue"}}</span>{{end}}</span>
     </div>
     <div class="waiting">
       {{if .Refund}}<span class="tag warranty">{{$.T "owed back to the customer"}}</span>{{else}}{{$.T "Due %s" ($.Date ($.Local .Due) "2 Jan 2006")}}{{if .Overdue}} &middot; {{$.N "%d day late" .DaysLate}}{{end}}{{end}}

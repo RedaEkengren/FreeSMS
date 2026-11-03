@@ -18,9 +18,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/auth"
 	"github.com/RedaEkengren/FreeSMS/internal/config"
 	"github.com/RedaEkengren/FreeSMS/internal/i18n"
+	"github.com/RedaEkengren/FreeSMS/internal/identity"
 	"github.com/RedaEkengren/FreeSMS/internal/live"
 	"github.com/RedaEkengren/FreeSMS/internal/notify"
 	"github.com/RedaEkengren/FreeSMS/internal/storage"
@@ -44,6 +46,13 @@ type Server struct {
 	photos         *storage.Store
 	baseURL        string
 	vehicleLookup  vehicledata.Lookup
+	lookupProvider string
+	// The keys identity values are sealed with; nil or empty, none can be
+	// recorded or read (#153).
+	identityKeys *identity.Keyring
+	// The services calls to the outside world go through, by kind; none
+	// ships, so each becomes a task for a person (#154, #235).
+	outboxAdapters map[string]workshop.OutboxAdapter
 	catalogues     *i18n.Catalogues
 
 	// Open screens, told when something they show has changed.
@@ -58,6 +67,9 @@ type Server struct {
 
 	// Pinned by SHOP_ID when an installation serves a named shop.
 	configuredShopID string
+
+	// What the shop runs, for requests with nobody signed in (moduleCache).
+	modules moduleCache
 
 	// Resolved once there is a shop. It starts empty on a fresh installation
 	// and is filled in by setup, while the process is running -- hence the
@@ -76,6 +88,10 @@ type Server struct {
 	// time stored is an instant. Nil until a shop resolves, which is UTC.
 	resolvedZone *time.Location
 
+	// Every route registered, with the module it belongs to; empty for Core.
+	// Read by the tests that hold each route to its module.
+	routeTable []registeredRoute
+
 	// Signalled when the shop is set after start-up, for whatever runs in the
 	// background and needs to know -- the retention sweep. Buffered by one
 	// and never blocked on: a signal nobody has read yet already says it.
@@ -86,15 +102,18 @@ type Server struct {
 //
 // Nothing is the default and is not a degraded mode: a shop without an
 // arrangement types the make and model, which is what it does today on paper.
+//
+// A provider is asked no faster than the shop's agreement allows, and backs
+// off when it says it is rate limiting (#155).
 func newLookup(cfg *config.Config) vehicledata.Lookup {
 	if cfg.VehicleLookupURL == "" {
 		return vehicledata.None{}
 	}
-	return vehicledata.HTTPLookup{
+	return vehicledata.NewLimited(vehicledata.HTTPLookup{
 		URL:    cfg.VehicleLookupURL,
 		Token:  cfg.VehicleLookupToken,
 		Fields: vehicledata.DefaultFields(),
-	}
+	}, cfg.VehicleLookupPerMinute)
 }
 
 // localeFor resolves the language for a request: the person's, then the
@@ -236,6 +255,8 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 		photos:           photos,
 		exportDir:        cfg.ExportDir,
 		vehicleLookup:    newLookup(cfg),
+		lookupProvider:   cfg.VehicleLookupProvider,
+		identityKeys:     cfg.IdentityKeys,
 		catalogues:       catalogues,
 		baseURL:          strings.TrimRight(cfg.BaseURL, "/"),
 		templates:        templates,
@@ -280,6 +301,11 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 		}
 		srv.sms = elks
 	}
+	if srv.canLookUp() {
+		srv.outboxAdapters = map[string]workshop.OutboxAdapter{
+			"vehicle_lookup": workshop.VehicleLookupAdapter{Pool: pool, Lookup: srv.vehicleLookup, Provider: srv.lookupProvider},
+		}
+	}
 	return srv, nil
 }
 
@@ -294,7 +320,13 @@ func (s *Server) canLookUp() bool {
 }
 
 func (s *Server) routes() (http.Handler, error) {
-	mux := routeMux{ServeMux: http.NewServeMux(), s: s}
+	// Every route is registered as Core or as a module's (#143). A module's
+	// answers exactly as a path that does not exist when the shop does not
+	// run it -- not a refusal, which would say there is something to refuse.
+	mux := routeMux{ServeMux: http.NewServeMux(), s: s, table: &s.routeTable}
+	workshopMux := mux.in(access.Workshop)
+	dealerMux := mux.in(access.Dealer)
+	rentalMux := mux.in(access.Rental)
 
 	// Health is outside the session middleware on purpose: a health check must
 	// not depend on authentication working.
@@ -316,66 +348,69 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /logout", s.handleLogout)
 
 	mux.HandleFunc("GET /{$}", s.requireSession(s.handleHome))
-	mux.HandleFunc("GET /board", s.requireSession(s.handleBoard))
-	mux.HandleFunc("GET /jobs/new", s.requireSession(s.handleNewJobForm))
-	mux.HandleFunc("POST /jobs/new", s.requireSession(s.handleNewJob))
-	mux.HandleFunc("GET /jobs/new/lookup", s.requireSession(s.handleVehicleLookup))
-	mux.HandleFunc("GET /jobs/new/customers", s.requireSession(s.handleIntakeCustomers))
-	mux.HandleFunc("GET /jobs/{id}", s.requireSession(s.handleJob))
-	mux.HandleFunc("POST /jobs/{id}/state", s.requireSession(s.handleSetState))
-	mux.HandleFunc("POST /jobs/{id}/quote", s.requireSession(s.handlePresentQuote))
-	mux.HandleFunc("POST /jobs/{id}/quote/{quoteID}/answer", s.requireSession(s.handleQuoteAnswer))
-	mux.HandleFunc("POST /jobs/{id}/lines/{position}/performed", s.requireSession(s.handleMarkPerformed))
-	mux.HandleFunc("POST /jobs/{id}/lines", s.requireSession(s.handleAddLine))
-	mux.HandleFunc("GET /jobs/{id}/lines/{position}/edit", s.requireSession(s.handleLineEditPage))
-	mux.HandleFunc("POST /jobs/{id}/lines/{position}/edit", s.requireSession(s.handleLineEdit))
-	mux.HandleFunc("POST /jobs/{id}/lines/{position}/withdraw", s.requireSession(s.handleLineWithdraw))
-	mux.HandleFunc("POST /jobs/{id}/invoice", s.requireSession(s.handleInvoice))
-	mux.HandleFunc("POST /jobs/{id}/credit", s.requireSession(s.handleCreditNote))
+	workshopMux.HandleFunc("GET /board", s.requireSession(s.handleBoard))
+	workshopMux.HandleFunc("GET /jobs/new", s.requireSession(s.handleNewJobForm))
+	workshopMux.HandleFunc("POST /jobs/new", s.requireSession(s.handleNewJob))
+	workshopMux.HandleFunc("GET /jobs/new/lookup", s.requireSession(s.handleVehicleLookup))
+	workshopMux.HandleFunc("GET /jobs/new/customers", s.requireSession(s.handleIntakeCustomers))
+	workshopMux.HandleFunc("GET /jobs/{id}", s.requireSession(s.handleJob))
+	workshopMux.HandleFunc("POST /jobs/{id}/state", s.requireSession(s.handleSetState))
+	workshopMux.HandleFunc("POST /jobs/{id}/quote", s.requireSession(s.handlePresentQuote))
+	workshopMux.HandleFunc("POST /jobs/{id}/quote/{quoteID}/answer", s.requireSession(s.handleQuoteAnswer))
+	workshopMux.HandleFunc("POST /jobs/{id}/lines/{position}/performed", s.requireSession(s.handleMarkPerformed))
+	workshopMux.HandleFunc("POST /jobs/{id}/lines", s.requireSession(s.handleAddLine))
+	workshopMux.HandleFunc("GET /jobs/{id}/lines/{position}/edit", s.requireSession(s.handleLineEditPage))
+	workshopMux.HandleFunc("POST /jobs/{id}/lines/{position}/edit", s.requireSession(s.handleLineEdit))
+	workshopMux.HandleFunc("POST /jobs/{id}/lines/{position}/withdraw", s.requireSession(s.handleLineWithdraw))
+	workshopMux.HandleFunc("POST /jobs/{id}/invoice", s.requireSession(s.handleInvoice))
+	workshopMux.HandleFunc("POST /jobs/{id}/credit", s.requireSession(s.handleCreditNote))
 	mux.HandleFunc("GET /invoices/{id}", s.requireSession(s.handleInvoiceDocument))
 	mux.HandleFunc("GET /invoices/{id}/einvoice.xml", s.requireSession(s.handleEInvoice))
 	mux.HandleFunc("POST /invoices/{id}/payments", s.requireSession(s.handleRecordPayment))
 	mux.HandleFunc("POST /payments/{id}/reverse", s.requireSession(s.handleReversePayment))
+	mux.HandleFunc("POST /payments/by-reference", s.requireSession(s.handleRecordPaymentByReference))
 	mux.HandleFunc("GET /receivables", s.requireSession(s.handleReceivables))
 
-	mux.HandleFunc("POST /jobs/{id}/inspect", s.requireSession(s.handleStartInspection))
-	mux.HandleFunc("POST /jobs/{id}/promise", s.requireSession(s.handlePromise))
-	mux.HandleFunc("POST /jobs/{id}/staff", s.requireSession(s.handleStaffJob))
-	mux.HandleFunc("POST /jobs/{id}/plan", s.requireSession(s.handlePlan))
-	mux.HandleFunc("POST /jobs/{id}/plan/carry", s.requireSession(s.handleCarryOver))
-	mux.HandleFunc("POST /jobs/{id}/answers/{itemID}", s.requireSession(s.handlePriceAnswer))
-	mux.HandleFunc("POST /jobs/{id}/car", s.requireSession(s.handleCar))
-	mux.HandleFunc("POST /jobs/{id}/takeout", s.requireSession(s.handleTakeOut))
-	mux.HandleFunc("POST /jobs/{id}/told", s.requireSession(s.handleTold))
-	mux.HandleFunc("POST /jobs/{id}/link", s.requireSession(s.handleJobLink))
+	workshopMux.HandleFunc("POST /jobs/{id}/inspect", s.requireSession(s.handleStartInspection))
+	workshopMux.HandleFunc("POST /jobs/{id}/promise", s.requireSession(s.handlePromise))
+	workshopMux.HandleFunc("POST /jobs/{id}/staff", s.requireSession(s.handleStaffJob))
+	workshopMux.HandleFunc("POST /jobs/{id}/plan", s.requireSession(s.handlePlan))
+	workshopMux.HandleFunc("POST /jobs/{id}/plan/carry", s.requireSession(s.handleCarryOver))
+	workshopMux.HandleFunc("POST /jobs/{id}/answers/{itemID}", s.requireSession(s.handlePriceAnswer))
+	workshopMux.HandleFunc("POST /jobs/{id}/car", s.requireSession(s.handleCar))
+	workshopMux.HandleFunc("POST /jobs/{id}/takeout", s.requireSession(s.handleTakeOut))
+	workshopMux.HandleFunc("POST /jobs/{id}/told", s.requireSession(s.handleTold))
+	workshopMux.HandleFunc("POST /jobs/{id}/link", s.requireSession(s.handleJobLink))
 	mux.HandleFunc("GET /events", s.requireSession(s.handleEvents))
-	mux.HandleFunc("POST /jobs/{id}/message", s.requireSession(s.handleSendMessage))
+	workshopMux.HandleFunc("POST /jobs/{id}/message", s.requireSession(s.handleSendMessage))
 	// A provider reporting delivery: no session, a secret in the address.
 	mux.HandleFunc("POST /hooks/46elks/{secret}", s.handleElksDelivered)
-	mux.HandleFunc("GET /calendar", s.requireSession(s.handleCalendar))
-	mux.HandleFunc("POST /calendar", s.requireSession(s.handleCreateBooking))
-	mux.HandleFunc("POST /calendar/capacity", s.requireSession(s.handleCapacity))
-	mux.HandleFunc("GET /enquiries", s.requireSession(s.handleEnquiries))
-	mux.HandleFunc("POST /enquiries", s.requireSession(s.handleCreateEnquiry))
-	mux.HandleFunc("GET /enquiries/{id}", s.requireSession(s.handleEnquiry))
-	mux.HandleFunc("POST /enquiries/{id}/lines", s.requireSession(s.handleEnquiryLine))
-	mux.HandleFunc("POST /enquiries/{id}/lines/{position}/remove", s.requireSession(s.handleEnquiryRemoveLine))
-	mux.HandleFunc("POST /enquiries/{id}/quote", s.requireSession(s.handleEnquiryPresent))
-	mux.HandleFunc("POST /enquiries/{id}/quote/{quoteID}/answer", s.requireSession(s.handleEnquiryAnswer))
-	mux.HandleFunc("POST /enquiries/{id}/link", s.requireSession(s.handleEnquiryLink))
-	mux.HandleFunc("POST /enquiries/{id}/book", s.requireSession(s.handleEnquiryBook))
-	mux.HandleFunc("GET /enquiries/{id}/quote/{version}/print", s.requireSession(s.handleProposalPrint))
-	mux.HandleFunc("GET /o/{token}", s.handleOffer)
-	mux.HandleFunc("POST /o/{token}/quote/{quoteID}", s.handleOfferAnswer)
-	mux.HandleFunc("GET /bookings/{id}", s.requireSession(s.handleBooking))
-	mux.HandleFunc("POST /bookings/{id}", s.requireSession(s.handleBookingAction))
-	mux.HandleFunc("POST /bookings/{id}/message", s.requireSession(s.handleBookingMessage))
-	mux.HandleFunc("POST /bookings/{id}/contact", s.requireSession(s.handleBookingContact))
-	mux.HandleFunc("POST /shop/final-check", s.requireSession(s.handleSaveFinalCheck))
+	workshopMux.HandleFunc("GET /calendar", s.requireSession(s.handleCalendar))
+	workshopMux.HandleFunc("POST /calendar", s.requireSession(s.handleCreateBooking))
+	workshopMux.HandleFunc("POST /calendar/capacity", s.requireSession(s.handleCapacity))
+	workshopMux.HandleFunc("GET /enquiries", s.requireSession(s.handleEnquiries))
+	workshopMux.HandleFunc("POST /enquiries", s.requireSession(s.handleCreateEnquiry))
+	workshopMux.HandleFunc("GET /enquiries/{id}", s.requireSession(s.handleEnquiry))
+	workshopMux.HandleFunc("POST /enquiries/{id}/lines", s.requireSession(s.handleEnquiryLine))
+	workshopMux.HandleFunc("POST /enquiries/{id}/lines/{position}/remove", s.requireSession(s.handleEnquiryRemoveLine))
+	workshopMux.HandleFunc("POST /enquiries/{id}/quote", s.requireSession(s.handleEnquiryPresent))
+	workshopMux.HandleFunc("POST /enquiries/{id}/quote/{quoteID}/answer", s.requireSession(s.handleEnquiryAnswer))
+	workshopMux.HandleFunc("POST /enquiries/{id}/link", s.requireSession(s.handleEnquiryLink))
+	workshopMux.HandleFunc("POST /enquiries/{id}/book", s.requireSession(s.handleEnquiryBook))
+	workshopMux.HandleFunc("GET /enquiries/{id}/quote/{version}/print", s.requireSession(s.handleProposalPrint))
+	links := workshopMux.customerLinks(s.handleServiceGone)
+	links.HandleFunc("GET /o/{token}", s.handleOffer)
+	links.HandleFunc("POST /o/{token}/quote/{quoteID}", s.handleOfferAnswer)
+	workshopMux.HandleFunc("GET /bookings/{id}", s.requireSession(s.handleBooking))
+	workshopMux.HandleFunc("POST /bookings/{id}", s.requireSession(s.handleBookingAction))
+	workshopMux.HandleFunc("POST /bookings/{id}/message", s.requireSession(s.handleBookingMessage))
+	workshopMux.HandleFunc("POST /bookings/{id}/contact", s.requireSession(s.handleBookingContact))
+	workshopMux.HandleFunc("POST /shop/final-check", s.requireSession(s.handleSaveFinalCheck))
 	mux.HandleFunc("GET /staff", s.requireSession(s.handleStaff))
 	mux.HandleFunc("POST /staff", s.requireSession(s.handleAddStaff))
 	mux.HandleFunc("POST /staff/{id}/active", s.requireSession(s.handleStaffActive))
 	mux.HandleFunc("POST /staff/{id}/password", s.requireSession(s.handleStaffPassword))
+	mux.HandleFunc("POST /staff/{id}/roles", s.requireSession(s.handleStaffRoles))
 	mux.HandleFunc("GET /account", s.requireSession(s.handleAccount))
 	mux.HandleFunc("POST /account/alert", s.requireSession(s.handleAlertSound))
 	mux.HandleFunc("GET /mine", s.requireSession(s.handleMine))
@@ -387,45 +422,64 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /account/password", s.requireSession(s.handleChangePassword))
 	mux.HandleFunc("POST /account/language", s.requireSession(s.handleMyLanguage))
 	mux.HandleFunc("POST /account/theme", s.requireSession(s.handleMyTheme))
+	// Checklists are Core (owner decision on #143, #147): a job's check, a
+	// purchase appraisal and a rental's check-out are made from the same.
+	s.rentalRoutes(rentalMux)
+	s.rentalCoreRoutes(mux)
 	mux.HandleFunc("GET /checklists", s.requireSession(s.handleChecklists))
 	mux.HandleFunc("POST /checklists", s.requireSession(s.handleSaveChecklist))
 	mux.HandleFunc("GET /checklists/{id}", s.requireSession(s.handleChecklists))
 	mux.HandleFunc("POST /checklists/{id}", s.requireSession(s.handleSaveChecklist))
 	mux.HandleFunc("POST /checklists/{id}/active", s.requireSession(s.handleChecklistActive))
-	mux.HandleFunc("GET /inspections/{id}", s.requireSession(s.handleInspection))
-	mux.HandleFunc("POST /inspections/{id}/items/{itemID}", s.requireSession(s.handleSetInspectionItem))
-	mux.HandleFunc("POST /inspections/{id}/items/{itemID}/photo", s.requireSession(s.handleUploadPhoto))
-	mux.HandleFunc("POST /inspections/{id}/complete", s.requireSession(s.handleCompleteInspection))
-	mux.HandleFunc("POST /inspections/{id}/share", s.requireSession(s.handleShareInspection))
-	mux.HandleFunc("POST /inspections/{id}/revoke", s.requireSession(s.handleRevokeShare))
-	mux.HandleFunc("GET /photos/{key}", s.requireSession(s.handlePhoto))
+	mux.HandleFunc("POST /checklists/{id}/subjects", s.requireSession(s.handleChecklistSubjects))
+	workshopMux.HandleFunc("GET /inspections/{id}", s.requireSession(s.handleInspection))
+	workshopMux.HandleFunc("POST /inspections/{id}/items/{itemID}", s.requireSession(s.handleSetInspectionItem))
+	workshopMux.HandleFunc("POST /inspections/{id}/items/{itemID}/photo", s.requireSession(s.handleUploadPhoto))
+	workshopMux.HandleFunc("POST /inspections/{id}/complete", s.requireSession(s.handleCompleteInspection))
+	workshopMux.HandleFunc("POST /inspections/{id}/share", s.requireSession(s.handleShareInspection))
+	workshopMux.HandleFunc("POST /inspections/{id}/revoke", s.requireSession(s.handleRevokeShare))
+	workshopMux.HandleFunc("GET /photos/{key}", s.requireSession(s.handlePhoto))
 
 	// The customer's link. No session; the token is the whole of the
 	// authorisation, and it authorises exactly one inspection.
-	mux.HandleFunc("GET /i/{token}", s.handleSharedInspection)
-	mux.HandleFunc("GET /k/{token}", s.handleCustomerStatus)
-	mux.HandleFunc("POST /k/{token}/quote/{quoteID}", s.handleCustomerQuote)
-	mux.HandleFunc("POST /i/{token}/items/{itemID}", s.handleSharedDecision)
-	mux.HandleFunc("GET /i/{token}/photos/{key}", s.handleSharedPhoto)
+	links.HandleFunc("GET /i/{token}", s.handleSharedInspection)
+	links.HandleFunc("GET /k/{token}", s.handleCustomerStatus)
+	links.HandleFunc("POST /k/{token}/quote/{quoteID}", s.handleCustomerQuote)
+	links.HandleFunc("POST /i/{token}/items/{itemID}", s.handleSharedDecision)
+	links.HandleFunc("GET /i/{token}/photos/{key}", s.handleSharedPhoto)
 
 	mux.HandleFunc("GET /figures", s.requireSession(s.handleDashboard))
 	mux.HandleFunc("GET /accounting", s.requireSession(s.handleAccounting))
 	mux.HandleFunc("POST /accounting/export", s.requireSession(s.handleAccountingExport))
 	mux.HandleFunc("GET /shop", s.requireSession(s.handleShop))
 	mux.HandleFunc("POST /shop", s.requireSession(s.handleSaveShop))
-	mux.HandleFunc("POST /shop/charges", s.requireSession(s.handleSaveSurcharges))
+	mux.HandleFunc("POST /shop/modules", s.requireSession(s.handleSwitchModule))
+	workshopMux.HandleFunc("POST /shop/charges", s.requireSession(s.handleSaveSurcharges))
 	mux.HandleFunc("GET /privacy", s.requireSession(s.handlePrivacy))
+	mux.HandleFunc("GET /payment-flows", s.requireSession(s.handlePaymentFlows))
+	mux.HandleFunc("POST /payment-flows", s.requireSession(s.handlePaymentFlowAction("add")))
+	mux.HandleFunc("POST /payment-flows/threshold", s.requireSession(s.handlePaymentFlowAction("threshold")))
+	mux.HandleFunc("POST /payment-flows/{id}/check", s.requireSession(s.handlePaymentFlowAction("check")))
+	mux.HandleFunc("POST /payment-flows/{id}/withdraw", s.requireSession(s.handlePaymentFlowAction("withdraw")))
+	mux.HandleFunc("GET /outbox", s.requireSession(s.handleOutbox))
+	mux.HandleFunc("POST /outbox/{id}/retry", s.requireSession(s.handleOutboxAction("retry")))
+	mux.HandleFunc("POST /outbox/{id}/done", s.requireSession(s.handleOutboxAction("done")))
+	mux.HandleFunc("POST /outbox/{id}/cancel", s.requireSession(s.handleOutboxAction("cancel")))
 	mux.HandleFunc("GET /people/{id}/export", s.requireSession(s.handleExportPerson))
 	mux.HandleFunc("POST /privacy/export", s.requireSession(s.handleShopExport))
 	mux.HandleFunc("GET /exports/{id}", s.requireSession(s.handleShopExportFile))
 	mux.HandleFunc("POST /people/{id}/erase", s.requireSession(s.handleErasePerson))
 
-	mux.HandleFunc("GET /labour", s.requireSession(s.handleLabour))
-	mux.HandleFunc("POST /labour", s.requireSession(s.handleSaveLabour))
-	mux.HandleFunc("POST /labour/rate", s.requireSession(s.handleSetLabourRate))
+	workshopMux.HandleFunc("GET /technicians", s.requireSession(s.handleTechnicianView))
+	workshopMux.HandleFunc("POST /technicians/fields", s.requireSession(s.handleTechnicianViewAction("field")))
+	workshopMux.HandleFunc("POST /technicians/exceptions", s.requireSession(s.handleTechnicianViewAction("grant")))
+	workshopMux.HandleFunc("POST /technicians/exceptions/end", s.requireSession(s.handleTechnicianViewAction("end")))
+	workshopMux.HandleFunc("GET /labour", s.requireSession(s.handleLabour))
+	workshopMux.HandleFunc("POST /labour", s.requireSession(s.handleSaveLabour))
+	workshopMux.HandleFunc("POST /labour/rate", s.requireSession(s.handleSetLabourRate))
 
-	mux.HandleFunc("GET /time", s.requireSession(s.handleTime))
-	mux.HandleFunc("POST /time/correct", s.requireSession(s.handleCorrectTime))
+	workshopMux.HandleFunc("GET /time", s.requireSession(s.handleTime))
+	workshopMux.HandleFunc("POST /time/correct", s.requireSession(s.handleCorrectTime))
 
 	mux.HandleFunc("POST /drafts", s.requireSession(s.handleSaveDraft))
 	mux.HandleFunc("GET /drafts", s.requireSession(s.handleLoadDraft))
@@ -447,53 +501,59 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /vehicles/{id}/sell", s.requireSession(s.handleSellForm))
 	mux.HandleFunc("POST /vehicles/{id}/sell", s.requireSession(s.handleSellVehicle))
 
-	mux.HandleFunc("GET /scan", s.requireSession(s.handleScan))
-	mux.HandleFunc("GET /labels", s.requireSession(s.handleLabels))
-	mux.HandleFunc("GET /stock", s.requireSession(s.handleStock))
-	mux.HandleFunc("POST /stock/move", s.requireSession(s.handleStockMove))
-	mux.HandleFunc("POST /stock/count", s.requireSession(s.handleStocktake))
-	mux.HandleFunc("GET /stock/parts/new", s.requireSession(s.handlePartForm))
-	mux.HandleFunc("POST /stock/parts", s.requireSession(s.handleSavePart))
-	mux.HandleFunc("GET /stock/parts/{id}", s.requireSession(s.handlePartForm))
-	mux.HandleFunc("POST /stock/parts/{id}", s.requireSession(s.handleSavePart))
-	mux.HandleFunc("POST /stock/parts/{id}/active", s.requireSession(s.handlePartActive))
-	mux.HandleFunc("POST /stock/bands", s.requireSession(s.handleSavePriceBand))
+	workshopMux.HandleFunc("GET /scan", s.requireSession(s.handleScan))
+	workshopMux.HandleFunc("GET /labels", s.requireSession(s.handleLabels))
+	workshopMux.HandleFunc("GET /stock", s.requireSession(s.handleStock))
+	workshopMux.HandleFunc("POST /stock/move", s.requireSession(s.handleStockMove))
+	workshopMux.HandleFunc("POST /stock/count", s.requireSession(s.handleStocktake))
+	workshopMux.HandleFunc("GET /stock/parts/new", s.requireSession(s.handlePartForm))
+	workshopMux.HandleFunc("POST /stock/parts", s.requireSession(s.handleSavePart))
+	workshopMux.HandleFunc("GET /stock/parts/{id}", s.requireSession(s.handlePartForm))
+	workshopMux.HandleFunc("POST /stock/parts/{id}", s.requireSession(s.handleSavePart))
+	workshopMux.HandleFunc("POST /stock/parts/{id}/active", s.requireSession(s.handlePartActive))
+	workshopMux.HandleFunc("POST /stock/bands", s.requireSession(s.handleSavePriceBand))
 
-	mux.HandleFunc("GET /parts", s.requireSession(s.handleParts))
-	mux.HandleFunc("POST /parts/arrived", s.requireSession(s.handlePartArrived))
-	mux.HandleFunc("GET /jobs/{id}/customer", s.requireSession(s.handleCustomerForm))
-	mux.HandleFunc("POST /jobs/{id}/customer", s.requireSession(s.handleSaveCustomer))
-	mux.HandleFunc("GET /jobs/{id}/parts", s.requireSession(s.handleJobParts))
-	mux.HandleFunc("POST /jobs/{id}/parts", s.requireSession(s.handleRequestPart))
-	mux.HandleFunc("POST /jobs/{id}/findings", s.requireSession(s.handleReportFinding))
-	mux.HandleFunc("POST /jobs/{id}/findings/handled", s.requireSession(s.handleHandleFinding))
-	mux.HandleFunc("GET /supply", s.requireSession(s.handleSupply))
-	mux.HandleFunc("POST /supply/orders", s.requireSession(s.handleRecordOrder))
-	mux.HandleFunc("GET /supply/orders/{id}", s.requireSession(s.handleOrder))
-	mux.HandleFunc("POST /supply/orders/{id}/cancel", s.requireSession(s.handleCancelOrder))
-	mux.HandleFunc("POST /supply/lines/{line}/eta", s.requireSession(s.handleLineETA))
-	mux.HandleFunc("POST /supply/lines/{line}/receive", s.requireSession(s.handleReceiveDelivery))
-	mux.HandleFunc("POST /supply/receipts/{receipt}/accept", s.requireSession(s.handleSubstitute(true)))
-	mux.HandleFunc("POST /supply/receipts/{receipt}/reject", s.requireSession(s.handleSubstitute(false)))
-	mux.HandleFunc("POST /supply/receipts/{receipt}/return", s.requireSession(s.handlePlanReturn))
-	mux.HandleFunc("POST /supply/returns/{ret}/returned", s.requireSession(s.handleReturned))
-	mux.HandleFunc("POST /supply/returns/{ret}/credit", s.requireSession(s.handleCredit))
-	mux.HandleFunc("GET /jobs/{id}/summary", s.requireSession(s.handleSummaryPage))
-	mux.HandleFunc("POST /jobs/{id}/summary", s.requireSession(s.handleIssueSummary))
-	mux.HandleFunc("GET /jobs/{id}/summary/{version}", s.requireSession(s.handleSummaryVersion))
-	mux.HandleFunc("POST /jobs/{id}/recommendations", s.requireSession(s.handleAddRecommendation))
-	mux.HandleFunc("POST /jobs/{id}/recommendations/{rec}/withdraw", s.requireSession(s.handleWithdrawRecommendation))
-	mux.HandleFunc("POST /jobs/{id}/recommendations/{rec}/enquiry", s.requireSession(s.handleRecommendationEnquiry))
-	mux.HandleFunc("GET /k/{token}/summary", s.handleCustomerSummary)
+	workshopMux.HandleFunc("GET /parts", s.requireSession(s.handleParts))
+	workshopMux.HandleFunc("POST /parts/arrived", s.requireSession(s.handlePartArrived))
+	workshopMux.HandleFunc("GET /jobs/{id}/customer", s.requireSession(s.handleCustomerForm))
+	workshopMux.HandleFunc("POST /jobs/{id}/customer", s.requireSession(s.handleSaveCustomer))
+	workshopMux.HandleFunc("GET /jobs/{id}/parts", s.requireSession(s.handleJobParts))
+	workshopMux.HandleFunc("POST /jobs/{id}/parts", s.requireSession(s.handleRequestPart))
+	workshopMux.HandleFunc("POST /jobs/{id}/findings", s.requireSession(s.handleReportFinding))
+	workshopMux.HandleFunc("POST /jobs/{id}/contact-request", s.requireSession(s.handleContactRequest))
+	workshopMux.HandleFunc("POST /jobs/{id}/findings/handled", s.requireSession(s.handleHandleFinding))
+	workshopMux.HandleFunc("GET /supply", s.requireSession(s.handleSupply))
+	workshopMux.HandleFunc("POST /supply/orders", s.requireSession(s.handleRecordOrder))
+	workshopMux.HandleFunc("GET /supply/orders/{id}", s.requireSession(s.handleOrder))
+	workshopMux.HandleFunc("POST /supply/orders/{id}/cancel", s.requireSession(s.handleCancelOrder))
+	workshopMux.HandleFunc("POST /supply/lines/{line}/eta", s.requireSession(s.handleLineETA))
+	workshopMux.HandleFunc("POST /supply/lines/{line}/receive", s.requireSession(s.handleReceiveDelivery))
+	workshopMux.HandleFunc("POST /supply/receipts/{receipt}/accept", s.requireSession(s.handleSubstitute(true)))
+	workshopMux.HandleFunc("POST /supply/receipts/{receipt}/reject", s.requireSession(s.handleSubstitute(false)))
+	workshopMux.HandleFunc("POST /supply/receipts/{receipt}/return", s.requireSession(s.handlePlanReturn))
+	workshopMux.HandleFunc("POST /supply/returns/{ret}/returned", s.requireSession(s.handleReturned))
+	workshopMux.HandleFunc("POST /supply/returns/{ret}/credit", s.requireSession(s.handleCredit))
+	workshopMux.HandleFunc("GET /jobs/{id}/summary", s.requireSession(s.handleSummaryPage))
+	workshopMux.HandleFunc("POST /jobs/{id}/summary", s.requireSession(s.handleIssueSummary))
+	workshopMux.HandleFunc("GET /jobs/{id}/summary/{version}", s.requireSession(s.handleSummaryVersion))
+	workshopMux.HandleFunc("POST /jobs/{id}/recommendations", s.requireSession(s.handleAddRecommendation))
+	workshopMux.HandleFunc("POST /jobs/{id}/recommendations/{rec}/withdraw", s.requireSession(s.handleWithdrawRecommendation))
+	workshopMux.HandleFunc("POST /jobs/{id}/recommendations/{rec}/enquiry", s.requireSession(s.handleRecommendationEnquiry))
+	links.HandleFunc("GET /k/{token}/summary", s.handleCustomerSummary)
 	mux.HandleFunc("GET /d/{token}", s.handleCustomerDocument)
+	// Contracts (#150): Core's, whichever module made them, so a module
+	// switched off keeps them readable; who may read which is the kind's.
+	mux.HandleFunc("GET /contracts/{id}", s.requireSession(s.handleContract))
+	mux.HandleFunc("POST /contracts/{id}/link", s.requireSession(s.handleContractLink))
+	mux.HandleFunc("GET /c/{token}", s.handleCustomerContract)
 	mux.HandleFunc("GET /day", s.requireSession(s.handleDay))
 	mux.HandleFunc("POST /day/settlement", s.requireSession(s.handleDaySettlement))
 	mux.HandleFunc("POST /day/review", s.requireSession(s.handleDayReview))
-	mux.HandleFunc("GET /jobs/{id}/comeback", s.requireSession(s.handleComebackPage))
-	mux.HandleFunc("POST /jobs/{id}/comeback", s.requireSession(s.handleComeback))
-	mux.HandleFunc("GET /jobs/{id}/outsourced", s.requireSession(s.handleOutsourcedPage))
-	mux.HandleFunc("POST /jobs/{id}/outsourced", s.requireSession(s.handleOutsourced))
-	mux.HandleFunc("GET /outsourced", s.requireSession(s.handleOutsourcedList))
+	workshopMux.HandleFunc("GET /jobs/{id}/comeback", s.requireSession(s.handleComebackPage))
+	workshopMux.HandleFunc("POST /jobs/{id}/comeback", s.requireSession(s.handleComeback))
+	workshopMux.HandleFunc("GET /jobs/{id}/outsourced", s.requireSession(s.handleOutsourcedPage))
+	workshopMux.HandleFunc("POST /jobs/{id}/outsourced", s.requireSession(s.handleOutsourced))
+	workshopMux.HandleFunc("GET /outsourced", s.requireSession(s.handleOutsourcedList))
 	mux.HandleFunc("GET /start", s.requireSession(s.handleStart))
 	mux.HandleFunc("POST /start/step/{step}", s.requireSession(s.handleStartStep))
 	mux.HandleFunc("GET /start/invoice", s.requireSession(s.handleStartInvoice))
@@ -515,15 +575,24 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /invoices/{id}/send", s.requireSession(s.handleSendDocument))
 	mux.HandleFunc("POST /invoices/{id}/handover", s.requireSession(s.handleHandDocumentOver))
 	mux.HandleFunc("POST /invoices/{id}/revoke", s.requireSession(s.handleRevokeDocumentLinks))
-	mux.HandleFunc("GET /jobs/{id}/timeline", s.requireSession(s.handleTimeline))
-	mux.HandleFunc("POST /jobs/{id}/notes", s.requireSession(s.handleAddNote))
-	mux.HandleFunc("POST /jobs/{id}/notes/{note}/correct", s.requireSession(s.handleCorrectNote))
-	mux.HandleFunc("POST /jobs/{id}/tasks", s.requireSession(s.handleAddTask))
-	mux.HandleFunc("POST /jobs/{id}/tasks/from-lines", s.requireSession(s.handleTasksFromLines))
-	mux.HandleFunc("POST /jobs/{id}/tasks/{task}/move", s.requireSession(s.handleMoveTask))
-	mux.HandleFunc("POST /jobs/{id}/tasks/{task}/decision", s.requireSession(s.handleTaskDecision))
-	mux.HandleFunc("POST /jobs/{id}/clock-in", s.requireSession(s.handleClock(true)))
-	mux.HandleFunc("POST /jobs/{id}/clock-out", s.requireSession(s.handleClock(false)))
+	workshopMux.HandleFunc("GET /jobs/{id}/timeline", s.requireSession(s.handleTimeline))
+	workshopMux.HandleFunc("POST /jobs/{id}/notes", s.requireSession(s.handleAddNote))
+	workshopMux.HandleFunc("POST /jobs/{id}/notes/{note}/correct", s.requireSession(s.handleCorrectNote))
+	workshopMux.HandleFunc("POST /jobs/{id}/tasks", s.requireSession(s.handleAddTask))
+	workshopMux.HandleFunc("POST /jobs/{id}/tasks/from-lines", s.requireSession(s.handleTasksFromLines))
+	workshopMux.HandleFunc("POST /jobs/{id}/tasks/{task}/move", s.requireSession(s.handleMoveTask))
+	workshopMux.HandleFunc("POST /jobs/{id}/tasks/{task}/decision", s.requireSession(s.handleTaskDecision))
+	workshopMux.HandleFunc("POST /jobs/{id}/clock-in", s.requireSession(s.handleClock(true)))
+	workshopMux.HandleFunc("POST /jobs/{id}/clock-out", s.requireSession(s.handleClock(false)))
+
+	// Dealer
+	s.leadRoutes(dealerMux)
+	s.testDriveRoutes(dealerMux)
+	s.dealRoutes(dealerMux)
+	dealerMux.HandleFunc("GET /cars/calculations/new", s.requireSession(s.handleCalculationForm))
+	dealerMux.HandleFunc("POST /cars/calculations", s.requireSession(s.handleSaveCalculation))
+	dealerMux.HandleFunc("GET /cars/calculations/{id}", s.requireSession(s.handleCalculation))
+	dealerMux.HandleFunc("POST /cars/calculations/{id}/accept", s.requireSession(s.handleAcceptCalculation))
 
 	return s.securityHeaders(s.checkOrigin(s.requireSetup(s.withSession(s.refuseNUL(s.idempotent(mux)))))), nil
 }

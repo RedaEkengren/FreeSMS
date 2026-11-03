@@ -117,3 +117,58 @@ func TestWithoutJavaScriptASceneIsOneMoment(t *testing.T) {
 		}
 	}
 }
+
+// The public page never says a shop is exempt from the certified cash
+// register requirement: an invoice paid on the spot in person may still
+// need one (#156), and the page says to check, in every language.
+func TestThePageNeverSaysAShopIsExemptFromTheCashRegisterRules(t *testing.T) {
+	exempt := regexp.MustCompile(`(?i)invoiced sales are not covered|fakturerad försäljning omfattas inte|not covered by the certified cash register|omfattas inte av kravet på certifierat kassaregister`)
+	check := map[string]string{"sv": "Skatteverket", "en": "Skatteverket"}
+	for _, p := range Pages {
+		for _, file := range []string{p.Source, p.Output} {
+			b, err := os.ReadFile(filepath.Join("../..", file))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if m := exempt.Find(b); m != nil {
+				t.Errorf("%s says a shop is exempt: %q", file, m)
+			}
+			want, ok := check[p.Locale]
+			if !ok {
+				t.Errorf("%s is in %q, for which the test has no words to look for", file, p.Locale)
+				continue
+			}
+			if !bytes.Contains(b, []byte(want)) {
+				t.Errorf("%s does not say to check with %s", file, want)
+			}
+		}
+	}
+}
+
+// The public page says what CLAUDE.md decided about hosting (#95): running
+// it yourself is free under AGPL-3.0, and a paid hosted service exists for
+// a workshop that would rather not -- never that there is none, in any
+// language.
+func TestThePageSaysSelfHostingIsFreeAndHostingIsPaid(t *testing.T) {
+	none := regexp.MustCompile(`(?i)no hosted service|ingen hostad tjänst`)
+	hosted := map[string]string{"sv": "hostad tjänst mot betalning", "en": "paid hosted service"}
+	for _, p := range Pages {
+		for _, file := range []string{p.Source, p.Output} {
+			b, err := os.ReadFile(filepath.Join("../..", file))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if m := none.Find(b); m != nil {
+				t.Errorf("%s says there is no hosted service: %q", file, m)
+			}
+			want, ok := hosted[p.Locale]
+			if !ok {
+				t.Errorf("%s is in %q, for which the test has no words to look for", file, p.Locale)
+				continue
+			}
+			if !bytes.Contains(b, []byte(want)) || !bytes.Contains(b, []byte("AGPL-3.0")) {
+				t.Errorf("%s does not say self-hosting is free under AGPL-3.0 and a %q exists", file, want)
+			}
+		}
+	}
+}

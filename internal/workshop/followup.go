@@ -186,7 +186,7 @@ func TakeFollowUp(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 				return ErrNotFound
 			}
 			var ok bool
-			if err := tx.QueryRow(ctx, `SELECT exists(SELECT 1 FROM users WHERE id = $1 AND active AND role IN ('owner', 'admin', 'service_advisor'))`, in.OwnerID).Scan(&ok); err != nil {
+			if err := tx.QueryRow(ctx, `SELECT exists(SELECT 1 FROM users u WHERE u.id = $1 AND u.active AND EXISTS (SELECT 1 FROM staff_roles sr WHERE sr.user_id = u.id AND sr.role IN ('owner', 'admin', 'service_advisor')))`, in.OwnerID).Scan(&ok); err != nil {
 				return fmt.Errorf("check owner: %w", err)
 			}
 			if !ok {
@@ -464,6 +464,10 @@ func QueueReminder(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		if disputed {
 			return fmt.Errorf("%w: the charge is disputed; lift the hold before sending a reminder", ErrInvalid)
 		}
+		// A message is a job's until the outbox for everything else (#156).
+		if b.WorkOrderID == "" {
+			return ErrNotAJobsDocument
+		}
 		var linkID string
 		if err := tx.QueryRow(ctx, `
 			INSERT INTO invoice_links (shop_id, invoice_id, token_sha256, created_by, expires_at)
@@ -570,8 +574,8 @@ func RecordRefund(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 		if amount > back {
 			return fmt.Errorf("%w: that is more than is owed back", ErrInvalid)
 		}
-		out = Payment{AmountMinor: -amount, Method: in.Method, PaidOn: in.PaidOn, Reference: strings.TrimSpace(in.Reference)}
-		if err := insertPayment(ctx, tx, scope, id, &out, ""); err != nil {
+		out = Payment{InvoiceID: id, AmountMinor: -amount, Method: in.Method, PaidOn: in.PaidOn, Reference: strings.TrimSpace(in.Reference)}
+		if err := insertPayment(ctx, tx, scope, &out); err != nil {
 			return err
 		}
 		if err := caseTx(ctx, tx, scope, id); err != nil {
@@ -628,11 +632,21 @@ func Worklist(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, today
 			return err
 		}
 		rows, err := tx.Query(ctx, `
-			WITH open AS (
-			  SELECT i.id, i.series || '-' || i.number AS ref, i.customer_name, i.work_order_id, i.issued_at, coalesce(i.seller_payment_terms_days, 0) AS terms,
-			         i.gross_minor
-			           + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = i.id), 0)
-			           - coalesce((SELECT sum(p.amount_minor + p.rounding_minor) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) AS owed
+			-- What each customer is now, through its merges, found once for
+			-- all of them rather than followed again for every invoice.
+			WITH RECURSIVE now_of(id, now, depth) AS (
+			  SELECT id, id, 0 FROM customers WHERE merged_into IS NULL
+			  UNION ALL
+			  SELECT c.id, n.now, n.depth + 1 FROM customers c JOIN now_of n ON c.merged_into = n.id WHERE n.depth < 64),
+			open AS (
+			  SELECT i.id, i.series || '-' || i.number AS ref, i.customer_name, i.issued_at, coalesce(i.seller_payment_terms_days, 0) AS terms,
+			         -- Whom it is to: the job's customer for the workshop's, its
+			         -- own for any other source (#146).
+			         -- Through any merge: a manual invoice keeps the customer it
+			         -- was issued to, which may since be merged into another.
+			         (SELECT n.now FROM now_of n
+			           WHERE n.id = coalesce(i.customer_id, (SELECT w.customer_id FROM work_orders w WHERE w.id = i.work_order_id))) AS customer_id,
+			         `+owedSQL("i")+` AS owed
 			  FROM invoices i WHERE i.credit_of_id IS NULL)
 			SELECT o.id::text, o.ref, o.customer_name, o.owed, (o.issued_at AT TIME ZONE $1)::date + o.terms,
 			       coalesce(c.owner_id::text, ''), coalesce(op.display_name, ''), c.next_follow_up, c.disputed_at IS NOT NULL,
@@ -644,8 +658,8 @@ func Worklist(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, today
 			                         OR (SELECT e.event FROM message_events e WHERE e.message_id = d.message_id ORDER BY e.at DESC, e.id DESC LIMIT 1) IN ('sent', 'delivered'))) THEN 'reached'
 			         WHEN EXISTS (SELECT 1 FROM invoice_deliveries d WHERE d.invoice_id = o.id) THEN 'tried'
 			         ELSE 'none' END,
-			       (SELECT count(*) FROM open x JOIN work_orders xw ON xw.id = x.work_order_id JOIN work_orders ow ON ow.id = o.work_order_id
-			         WHERE x.id <> o.id AND x.owed <> 0 AND xw.customer_id = ow.customer_id)::int,
+			       (SELECT count(*) FROM open x
+			         WHERE x.id <> o.id AND x.owed <> 0 AND x.customer_id = o.customer_id)::int,
 			       (SELECT count(*) FROM receivable_events e WHERE e.invoice_id = o.id AND e.kind = 'reminder')::int
 			FROM open o
 			LEFT JOIN receivable_cases c ON c.invoice_id = o.id
@@ -696,7 +710,7 @@ func DeskPeople(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT u.id::text, p.display_name FROM users u JOIN people p ON p.id = u.person_id
-			WHERE u.active AND u.role IN ('owner', 'admin', 'service_advisor') ORDER BY p.display_name`)
+			WHERE u.active AND EXISTS (SELECT 1 FROM staff_roles sr WHERE sr.user_id = u.id AND sr.role IN ('owner', 'admin', 'service_advisor')) ORDER BY p.display_name`)
 		if err != nil {
 			return fmt.Errorf("list desk people: %w", err)
 		}

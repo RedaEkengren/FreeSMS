@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/RedaEkengren/FreeSMS/internal/database"
@@ -12,15 +13,29 @@ import (
 // transaction so that the counter's half and the parts half are one moment.
 func (s *Server) handleMine(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
-	var items []workshop.WaitingItem
+	var items []workshop.ActionItem
 	var err error
 	database.Reading(r.Context(), s.pool, session.Scope, func(ctx context.Context) {
 		items, err = workshop.WaitingFor(ctx, s.pool, session.Scope)
 	})
-	if s.handoverError(w, r, err) {
+	incomplete := s.waitingIncomplete(err)
+	if !incomplete && s.handoverError(w, r, err) {
 		return
 	}
-	s.render(w, r, http.StatusOK, "mine", pageData{Title: "For me", Session: session, Waiting: items})
+	s.render(w, r, http.StatusOK, "mine", pageData{Title: "For me", Session: session, Waiting: items, WaitingIncomplete: incomplete})
+}
+
+// waitingIncomplete logs the queue's providers that failed and reports
+// whether any did: the rest of the list is shown, and says it is not all.
+func (s *Server) waitingIncomplete(err error) bool {
+	var incomplete *workshop.IncompleteError
+	if !errors.As(err, &incomplete) {
+		return false
+	}
+	for _, f := range incomplete.Failed {
+		s.log.Error("waiting for you", "error", f)
+	}
+	return true
 }
 
 // handleMineCount is the number in the header, asked for after the page has
@@ -30,17 +45,21 @@ func (s *Server) handleMineCount(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	var n int
 	var sound bool
-	var err error
+	var err, soundErr error
 	database.Reading(r.Context(), s.pool, session.Scope, func(ctx context.Context) {
-		if n, err = workshop.CountWaiting(ctx, s.pool, session.Scope); err != nil {
-			return
-		}
-		sound, err = workshop.AlertSound(ctx, s.pool, session.Scope)
+		n, err = workshop.CountWaiting(ctx, s.pool, session.Scope)
+		// A provider failing leaves the rest of the count, and the chime
+		// the person asked for plays for what did load.
+		sound, soundErr = workshop.AlertSound(ctx, s.pool, session.Scope)
 	})
-	if err != nil {
+	incomplete := s.waitingIncomplete(err)
+	if err != nil && !incomplete {
 		s.log.Error("count waiting", "error", err)
 	}
-	s.renderPartial(w, r, "mine", "count", pageData{Session: session, WaitingCount: n, AlertSound: sound})
+	if soundErr != nil {
+		s.log.Error("read alert sound", "error", soundErr)
+	}
+	s.renderPartial(w, r, "mine", "count", pageData{Session: session, WaitingCount: n, AlertSound: sound, WaitingIncomplete: incomplete})
 }
 
 // handleAlertSound is the person's own choice to hear when something new is

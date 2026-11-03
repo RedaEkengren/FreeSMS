@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,20 +25,88 @@ import (
 // this cannot, and when one person at the counter rings the customer the item
 // leaves both of their lists.
 
-// WaitingItem is one thing waiting for somebody.
-type WaitingItem struct {
-	Kind         string
-	JobID        string
+// ActionItem is one thing waiting for somebody (#158): the one queue,
+// whatever modules the shop runs. Each module, and Core, supplies its
+// items through an ActionProvider; nothing is stored, and an item leaves
+// every list once somebody deals with what made it true.
+type ActionItem struct {
+	Kind string
+	// The module whose business it is; empty for Core's.
+	Module access.Module
+	// What it is about: "job", "booking", "document", or a page of its own
+	// ("outbox", "payment_flows", "schedule"), and its id where it has one.
+	SubjectKind string
+	SubjectID   string
+	// A job's number and the car's plate, where it is about a job.
 	Number       int64
 	Registration string
-	// How many, where it is several of the same thing on one job.
+	// How many, where it is several of the same thing.
 	Count int
-	// For an item about a booking.
-	BookingID string
-	// The shop's or the technician's own words -- a part's description, the
-	// line the customer said yes to. Never a customer's details.
+	// The shop's, the technician's or the system's own words -- a part's
+	// description, the line the customer said yes to, a template's name.
+	// Never a customer's details, and never a price.
 	Text string
+	// How soon: UrgencyNow before UrgencySoon. Due, where it has one, then
+	// orders within the same urgency.
+	Urgency Urgency
+	Due     time.Time
 }
+
+// Urgency is how soon an item wants somebody.
+type Urgency int
+
+// The urgencies, most urgent first.
+const (
+	// UrgencyNow is something already gone wrong: a call to another service
+	// given up.
+	UrgencyNow Urgency = iota
+	// UrgencySoon is everything else waiting for a person.
+	UrgencySoon
+)
+
+// ActionProvider is how a module puts its items on the queue: its module
+// (empty for Core), whose providers are called only while the shop runs it,
+// and a function that asks only what the caller's role may ask -- each
+// checks the role itself, where it reads.
+type ActionProvider struct {
+	Module access.Module
+	Name   string
+	Items  func(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ActionItem, error)
+}
+
+// actionProviders are every provider there is, in the order their items
+// come when nothing else orders them. Dealer and Rental add theirs with the
+// issues that build what they wait on.
+var actionProviders = []ActionProvider{
+	{Name: "schedule", Items: scheduleChanged},
+	// Money taken in person (#156), for whoever runs the shop.
+	{Name: "payment flows", Items: uncheckedFlowsWaiting},
+	// Documents waiting for a signature (#150), for whoever makes them.
+	{Name: "documents", Items: unsignedDocumentsWaiting},
+	// Calls to the outside world a person has to look at (#154).
+	{Name: "outbox", Items: outboxWaiting},
+	{Module: access.Workshop, Name: "workshop", Items: workshopWaiting},
+	// Dealer: leads (#172).
+	{Module: access.Dealer, Name: "dealer", Items: dealerWaiting},
+	// Rental
+	{Module: access.Rental, Name: "rental", Items: rentalWaiting},
+	// The fleet's paperwork (#202), a provider of its own: today's page
+	// is the day's handovers, and this failing does not take them with it.
+	{Module: access.Rental, Name: "rental paperwork", Items: rentalPaperworkWaiting},
+}
+
+// IncompleteError is WaitingFor's when a provider failed: the items of the
+// rest are still returned, and the page says some could not be loaded.
+type IncompleteError struct {
+	Failed []error
+}
+
+func (e *IncompleteError) Error() string {
+	return fmt.Sprintf("workshop: %d of the queue's providers failed: %v", len(e.Failed), errors.Join(e.Failed...))
+}
+
+// Unwrap is the providers' errors.
+func (e *IncompleteError) Unwrap() []error { return e.Failed }
 
 // Waiting kinds, and what they say, as catalogue keys. A key with %d takes
 // Count; with %s, Text.
@@ -62,81 +131,184 @@ var waitingSays = map[string]string{
 	"booking_not_told":   "The customer was not reached about a booking: %s",
 	"outsourced_overdue": "Due back from a supplier and not here: %s",
 	"outsourced_invoice": "A supplier invoice nobody has handed on: %s",
+	"flow_unchecked":     "A way of taking money in person is in use and not checked against the cash register rules: %s",
+	"unsigned":           "Waiting for a signature: %s",
+	"outbox_given_up":    "%d call to another service was given up",
+	"outbox_manual":      "%d call to another service is a task to do by hand",
+	// Dealer
+	"lead_follow_up":      "A lead's next step is due: %s",
+	"lead_follow_up_any":  "A lead's next step is due",
+	"lead_car_gone":       "The car a lead asked about is reserved or sold: %s",
+	"lead_unassigned":     "A new lead nobody has: %s",
+	"lead_unassigned_any": "A new lead nobody has",
+	"test_drive_overdue":  "A test drive is not back: %s",
+	// Rental
+	"rental_handover": "To hand over today: %s",
+	"rental_return":   "Due back today: %s",
+	"rental_overdue":  "Out past its return: %s",
+	"rental_at_risk":  "May not be back in time for this rental: %s",
+	// Rental: the fleet's paperwork (#202).
+	"rental_report_in":       "Report into rental use in the vehicle register: %s",
+	"rental_report_out":      "Out of the fleet, and still reported into rental use: %s",
+	"rental_insurance_ends":  "Its insurance for rental use ends soon: %s",
+	"rental_insurance_ended": "Its insurance for rental use has ended: %s",
+	"rental_permit_ends":     "The rental permit ends soon",
+	"rental_gaps":            "Something is missing before this handover: %s",
 }
 
 // Says is the item's catalogue key.
-func (w WaitingItem) Says() string { return waitingSays[w.Kind] }
+func (w ActionItem) Says() string { return waitingSays[w.Kind] }
 
 // Plural reports whether the key counts, for the page to pick N or T.
-func (w WaitingItem) Plural() bool {
+func (w ActionItem) Plural() bool {
 	switch w.Kind {
-	case "finding", "answer", "uncollected":
+	case "finding", "answer", "uncollected", "outbox_given_up", "outbox_manual":
 		return true
 	}
 	return false
 }
 
-// Link is where dealing with it starts.
-func (w WaitingItem) Link() string {
-	switch w.Kind {
-	case "booking_not_told":
-		return "/bookings/" + w.BookingID
-	case "part_requested":
+// Link is where dealing with it starts: its subject's page.
+func (w ActionItem) Link() string {
+	switch {
+	case w.Kind == "part_requested":
 		return "/parts"
-	case "schedule_changed":
+	case w.SubjectKind == "booking":
+		return "/bookings/" + w.SubjectID
+	case w.SubjectKind == "document":
+		return "/contracts/" + w.SubjectID
+	case w.SubjectKind == "schedule":
 		return "/schedule"
+	case w.SubjectKind == "payment_flows":
+		return "/payment-flows"
+	case w.SubjectKind == "outbox":
+		return "/outbox"
+	case w.SubjectKind == "lead":
+		return "/cars/leads/" + w.SubjectID
+	case w.SubjectKind == "test_drive":
+		return "/cars/test-drives/" + w.SubjectID
+	case w.SubjectKind == "rental_booking":
+		return "/rental/bookings/" + w.SubjectID
+	case w.SubjectKind == "rental_unit":
+		return "/rental/units/" + w.SubjectID
+	case w.SubjectKind == "rental_settings":
+		return "/rental/settings"
 	}
-	return "/jobs/" + w.JobID
+	return "/jobs/" + w.SubjectID
 }
 
-// WaitingFor is what is waiting for the caller, by what their role does.
-// Every role may ask, and each gets only its own kind of item: a
-// technician's list says "the customer said yes", never who.
-func WaitingFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]WaitingItem, error) {
-	var out []WaitingItem
-	add := func(items []WaitingItem, err error) error {
+// WaitingFor is what is waiting for the caller, by what their role does,
+// from every provider of a module the shop runs and Core's. Every role may
+// ask, and each gets only its own kind of item: a technician's list says
+// "the customer said yes", never who.
+//
+// A provider that fails leaves its items out rather than the whole list:
+// the rest are returned with an *IncompleteError naming what failed.
+//
+// One person with several roles gets the union, each item once. The order
+// is by urgency, then by when it is due, then by module -- Core's first,
+// then the workshop's, the dealer's and the rental desk's -- then by the
+// job's number, and otherwise as the providers gave them.
+func WaitingFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ActionItem, error) {
+	var out []ActionItem
+	var failed []error
+	seen := map[ActionItem]bool{}
+	for _, p := range actionProviders {
+		// A module the shop has switched off puts nothing in it.
+		if p.Module != "" && !scope.Uses(p.Module) {
+			continue
+		}
+		items, err := p.Items(ctx, pool, scope)
+		if err != nil {
+			failed = append(failed, fmt.Errorf("%s: %w", p.Name, err))
+			continue
+		}
+		for _, it := range items {
+			if !seen[it] {
+				seen[it] = true
+				out = append(out, it)
+			}
+		}
+	}
+	sortActions(out)
+	if failed != nil {
+		return out, &IncompleteError{Failed: failed}
+	}
+	return out, nil
+}
+
+// moduleRank orders the modules' items: Core's, then each module's.
+var moduleRank = map[access.Module]int{"": 0, access.Workshop: 1, access.Dealer: 2, access.Rental: 3}
+
+func sortActions(items []ActionItem) {
+	sort.SliceStable(items, func(i, j int) bool {
+		a, b := items[i], items[j]
+		switch {
+		case a.Urgency != b.Urgency:
+			return a.Urgency < b.Urgency
+		case !a.Due.Equal(b.Due):
+			// Something with a due time before something without.
+			return !a.Due.IsZero() && (b.Due.IsZero() || a.Due.Before(b.Due))
+		case moduleRank[a.Module] != moduleRank[b.Module]:
+			return moduleRank[a.Module] < moduleRank[b.Module]
+		}
+		return a.Number < b.Number
+	})
+}
+
+// workshopWaiting is the workshop's items: what each role held is waiting
+// for at the counter, the parts desk, the lift and with a supplier.
+func workshopWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ActionItem, error) {
+	var out []ActionItem
+	add := func(items []ActionItem, err error) error {
 		out = append(out, items...)
 		return err
 	}
-	if err := add(scheduleChanged(ctx, pool, scope)); err != nil {
-		return nil, err
-	}
-	switch scope.Role {
-	case access.RoleTechnician:
-		if err := add(technicianWaiting(ctx, pool, scope)); err != nil {
-			return nil, err
-		}
-	case access.RoleParts:
-		if err := add(partsWaiting(ctx, pool, scope)); err != nil {
-			return nil, err
-		}
-	case access.RoleServiceAdvisor:
-		if err := add(deskWaiting(ctx, pool, scope, false)); err != nil {
-			return nil, err
-		}
-	case access.RoleOwner, access.RoleAdmin:
+	// What each role held is waiting for, once each: a parts person who also
+	// turns spanners gets the parts desk's and the technician's. A role with
+	// no part in the workshop (car sales, rental) gets none of it.
+	roles := scope.Role
+	runsIt := roles.RunsTheShop()
+	switch {
+	case runsIt:
 		// In a small workshop the owner is the counter and the parts desk
 		// too, and the one who minds what is late.
 		if err := add(deskWaiting(ctx, pool, scope, true)); err != nil {
 			return nil, err
 		}
+	case roles.Has(access.RoleServiceAdvisor):
+		if err := add(deskWaiting(ctx, pool, scope, false)); err != nil {
+			return nil, err
+		}
+	}
+	if runsIt || roles.Has(access.RoleParts) {
 		if err := add(partsWaiting(ctx, pool, scope)); err != nil {
 			return nil, err
 		}
-	default:
-		return nil, access.ErrForbidden
+	}
+	if roles.Has(access.RoleTechnician) {
+		if err := add(technicianWaiting(ctx, pool, scope)); err != nil {
+			return nil, err
+		}
 	}
 	// Everybody above the shop floor chases a supplier.
-	if scope.Role != access.RoleTechnician {
+	if roles.SeesParts() {
 		if err := add(outsourcedWaiting(ctx, pool, scope)); err != nil {
 			return nil, err
 		}
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Number < out[j].Number })
+	for i := range out {
+		out[i].Module, out[i].Urgency = access.Workshop, UrgencySoon
+		if out[i].SubjectKind == "" {
+			out[i].SubjectKind = "job"
+		}
+	}
 	return out, nil
 }
 
-// CountWaiting is how many things are waiting, for the header.
+// CountWaiting is how many things are waiting, for the header and its
+// sound: the whole queue, every module's. With a provider failed it is
+// what loaded, and the error says what did not.
 func CountWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (int, error) {
 	items, err := WaitingFor(ctx, pool, scope)
 	return len(items), err
@@ -176,8 +348,8 @@ const openJob = `w.state IN ('draft', 'estimated', 'awaiting_approval', 'approve
 // said yes to something they found and it is now on the job, or a car booked
 // on them has come in. Each stops once they clock on to the job: picking it
 // up is dealing with it.
-func technicianWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]WaitingItem, error) {
-	var out []WaitingItem
+func technicianWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ActionItem, error) {
+	var out []ActionItem
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			WITH mine AS (
@@ -222,8 +394,8 @@ func technicianWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		}
 		defer rows.Close()
 		for rows.Next() {
-			var it WaitingItem
-			if err := rows.Scan(&it.Kind, &it.JobID, &it.Number, &it.Registration, &it.Text); err != nil {
+			var it ActionItem
+			if err := rows.Scan(&it.Kind, &it.SubjectID, &it.Number, &it.Registration, &it.Text); err != nil {
 				return fmt.Errorf("scan technician's item: %w", err)
 			}
 			out = append(out, it)
@@ -235,13 +407,13 @@ func technicianWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 
 // partsWaiting: parts asked for and not yet here, and parts taken out to a
 // job that nobody has priced -- the one a shop fits and never bills.
-func partsWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]WaitingItem, error) {
+func partsWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ActionItem, error) {
 	requests, err := OpenPartRequests(ctx, pool, scope)
 	if err != nil {
 		return nil, err
 	}
 	numbers := map[string]int64{}
-	var out []WaitingItem
+	var out []ActionItem
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT w.id, w.number, coalesce(r.registration, ''), p.number || ' · ' || p.name
@@ -260,8 +432,8 @@ func partsWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (
 		}
 		defer rows.Close()
 		for rows.Next() {
-			it := WaitingItem{Kind: "taken_out_unpriced"}
-			if err := rows.Scan(&it.JobID, &it.Number, &it.Registration, &it.Text); err != nil {
+			it := ActionItem{Kind: "taken_out_unpriced"}
+			if err := rows.Scan(&it.SubjectID, &it.Number, &it.Registration, &it.Text); err != nil {
 				return err
 			}
 			out = append(out, it)
@@ -270,13 +442,11 @@ func partsWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (
 			return err
 		}
 		// The request list does not carry the job's number; one query for
-		// all of them rather than one each.
-		var ids []string
+		// all of them rather than one each -- asked with none as well, so
+		// the list costs the same whether anything is on order or not.
+		ids := []string{}
 		for _, r := range requests {
 			ids = append(ids, r.WorkOrderID)
-		}
-		if len(ids) == 0 {
-			return nil
 		}
 		nrows, err := tx.Query(ctx, `SELECT id, number FROM work_orders WHERE id = ANY($1::uuid[])`, ids)
 		if err != nil {
@@ -297,7 +467,7 @@ func partsWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (
 		return nil, err
 	}
 	for _, r := range requests {
-		out = append(out, WaitingItem{Kind: "part_requested", JobID: r.WorkOrderID, Number: numbers[r.WorkOrderID],
+		out = append(out, ActionItem{Kind: "part_requested", SubjectID: r.WorkOrderID, Number: numbers[r.WorkOrderID],
 			Registration: r.Registration, Text: r.Description})
 	}
 	return out, nil
@@ -305,32 +475,31 @@ func partsWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (
 
 // deskWaiting reads the counter's board and says what on it is waiting for
 // the counter. The owner also sees what is past its promise.
-func deskWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, late bool) ([]WaitingItem, error) {
-	board, err := Board(ctx, pool, scope)
+func deskWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, late bool) ([]ActionItem, error) {
+	desk, err := deskFor(ctx, pool, scope)
 	if err != nil {
 		return nil, err
 	}
-	owed, err := Receivables(ctx, pool, scope)
-	if err != nil {
-		return nil, err
+	if desk.OwedErr != nil {
+		return nil, desk.OwedErr
 	}
+	if desk.BacklogErr != nil {
+		return nil, desk.BacklogErr
+	}
+	board, backlog := desk.Board, desk.Backlog
 	overdue := map[string]bool{}
-	for _, r := range owed {
+	for _, r := range desk.Owed {
 		if r.Overdue() {
 			overdue[r.WorkOrderID] = true
 		}
 	}
-	var out []WaitingItem
+	var out []ActionItem
 	untold, err := BookingsNeedingAttention(ctx, pool, scope)
 	if err != nil {
 		return nil, err
 	}
 	for _, b := range untold {
-		out = append(out, WaitingItem{Kind: "booking_not_told", BookingID: b.BookingID, Text: b.What})
-	}
-	backlog, err := Backlog(ctx, pool, scope)
-	if err != nil {
-		return nil, err
+		out = append(out, ActionItem{Kind: "booking_not_told", SubjectKind: "booking", SubjectID: b.BookingID, Text: b.What})
 	}
 	for _, b := range backlog {
 		kind := map[string]string{"unstaffed": "unstaffed", "away": "tech_away", "overdue": "plan_overdue"}[b.Kind]
@@ -339,11 +508,11 @@ func deskWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, la
 		if b.Kind == "unstaffed" && b.State != StateApproved && b.State != StateInProgress && b.State != StateAwaitingParts {
 			continue
 		}
-		out = append(out, WaitingItem{Kind: kind, JobID: b.JobID, Number: b.Number, Registration: b.Registration, Text: b.Who})
+		out = append(out, ActionItem{Kind: kind, SubjectID: b.JobID, Number: b.Number, Registration: b.Registration, Text: b.Who})
 	}
 	for _, b := range board {
 		item := func(kind string, count int) {
-			out = append(out, WaitingItem{Kind: kind, JobID: b.ID, Number: b.Number, Registration: b.Registration, Count: count})
+			out = append(out, ActionItem{Kind: kind, SubjectID: b.ID, Number: b.Number, Registration: b.Registration, Count: count})
 		}
 		if b.OpenFindings > 0 {
 			item("finding", b.OpenFindings)
@@ -371,7 +540,7 @@ func deskWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, la
 // still to come, or recorded them away, since they last looked at their own
 // schedule. A rota that changes silently is how two people turn up for one
 // shift, or none.
-func scheduleChanged(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]WaitingItem, error) {
+func scheduleChanged(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ActionItem, error) {
 	var changed bool
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `
@@ -387,5 +556,5 @@ func scheduleChanged(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 	if err != nil || !changed {
 		return nil, err
 	}
-	return []WaitingItem{{Kind: "schedule_changed"}}, nil
+	return []ActionItem{{Kind: "schedule_changed", SubjectKind: "schedule", Urgency: UrgencySoon}}, nil
 }

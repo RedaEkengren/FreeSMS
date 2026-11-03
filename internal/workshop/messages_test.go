@@ -156,7 +156,7 @@ func TestErasingACustomerClearsWhereTheirMessagesWent(t *testing.T) {
 	if person == "" {
 		t.Skip("the fixture job has no person as its customer")
 	}
-	if err := workshop.ErasePerson(ctx, pool, advisor(), person, "asked"); err != nil {
+	if err := workshop.ErasePerson(ctx, pool, advisor(), &recordingRemover{}, person, "asked"); err != nil {
 		t.Fatal(err)
 	}
 	msgs, _ := workshop.MessagesFor(ctx, pool, advisor(), job)

@@ -1,0 +1,49 @@
+{{/* The home page's cards and the top of the queue (#157, #158): what to
+     do now, then how the business is doing, each card one query asked under
+     the reader's scope. Above the board or the job list for whoever works
+     in the workshop; the whole page for anybody else. */}}
+{{define "homecards"}}{{with .Home}}
+<div id="live-home" data-live="board parts actions">
+{{- if or .Actions .Waiting}}
+<section class="home-now" aria-labelledby="home-now">
+  <h2 id="home-now">{{$.T "What to do now"}}</h2>
+  {{- if .Actions}}
+  <ul class="figures">
+    {{- range .Actions}}
+    <li class="figure action">{{if .Link}}<a href="{{.Link}}">{{end}}{{$.N .Title .Count}}{{if .Link}}</a>{{end}}</li>
+    {{- end}}
+  </ul>
+  {{- end}}
+  {{- if .Waiting}}
+  <ul class="lines">
+    {{- range .Waiting}}
+    <li><a href="{{.Link}}">
+      {{- if or .Registration .Number}}
+      <div class="row">
+        <span class="plate">{{if .Registration}}{{.Registration}}{{else}}{{$.T "no plate"}}{{end}}</span>
+        {{- if .Number}} <span class="tag">#{{.Number}}</span>{{end}}
+      </div>
+      {{- end}}
+      <div class="waiting">{{if .Plural}}{{$.N .Says .Count}}{{else}}{{$.T .Says .Text}}{{end}}</div>
+    </a></li>
+    {{- end}}
+  </ul>
+  <p><a href="/mine">{{if .MoreWaiting}}{{$.N "%d more is waiting for you" .MoreWaiting}}{{else}}{{$.T "Everything waiting for you"}}{{end}}</a></p>
+  {{- end}}
+</section>
+{{- end}}
+{{- if .Information}}
+<section class="home-business" aria-labelledby="home-business">
+  <h2 id="home-business">{{$.T "How the business is doing"}}</h2>
+  <ul class="figures">
+    {{- range .Information}}
+    <li class="figure">{{if .Money}}{{$.T .Title}}: {{$.Money .Minor}}{{else}}{{$.N .Title .Count}}{{end}}</li>
+    {{- end}}
+  </ul>
+</section>
+{{- end}}
+{{- if .Incomplete}}
+<p class="waiting">{{$.T "Some of this could not be loaded."}}</p>
+{{- end}}
+</div>
+{{- end}}{{end}}

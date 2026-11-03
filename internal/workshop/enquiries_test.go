@@ -223,23 +223,23 @@ func TestAnAcceptedProposalBecomesABookingAndThenAJobAtTheSamePrice(t *testing.T
 	pool := setup(t)
 	ctx := context.Background()
 	id := enquired(t, pool)
-	if _, err := workshop.BookEnquiry(ctx, pool, advisor(), id, workshop.NewBooking{
+	if _, err := workshop.BookEnquiry(ctx, pool, advisor(), id, workshop.NewBooking{ConfirmedPast: true, // a fixed date, gone by
 		Starts: at("2026-10-20", 8, 0), Ends: at("2026-10-20", 9, 0)}); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("booking before anything was put forward: %v", err)
 	}
 	v, _ := workshop.PresentEnquiry(ctx, pool, advisor(), id, fixed)
-	if _, err := workshop.BookEnquiry(ctx, pool, advisor(), id, workshop.NewBooking{
+	if _, err := workshop.BookEnquiry(ctx, pool, advisor(), id, workshop.NewBooking{ConfirmedPast: true, // a fixed date, gone by
 		Starts: at("2026-10-20", 8, 0), Ends: at("2026-10-20", 9, 0)}); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("booking before the customer said yes: %v", err)
 	}
 	accept(t, pool, id, 2) // the part is bought elsewhere
 
-	b1, err := workshop.BookEnquiry(ctx, pool, advisor(), id, workshop.NewBooking{
+	b1, err := workshop.BookEnquiry(ctx, pool, advisor(), id, workshop.NewBooking{ConfirmedPast: true, // a fixed date, gone by
 		Starts: at("2026-10-20", 8, 0), Ends: at("2026-10-20", 9, 0)})
 	if err != nil {
 		t.Fatalf("BookEnquiry: %v", err)
 	}
-	b2, _ := workshop.BookEnquiry(ctx, pool, advisor(), id, workshop.NewBooking{
+	b2, _ := workshop.BookEnquiry(ctx, pool, advisor(), id, workshop.NewBooking{ConfirmedPast: true, // a fixed date, gone by
 		Starts: at("2026-10-20", 8, 0), Ends: at("2026-10-20", 9, 0)})
 	if b1 != b2 {
 		t.Error("booking twice made two bookings")
@@ -297,7 +297,7 @@ func TestEnquiriesAreTheFrontDesksAlone(t *testing.T) {
 	addTechnician(t, pool)
 	ctx := context.Background()
 	id := enquired(t, pool)
-	tech := access.Scope{ShopID: shopID, UserID: techUserID, Role: access.RoleTechnician}
+	tech := access.Scope{ShopID: shopID, UserID: techUserID, Role: access.Of(access.RoleTechnician), Modules: workshopOnly}
 	if _, err := workshop.CreateEnquiry(ctx, pool, tech, workshop.NewEnquiry{Subject: "x"}); !errors.Is(err, access.ErrForbidden) {
 		t.Errorf("a technician creating one: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestEnquiriesAreTheFrontDesksAlone(t *testing.T) {
 		t.Errorf("a technician putting one forward: %v", err)
 	}
 	// Another shop's enquiry is not there.
-	if _, err := workshop.EnquiryByID(ctx, pool, access.Scope{ShopID: "99999999-9999-9999-9999-999999999999", UserID: userID, Role: access.RoleServiceAdvisor}, id); err == nil {
+	if _, err := workshop.EnquiryByID(ctx, pool, access.Scope{ShopID: "99999999-9999-9999-9999-999999999999", UserID: userID, Role: access.Of(access.RoleServiceAdvisor), Modules: workshopOnly}, id); err == nil {
 		t.Error("another shop read the enquiry")
 	}
 }

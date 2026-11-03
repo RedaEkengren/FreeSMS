@@ -3,11 +3,15 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
+	"github.com/jackc/pgx/v5"
 )
 
 // Two records that are one, and two that only look alike. People are never
@@ -204,5 +208,180 @@ func TestTwoVehiclesThatAreTwoCarsAreNotMerged(t *testing.T) {
 	pv, err = workshop.PreviewVehicleMerge(ctx, pool, advisor(), vehicleA, third)
 	if err != nil || !strings.Contains(pv.Blocked, "owner at the same time") {
 		t.Errorf("two current owners: %+v, %v", pv, err)
+	}
+}
+
+// An invoice that is not a job's names its own customer, and keeps it: it
+// is immutable as issued, so a merge does not rewrite it. It is read through
+// the merge instead -- the kept card counts it, the worklist sees it as the
+// same customer's, the kept person's export lists it.
+func TestAMergedCustomersOwnInvoicesAreReadAsTheKeptOnes(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	keep := fixtureCustomer
+	dup, err := workshop.CreateCustomer(ctx, pool, advisor(), workshop.NewCustomer{Kind: "private", Name: "A. Customer", Email: "dup@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := []workshop.SourcedLine{{Description: "Vinterhjul", QuantityMilli: 1000, UnitPriceMinor: 100000, VATRateBasis: 2500}}
+	if _, err := workshop.IssueManual(ctx, pool, advisor(), workshop.ManualInvoice{CustomerID: keep, Lines: line}); err != nil {
+		t.Fatal(err)
+	}
+	theirs, err := workshop.IssueManual(ctx, pool, advisor(), workshop.ManualInvoice{CustomerID: dup, Lines: line})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := cardOf(t, pool, keep).Invoices
+
+	pv, err := workshop.PreviewCustomerMerge(ctx, pool, advisor(), keep, dup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pv.Invoices != 1 {
+		t.Errorf("the preview counts %d of the other's invoices, want 1", pv.Invoices)
+	}
+	if _, err := workshop.MergeCustomers(ctx, pool, advisor(), keep, dup, pv.KeepRevision, pv.DropRevision, "Same person"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, customer := sourceRow(t, pool, theirs.ID); customer != dup {
+		t.Errorf("the merge rewrote the issued invoice's customer to %s", customer)
+	}
+	if got := cardOf(t, pool, keep).Invoices; got != before+1 {
+		t.Errorf("the kept card counts %d invoices, want %d", got, before+1)
+	}
+	items, err := workshop.Worklist(ctx, pool, advisor(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range items {
+		if it.OtherOpen != 1 {
+			t.Errorf("%s: %d others open for the same customer, want 1", it.Reference, it.OtherOpen)
+		}
+	}
+	exp, err := workshop.ExportPerson(ctx, pool, advisor(), customerPersonID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(exp.Invoices) != 2 {
+		t.Errorf("the kept person's export lists %d invoices, want both", len(exp.Invoices))
+	}
+}
+
+// A finished protocol keeps the vehicle it was made of; merging that car
+// into another leaves it so, and the kept car's protocols include it.
+func TestAMergedVehiclesProtocolsAreReadAsTheKeptOnes(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	dup := newOtherVehicle(t, pool, "ABC 12O")
+	desk := otherRoles(access.Of(access.RoleRentalAgent))
+	id, err := workshop.StartProtocol(ctx, pool, desk, workshop.ProtocolSubject{Kind: workshop.SubjectCheckOut,
+		RefID: rentalA, VehicleID: dup}, rentalChecklist(t, pool), "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.CompleteProtocol(ctx, pool, desk, id); err != nil {
+		t.Fatal(err)
+	}
+	pv, err := workshop.PreviewVehicleMerge(ctx, pool, advisor(), vehicleA, dup)
+	if err != nil || pv.Blocked != "" {
+		t.Fatalf("preview = %+v, %v", pv, err)
+	}
+	if _, err := workshop.MergeVehicles(ctx, pool, advisor(), vehicleA, dup, pv.KeepRevision, pv.DropRevision, "Misread plate"); err != nil {
+		t.Fatalf("MergeVehicles with a finished protocol on the other: %v", err)
+	}
+	ps, err := workshop.ProtocolsForVehicle(ctx, pool, desk, vehicleA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ps) != 1 || ps[0].ID != id {
+		t.Fatalf("the kept car's protocols are %+v, want the other's check-out", ps)
+	}
+	if ps[0].VehicleID != dup || ps[0].Registration != "ABC 12D" {
+		t.Errorf("the protocol reads vehicle %s, plate %q; want the vehicle it was made of, under the kept car's plate", ps[0].VehicleID, ps[0].Registration)
+	}
+}
+
+// A car the business books is merged with the bookings in mind. One kept
+// that is booked ahead refuses the other's open job as any job is refused
+// -- naming the rental, not overlapping periods -- and one merged away
+// would leave its resource and its bookings on a record nothing reads, so
+// it is the one kept instead.
+func TestAVehicleMergeMindsTheResourcesBookings(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	res, err := workshop.CreateResource(ctx, pool, rentalDesk(), workshop.NewResource{VehicleID: vehicleA})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rent(pool, rentalDesk(), res, in2031(14, 9), in2031(14, 17)); err != nil {
+		t.Fatal(err)
+	}
+	dup := newOtherVehicle(t, pool, "ABC 12O")
+	if _, err := workshop.TakeIn(ctx, pool, advisor(), "ABC 12O", "Squeal", nil); err != nil {
+		t.Fatal(err)
+	}
+	pv, err := workshop.PreviewVehicleMerge(ctx, pool, advisor(), vehicleA, dup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.MergeVehicles(ctx, pool, advisor(), vehicleA, dup, pv.KeepRevision, pv.DropRevision, "Felläst skylt"); !errors.Is(err, workshop.ErrResourceTaken) ||
+		err.Error() != "workshop: invalid: it is taken then by a rental" {
+		t.Errorf("an open job moved onto a car rented out ahead: %v", err)
+	}
+
+	pv, err = workshop.PreviewVehicleMerge(ctx, pool, advisor(), dup, vehicleA)
+	if err != nil || pv.Blocked != "The other is a car the business books. Keep it, and merge this one into it." {
+		t.Errorf("the resource merged away: %+v, %v", pv, err)
+	}
+	if _, err := workshop.MergeVehicles(ctx, pool, advisor(), dup, vehicleA, pv.KeepRevision, pv.DropRevision, ""); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("the resource merged away: %v, want refused", err)
+	}
+}
+
+// What is read as a record through its merges is found once, as a set, so
+// a read asks for the rows naming any of it by index rather than following
+// every row's merges: the record itself and everything merged into it,
+// through a chain; nothing for a record merged away, as no row is read as
+// that one either.
+func TestTheRecordsReadAsOneAreFoundOnce(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	customer := func(name string) string {
+		id, err := workshop.CreateCustomer(ctx, pool, advisor(), workshop.NewCustomer{Kind: "private", Name: name})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	a, b := customer("Kedja A"), customer("Kedja B")
+	// fixtureCustomer <- a <- b: b merged into a, then a into the fixture.
+	for _, m := range [][2]string{{a, b}, {fixtureCustomer, a}} {
+		pv, err := workshop.PreviewCustomerMerge(ctx, pool, advisor(), m[0], m[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := workshop.MergeCustomers(ctx, pool, advisor(), m[0], m[1], pv.KeepRevision, pv.DropRevision, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	read := func(id string) []string {
+		var ids []string
+		if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+			return tx.QueryRow(ctx, `SELECT coalesce(array_agg(x::text ORDER BY x), '{}') FROM unnest(customer_ids_read_as($1)) x`, id).Scan(&ids)
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return ids
+	}
+	want := []string{fixtureCustomer, a, b}
+	slices.Sort(want)
+	if got := read(fixtureCustomer); !slices.Equal(got, want) {
+		t.Errorf("read as the kept customer: %v, want %v", got, want)
+	}
+	if got := read(a); len(got) != 0 {
+		t.Errorf("read as a customer merged away: %v, want none", got)
+	}
+	if got := read("99999999-0000-0000-0000-000000000000"); len(got) != 0 {
+		t.Errorf("read as no customer: %v, want none", got)
 	}
 }

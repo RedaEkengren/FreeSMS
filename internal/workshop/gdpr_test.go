@@ -73,7 +73,7 @@ func TestErasureClearsThePersonAndKeepsTheInvoice(t *testing.T) {
 		t.Fatalf("Issue: %v", err)
 	}
 
-	if err := workshop.ErasePerson(ctx, pool, advisor(), customerPersonID, "Asked by email"); err != nil {
+	if err := workshop.ErasePerson(ctx, pool, advisor(), &recordingRemover{}, customerPersonID, "Asked by email"); err != nil {
 		t.Fatalf("ErasePerson: %v", err)
 	}
 
@@ -136,10 +136,10 @@ func TestErasureClearsThePersonAndKeepsTheInvoice(t *testing.T) {
 func TestErasingTwiceIsRefused(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
-	if err := workshop.ErasePerson(ctx, pool, advisor(), customerPersonID, ""); err != nil {
+	if err := workshop.ErasePerson(ctx, pool, advisor(), &recordingRemover{}, customerPersonID, ""); err != nil {
 		t.Fatalf("ErasePerson: %v", err)
 	}
-	if err := workshop.ErasePerson(ctx, pool, advisor(), customerPersonID, ""); !errors.Is(err, workshop.ErrInvalid) {
+	if err := workshop.ErasePerson(ctx, pool, advisor(), &recordingRemover{}, customerPersonID, ""); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("erasing twice = %v, want a refusal", err)
 	}
 }
@@ -150,7 +150,7 @@ func TestAnActiveEmployeeCannotBeErased(t *testing.T) {
 	addTechnician(t, pool)
 	ctx := context.Background()
 
-	err := workshop.ErasePerson(ctx, pool, advisor(), "22222222-2222-2222-2222-222222222224", "")
+	err := workshop.ErasePerson(ctx, pool, advisor(), &recordingRemover{}, "22222222-2222-2222-2222-222222222224", "")
 	if !errors.Is(err, workshop.ErrInvalid) {
 		t.Fatalf("ErasePerson on an active account = %v, want a refusal", err)
 	}
@@ -167,7 +167,7 @@ func TestOnlyTheFrontDeskCanExportOrErase(t *testing.T) {
 	if _, err := workshop.ExportPerson(ctx, pool, technician(), customerPersonID); !errors.Is(err, access.ErrForbidden) {
 		t.Errorf("a technician exported somebody's personal data: %v", err)
 	}
-	if err := workshop.ErasePerson(ctx, pool, technician(), customerPersonID, ""); !errors.Is(err, access.ErrForbidden) {
+	if err := workshop.ErasePerson(ctx, pool, technician(), &recordingRemover{}, customerPersonID, ""); !errors.Is(err, access.ErrForbidden) {
 		t.Errorf("a technician erased somebody: %v", err)
 	}
 }
@@ -194,7 +194,7 @@ func TestDeletingAnAttachmentRemovesTheFile(t *testing.T) {
 	}
 
 	remover := &recordingRemover{}
-	if err := workshop.DeleteAttachment(ctx, pool, advisor(), remover, attachmentID); err != nil {
+	if err := workshop.DeleteAttachment(ctx, pool, advisor(), remover, attachmentID, ""); err != nil {
 		t.Fatalf("DeleteAttachment: %v", err)
 	}
 	if len(remover.removed) != 1 || remover.removed[0] != "abc123" {

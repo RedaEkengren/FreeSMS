@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // A workshop books three weeks ahead and FreeSMS had no surface for it. A
@@ -69,7 +68,17 @@ type NewBooking struct {
 	What            string
 	EstimateMinutes *int
 	PartsNeeded     bool
+
+	// Set when the person has been told the booking starts on a day that has
+	// gone and says it is meant: a visit written down afterwards. Without it
+	// 2020 typed for 2026 is a booking nobody will ever come to.
+	ConfirmedPast bool
 }
+
+// ErrBookingInThePast is a booking that starts before today, on the shop's
+// calendar, until somebody says it is meant. Earlier today is not asked
+// about: the car that came in at eight and was written up at nine.
+var ErrBookingInThePast = fmt.Errorf("%w: that booking starts on a day that has already gone; if it is meant, tick that and book it again", ErrInvalid)
 
 // BookingEvent is one thing that happened to a booking.
 type BookingEvent struct {
@@ -134,7 +143,7 @@ func CreateBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		return "", err
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		id, err = createBookingTx(ctx, tx, scope, nb, "", "")
 		return err
@@ -144,7 +153,15 @@ func CreateBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 
 // createBookingTx writes the booking and its first event. A booking made from
 // an enquiry carries it and the accepted version along.
+//
+// A day that has gone is asked about here, so every way of booking asks:
+// the calendar's form and an enquiry's.
 func createBookingTx(ctx context.Context, tx pgx.Tx, scope access.Scope, nb NewBooking, enquiryID, quoteID string) (string, error) {
+	if !nb.ConfirmedPast {
+		if err := notInThePastTx(ctx, tx, nb.Starts); err != nil {
+			return "", err
+		}
+	}
 	if err := closedTx(ctx, tx, nb.Starts); err != nil {
 		return "", err
 	}
@@ -162,19 +179,52 @@ func createBookingTx(ctx context.Context, tx pgx.Tx, scope access.Scope, nb NewB
 	return id, bookingEventTx(ctx, tx, scope, id, "booked", &nb.Starts, &nb.Ends, "")
 }
 
+// notInThePastTx refuses a start before today on the shop's calendar with
+// ErrBookingInThePast.
+func notInThePastTx(ctx context.Context, tx pgx.Tx, starts time.Time) error {
+	loc, err := shopLocationTx(ctx, tx)
+	if err != nil {
+		return err
+	}
+	now := time.Now().In(loc)
+	if starts.Before(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)) {
+		return ErrBookingInThePast
+	}
+	return nil
+}
+
+// MoveOption changes how MoveBooking behaves.
+type MoveOption func(*moveOptions)
+
+type moveOptions struct{ past bool }
+
+// MoveIntoThePast says a booking moved to a day that has gone is meant: the
+// visit written down where it really happened.
+func MoveIntoThePast() MoveOption { return func(o *moveOptions) { o.past = true } }
+
 // MoveBooking gives a booking another time or another technician. A row of
-// its own records the move.
-func MoveBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id string, starts, ends time.Time, technicianID string) error {
+// its own records the move. A day that has gone is asked about, as it is
+// when booking.
+func MoveBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id string, starts, ends time.Time, technicianID string, opts ...MoveOption) error {
 	if !scope.Role.SeesCustomerPersonalData() {
 		return access.ErrForbidden
+	}
+	var o moveOptions
+	for _, opt := range opts {
+		opt(&o)
 	}
 	nb := NewBooking{Starts: starts, Ends: ends, TechnicianID: technicianID, What: "x"}
 	if err := checkBooking(&nb); err != nil {
 		return err
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := closedTx(ctx, tx, starts); err != nil {
 			return err
+		}
+		if !o.past {
+			if err := notInThePastTx(ctx, tx, starts); err != nil {
+				return err
+			}
 		}
 		tag, err := tx.Exec(ctx, `
 			UPDATE bookings SET starts_at = $2, ends_at = $3, technician_id = nullif($4, '')::uuid
@@ -209,7 +259,7 @@ func closeBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 	if !looksLikeUUID(id) {
 		return ErrNotFound
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `UPDATE bookings SET status = $2 WHERE id = $1 AND status = 'booked'`, id, status)
 		if err != nil {
 			return fmt.Errorf("close booking: %w", err)
@@ -282,7 +332,7 @@ func BookingByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 	}
 	var b Booking
 	var events []BookingEvent
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		b, err = scanBooking(tx.QueryRow(ctx, `SELECT`+bookingColumns+bookingFrom+` WHERE b.id = $1`, id))
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -315,7 +365,7 @@ func BookingByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 
 func queryBookings(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, where string, args ...any) ([]Booking, error) {
 	var out []Booking
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT`+bookingColumns+bookingFrom+where, args...)
 		if err != nil {
 			return fmt.Errorf("list bookings: %w", err)
@@ -345,10 +395,10 @@ func PlannerRows(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([
 		return nil, access.ErrForbidden
 	}
 	var out []PlannerRow
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT u.id, p.display_name FROM users u JOIN people p ON p.id = u.person_id
-			WHERE u.active AND u.role = 'technician' ORDER BY p.display_name`)
+			WHERE u.active AND EXISTS (SELECT 1 FROM staff_roles sr WHERE sr.user_id = u.id AND sr.role = 'technician') ORDER BY p.display_name`)
 		if err != nil {
 			return err
 		}

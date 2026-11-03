@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
@@ -70,7 +72,7 @@ func TestLoginReturnsTheUsersScope(t *testing.T) {
 	if token == "" {
 		t.Error("Login returned an empty token")
 	}
-	if s.Scope.UserID != userID || s.Scope.Role != access.RoleTechnician || s.Scope.ShopID != shopID {
+	if s.Scope.UserID != userID || s.Scope.Role.Main() != access.RoleTechnician || s.Scope.ShopID != shopID {
 		t.Errorf("scope = %+v, want the seeded technician", s.Scope)
 	}
 }
@@ -143,7 +145,7 @@ func TestDeactivationEndsSessionsImmediately(t *testing.T) {
 		t.Fatalf("the session was not usable before deactivation: %v", err)
 	}
 
-	owner := access.Scope{ShopID: shopID, UserID: anOwner, Role: access.RoleOwner}
+	owner := access.Scope{ShopID: shopID, UserID: anOwner, Role: access.Of(access.RoleOwner)}
 	if err := Deactivate(ctx, pool, owner, userID); err != nil {
 		t.Fatalf("Deactivate() = %v", err)
 	}
@@ -275,7 +277,7 @@ func TestOnlyThoseWhoRunTheShopDeactivateAUser(t *testing.T) {
 		t.Fatalf("Login: %v", err)
 	}
 	for _, role := range []access.Role{access.RoleTechnician, access.RoleParts, access.RoleServiceAdvisor} {
-		err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: anOwner, Role: role}, userID)
+		err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: anOwner, Role: access.Of(role)}, userID)
 		if !errors.Is(err, access.ErrForbidden) {
 			t.Errorf("Deactivate as %s: %v, want forbidden", role, err)
 		}
@@ -283,7 +285,7 @@ func TestOnlyThoseWhoRunTheShopDeactivateAUser(t *testing.T) {
 	if _, err := Authenticate(ctx, pool, shopID, token); err != nil {
 		t.Errorf("a refused deactivation ended the session anyway: %v", err)
 	}
-	if err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: anOwner, Role: access.RoleOwner}, userID); err != nil {
+	if err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: anOwner, Role: access.Of(access.RoleOwner)}, userID); err != nil {
 		t.Fatalf("Deactivate as owner: %v", err)
 	}
 	if _, err := Authenticate(ctx, pool, shopID, token); !errors.Is(err, ErrNoSession) {
@@ -330,7 +332,7 @@ func TestChangingYourPasswordKeepsThisSessionAndEndsTheRest(t *testing.T) {
 func TestYouCannotSwitchYourselfOff(t *testing.T) {
 	pool := testPool(t)
 	ctx := context.Background()
-	err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleOwner}, userID)
+	err := Deactivate(ctx, pool, access.Scope{ShopID: shopID, UserID: userID, Role: access.Of(access.RoleOwner)}, userID)
 	if !errors.Is(err, ErrRefused) {
 		t.Errorf("switching yourself off: %v, want refused", err)
 	}
@@ -394,5 +396,108 @@ func TestAResetDoesNotGuess(t *testing.T) {
 	}
 	if _, err := ResetPasswordByEmail(ctx, pool, email, "a long enough phrase"); !errors.Is(err, ErrNoSuchUser) {
 		t.Errorf("a deactivated account = %v", err)
+	}
+}
+
+// What is opened for a technician (#225) comes with their session: the
+// shop's profile and their own exceptions, not another person's and not
+// one past its end. Somebody who is not a technician is handed none of it,
+// and nothing of it is read for them.
+func TestASessionCarriesWhatIsOpenedForThisTechnicianAlone(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	const other = "44444444-4444-4444-4444-444444444444"
+	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		for _, q := range []string{
+			`INSERT INTO people (id, shop_id, display_name) VALUES ('55555555-5555-5555-5555-555555555555', $1, 'Another Technician')`,
+			`INSERT INTO users (id, shop_id, person_id, role, password_hash) VALUES ('` + other + `', $1, '55555555-5555-5555-5555-555555555555', 'technician', 'x')`,
+			`INSERT INTO technician_view_changes (shop_id, field, shown, reason, changed_by) VALUES ($1, 'line_prices', true, 'Ackord', '` + other + `')`,
+			`INSERT INTO technician_view_changes (shop_id, field, shown, reason, changed_by) VALUES ($1, 'hourly_rate', true, 'Ett tag', '` + other + `')`,
+			`INSERT INTO technician_view_changes (shop_id, field, shown, reason, changed_by) VALUES ($1, 'hourly_rate', false, 'Inte längre', '` + other + `')`,
+			`INSERT INTO technician_view_exceptions (shop_id, user_id, field, granted, reason, by_user) VALUES ($1, '` + userID + `', 'customer_name', true, 'Ringer själv', '` + other + `')`,
+			`INSERT INTO technician_view_exceptions (shop_id, user_id, field, granted, until, reason, by_user) VALUES ($1, '` + userID + `', 'invoice_status', true, clock_timestamp() - interval '1 hour', 'Förra veckan', '` + other + `')`,
+			`INSERT INTO technician_view_exceptions (shop_id, user_id, field, granted, reason, by_user) VALUES ($1, '` + other + `', 'customer_phone', true, 'Bara den andra', '` + other + `')`,
+		} {
+			if _, err := tx.Exec(ctx, q, shopID); err != nil {
+				return fmt.Errorf("%s: %w", q, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _, err := Login(ctx, pool, shopID, email, pass, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := Check(ctx, pool, shopID, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"customer_name", "line_prices"}; !slices.Equal(s.Scope.Opened, want) {
+		t.Errorf("opened for the technician: %v, want %v", s.Scope.Opened, want)
+	}
+
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE users SET role = 'service_advisor' WHERE id = $1`, userID)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if s, err := Check(ctx, pool, shopID, token); err != nil || len(s.Scope.Opened) != 0 {
+		t.Errorf("opened for somebody who is no longer a technician: %v, %v", s.Scope.Opened, err)
+	}
+}
+
+// What is open for a technician is one rule in the database
+// (technician_fields_open_rows), read by the session and by the view the
+// settings page reads (technician_fields_open). Changed, as a later
+// migration might change it, both see the change: there is no second copy
+// of the rule to drift apart from the first.
+func TestTheSessionAndTheSettingsReadOneRuleForWhatIsOpen(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `
+			INSERT INTO technician_view_exceptions (shop_id, user_id, field, granted, until, reason, by_user)
+			VALUES ($1, $2, 'invoice_status', true, clock_timestamp() - interval '1 hour', 'Förra veckan', $2)`, shopID, userID)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The rule changed: an exception past its end still counts.
+	if _, err := pool.Exec(ctx, `
+		CREATE OR REPLACE FUNCTION technician_fields_open_rows(only_user uuid)
+		RETURNS TABLE (shop_id uuid, user_id uuid, field text) LANGUAGE sql STABLE AS $$
+		    SELECT e.shop_id, e.user_id, e.field
+		      FROM (SELECT DISTINCT ON (x.user_id, x.field) x.shop_id, x.user_id, x.field, x.granted
+		              FROM technician_view_exceptions x
+		             WHERE only_user IS NULL OR x.user_id = only_user
+		             ORDER BY x.user_id, x.field, x.seq DESC) e
+		     WHERE e.granted
+		$$`); err != nil {
+		t.Fatalf("change the rule: %v", err)
+	}
+	token, _, err := Login(ctx, pool, shopID, email, pass, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := Check(ctx, pool, shopID, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"invoice_status"}; !slices.Equal(s.Scope.Opened, want) {
+		t.Errorf("the session read %v after the rule changed, want %v", s.Scope.Opened, want)
+	}
+	var viewed []string
+	if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT coalesce(array_agg(field ORDER BY field), '{}') FROM technician_fields_open WHERE user_id = $1`, userID).Scan(&viewed)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"invoice_status"}; !slices.Equal(viewed, want) {
+		t.Errorf("the view read %v after the rule changed, want %v", viewed, want)
 	}
 }

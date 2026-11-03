@@ -294,3 +294,131 @@ func TestAJobIsNotApprovedWithoutTheCustomersAgreement(t *testing.T) {
 		t.Errorf("approving a job whose every line was declined = %v", err)
 	}
 }
+
+// #136: a yes recorded on a draft used to approve the lines and move nothing,
+// so the job still said "Price the work" and whoever wrote the yes down
+// believed it had been taken. Putting the quote forward now asks the customer:
+// the draft goes to waiting for their answer, and the yes lands where "Mark it
+// approved" is. A job taken back to an estimate after that is not being asked,
+// and an answer to it -- the desk's or the customer's -- is refused rather
+// than kept where nothing reads it.
+func TestPuttingTheQuoteForwardAsksTheCustomerAndATakenBackJobIsNotAnswered(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	job := newJob(t, pool)
+	token, err := workshop.CreateJobLink(ctx, pool, advisor(), job)
+	if err != nil {
+		t.Fatal(err)
+	}
+	quote(t, pool, job, "Brake pads", 1000)
+	q, err := workshop.PresentQuote(ctx, pool, advisor(), job)
+	if err != nil {
+		t.Fatalf("PresentQuote on a draft: %v", err)
+	}
+	if j, _, _ := workshop.JobByID(ctx, pool, advisor(), job); workshop.State(j.State) != workshop.StateAwaitingApproval {
+		t.Fatalf("a draft whose quote was put forward is %s, want awaiting_approval", j.State)
+	}
+
+	move(t, pool, job, workshop.StateEstimated)
+	if err := workshop.RecordQuoteAnswer(ctx, pool, advisor(), job, q.ID, workshop.QuoteAnswer{
+		Decision: "approved", Via: "phone", AgreedGrossMinor: q.GrossMinor}); !errors.Is(err, workshop.ErrNotAskedYet) {
+		t.Errorf("the desk's yes on a job taken back = %v, want ErrNotAskedYet", err)
+	}
+	if err := workshop.QuoteAnswerFromLink(ctx, pool, shopID, token, q.ID, "approved"); !errors.Is(err, workshop.ErrNotAskedYet) {
+		t.Errorf("the customer's yes on a job taken back = %v, want ErrNotAskedYet", err)
+	}
+	if st, err := workshop.JobStatus(ctx, pool, shopID, token); err != nil || st.Quote != nil {
+		t.Errorf("the link of a job taken back shows a quote to answer: %+v, %v", st.Quote, err)
+	}
+	if n := decisionsOn(t, pool, job); n != 0 {
+		t.Errorf("%d answers were recorded on a job taken back", n)
+	}
+	if got := statuses(t, pool, job); got[0] == "approved" {
+		t.Error("a refused yes approved the line")
+	}
+
+	// Put forward again: the same version, asked again.
+	again, err := workshop.PresentQuote(ctx, pool, advisor(), job)
+	if err != nil || again.ID != q.ID {
+		t.Fatalf("putting it forward again = %v, %v; want the same version", again.ID, err)
+	}
+	if err := workshop.QuoteAnswerFromLink(ctx, pool, shopID, token, q.ID, "approved"); err != nil {
+		t.Fatalf("the customer's yes once asked again: %v", err)
+	}
+	if err := workshop.SetState(ctx, pool, advisor(), job, workshop.StateApproved); err != nil {
+		t.Errorf("approving after the yes: %v", err)
+	}
+}
+
+// A quote put to the customer by the release before #136 left the job a
+// draft: PresentQuote did not move it. Nothing took it back, so the customer
+// is still holding it, and their answer -- at the counter or on the link --
+// is taken, the job moving on to waiting for it first so that the yes lands
+// where "Mark it approved" is. Refusing it as taken back would strand every
+// quote outstanding at the upgrade.
+func TestAQuotePutForwardOnADraftBeforeTheUpgradeIsStillAnswered(t *testing.T) {
+	ctx := context.Background()
+	for _, via := range []string{"counter", "link"} {
+		t.Run(via, func(t *testing.T) {
+			pool := setup(t)
+			job := newJob(t, pool)
+			token, err := workshop.CreateJobLink(ctx, pool, advisor(), job)
+			if err != nil {
+				t.Fatal(err)
+			}
+			quote(t, pool, job, "Brake pads", 1000)
+			// What the previous release wrote: a version and its lines, the
+			// job left as it was.
+			var quoteID string
+			var gross int64
+			if err := database.InShop(ctx, pool, shopID, func(ctx context.Context, tx pgx.Tx) error {
+				const priced = `
+					SELECT shop_id, work_order_id, id, position, kind, description, quantity, unit_price_minor,
+					       vat_rate_bp, net, round(net * vat_rate_bp / 10000)::bigint AS vat
+					FROM (SELECT *, round(quantity * unit_price_minor)::bigint AS net
+					      FROM work_order_lines WHERE work_order_id = $1) l`
+				if err := tx.QueryRow(ctx, `
+					INSERT INTO quotes (shop_id, work_order_id, version, net_minor, vat_minor, gross_minor)
+					SELECT shop_id, work_order_id, 1, sum(net), sum(vat), sum(net + vat)
+					FROM (`+priced+`) p GROUP BY shop_id, work_order_id
+					RETURNING id, gross_minor`, job).Scan(&quoteID, &gross); err != nil {
+					return err
+				}
+				_, err := tx.Exec(ctx, `
+					INSERT INTO quote_lines (shop_id, quote_id, line_id, position, kind, description,
+					       quantity, unit_price_minor, vat_rate_bp, net_minor, vat_minor)
+					SELECT shop_id, $2::uuid, id, position, kind, description, quantity, unit_price_minor,
+					       vat_rate_bp, net, vat
+					FROM (`+priced+`) p`, job, quoteID)
+				return err
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if j, _, _ := workshop.JobByID(ctx, pool, advisor(), job); workshop.State(j.State) != workshop.StateDraft {
+				t.Fatalf("the job is %s, want the draft the previous release left", j.State)
+			}
+			if v, err := workshop.QuoteFor(ctx, pool, advisor(), job); err != nil || v.TakenBack {
+				t.Errorf("the job page reads the quote as taken back: %+v, %v", v, err)
+			}
+			if st, err := workshop.JobStatus(ctx, pool, shopID, token); err != nil || st.Quote == nil {
+				t.Errorf("the link shows no quote to answer: %+v, %v", st.Quote, err)
+			}
+
+			if via == "counter" {
+				err = workshop.RecordQuoteAnswer(ctx, pool, advisor(), job, quoteID, workshop.QuoteAnswer{
+					Decision: "approved", Via: "phone", AgreedGrossMinor: gross})
+			} else {
+				err = workshop.QuoteAnswerFromLink(ctx, pool, shopID, token, quoteID, "approved")
+			}
+			if err != nil {
+				t.Fatalf("the yes to a quote from before the upgrade: %v", err)
+			}
+			if j, _, _ := workshop.JobByID(ctx, pool, advisor(), job); workshop.State(j.State) != workshop.StateAwaitingApproval {
+				t.Errorf("after the yes the job is %s, want awaiting_approval", j.State)
+			}
+			if err := workshop.SetState(ctx, pool, advisor(), job, workshop.StateApproved); err != nil {
+				t.Errorf("approving after the yes: %v", err)
+			}
+		})
+	}
+}

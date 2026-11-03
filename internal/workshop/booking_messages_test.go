@@ -24,7 +24,9 @@ func aBooking(t *testing.T, pool *pgxpool.Pool, in time.Duration) string {
 	t.Helper()
 	starts := time.Now().Add(in).Truncate(time.Minute)
 	id, err := workshop.CreateBooking(context.Background(), pool, advisor(), workshop.NewBooking{
-		Starts: starts, Ends: starts.Add(time.Hour), What: "Service", CustomerName: "Greta Gren", CustomerPhone: "070-123 45 67", Registration: "ABC 12D"})
+		// A fixed date, which may have gone by: meant.
+		ConfirmedPast: true,
+		Starts:        starts, Ends: starts.Add(time.Hour), What: "Service", CustomerName: "Greta Gren", CustomerPhone: "070-123 45 67", Registration: "ABC 12D"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +223,7 @@ func TestAnOutageIsRetriedAndAGivenUpMessageIsInTheCountersQueueUntilTheyAct(t *
 	items, _ := workshop.WaitingFor(ctx, pool, advisor())
 	var queued bool
 	for _, it := range items {
-		if it.Kind == "booking_not_told" && it.BookingID == b2 {
+		if it.Kind == "booking_not_told" && it.SubjectKind == "booking" && it.SubjectID == b2 {
 			queued = true
 		}
 	}

@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // A job's work list: the steps the car needs, apart from what is charged.
@@ -181,7 +180,7 @@ type TaskMove struct {
 // -- and it carries no price. Adding work to a car that was ready puts it
 // back in progress: it is on the lift again.
 func AddTask(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID, title string, linePosition int, findingID string) (string, error) {
-	if scope.Role != access.RoleTechnician && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.FollowsJobs() {
 		return "", access.ErrForbidden
 	}
 	title = strings.TrimSpace(title)
@@ -189,7 +188,7 @@ func AddTask(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID,
 		return "", fmt.Errorf("%w: say what is to be done, in 120 characters or fewer", ErrInvalid)
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := lockJobTx(ctx, tx, jobID); err != nil {
 			return err
 		}
@@ -275,7 +274,7 @@ func TasksFromLines(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		return 0, access.ErrForbidden
 	}
 	var made int
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := lockJobTx(ctx, tx, jobID); err != nil {
 			return err
 		}
@@ -332,7 +331,7 @@ func TasksFromLines(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 // harmless. Leaving a task out is the front desk's, since it may mean telling
 // the customer something.
 func MoveTask(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, taskID string, m TaskMove) error {
-	if scope.Role != access.RoleTechnician && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.FollowsJobs() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(taskID) {
@@ -364,7 +363,7 @@ func MoveTask(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, taskI
 			return fmt.Errorf("%w: say why it is being left out", ErrInvalid)
 		}
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var jobID string
 		if err := tx.QueryRow(ctx, `SELECT work_order_id FROM job_tasks WHERE id = $1`, taskID).Scan(&jobID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -556,7 +555,7 @@ func RecordTaskDecision(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 	if note == "" || len([]rune(note)) > 300 {
 		return fmt.Errorf("%w: say what the customer decided, in 300 characters or fewer", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var jobID string
 		if err := tx.QueryRow(ctx, `SELECT work_order_id FROM job_tasks WHERE id = $1`, taskID).Scan(&jobID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -588,7 +587,7 @@ func RecordTaskDecision(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 // customer field exists on it, so a technician may read it.
 func TasksFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) ([]Task, error) {
 	var out []Task
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		out, err = tasksTx(ctx, tx, jobID)
 		return err

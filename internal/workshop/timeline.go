@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // One job, in the order it happened.
@@ -111,7 +110,7 @@ func cleanNote(n *NoteInput) error {
 // Neither is an approval. Agreement to a price is a quote decision, and a note
 // that says the customer agreed changes nothing about the job.
 func AddNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string, n NoteInput) (string, error) {
-	if scope.Role != access.RoleTechnician && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.FollowsJobs() {
 		return "", access.ErrForbidden
 	}
 	if !looksLikeUUID(jobID) {
@@ -129,7 +128,7 @@ func AddNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 		n.DeskOnly = false
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var opened time.Time
 		if err := tx.QueryRow(ctx, `SELECT opened_at FROM work_orders WHERE id = $1`, jobID).Scan(&opened); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -166,7 +165,7 @@ func AddNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID 
 // their own; the counter may correct anybody's. Two people correcting the same
 // version is a conflict for the second.
 func CorrectNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, noteID, body string) error {
-	if scope.Role != access.RoleTechnician && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.FollowsJobs() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(noteID) {
@@ -176,7 +175,7 @@ func CorrectNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, no
 	if body == "" || len([]rune(body)) > 1000 {
 		return fmt.Errorf("%w: write something, in 1000 characters or fewer", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var jobID, kind, audience, author string
 		var channel *string
 		var occurred time.Time
@@ -216,7 +215,7 @@ func TimelineFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 	}
 	desk := scope.Role.SeesCustomerPersonalData()
 	var out []Event
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var exists bool
 		if err := tx.QueryRow(ctx, `SELECT exists(SELECT 1 FROM work_orders WHERE id = $1)`, jobID).Scan(&exists); err != nil {
 			return fmt.Errorf("read job: %w", err)
@@ -372,8 +371,8 @@ func timelineTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID string
 		return nil, err
 	}
 
-	// Scope and price: the lines as they were written, with prices for the
-	// counter only.
+	// Scope and price: the lines as they were written, with prices for
+	// whoever is shown the job's prices (access.FieldLinePrices).
 	if err := add(collect(ctx, tx, `
 		SELECT r.id::text, r.at, r.change, r.description, coalesce(r.reason, ''), r.approval_cleared,
 		       coalesce(p.display_name, ''),
@@ -381,7 +380,7 @@ func timelineTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID string
 		FROM work_order_line_revisions r
 		JOIN work_order_lines l ON l.id = r.line_id
 		LEFT JOIN users u ON u.id = r.by_user LEFT JOIN people p ON p.id = u.person_id
-		WHERE l.work_order_id = $1 AND r.revision > 0`, append(job, desk), func(r pgx.Rows) (Event, error) {
+		WHERE l.work_order_id = $1 AND r.revision > 0`, append(job, scope.SeesOnJob(access.FieldLinePrices)), func(r pgx.Rows) (Event, error) {
 		var e Event
 		var change string
 		var cleared bool
@@ -840,7 +839,7 @@ func HandoverFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 	}
 	var h Handover
 	desk := scope.Role.SeesCustomerPersonalData()
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var hasCustomer bool
 		if err := tx.QueryRow(ctx, `SELECT state, promised_at, customer_id IS NOT NULL FROM work_orders WHERE id = $1`,
 			jobID).Scan(&h.State, &h.Promised, &hasCustomer); err != nil {

@@ -178,7 +178,7 @@ func CreateEnquiry(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		return "", fmt.Errorf("%w: say what the customer is asking about", ErrInvalid)
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `
 			INSERT INTO enquiries (shop_id, subject, registration, vehicle_text, customer_name, customer_phone, created_by)
 			VALUES ($1, btrim($2), nullif(upper(btrim($3)), ''), nullif(btrim($4), ''), nullif(btrim($5), ''), nullif(btrim($6), ''), $7)
@@ -204,7 +204,7 @@ func AddEnquiryLine(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 	case !money.LineWithinLimits(l.QuantityMilli, l.UnitPriceMinor):
 		return fmt.Errorf("%w: the price or the quantity is larger than a line can hold", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := lockEnquiryTx(ctx, tx, enquiryID); err != nil {
 			return err
 		}
@@ -226,7 +226,7 @@ func RemoveEnquiryLine(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 	if !scope.Role.SeesCustomerPersonalData() {
 		return access.ErrForbidden
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := lockEnquiryTx(ctx, tx, enquiryID); err != nil {
 			return err
 		}
@@ -321,7 +321,7 @@ func PresentEnquiry(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		return EnquiryQuote{}, fmt.Errorf("%w: say whether the price is fixed or an estimate", ErrInvalid)
 	}
 	var out EnquiryQuote
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := lockEnquiryTx(ctx, tx, enquiryID); err != nil {
 			return err
 		}
@@ -471,7 +471,7 @@ func EnquiryByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 		return Enquiry{}, ErrNotFound
 	}
 	var e Enquiry
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		err := tx.QueryRow(ctx, `
 			SELECT enquiries.id, subject, coalesce(registration, ''), coalesce(vehicle_text, ''),
 			       coalesce(customer_name, ''), coalesce(customer_phone, ''), enquiries.created_at,
@@ -502,7 +502,7 @@ func Enquiries(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]E
 		return nil, access.ErrForbidden
 	}
 	var out []EnquiryRow
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT e.id, e.subject, coalesce(e.registration, ''), coalesce(e.customer_name, ''), e.created_at,
 			       coalesce(q.version, 0), q.id IS NOT NULL, coalesce(q.valid_until < now(), false),
@@ -600,7 +600,7 @@ func RecordEnquiryAnswer(ctx context.Context, pool *pgxpool.Pool, scope access.S
 	if a.Via != "phone" && a.Via != "counter" {
 		return fmt.Errorf("%w: say whether it was by telephone or at the counter", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := lockEnquiryTx(ctx, tx, enquiryID); err != nil {
 			return err
 		}
@@ -648,7 +648,7 @@ func CreateEnquiryLink(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 	}
 	token := base64.RawURLEncoding.EncodeToString(raw)
 	sum := sha256.Sum256([]byte(token))
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := lockEnquiryTx(ctx, tx, enquiryID); err != nil {
 			return err
 		}
@@ -795,7 +795,7 @@ func BookEnquiry(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, en
 		return "", access.ErrForbidden
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := lockEnquiryTx(ctx, tx, enquiryID); err != nil {
 			return err
 		}

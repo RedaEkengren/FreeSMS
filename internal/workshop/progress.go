@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -122,7 +121,7 @@ func ProgressFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 	if !looksLikeUUID(jobID) {
 		return p, ErrNotFound
 	}
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		err := tx.QueryRow(ctx, `SELECT`+progressColumns+` FROM work_orders w WHERE w.id = $1`, jobID).
 			Scan(p.scanTargets()...)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -143,7 +142,7 @@ func SetPromise(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, job
 	if !looksLikeUUID(jobID) {
 		return ErrNotFound
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `
 			UPDATE work_orders SET promised_at = $2
 			WHERE id = $1 AND state NOT IN ('invoiced', 'closed', 'cancelled')`, jobID, at)

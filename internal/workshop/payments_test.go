@@ -85,7 +85,7 @@ func TestAnOverpaymentAfterACreditNoteShows(t *testing.T) {
 		t.Errorf("a payment against the credit note: %v, want it sent to the invoice", err)
 	}
 	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
-		AmountMinor: amount(inv.GrossMinor), Method: "bank", PaidOn: time.Now(), ConfirmedOverpayment: true}); err != nil {
+		AmountMinor: amount(inv.GrossMinor), Method: "bank", PaidOn: time.Now(), ConfirmedOverpayment: true, OverpaymentReason: "Betalade två gånger"}); err != nil {
 		t.Fatalf("RecordPayment: %v", err)
 	}
 	b, _ := workshop.BalanceFor(ctx, pool, advisor(), credit.ID)
@@ -106,10 +106,10 @@ func TestAMistakeIsReversedNotDeleted(t *testing.T) {
 	inv, _ := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
 	wrong, _ := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
 		AmountMinor: amount(50000), Method: "card", PaidOn: time.Now()})
-	if err := workshop.ReversePayment(ctx, pool, advisor(), wrong.ID); err != nil {
+	if err := workshop.ReversePayment(ctx, pool, advisor(), wrong.ID, "Registrerad av misstag"); err != nil {
 		t.Fatalf("ReversePayment: %v", err)
 	}
-	if err := workshop.ReversePayment(ctx, pool, advisor(), wrong.ID); !errors.Is(err, workshop.ErrInvalid) {
+	if err := workshop.ReversePayment(ctx, pool, advisor(), wrong.ID, "Registrerad av misstag"); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("reversing twice: %v", err)
 	}
 	b, _ := workshop.BalanceFor(ctx, pool, advisor(), inv.ID)
@@ -194,7 +194,99 @@ func TestAPaymentIsBookedAgainstTheReceivable(t *testing.T) {
 	if posted[1910] != p.AmountMinor || posted[3740] != p.RoundingMinor {
 		t.Errorf("till %d and rounding %d, want %d and %d", posted[1910], posted[3740], p.AmountMinor, p.RoundingMinor)
 	}
-	if !containsLine(body, `#VER "B" "1" `+time.Now().Format("20060102")+` "Betalning A-1 A Customer"`) {
+	if !containsLine(body, `#VER "B" "1" `+p.PaidOn.Format("20060102")+` "Betalning A-1 A Customer"`) {
 		t.Errorf("no voucher B 1 dated today:\n%s", body)
+	}
+}
+
+// Money given back on an invoice that is not a refund of one payment --
+// an overpayment returned -- is at most what is owed back: never more than
+// the customer paid over, and nothing at all on an invoice that owes the
+// shop. The database holds it too.
+func TestMoneyGivenBackOnAnInvoiceIsAtMostWhatIsOwedBack(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	inv, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: amount(-1000), Method: "bank", PaidOn: time.Now()}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("money given back on an invoice nobody has paid: %v", err)
+	}
+	if err := rawPayment(t, pool, "invoice_id, amount_minor", 970, inv.ID, -1000); err == nil {
+		t.Error("the database let money be given back on an invoice that owes the shop")
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: amount(inv.GrossMinor + 5000), Method: "bank", PaidOn: time.Now(), ConfirmedOverpayment: true, OverpaymentReason: "Betalade för mycket"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: amount(-5001), Method: "bank", PaidOn: time.Now()}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("more given back than was paid over: %v", err)
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: amount(-5000), Method: "bank", PaidOn: time.Now()}); err != nil {
+		t.Errorf("the overpayment given back: %v", err)
+	}
+	if b, _ := workshop.BalanceFor(ctx, pool, advisor(), inv.ID); !b.Settled() {
+		t.Errorf("after the overpayment went back: %d outstanding", b.OutstandingMinor())
+	}
+}
+
+// Whatever the path, what is given back on an invoice is at most what the
+// customer paid beyond it: an overpayment returned and then the payment
+// that overpaid refunded as well is one too many; a receipt reversed after
+// its overpayment went back would leave money given back on an invoice
+// that owes the shop; and a refund of an invoice paid exactly waits for a
+// credit note. The database holds it too.
+func TestEverythingGivenBackOnAnInvoiceIsWithinWhatWasPaidOver(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	desk := advisor()
+	inv, err := workshop.Issue(ctx, pool, desk, readyToInvoice(t, pool))
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := workshop.RecordPayment(ctx, pool, desk, inv.ID, workshop.NewPayment{Method: "bank", PaidOn: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Paid exactly: nothing is owed back, so a refund waits for a credit.
+	if _, err := workshop.RefundPayment(ctx, pool, desk, first.ID, workshop.NewPayment{
+		AmountMinor: minor(1000), Method: "bank", PaidOn: time.Now()}, "Kunden klagade"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a refund on an invoice paid exactly: %v, want refused", err)
+	}
+	second, err := workshop.RecordPayment(ctx, pool, desk, inv.ID, workshop.NewPayment{
+		AmountMinor: amount(inv.GrossMinor), Method: "bank", PaidOn: time.Now(), ConfirmedOverpayment: true, OverpaymentReason: "Betalade två gånger"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordRefund(ctx, pool, desk, inv.ID, workshop.RefundInput{Method: "bank", PaidOn: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RefundPayment(ctx, pool, desk, second.ID, workshop.NewPayment{
+		AmountMinor: minor(inv.GrossMinor), Method: "bank", PaidOn: time.Now()}, "Dubbelbetalning"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("the overpayment given back a second time, as a refund of the payment: %v", err)
+	}
+	if err := rawPayment(t, pool, "invoice_id, amount_minor, refunds_id, reason", 980, inv.ID, -1000, second.ID, "x"); err == nil {
+		t.Error("the database let a refund take more back than was paid over")
+	}
+	if err := workshop.ReversePayment(ctx, pool, desk, second.ID, "Fel"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a receipt reversed after its overpayment went back: %v", err)
+	}
+	if b, _ := workshop.BalanceFor(ctx, pool, desk, inv.ID); !b.Settled() {
+		t.Errorf("after the refusals: %d outstanding, want settled", b.OutstandingMinor())
+	}
+	// Credited, the money is owed back, and a refund of a payment gives it.
+	if _, err := workshop.CreditNote(ctx, pool, desk, inv.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RefundPayment(ctx, pool, desk, second.ID, workshop.NewPayment{
+		AmountMinor: minor(inv.GrossMinor), Method: "bank", PaidOn: time.Now()}, "Krediterad"); err != nil {
+		t.Errorf("a refund once the invoice is credited: %v", err)
+	}
+	if b, _ := workshop.BalanceFor(ctx, pool, desk, inv.ID); !b.Settled() {
+		t.Errorf("credited and refunded: %d outstanding, want settled", b.OutstandingMinor())
 	}
 }

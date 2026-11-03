@@ -31,6 +31,7 @@
     <select name="technician_id"><option value="">{{$.T "Not given to anybody yet"}}</option>
       {{range $.Planner.Rows}}<option value="{{.ID}}" {{if eq .ID $.Booking.TechnicianID}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
   <input type="hidden" name="what" value="{{.What}}">
+  <label class="tick"><input type="checkbox" name="confirm_past" value="1"><span>{{$.T "It is meant to be on a day that has gone"}}</span></label>
   <button type="submit" class="secondary">{{$.T "Move it"}}</button>
 </form>
 <div class="actions mt-m">

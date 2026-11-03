@@ -43,7 +43,7 @@ func TestRawQueryCannotReachAnotherShop(t *testing.T) {
 	seedSecondShop(t, pool)
 	ctx := context.Background()
 
-	scope := access.Scope{ShopID: shopID, UserID: "33333333-3333-3333-3333-333333333333", Role: access.RoleOwner}
+	scope := access.Scope{ShopID: shopID, UserID: "33333333-3333-3333-3333-333333333333", Role: access.Of(access.RoleOwner)}
 
 	var total, others int
 	err := InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
@@ -97,7 +97,7 @@ func TestCannotWriteIntoAnotherShop(t *testing.T) {
 	seedSecondShop(t, pool)
 	ctx := context.Background()
 
-	scope := access.Scope{ShopID: shopID, UserID: "33333333-3333-3333-3333-333333333333", Role: access.RoleOwner}
+	scope := access.Scope{ShopID: shopID, UserID: "33333333-3333-3333-3333-333333333333", Role: access.Of(access.RoleOwner)}
 	err := InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx,
 			`INSERT INTO vehicles (shop_id, make, model) VALUES ($1, 'Planted', 'Row')`, otherShopID)
@@ -117,7 +117,7 @@ func TestInScopeRefusesAnEmptyScope(t *testing.T) {
 	pool := testPool(t)
 	ctx := context.Background()
 
-	err := InScope(ctx, pool, access.Scope{Role: access.RoleOwner}, func(context.Context, pgx.Tx) error {
+	err := InScope(ctx, pool, access.Scope{Role: access.Of(access.RoleOwner)}, func(context.Context, pgx.Tx) error {
 		t.Error("the callback ran despite there being no shop in scope")
 		return nil
 	})
@@ -130,7 +130,7 @@ func TestInScopeRefusesAnUnknownRole(t *testing.T) {
 	pool := testPool(t)
 	ctx := context.Background()
 
-	err := InScope(ctx, pool, access.Scope{ShopID: shopID, Role: "superuser"}, func(context.Context, pgx.Tx) error {
+	err := InScope(ctx, pool, access.Scope{ShopID: shopID, Role: access.Of("superuser")}, func(context.Context, pgx.Tx) error {
 		t.Error("the callback ran with a role that does not exist")
 		return nil
 	})

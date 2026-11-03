@@ -450,3 +450,34 @@ func TestTheShippedExamplesAndTemplatesAreValidFiles(t *testing.T) {
 		}
 	}
 }
+
+// Import is Core's, by kind of record (owner decision on #143): customers
+// and vehicles whatever the shop runs, parts and opening stock only while
+// the workshop runs -- and a batch read in while it ran is not applied
+// after it was switched off.
+func TestWhatMayBeImportedFollowsTheModules(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	off := runningNothing(owner())
+	if got := workshop.ImportKindsFor(off); len(got) != 2 || got[0] != "customers" || got[1] != "vehicles" {
+		t.Errorf("with every module off the shop may import %v", got)
+	}
+	if got := workshop.ImportKindsFor(owner()); len(got) != len(workshop.ImportKinds) {
+		t.Errorf("a workshop may import %v", got)
+	}
+	parts, _ := workshop.ImportTemplate("parts")
+	if _, err := workshop.PreviewImport(ctx, pool, off, "parts", "delar.csv", []byte(parts)); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("parts read in with the workshop off: %v, want refused", err)
+	}
+	customers, _ := workshop.ImportTemplate("customers")
+	if _, err := workshop.PreviewImport(ctx, pool, off, "customers", "kunder.csv", []byte(customers)); err != nil {
+		t.Errorf("customers read in with the workshop off: %v", err)
+	}
+	b, err := workshop.PreviewImport(ctx, pool, owner(), "parts", "delar.csv", []byte(parts))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.ApplyImport(ctx, pool, off, b.ID, nil, true); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a parts batch applied after the workshop was switched off: %v, want refused", err)
+	}
+}

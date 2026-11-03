@@ -1,0 +1,47 @@
+{{define "content"}}
+{{/* A contract (#150), as it was produced: the shop's own words, frozen, and
+     the parties as it names them. The headings are the reader's language;
+     the text is the shop's, as written, and is not translated -- a Swedish
+     contract read by somebody who reads English is still the Swedish
+     contract. The hash printed on it matches a signed paper copy to the
+     version signed. */}}
+{{with .Contract}}
+<article class="document">
+  <header>
+    <p class="waiting">{{$.T .KindLabel}}</p>
+    <h1>{{.Title}}</h1>
+    <p class="waiting">{{$.Date ($.Local .CreatedAt) "2 Jan 2006"}} &middot; {{$.T "Document"}} {{.ShortHash}}</p>
+  </header>
+  {{if .SupersededByID}}<p class="error">{{$.T "This document has been replaced by a correction, and is not signed any more."}}</p>{{end}}
+  {{if .ErasedAt}}
+  <p class="waiting">{{$.T "What this document said has been erased at a person's request. That it existed, and who signed it, is kept."}}</p>
+  {{else}}
+  <div class="contract-text">{{.Body}}</div>
+  {{end}}
+
+  <h2>{{$.T "Parties"}}</h2>
+  <ul class="lines">
+    {{range .Parties}}
+    <li>
+      <div class="row"><span>{{.Name}}</span><span class="tag">{{$.T .RoleLabel}}</span></div>
+      {{if or .OrgNumber .Address}}<div class="waiting">{{.OrgNumber}}{{if and .OrgNumber .Address}} &middot; {{end}}{{.Address}}</div>{{end}}
+      <div class="waiting">{{with .Signature}}{{$.T "Signed"}} {{$.Date ($.Local .SignedAt) "2 Jan 2006 15:04"}}, {{$.T .MethodLabel}}{{if .WitnessedBy}} &middot; {{$.T "witnessed by"}} {{.WitnessedBy}}{{end}}{{else}}{{$.T "Not signed"}}{{end}}</div>
+    </li>
+    {{end}}
+  </ul>
+  <p><strong>{{$.T .SigningLabel}}</strong></p>
+</article>
+
+<div class="no-print mt-l">
+  <button type="button" class="secondary" data-print>{{$.T "Print"}}</button>
+  {{if $.ContractCustomer}}
+  <p class="waiting mt-l">{{$.T "This link opens this document only, and stops working after a while."}}</p>
+  {{else}}
+  <form class="mt-s" method="post" action="/contracts/{{.ID}}/link">
+    <button type="submit" class="secondary">{{$.T "Make a link for the customer"}}</button>
+  </form>
+  {{if $.ContractLink}}<p class="mt-s">{{$.T "The customer's link, shown this once:"}} <code>{{$.ContractLink}}</code></p>{{end}}
+  {{end}}
+</div>
+{{end}}
+{{end}}

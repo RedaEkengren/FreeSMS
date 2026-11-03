@@ -112,7 +112,7 @@
 <ul class="lines">
   {{range .Jobs}}
   <li><div class="row">
-    <a href="/jobs/{{.ID}}">#{{.Number}} &middot; {{$.Date ($.Local .OpenedAt) "2 Jan 2006"}}{{if .Registration}} &middot; {{.Registration}}{{end}}</a>
+    <a{{if $.Runs "workshop"}} href="/jobs/{{.ID}}"{{end}}>#{{.Number}} &middot; {{$.Date ($.Local .OpenedAt) "2 Jan 2006"}}{{if .Registration}} &middot; {{.Registration}}{{end}}</a>
     <span class="tag">{{$.T .StateLabel}}</span>
   </div></li>
   {{end}}

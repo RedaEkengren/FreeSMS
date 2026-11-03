@@ -220,7 +220,14 @@ test.describe.serial('the whole job scene', () => {
       await expect(phone.getByText('Din bil är klar att hämta.')).toBeVisible();
 
       // Collected and paid at the counter: the job closes itself.
+      // The part was priced after the customer said yes, so the invoice
+      // asks first, and the counter says it is meant (#131): the customer
+      // said yes to the pads being changed, and this is the pads.
       await d.goto(job);
+      const invoice = d.locator('form[action$="/invoice"]');
+      await expect(invoice).toContainText('1 rad lades till efter att kunden godkänt och saknar godkännande.');
+      await invoice.getByLabel('Fakturera med raderna ingen godkänt').check();
+      await invoice.getByLabel('Varför de faktureras ändå').fill('Kunden sa ja till att byta beläggen, och det här är beläggen');
       await d.getByRole('button', { name: 'Fakturera den' }).click();
       await d.getByRole('link', { name: /A-\d+/ }).first().click();
       const pay = d.locator('form[action$="/payments"]');

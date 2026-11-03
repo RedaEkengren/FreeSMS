@@ -127,7 +127,7 @@ func TestAReversalAfterClosingReopensNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := pay(t, pool, inv)
-	if err := workshop.ReversePayment(ctx, pool, advisor(), p.ID); err != nil {
+	if err := workshop.ReversePayment(ctx, pool, advisor(), p.ID, "Registrerad av misstag"); err != nil {
 		t.Fatalf("ReversePayment: %v", err)
 	}
 	if s := stateOf(t, pool, job); s != workshop.StateClosed {

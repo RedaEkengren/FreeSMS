@@ -7,11 +7,14 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/testsupport"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // "Slow" is the commonest complaint about every system FreeSMS is meant to
@@ -26,7 +29,10 @@ import (
 // made in the commit that does it, with the reason in the message.
 var queryBudgets = map[string]int{
 	// The technician's screens, on the worst connection: these matter most.
-	"tech GET /": 11,
+	// 11 to 19 (#157): the home page's cards and the top of the one queue,
+	// each read under the reader's scope, above the job list. 19 to 18: the
+	// workshop's job counts in one statement.
+	"tech GET /": 18,
 	// 23 to 24: the work list is one more read (two once a job has steps,
 	// which the budget's jobs do not). 24 to 25: whether the job is a return
 	// visit or has been come back to (#119), one read.
@@ -41,12 +47,29 @@ var queryBudgets = map[string]int{
 	// The counter.
 	// 21: the open jobs that need a decision about who or when (#113),
 	// one read in its own scope.
+	// The home page (#157), every module on: the board, with the cards and
+	// the top of the one queue above it, read in a transaction of their own.
+	// The owner's queue is the counter's, the parts desk's and Core's --
+	// payment flows, documents, the outbox -- and two money cards besides.
+	// 35 to 20 and 43 to 28: the board, what is owed and the backlog read
+	// once, in the page's transaction, for the queue and the board alike.
+	// 20 to 17 and 28 to 24: the workshop's job counts in one statement.
+	// 24 to 26: Rental's cards, counted in one statement beside the
+	// workshop's, and the rental desk's part of the queue in one more
+	// (#192). 26 to 27: car sales' part of the queue -- leads due, new
+	// and whose car has gone -- in one statement (#172). 27 to 28: the
+	// fleet's paperwork (#202) -- reports, insurances, the permit ending
+	// and what every booking ahead lacks, in one statement
+	// (seedRentalsAhead books five, so a loop over them would show).
+	"desk GET /":      17,
+	"owner GET /":     28,
 	"desk GET /board": 21,
 	// 35: the quote the customer was shown and what they answered to it
 	// (two statements), which the counter reads on every live refresh.
 	// 39: the work list, as for the technician. 40: whether the job is a
 	// return visit or has been come back to (#119), as for the technician.
-	"desk GET /jobs/{id}": 40,
+	// 41: the shop's payment flows, for a job paid as it is invoiced (#156).
+	"desk GET /jobs/{id}": 41,
 	// 17: the documents the customer is not known to have, one read in its own
 	// scope, and the worklist reads the shop's zone to date what is late.
 	"desk GET /receivables": 17,
@@ -89,8 +112,13 @@ func (c *queryCounter) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryE
 func TestPagesStayWithinTheirQueryBudgetWhateverTheHistory(t *testing.T) {
 	counter := &queryCounter{}
 	ts, pool := testServerOn(t, testsupport.FreshPoolWith(t, counter))
+	// Every module on (#157): the home page asks each module's cards and
+	// queue, and stays within its budget with all three.
+	seedShop(t, pool, shopA, []string{`INSERT INTO shop_module_changes (shop_id, module, enabled) VALUES
+		('` + shopA + `','workshop',true), ('` + shopA + `','dealer',true), ('` + shopA + `','rental',true)`})
 	tech := signIn(t, ts, techEmail)
 	desk := signIn(t, ts, advisorEmail)
+	owner := signIn(t, ts, ownerEmail)
 
 	measure := func() map[string]int {
 		t.Helper()
@@ -100,10 +128,7 @@ func TestPagesStayWithinTheirQueryBudgetWhateverTheHistory(t *testing.T) {
 			method, path, _ := strings.Cut(rest, " ")
 			htmx := strings.HasSuffix(path, " (htmx)")
 			path = strings.TrimSuffix(path, " (htmx)")
-			client := tech
-			if who == "desk" {
-				client = desk
-			}
+			client := map[string]*http.Client{"tech": tech, "desk": desk, "owner": owner}[who]
 			path = strings.ReplaceAll(strings.ReplaceAll(path, "{id}", jobA), "{inspection}", budgetInspection)
 			req, _ := http.NewRequest(method, ts.URL+path, nil)
 			if htmx {
@@ -257,4 +282,43 @@ func seedHistory(t *testing.T, pool *pgxpool.Pool) {
 		 SELECT '` + shopA + `', '` + tech + `', current_date - n, '10:00', '18:00', '` + tech + `'
 		 FROM generate_series(-14, 700) n`,
 	})
+	seedRentalsAhead(t, pool)
+}
+
+// seedRentalsAhead books a van five times in the next weeks, each lacking
+// what a handover needs, so the rental desk's queue has bookings ahead to
+// ask about (#202) -- in one statement, whatever their number.
+func seedRentalsAhead(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	ctx := context.Background()
+	owner := access.Scope{ShopID: shopA, UserID: "aaaaaaaa-0000-0000-0000-000000000011", Role: access.Of(access.RoleOwner), Modules: access.Modules}
+	profiles, err := workshop.RentalProfiles(ctx, pool, owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unit, err := workshop.AddRentalUnit(ctx, pool, owner, workshop.NewRentalUnit{Registration: "RNT 001", FleetNumber: "R1", Category: "Bil", ProfileID: profiles[0].ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.StartFleetMembership(ctx, pool, owner, unit, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := workshop.CreateRatePlan(ctx, pool, owner, workshop.NewRatePlan{Name: "Bil", Category: "Bil", VATRateBp: 2500, SeasonRule: "at_start"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	price := int64(40000)
+	if _, err := workshop.AddRateSeason(ctx, pool, owner, plan, workshop.RateSeason{ValidFrom: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), Day: &price}); err != nil {
+		t.Fatal(err)
+	}
+	renter, err := workshop.CreateParty(ctx, pool, owner, workshop.NewParty{Kind: "private", Name: "Rita", Role: workshop.PartyRenter})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		from := time.Now().AddDate(0, 0, 2+3*i)
+		if _, err := workshop.BookRental(ctx, pool, owner, workshop.NewRentalBooking{UnitID: unit, RenterID: renter, From: from, To: from.Add(24 * time.Hour)}); err != nil {
+			t.Fatal(err)
+		}
+	}
 }

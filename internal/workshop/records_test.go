@@ -363,7 +363,7 @@ func TestErasingAPersonBlanksTheLogOfTheirCorrectionsButNotThatTheyHappened(t *t
 	if err != nil || len(ex.Corrections) != 1 || ex.Corrections[0].Now != "070-444 55 66" {
 		t.Fatalf("the export does not carry the correction: %v %+v", err, ex.Corrections)
 	}
-	if err := workshop.ErasePerson(ctx, pool, advisor(), c.PersonID, "Asked"); err != nil {
+	if err := workshop.ErasePerson(ctx, pool, advisor(), &recordingRemover{}, c.PersonID, "Asked"); err != nil {
 		t.Fatal(err)
 	}
 	got := cardOf(t, pool, c.ID)

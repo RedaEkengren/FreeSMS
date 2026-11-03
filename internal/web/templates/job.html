@@ -190,6 +190,23 @@
 <p class="waiting">{{.T "No customer recorded yet"}}</p>
 <a class="button secondary" href="/jobs/{{.Job.ID}}/customer">{{.T "Say who is paying"}}</a>
 {{end}}
+{{/* What the shop has opened for a technician (#225), each fetched only
+     when opened; the customer only on a job of their own. */}}
+{{with .TechJob}}
+{{if .PersonalData}}
+<h2>{{$.T "Customer"}}</h2>
+{{if .CustomerName}}<div class="waiting">{{.CustomerName}}</div>{{end}}
+{{if .CustomerPhone}}<div><a href="tel:{{.CustomerPhone}}">{{.CustomerPhone}}</a></div>{{end}}
+<p class="waiting">{{$.T "The customer's details are shown to you for this job, and may be used only for it."}}</p>
+{{end}}
+{{if or .CeilingMinor .InvoiceStatus .HourlyRateMinor}}
+<dl>
+  {{if .CeilingMinor}}<dt>{{$.T "The customer agreed to at most"}}</dt><dd>{{$.MoneyOrBlank .CeilingMinor}} <span class="waiting">{{$.T "including VAT"}}</span></dd>{{end}}
+  {{if .HourlyRateMinor}}<dt>{{$.T "Hourly rate"}}</dt><dd>{{$.MoneyOrBlank .HourlyRateMinor}} <span class="waiting">{{$.T "before VAT"}}</span></dd>{{end}}
+  {{with .InvoiceStatus}}<dt>{{$.T "Invoice"}}</dt><dd>{{$.T .}}</dd>{{end}}
+</dl>
+{{end}}
+{{end}}
 </div>
 
 <div id="live-move" data-live="job:{{.Job.ID}}">
@@ -342,7 +359,8 @@
   <li>
     <div class="row">
       <span>{{.Note}}</span>
-      {{if not .Handled}}<span class="tag warranty">{{$.T "needs pricing"}}</span>{{end}}
+      {{if .AsksContact}}{{if not .Handled}}<span class="tag late">{{$.T "contact the customer"}}</span>{{end}}
+      {{else if not .Handled}}<span class="tag warranty">{{$.T "needs pricing"}}</span>{{end}}
     </div>
     <div class="waiting">{{.ReportedBy}}</div>
     {{if and (not .Handled) $.Session.Scope.Role.SeesCustomerPersonalData}}
@@ -470,7 +488,7 @@
 </div>
 
 <div id="live-totals" data-live="job:{{.Job.ID}}">
-{{if .Lines}}
+{{if and .Lines (.Session.Scope.SeesOnJob "line_prices")}}
 {{/* In the side rail rather than under the lines: the total is what the front
      desk is asked for on the telephone, and it used to scroll away with
      everything else. On a phone the rail is simply the top of the page, so it
@@ -510,8 +528,8 @@
     <tr>
       <th>{{.T "What"}}</th>
       <th class="num">{{.T "Quantity"}}</th>
-      <th class="num">{{.T "Unit price"}}</th>
-      <th class="num">{{.T "Amount"}}</th>
+      {{if .Session.Scope.SeesOnJob "line_prices"}}<th class="num">{{.T "Unit price"}}</th>
+      <th class="num">{{.T "Amount"}}</th>{{end}}
     </tr>
   </thead>
   <tbody>
@@ -526,18 +544,18 @@
           {{if .PerformedAt}}<span class="tag">{{$.T "done"}}</span>{{end}}
         {{end}}
         {{if and $.Session.Scope.Role.SeesCustomerPersonalData (ne .Status "withdrawn") (ne .Status "declined") (not (or (eq $.Job.State "invoiced") (eq $.Job.State "closed") (eq $.Job.State "cancelled")))}}<a href="/jobs/{{$.Job.ID}}/lines/{{.Position}}/edit">{{$.T "Correct"}}</a>{{end}}
-        {{if and (ne .Status "withdrawn") (or $.Session.Scope.Role.SeesCustomerPersonalData (eq $.Session.Scope.Role "technician"))}}{{if not (or (eq $.Job.State "invoiced") (eq $.Job.State "closed") (eq $.Job.State "cancelled"))}}
+        {{if and (ne .Status "withdrawn") $.Session.Scope.Role.FollowsJobs}}{{if not (or (eq $.Job.State "invoiced") (eq $.Job.State "closed") (eq $.Job.State "cancelled"))}}
         <form class="m-0 inline" method="post" action="/jobs/{{$.Job.ID}}/lines/{{.Position}}/performed">
           {{if .PerformedAt}}<input type="hidden" name="performed" value="no"><button type="submit" class="secondary">{{$.T "Not done"}}</button>
           {{else}}<input type="hidden" name="performed" value="yes"><button type="submit" class="secondary">{{$.T "Mark done"}}</button>{{end}}
         </form>
         {{end}}{{end}}
         {{if ne .CostBearer "customer"}}<span class="tag warranty">{{$.T "warranty: %s" .CostBearer}}</span>{{end}}
-        {{if .PriceChanged}}<span class="tag warranty">{{$.T "quoted %s" ($.MoneyOrBlank .EstimatedMinor)}}</span>{{end}}
+        {{if and .PriceChanged ($.Session.Scope.SeesOnJob "line_prices")}}<span class="tag warranty">{{$.T "quoted %s" ($.MoneyOrBlank .EstimatedMinor)}}</span>{{end}}
       </td>
       <td class="num" data-label="{{$.T "Quantity"}}">{{$.Num .Quantity}}</td>
-      <td class="num" data-label="{{$.T "Unit price"}}">{{$.Money .UnitPriceMinor}}</td>
-      <td class="num" data-label="{{$.T "Amount"}}">{{$.Money .NetMinor}}</td>
+      {{if $.Session.Scope.SeesOnJob "line_prices"}}<td class="num" data-label="{{$.T "Unit price"}}">{{$.Money .UnitPriceMinor}}</td>
+      <td class="num" data-label="{{$.T "Amount"}}">{{$.Money .NetMinor}}</td>{{end}}
     </tr>
   {{else}}
     <tr><td colspan="4" class="empty">{{.T "Nothing on this order yet."}}</td></tr>
@@ -605,6 +623,14 @@
   <p class="waiting">{{.T "Nothing has been put to the customer yet."}}</p>
 {{end}}
 
+{{/* A job taken back to a draft or an estimate after the quote went out
+     is not being asked: an answer written down now would be refused (#136).
+     Putting the quote forward again asks the customer again. A quote put
+     forward on a draft before #136, never taken back, is still answered. */}}
+{{$asked := not .Quote.TakenBack}}
+{{if and .Quote.Latest (not $asked)}}
+<p class="waiting">{{.T "Taken back from the customer: their answer is written down once the quote is put to them again."}}</p>
+{{end}}
 {{if .Quote.Pending}}
 <p><span class="tag warranty">{{.N "%d line has no agreement yet" .Quote.Pending}}</span></p>
 <form class="my" method="post" action="/jobs/{{.Job.ID}}/quote">
@@ -612,7 +638,7 @@
 </form>
 {{end}}
 
-{{with .Quote.Latest}}
+{{if $asked}}{{with .Quote.Latest}}
 <form class="my" method="post" action="/jobs/{{$.Job.ID}}/quote/{{.ID}}/answer">
   <p class="waiting">{{$.T "The customer answered by telephone or at the counter? Write it down."}}</p>
   <div class="pair">
@@ -629,7 +655,7 @@
     <button name="decision" value="declined" class="secondary">{{$.T "They said no"}}</button>
   </div>
 </form>
-{{end}}
+{{end}}{{end}}
 
 {{if .Quote.Decisions}}
 <ul class="lines">
@@ -782,7 +808,16 @@
     {{if and .NotAgreedLines (ne .Job.State "declined")}}
     <p class="waiting">{{.N "%d line was put on after the customer agreed, and has no agreement." .NotAgreedLines}}</p>
     <label class="tick"><input type="checkbox" name="confirm_unagreed" value="1"> <span>{{.T "Invoice it with the lines nobody agreed to"}}</span></label>
+    <label><span>{{.T "Why they are invoiced anyway"}}</span><input name="unagreed_reason" maxlength="300"></label>
     {{end}}
+    <details>
+      <summary>{{.T "Paid now, at the counter"}}</summary>
+      <div class="pair">
+        <label><span>{{.T "How"}}</span><select name="paid_now"><option value="">{{.T "Not paid now"}}</option>{{range .CounterFlows}}<option value="flow:{{.ID}}">{{.Name}} ({{$.T .Method}})</option>{{end}}{{range .CashMethods}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+        <label><span>{{.T "Reference"}}</span><input name="paid_reference" maxlength="100"></label>
+      </div>
+      <p class="waiting">{{.T "Issued and paid in one step: the invoice says it was paid. A recorded payment is not a cash-register receipt, and FreeSMS is not a cash register."}}</p>
+    </details>
     <button type="submit">{{.T "Invoice it"}}</button>
   </form>
   {{end}}
@@ -814,6 +849,13 @@
     <input name="note" placeholder="Other track rod end is going too">
   </label>
   <button type="submit" class="secondary">{{.T "Tell the front desk"}}</button>
+</form>
+<form class="mt" method="post" action="/jobs/{{.Job.ID}}/contact-request" data-offline>
+  <label>
+    <span>{{.T "What the customer should be asked"}}</span>
+    <input name="why" maxlength="300" placeholder="{{.T "May we replace the rear pads too?"}}">
+  </label>
+  <button type="submit" class="secondary">{{.T "Ask the front desk to contact the customer"}}</button>
 </form>
 {{end}}
 

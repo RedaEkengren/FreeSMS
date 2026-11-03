@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/RedaEkengren/FreeSMS/internal/vehicledata"
@@ -14,17 +15,24 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 
-	results, err := workshop.Search(r.Context(), s.pool, session.Scope, query)
+	// One box across every module the shop runs (#159), each result only
+	// what the caller's role may see.
+	results, err := workshop.SearchAll(r.Context(), s.pool, session.Scope, query)
+	if errors.Is(err, workshop.ErrInvalid) {
+		s.renderError(w, r, http.StatusBadRequest, "Not accepted", trimInvalid(err))
+		return
+	}
 	if err != nil {
 		s.fault(w, r, "search", err)
 		return
 	}
 
-	// One hit goes straight there. Making somebody choose from a list of one
-	// is a tap for nothing, and at a counter with a telephone in the other
-	// hand that tap is the difference.
-	if len(results) == 1 {
-		http.Redirect(w, r, "/vehicles/"+results[0].VehicleID, http.StatusSeeOther)
+	// One hit goes straight there, and so does the one exact plate, chassis
+	// number or job number among weaker hits. Making somebody choose from a
+	// list is a tap for nothing, and at a counter with a telephone in the
+	// other hand that tap is the difference.
+	if only, ok := workshop.Straight(results); ok {
+		http.Redirect(w, r, only.Link(), http.StatusSeeOther)
 		return
 	}
 
@@ -32,7 +40,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		Title:   "Search",
 		Session: session,
 		Query:   query,
-		Results: results,
+		Found:   results,
 	})
 }
 
@@ -49,11 +57,20 @@ func (s *Server) handleVehicle(w http.ResponseWriter, r *http.Request) {
 			s.log.Error("read vehicle changes", "error", err)
 		}
 	}
+	// Its cycles through the dealer's stock (#160): a car bought twice is
+	// two. Not asked for a role that may not read them.
+	var units []workshop.StockUnit
+	if session.Scope.Role.BuysVehicles() || session.Scope.Role.SellsVehicles() {
+		if units, err = workshop.StockUnitsOfVehicle(r.Context(), s.pool, session.Scope, vehicle.ID); err != nil {
+			s.log.Error("read stock units", "error", err)
+		}
+	}
 	s.render(w, r, http.StatusOK, "vehicle", pageData{
 		Title:          vehicle.Describe(),
 		Session:        session,
 		Vehicle:        vehicle,
 		VehicleChanges: changes,
+		StockUnits:     units,
 	})
 }
 
@@ -67,23 +84,62 @@ func (s *Server) handleVehicle(w http.ResponseWriter, r *http.Request) {
 // worst outcome available.
 func (s *Server) handleVehicleLookup(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
-	registration := strings.TrimSpace(r.URL.Query().Get("registration"))
+	q := r.URL.Query()
+	registration := strings.TrimSpace(q.Get("registration"))
+	// What the person has typed already is theirs: a lookup fills in only
+	// what is empty, and a VIN that differs is a conflict, not a change.
+	typed := vehicledata.Vehicle{Make: strings.TrimSpace(q.Get("make")), Model: strings.TrimSpace(q.Get("model")),
+		Engine: strings.TrimSpace(q.Get("engine"))}
+	if y, err := strconv.Atoi(strings.TrimSpace(q.Get("model_year"))); err == nil && y > 1885 && y < 2100 {
+		typed.ModelYear = int16(y)
+	}
+	if vin := strings.TrimSpace(q.Get("vin")); vin != "" {
+		typed.VIN = vehicledata.Of(vin)
+	}
 
-	data := pageData{Session: session}
-
-	switch vehicle, err := s.vehicleLookup.Lookup(r.Context(), registration); {
+	data := pageData{Session: session, Lookup: typed, CanLookUp: s.canLookUp(), LookupRegistration: registration}
+	found, err := workshop.LookUpVehicle(r.Context(), s.pool, session.Scope, s.vehicleLookup, s.lookupProvider,
+		registration, workshop.LookupIntake, typed.VIN.Value, q.Get("refresh") != "")
+	switch {
 	case errors.Is(err, vehicledata.ErrNotConfigured):
 		// Not an error the person needs to see. The shop has not set this up.
-		data.LookupNote = ""
-	case errors.Is(err, vehicledata.ErrNotFound):
-		data.LookupNote = "Nothing is registered under that number. Type what you can."
 	case err != nil:
-		s.log.Warn("vehicle lookup", "error", err)
+		s.handoverError(w, r, err)
+		return
+	case found.Outcome == workshop.LookupNotFound:
+		data.LookupNote = "Nothing is registered under that number. Type what you can."
+	case found.Outcome == workshop.LookupFailed:
 		data.LookupNote = "The lookup service did not answer. Type what you can; this does not stop you."
 	default:
-		data.Lookup = vehicle
+		data.Lookup = fillEmpty(typed, found.Vehicle)
+		data.Looked = &found
 		data.LookupNote = "Filled in from the registration. Change anything that is wrong."
+		if found.VINConflict {
+			data.LookupConflict = found.Vehicle.VIN.Value
+		}
 	}
 
 	s.renderPartial(w, r, "newjob", "lookup", data)
+}
+
+// fillEmpty is what was typed, with what a lookup found where nothing was.
+// The VIN is never taken over one typed; the status facts are the lookup's.
+func fillEmpty(typed, found vehicledata.Vehicle) vehicledata.Vehicle {
+	v := found
+	if typed.Make != "" {
+		v.Make = typed.Make
+	}
+	if typed.Model != "" {
+		v.Model = typed.Model
+	}
+	if typed.ModelYear != 0 {
+		v.ModelYear = typed.ModelYear
+	}
+	if typed.Engine != "" {
+		v.Engine = typed.Engine
+	}
+	if typed.VIN.Value != "" {
+		v.VIN = typed.VIN
+	}
+	return v
 }

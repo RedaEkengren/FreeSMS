@@ -1,0 +1,7 @@
+{{define "content"}}
+<h1>{{.T "Start page"}}</h1>
+{{template "homecards" .}}
+{{if and (not .Home.Actions) (not .Home.Waiting) (not .Home.Information)}}
+<p class="empty">{{.T "Nothing is waiting for you."}}</p>
+{{end}}
+{{end}}

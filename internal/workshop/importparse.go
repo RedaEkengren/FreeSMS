@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"io"
 	"net/mail"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 )
 
 // Reading a file somebody exported from their old system.
@@ -33,6 +36,33 @@ const (
 // ImportKinds are the things that can be imported, in the order they make
 // sense: a vehicle names its owner, a stock row names its part.
 var ImportKinds = []string{"customers", "vehicles", "parts", "stock"}
+
+// ImportKindsFor is the kinds this shop may import (owner decision on #143):
+// customers and vehicles always, being Core's; parts and opening stock only
+// while the workshop runs, whose they are.
+func ImportKindsFor(scope access.Scope) []string {
+	var out []string
+	for _, k := range ImportKinds {
+		if importable(scope, k) {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+// importable reports whether this shop may import kind. The import is
+// Core's and works whatever the shop runs; what it may bring in depends on
+// the modules.
+func importable(scope access.Scope, kind string) bool {
+	switch kind {
+	case "parts", "stock":
+		return scope.Offers(access.Workshop)
+	}
+	return true
+}
+
+// errNotImportable is a kind of record whose module the shop does not run.
+var errNotImportable = fmt.Errorf("%w: those records belong to a part of FreeSMS this shop does not run", ErrInvalid)
 
 // importColumns are the columns of each kind, in the template's order, and
 // which of them a row cannot be without.
@@ -277,6 +307,30 @@ func looksLikeFormula(s string) bool {
 	}
 	return false
 }
+
+// SpreadsheetCell is a value as it may be written into a file a
+// spreadsheet opens: one starting =, +, -, @, a tab or a return is led by
+// an apostrophe, which the spreadsheet shows as text and does not run --
+// a minus as well, since -1+cmd|... runs, unless the whole value is a
+// plain number. Stricter than an import's own test (looksLikeFormula),
+// which must take a negative amount as typed.
+func SpreadsheetCell(s string) string {
+	if s == "" {
+		return s
+	}
+	switch s[0] {
+	case '=', '+', '@', '\t', '\r':
+		return "'" + s
+	case '-':
+		if !plainNumber.MatchString(s) {
+			return "'" + s
+		}
+	}
+	return s
+}
+
+// plainNumber is a number and nothing else, with a decimal point or comma.
+var plainNumber = regexp.MustCompile(`^-?[0-9]+([.,][0-9]+)?$`)
 
 // parseScaledDecimal reads a number written the Swedish way or the English
 // way into an integer of thousandths, hundredths and so on, refusing digits

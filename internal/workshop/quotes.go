@@ -97,6 +97,9 @@ type QuoteView struct {
 	CanApprove bool
 	// Every answer to every version, oldest first.
 	Decisions []QuoteDecisionRow
+	// The job was taken back from the customer after the latest version
+	// went out, so an answer to it is not written down (ErrNotAskedYet).
+	TakenBack bool
 }
 
 // quotable is a job line that has not been agreed or declined.
@@ -219,6 +222,85 @@ func lockedState(ctx context.Context, tx pgx.Tx, jobID string) (State, error) {
 	return state, nil
 }
 
+// ErrNotAskedYet is an answer to a quote on a job that is a draft or an
+// estimate: one that was put to the customer and then taken back.
+//
+// The customer is asked when the job waits for their answer, and approving it
+// after their yes is the front desk's own move, as it is for every job. A yes
+// taken on a draft used to approve the lines and move nothing: the job still
+// read "Price the work", and the person who wrote the yes down believed it had
+// been taken (#136). Putting the quote forward now sends the job to the
+// customer (PresentQuote), so an ordinary yes always lands on a job waiting
+// for it; one that arrives after the desk took the job back is refused with
+// the way through, not kept where nothing reads it.
+var ErrNotAskedYet = fmt.Errorf("%w: the job was taken back from the customer; put the quote to them again first", ErrInvalid)
+
+// notAskedYet is a job in a state the customer is not asked in.
+func notAskedYet(s State) bool { return s == StateDraft || s == StateEstimated }
+
+// takenBackTx reports whether a job in a draft or an estimate was moved back
+// there from asking the customer after its latest quote went out: the case
+// ErrNotAskedYet is for.
+//
+// A quote put forward on a draft by the release before #136 left the job a
+// draft, and nothing took it back; the customer is still holding it, and
+// refusing their answer would strand every quote outstanding at the
+// upgrade. Only a move back from waiting for the customer, or from further
+// on, after the quote was presented, is a taking back.
+func takenBackTx(ctx context.Context, tx pgx.Tx, jobID string, state State, latest *Quote) (bool, error) {
+	if !notAskedYet(state) || latest == nil {
+		return false, nil
+	}
+	var back bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM work_order_state_changes
+		               WHERE work_order_id = $1 AND at >= $2
+		                 AND to_state IN ('draft', 'estimated')
+		                 AND from_state IS NOT NULL AND from_state NOT IN ('draft', 'estimated'))`,
+		jobID, latest.PresentedAt).Scan(&back); err != nil {
+		return false, fmt.Errorf("read whether the job was taken back: %w", err)
+	}
+	return back, nil
+}
+
+// askTx sends a draft or an estimate on to waiting for the customer's
+// answer, through the state machine, and returns the state it is in.
+func askTx(ctx context.Context, tx pgx.Tx, jobID string, state State) (State, error) {
+	for _, step := range []State{StateEstimated, StateAwaitingApproval} {
+		if notAskedYet(state) {
+			if err := setStateTx(ctx, tx, jobID, step); err != nil {
+				return state, err
+			}
+			state = step
+		}
+	}
+	return state, nil
+}
+
+// answerableTx is the latest quote, if an answer to it may be written down
+// now, with a quote from before #136 -- put to the customer while the job
+// stayed a draft -- moved on to waiting for the answer first, so that a yes
+// lands where "Mark it approved" is, as it does for one put forward today.
+func answerableTx(ctx context.Context, tx pgx.Tx, jobID string, state State) (*Quote, error) {
+	latest, err := latestQuoteTx(ctx, tx, jobID)
+	if err != nil {
+		return nil, err
+	}
+	back, err := takenBackTx(ctx, tx, jobID, state, latest)
+	if err != nil {
+		return nil, err
+	}
+	if back {
+		return nil, ErrNotAskedYet
+	}
+	if latest != nil && notAskedYet(state) {
+		if _, err := askTx(ctx, tx, jobID, state); err != nil {
+			return nil, err
+		}
+	}
+	return latest, nil
+}
+
 func settled(s State) bool {
 	switch s {
 	case StateInvoiced, StateClosed, StateCancelled, StateDeclined:
@@ -240,7 +322,7 @@ func PresentQuote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, j
 		return Quote{}, access.ErrForbidden
 	}
 	var out Quote
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		state, err := lockedState(ctx, tx, jobID)
 		if err != nil {
 			return err
@@ -254,6 +336,12 @@ func PresentQuote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, j
 		}
 		if len(pending) == 0 {
 			return fmt.Errorf("%w: there is nothing on this order that the customer has not answered", ErrInvalid)
+		}
+		// Putting the quote to the customer is asking them: a draft or an
+		// estimate goes to waiting for their answer, through the state
+		// machine, so that their yes lands where "Mark it approved" is.
+		if state, err = askTx(ctx, tx, jobID, state); err != nil {
+			return err
 		}
 		latest, err := latestQuoteTx(ctx, tx, jobID)
 		if err != nil {
@@ -315,7 +403,7 @@ func QuoteFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID
 		return QuoteView{}, access.ErrForbidden
 	}
 	var v QuoteView
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var q Quote
 		var lines, answers []byte
 		err := tx.QueryRow(ctx, `
@@ -382,6 +470,13 @@ func QuoteFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID
 				}
 			}
 			v.Latest = &q
+			var state State
+			if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1`, jobID).Scan(&state); err != nil {
+				return fmt.Errorf("read state: %w", err)
+			}
+			if v.TakenBack, err = takenBackTx(ctx, tx, jobID, state, &q); err != nil {
+				return err
+			}
 		}
 		pending, err := agreementTx(ctx, tx, jobID)
 		v.Pending = pending.lines
@@ -417,7 +512,7 @@ func RecordQuoteAnswer(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 	if a.Via != "phone" && a.Via != "counter" {
 		return fmt.Errorf("%w: say whether it was by telephone or at the counter", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		state, err := lockedState(ctx, tx, jobID)
 		if err != nil {
 			return err
@@ -425,7 +520,7 @@ func RecordQuoteAnswer(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		if settled(state) {
 			return fmt.Errorf("%w: a %s order is not quoted", ErrInvalid, state)
 		}
-		latest, err := latestQuoteTx(ctx, tx, jobID)
+		latest, err := answerableTx(ctx, tx, jobID, state)
 		if err != nil {
 			return err
 		}
@@ -475,7 +570,9 @@ func QuoteAnswerFromLink(ctx context.Context, pool *pgxpool.Pool, shopID, token,
 		if settled(state) {
 			return ErrShareNotUsable
 		}
-		latest, err := latestQuoteTx(ctx, tx, jobID)
+		// A quote put forward and then taken back to an estimate is not
+		// shown on the link; a page opened before that still posts here.
+		latest, err := answerableTx(ctx, tx, jobID, state)
 		if err != nil {
 			return err
 		}

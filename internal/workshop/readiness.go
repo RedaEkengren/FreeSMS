@@ -133,8 +133,8 @@ func setupTx(ctx context.Context, tx pgx.Tx, scope access.Scope, env ReadinessEn
 		into *int
 		q    string
 	}{
-		{&technicians, `SELECT count(*) FROM users WHERE role = 'technician' AND active`},
-		{&others, `SELECT count(*) FROM users WHERE role IN ('service_advisor', 'parts') AND active`},
+		{&technicians, `SELECT count(*) FROM users u WHERE u.active AND EXISTS (SELECT 1 FROM staff_roles r WHERE r.user_id = u.id AND r.role = 'technician')`},
+		{&others, `SELECT count(*) FROM users u WHERE u.active AND EXISTS (SELECT 1 FROM staff_roles r WHERE r.user_id = u.id AND r.role IN ('service_advisor', 'parts'))`},
 		{&rotas, `SELECT count(DISTINCT user_id) FROM rotas`},
 		{&labour, `SELECT count(*) FROM labour_times`},
 		{&bands, `SELECT count(*) FROM price_bands`},
@@ -176,6 +176,11 @@ func setupTx(ctx context.Context, tx pgx.Tx, scope access.Scope, env ReadinessEn
 	}
 
 	solo := acks["operating_model"].note == "solo"
+	// The list is Core's, and a shop with the workshop off is not asked to
+	// set up what only the workshop uses: its pages are not there (#143).
+	// This chooses what to list and refuses nothing, and ReadinessFor stays
+	// Core's.
+	workshopOn := scope.Offers(access.Workshop)
 	var tasks []ReadinessTask
 	add := func(t ReadinessTask) {
 		if a, ok := acks[t.Key]; ok && t.State == "" {
@@ -239,6 +244,12 @@ func setupTx(ctx context.Context, tx pgx.Tx, scope access.Scope, env ReadinessEn
 	staff := ReadinessTask{Key: "staff", Group: "People and time", Title: "Staff", Required: !solo, Link: "/staff",
 		Why: "A technician sees the cars and the work and never a customer's personal details. A one-person workshop does it all as the owner."}
 	switch {
+	case !workshopOn:
+		// Who is a technician is the workshop's question.
+		staff.Required = false
+		if technicians+others > 0 {
+			staff.State = "done"
+		}
 	case technicians > 0:
 		staff.State, staff.Detail = "done", []string{fmt.Sprintf("technicians|%d", technicians), fmt.Sprintf("counter and parts desk|%d", others)}
 	case solo:
@@ -270,7 +281,9 @@ func setupTx(ctx context.Context, tx pgx.Tx, scope access.Scope, env ReadinessEn
 	if labour > 0 || bands > 0 {
 		rates.State, rates.Detail = "done", []string{fmt.Sprintf("labour times|%d", labour), fmt.Sprintf("price bands|%d", bands)}
 	}
-	add(rates)
+	if workshopOn {
+		add(rates)
+	}
 	add(ReadinessTask{Key: "accountant", Group: "Money", Title: "The accountant can read the export", Required: true, Link: "/accounting",
 		Why:    "FreeSMS writes a SIE 4B file. Hand your accountant a real one and have them tell you it imported before the first month ends; this cannot be checked from here.",
 		CanSay: true, SayLabel: "My accountant has read an export", NeedNote: true})
@@ -291,7 +304,9 @@ func setupTx(ctx context.Context, tx pgx.Tx, scope access.Scope, env ReadinessEn
 	if templates > 0 || parts > 0 {
 		cat.State, cat.Detail = "done", []string{fmt.Sprintf("checklists|%d", templates), fmt.Sprintf("parts|%d", parts)}
 	}
-	add(cat)
+	if workshopOn {
+		add(cat)
+	}
 
 	// Before the first customer.
 	fc := ReadinessTask{Key: "final_check", Group: "Before the first customer", Title: "Final check before a car is ready", Required: true, Link: "/shop",
@@ -300,7 +315,9 @@ func setupTx(ctx context.Context, tx pgx.Tx, scope access.Scope, env ReadinessEn
 	if finalTemplate > 0 {
 		fc.State, fc.Detail = "done", []string{"a checklist signs the work off"}
 	}
-	add(fc)
+	if workshopOn {
+		add(fc)
+	}
 
 	msg := ReadinessTask{Key: "messaging", Group: "Before the first customer", Title: "Texts and email to customers", Required: false, Link: "/start",
 		Why: "If a provider is set up, FreeSMS can send the link to a job, a booking confirmation and an invoice. Without one you send them yourself and write down that you did."}

@@ -29,7 +29,7 @@ func addPart(t *testing.T, pool *pgxpool.Pool, number, name, unit string, costMi
 }
 
 func partsDeskScope() access.Scope {
-	return access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleParts}
+	return access.Scope{ShopID: shopID, UserID: userID, Role: access.Of(access.RoleParts), Modules: workshopOnly}
 }
 
 func onHand(t *testing.T, pool *pgxpool.Pool, partID string) workshop.Part {

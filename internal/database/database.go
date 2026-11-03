@@ -7,18 +7,40 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// StartupWait is how long Open keeps trying a database that is not up yet.
+//
+// A container started beside its database races it: the database can say it
+// is ready and then restart once more while it finishes initialising, and an
+// application that gives up on the first refused connection exits, and
+// `docker compose up --wait` gives up with it. A minute covers a first
+// initialisation on a slow disk; a database that is still not there after a
+// minute is down, and saying so is better than waiting forever.
+const StartupWait = time.Minute
 
 // Open returns a pool that has proved it can reach the database.
 //
 // It verifies rather than assuming, because pgxpool.New is lazy: it parses the
 // URL and returns, so a completely unreachable database produces a healthy
 // looking start and a failure on the first request instead.
+//
+// A database that is not up yet -- nothing listening, or Postgres saying it
+// is starting -- is tried again for up to StartupWait. Anything else, such as
+// a wrong password or a database that does not exist, fails at once: waiting
+// a minute would not change it.
 func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
+	return openWithin(ctx, url, StartupWait)
+}
+
+func openWithin(ctx context.Context, url string, wait time.Duration) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(url)
 	if err != nil {
 		return nil, fmt.Errorf("parse DATABASE_URL: %w", err)
@@ -45,11 +67,41 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("create pool: %w", err)
 	}
 
-	pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	if err := pool.Ping(pingCtx); err != nil {
-		pool.Close()
-		return nil, fmt.Errorf("reach database: %w", err)
+	deadline := time.Now().Add(wait)
+	pause := 100 * time.Millisecond
+	for {
+		pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		err := pool.Ping(pingCtx)
+		cancel()
+		if err == nil {
+			return pool, nil
+		}
+		if !notUpYet(err) || time.Now().Add(pause).After(deadline) {
+			pool.Close()
+			return nil, fmt.Errorf("reach database: %w", err)
+		}
+		select {
+		case <-ctx.Done():
+			pool.Close()
+			return nil, fmt.Errorf("reach database: %w", ctx.Err())
+		case <-time.After(pause):
+		}
+		pause = min(pause*2, 2*time.Second)
 	}
-	return pool, nil
+}
+
+// notUpYet says whether an error is a database still starting rather than
+// one that is wrongly configured.
+func notUpYet(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		// cannot_connect_now: "the database system is starting up", or
+		// shutting down during the initialisation's restart.
+		return pgErr.Code == "57P03"
+	}
+	// Nothing listening, or a name the container network does not resolve
+	// yet.
+	var opErr *net.OpError
+	var dnsErr *net.DNSError
+	return errors.As(err, &opErr) || errors.As(err, &dnsErr)
 }

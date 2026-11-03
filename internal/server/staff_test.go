@@ -65,3 +65,43 @@ func TestAnOwnerAddsATechnicianThroughThePage(t *testing.T) {
 		t.Errorf("signed out by changing the password here: %d", resp.StatusCode)
 	}
 }
+
+// A role whose module is switched off stays with the person (#145), and the
+// roles form must say so: it posts the whole set back and SetStaffRoles
+// writes what arrives. Left off the form, a salesperson's main role would
+// fall back to the first option and their buyer's role would go the next
+// time anybody ticked anything.
+func TestTheRolesFormKeepsARoleWhoseModuleIsOff(t *testing.T) {
+	ts, pool := testServer(t)
+	seedShop(t, pool, shopA, []string{
+		`INSERT INTO people (id, shop_id, display_name, email) VALUES
+		 ('aaaaaaaa-0000-0000-0000-0000000000c1','` + shopA + `','A Salesperson','sales@shop-a.test')`,
+		`INSERT INTO users (id, shop_id, person_id, role, password_hash) VALUES
+		 ('aaaaaaaa-0000-0000-0000-0000000000c2','` + shopA + `','aaaaaaaa-0000-0000-0000-0000000000c1','sales','x')`,
+		`INSERT INTO user_roles (shop_id, user_id, role) VALUES
+		 ('` + shopA + `','aaaaaaaa-0000-0000-0000-0000000000c2','buyer')`,
+	})
+	owner := signIn(t, ts, ownerEmail)
+	resp, err := owner.Get(ts.URL + "/staff")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	body := string(b)
+	start := strings.Index(body, `action="/staff/aaaaaaaa-0000-0000-0000-0000000000c2/roles"`)
+	if start < 0 {
+		t.Fatalf("no roles form for the salesperson (%d)", resp.StatusCode)
+	}
+	form := body[start:]
+	form = form[:strings.Index(form, "</form>")]
+	if !strings.Contains(form, `<option value="sales" selected>`) {
+		t.Error("the roles form does not select the salesperson's own main role")
+	}
+	if !strings.Contains(form, `name="also" value="buyer" checked`) {
+		t.Error("the roles form leaves off the buyer's role the person holds")
+	}
+	if strings.Contains(form, `value="rental_agent"`) {
+		t.Error("the roles form offers a role from a module the shop does not run and the person does not hold")
+	}
+}

@@ -185,3 +185,51 @@ func TestManyChangesAtOnceAreOneRefresh(t *testing.T) {
 		t.Errorf("a hundred rows in one transaction were %d refreshes, want 1", parts)
 	}
 }
+
+// The header's "For me" count is the same queue as /mine, so it refreshes
+// on every topic the queue listens for: a call given up or a contract
+// waiting for a signature ('actions') changes the count on every page,
+// not only on /mine and the home page.
+func TestTheHeaderCountListensForEveryTopicTheQueueDoes(t *testing.T) {
+	ts, _ := testServer(t)
+	owner := signIn(t, ts, ownerEmail)
+	page := get(t, owner, ts.URL+"/mine", http.StatusOK)
+	attr := func(name string) []string {
+		i := strings.Index(page, name+`="`)
+		if i < 0 {
+			t.Fatalf("no %s on /mine", name)
+		}
+		rest := page[i+len(name)+2:]
+		return strings.Fields(rest[:strings.IndexByte(rest, '"')])
+	}
+	header := map[string]bool{}
+	for _, topic := range attr("data-live-topics") {
+		header[topic] = true
+	}
+	for _, topic := range attr(`id="live-mine" data-live`) {
+		if !header[topic] {
+			t.Errorf("the header's count does not listen for %q, which the queue does", topic)
+		}
+	}
+}
+
+// One provider of the queue failing leaves the rest of the count, and the
+// person's chime with it: the count says it is not all, and the sound they
+// asked for still plays for what did load.
+func TestACountWithAProviderFailingKeepsItsChime(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := signIn(t, ts, ownerEmail)
+	if status := postStatus(t, owner, ts.URL+"/account/alert", url.Values{"on": {"yes"}}); status != http.StatusSeeOther {
+		t.Fatalf("turning the sound on answered %d", status)
+	}
+	if _, err := pool.Exec(context.Background(), `ALTER TABLE payment_flow_checks RENAME TO payment_flow_checks_gone`); err != nil {
+		t.Fatal(err)
+	}
+	count := get(t, owner, ts.URL+"/mine/count", http.StatusOK)
+	if !strings.Contains(count, "data-sound") {
+		t.Errorf("a failing provider turned the chime off:\n%s", count)
+	}
+	if !strings.Contains(count, "data-incomplete") {
+		t.Errorf("the count does not say it is not all:\n%s", count)
+	}
+}

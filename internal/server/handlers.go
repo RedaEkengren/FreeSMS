@@ -74,7 +74,9 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
-func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
+// renderJobs is the list of open jobs: the home page of whoever works in
+// the workshop away from the counter, with the home page's cards above it.
+func (s *Server) renderJobs(w http.ResponseWriter, r *http.Request, home *workshop.Home) {
 	session := sessionFrom(r.Context())
 	jobs, err := workshop.OpenJobs(r.Context(), s.pool, session.Scope)
 	if err != nil {
@@ -85,6 +87,7 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 		Title:   "In the shop",
 		Session: session,
 		Jobs:    jobs,
+		Home:    home,
 	})
 }
 
@@ -131,6 +134,18 @@ func (s *Server) handleCustomerStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleServiceGone is what a customer's link answers when the module it
+// belongs to has been switched off: the same for every link and every
+// token, so it says nothing about whether this one was ever valid, and
+// offers nothing to press.
+func (s *Server) handleServiceGone(w http.ResponseWriter, r *http.Request) {
+	s.render(w, r, http.StatusGone, "status", pageData{
+		Locale: s.shopLocale(r),
+		Title:  "This service is no longer available",
+		Error:  "Please contact the shop.",
+	})
+}
+
 // handleCustomerQuote is the customer's own yes or no to a quote. Bound to the
 // version they were shown: an answer to one that has since been replaced is
 // not taken for the newer, and they are sent to look at it.
@@ -143,6 +158,12 @@ func (s *Server) handleCustomerQuote(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/k/"+token, http.StatusSeeOther)
 	case errors.Is(err, workshop.ErrQuoteSuperseded):
 		http.Redirect(w, r, "/k/"+token+"?changed=1", http.StatusSeeOther)
+	case errors.Is(err, workshop.ErrNotAskedYet):
+		s.render(w, r, http.StatusConflict, "status", pageData{
+			Locale: s.shopLocale(r),
+			Title:  "The workshop is still working on the quote",
+			Error:  "You can answer it once the workshop has finished it.",
+		})
 	case errors.Is(err, workshop.ErrShareNotUsable), errors.Is(err, workshop.ErrNotFound):
 		s.render(w, r, http.StatusNotFound, "status", pageData{
 			Locale: s.shopLocale(r),
@@ -301,6 +322,15 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 		}
 	}
 
+	// The shop's ways of taking money in person, for a job paid as it is
+	// invoiced (#156): the counter says which.
+	var counterFlows []workshop.CounterFlow
+	if session.Scope.Role.SeesCustomerPersonalData() {
+		if counterFlows, err = workshop.CounterPaymentFlows(r.Context(), s.pool, session.Scope); err != nil {
+			s.log.Error("read payment flows", "error", err)
+		}
+	}
+
 	// Telling the customer from here: what there is to tell, how, and what
 	// was sent. The counter's.
 	var messages []workshop.OutboundMessage
@@ -347,12 +377,15 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 	var invoices []workshop.Invoice
 	var contact workshop.Contact
 	var surcharges []workshop.SurchargeLine
-	if session.Scope.Role.SeesCustomerPersonalData() {
-		// What the invoice would add, shown with the total so the figure
-		// read out on the telephone is the one the invoice prints.
+	// What the invoice would add, shown with the total so the figure read
+	// out on the telephone is the one the invoice prints -- to whoever is
+	// shown the total, a technician the prices are opened for included.
+	if session.Scope.SeesOnJob(access.FieldLinePrices) {
 		if surcharges, err = workshop.PreviewSurcharges(r.Context(), s.pool, session.Scope, id); err != nil {
 			s.log.Error("preview surcharges", "error", err)
 		}
+	}
+	if session.Scope.Role.SeesCustomerPersonalData() {
 		invoices, err = workshop.InvoicesFor(r.Context(), s.pool, session.Scope, id)
 		if err != nil {
 			s.log.Error("read invoices", "error", err)
@@ -362,6 +395,15 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 		contact, err = workshop.ContactFor(r.Context(), s.pool, session.Scope, id)
 		if err != nil {
 			s.log.Error("read contact", "error", err)
+		}
+	}
+
+	// What the shop has opened for a technician (#225): nothing read when
+	// nothing is.
+	var techJob workshop.TechnicianJob
+	if session.Scope.OpenedForTechnician() {
+		if techJob, err = workshop.TechnicianJobFor(r.Context(), s.pool, session.Scope, id); err != nil {
+			s.log.Error("read what is opened for the technician", "error", err)
 		}
 	}
 
@@ -380,39 +422,41 @@ func (s *Server) readJob(r *http.Request, linkURL string) (pageData, error) {
 	})
 
 	return pageData{
-		Title:       "Job",
-		Session:     session,
-		Step:        step,
-		Job:         job,
-		Progress:    progress,
-		Lines:       lines,
-		Next:        next,
-		FinalCheck:  finalCheck,
-		Totals:      workshop.TotalsWith(lines, surcharges),
-		Surcharges:  surcharges,
-		Invoices:    invoices,
-		Contact:     contact,
-		Requests:    requests,
-		Findings:    findings,
-		Tasks:       tasks,
-		TaskCounts:  taskCounts,
-		Answers:     answers,
-		Quote:       quote,
-		Presence:    presence,
-		JobPlan:     jobPlan,
-		PlanTechs:   planTechs,
-		JobParts:    jobParts,
-		Contacts:    contacts,
-		ShareURL:    linkURL,
-		Inspections: inspections,
-		Templates:   templates,
-		Suggestions: suggestions,
-		Parts:       stocked,
-		LabourRate:  labourRate,
-		Messages:    messages,
-		Tell:        tell,
-		CanText:     s.sms != nil,
-		CanEmail:    s.email != nil,
+		Title:        "Job",
+		CounterFlows: counterFlows,
+		Session:      session,
+		Step:         step,
+		Job:          job,
+		Progress:     progress,
+		Lines:        lines,
+		Next:         next,
+		FinalCheck:   finalCheck,
+		Totals:       workshop.TotalsWith(lines, surcharges),
+		Surcharges:   surcharges,
+		Invoices:     invoices,
+		Contact:      contact,
+		Requests:     requests,
+		Findings:     findings,
+		Tasks:        tasks,
+		TaskCounts:   taskCounts,
+		Answers:      answers,
+		Quote:        quote,
+		Presence:     presence,
+		JobPlan:      jobPlan,
+		PlanTechs:    planTechs,
+		JobParts:     jobParts,
+		Contacts:     contacts,
+		ShareURL:     linkURL,
+		Inspections:  inspections,
+		Templates:    templates,
+		Suggestions:  suggestions,
+		Parts:        stocked,
+		LabourRate:   labourRate,
+		TechJob:      techJob,
+		Messages:     messages,
+		Tell:         tell,
+		CanText:      s.sms != nil,
+		CanEmail:     s.email != nil,
 	}, nil
 }
 
@@ -465,9 +509,14 @@ func (s *Server) handleClock(in bool) http.HandlerFunc {
 // A technician seeing "invoiced" would be reading somebody else's job, and a
 // button they cannot press is a button that teaches them to ignore the row it
 // sits in.
-func stateChoices(role access.Role, from workshop.State, hasWork bool) []workshop.State {
-	if role.SeesCustomerPersonalData() {
-		return workshop.AvailableStates(from, hasWork)
+//
+// The moves offered are those any role the person holds may make.
+func stateChoices(role access.Roles, from workshop.State, hasWork bool) []workshop.State {
+	var out []workshop.State
+	for _, to := range workshop.AvailableStates(from, hasWork) {
+		if workshop.MayTransition(role, from, to) {
+			out = append(out, to)
+		}
 	}
-	return workshop.TechnicianStates(from, hasWork)
+	return out
 }

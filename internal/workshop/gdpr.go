@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
@@ -49,9 +50,56 @@ type PersonExport struct {
 	Employment *ExportedEmployment `json:"employment,omitempty"`
 	// What was corrected on their records, and when.
 	Corrections []ExportedCorrection `json:"corrections,omitempty"`
+	// What they have been to the business -- customer, seller, buyer,
+	// renter -- and for how long (#148).
+	Roles []ExportedPartyRole `json:"roles,omitempty"`
+	// Contracts naming them (#150), as they were produced.
+	Contracts []ExportedContract `json:"contracts,omitempty"`
+	// Cars they asked about (#172) and drove (#173).
+	Leads      []ExportedLead      `json:"leads,omitempty"`
+	TestDrives []ExportedTestDrive `json:"test_drives,omitempty"`
 
 	// Written out rather than left for somebody to infer.
 	Notes []string `json:"notes"`
+}
+
+type ExportedContract struct {
+	Kind      string     `json:"kind"`
+	Title     string     `json:"title"`
+	Text      string     `json:"text,omitempty"`
+	Made      time.Time  `json:"made"`
+	ErasedAt  *time.Time `json:"erased_at,omitempty"`
+	Signed    bool       `json:"signed_by_you"`
+	KeptUntil time.Time  `json:"kept_until"`
+}
+
+type ExportedLead struct {
+	Asked    time.Time `json:"asked"`
+	Channel  string    `json:"channel"`
+	Car      string    `json:"car,omitempty"`
+	Wishes   string    `json:"wishes,omitempty"`
+	Name     string    `json:"name,omitempty"`
+	Phone    string    `json:"phone,omitempty"`
+	Email    string    `json:"email,omitempty"`
+	Status   string    `json:"status"`
+	Contacts []string  `json:"contacts,omitempty"`
+}
+
+type ExportedTestDrive struct {
+	Car         string     `json:"car"`
+	From        time.Time  `json:"from"`
+	To          time.Time  `json:"to"`
+	Area        string     `json:"area,omitempty"`
+	Categories  []string   `json:"licence_categories,omitempty"`
+	ValidUntil  *time.Time `json:"licence_valid_until,omitempty"`
+	LicenceNote string     `json:"licence_note,omitempty"`
+	Notes       []string   `json:"notes,omitempty"`
+}
+
+type ExportedPartyRole struct {
+	Role string     `json:"role"`
+	From time.Time  `json:"from"`
+	To   *time.Time `json:"to,omitempty"`
 }
 
 type ExportedCorrection struct {
@@ -98,7 +146,9 @@ type ExportedInvoice struct {
 }
 
 type ExportedEmployment struct {
-	Role          string     `json:"role"`
+	Role string `json:"role"`
+	// Any other roles they hold besides their main one (#145).
+	OtherRoles    []string   `json:"other_roles,omitempty"`
 	Active        bool       `json:"active"`
 	HoursClocked  float64    `json:"hours_clocked"`
 	Since         time.Time  `json:"since"`
@@ -141,7 +191,11 @@ func ExportPerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 			SELECT coalesce(address_line1,''), coalesce(address_line2,''),
 			       coalesce(postal_code,''), coalesce(city,''), coalesce(country,''),
 			       coalesce(endpoint_id,''), coalesce(buyer_reference,'')
-			FROM customers WHERE person_id = $1`, personID)
+			FROM customers WHERE person_id = $1
+			UNION ALL
+			SELECT coalesce(address_line1,''), coalesce(address_line2,''),
+			       coalesce(postal_code,''), coalesce(city,''), coalesce(country,''), '', ''
+			FROM parties WHERE person_id = $1`, personID)
 		if err != nil {
 			return fmt.Errorf("read addresses: %w", err)
 		}
@@ -206,9 +260,13 @@ func ExportPerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 		invoices, err := tx.Query(ctx, `
 			SELECT i.series, i.number, i.issued_at, i.gross_minor
 			FROM invoices i
-			JOIN work_orders w ON w.id = i.work_order_id
-			JOIN customers c   ON c.id = w.customer_id
-			WHERE c.person_id = $1
+			LEFT JOIN work_orders w ON w.id = i.work_order_id
+			-- The job's customer, or the invoice's own when it is not a
+			-- job's (#146) -- that one, or the one it has been merged into,
+			-- since the invoice keeps the customer it was issued to.
+			WHERE EXISTS (SELECT 1 FROM customers c
+			              WHERE c.id IN (coalesce(i.customer_id, w.customer_id), customer_now(coalesce(i.customer_id, w.customer_id)))
+			                AND c.person_id = $1)
 			ORDER BY i.issued_at`, personID)
 		if err != nil {
 			return fmt.Errorf("read invoices: %w", err)
@@ -230,6 +288,58 @@ func ExportPerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 			})
 		}
 		invoices.Close()
+
+		// Their parties: as a customer, or on their own -- and any merged
+		// into one of those, whose roles are theirs as well.
+		roles, err := tx.Query(ctx, `
+			WITH theirs AS (
+			  SELECT pa.id FROM parties pa LEFT JOIN customers c ON c.id = pa.customer_id
+			  WHERE pa.person_id = $1 OR c.person_id = $1)
+			SELECT r.role, r.valid_from, r.valid_to FROM party_roles r
+			WHERE r.party_id IN (SELECT id FROM theirs) OR party_now(r.party_id) IN (SELECT id FROM theirs)
+			ORDER BY r.valid_from, r.id`, personID)
+		if err != nil {
+			return fmt.Errorf("read roles: %w", err)
+		}
+		for roles.Next() {
+			var r ExportedPartyRole
+			if err := roles.Scan(&r.Role, &r.From, &r.To); err != nil {
+				roles.Close()
+				return err
+			}
+			e.Roles = append(e.Roles, r)
+		}
+		roles.Close()
+
+		// The cars they asked about and drove.
+		if err := exportLeadsAndDrivesTx(ctx, tx, personID, &e); err != nil {
+			return err
+		}
+
+		years, err := retentionTx(ctx, tx)
+		if err != nil {
+			return err
+		}
+		docs, err := tx.Query(ctx, `
+			SELECT r.kind, r.title, coalesce(r.body, ''), r.created_at, r.erased_at,
+			       bool_or(EXISTS (SELECT 1 FROM document_signatures s WHERE s.document_party_id = dp.id))
+			FROM document_records r JOIN document_record_parties dp ON dp.document_id = r.id
+			JOIN parties pa ON pa.id = dp.party_id LEFT JOIN customers c ON c.id = pa.customer_id
+			WHERE pa.person_id = $1 OR c.person_id = $1
+			GROUP BY r.id ORDER BY r.created_at, r.id`, personID)
+		if err != nil {
+			return fmt.Errorf("read contracts: %w", err)
+		}
+		for docs.Next() {
+			var c ExportedContract
+			if err := docs.Scan(&c.Kind, &c.Title, &c.Text, &c.Made, &c.ErasedAt, &c.Signed); err != nil {
+				docs.Close()
+				return err
+			}
+			c.KeptUntil = c.Made.AddDate(years[c.Kind], 0, 0)
+			e.Contracts = append(e.Contracts, c)
+		}
+		docs.Close()
 
 		fixes, err := tx.Query(ctx, `
 			SELECT field, coalesce(old_value, ''), coalesce(new_value, ''), at
@@ -254,9 +364,10 @@ func ExportPerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 		err = tx.QueryRow(ctx, `
 			SELECT u.role, u.active, u.created_at, u.deactivated_at,
 			       coalesce((SELECT sum(extract(epoch from (t.ended_at - t.started_at)) / 3600)
-			                 FROM time_entries t WHERE t.user_id = u.id AND t.ended_at IS NOT NULL), 0)
+			                 FROM time_entries t WHERE t.user_id = u.id AND t.ended_at IS NOT NULL), 0),
+			       ARRAY(SELECT r.role FROM user_roles r WHERE r.user_id = u.id AND r.role <> u.role ORDER BY r.role)
 			FROM users u WHERE u.person_id = $1`, personID).Scan(
-			&emp.Role, &emp.Active, &emp.Since, &emp.DeactivatedAt, &emp.HoursClocked)
+			&emp.Role, &emp.Active, &emp.Since, &emp.DeactivatedAt, &emp.HoursClocked, &emp.OtherRoles)
 		if err == nil {
 			e.Employment = &emp
 		} else if err != pgx.ErrNoRows {
@@ -295,7 +406,10 @@ func MarshalExport(e PersonExport) ([]byte, error) {
 // cleared and what was kept is written down, because anonymising is not
 // deleting and a shop asked "did you action my request" needs an answer better
 // than a row that now says nothing.
-func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, personID, reason string) error {
+//
+// files removes what is stored for them: the scans of contracts past their
+// retention, after the transaction has committed, as DeleteAttachment does.
+func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, files PhotoRemover, personID, reason string) error {
 	if !scope.Role.SeesCustomerPersonalData() {
 		return access.ErrForbidden
 	}
@@ -303,7 +417,8 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 		return ErrNotFound
 	}
 
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	var scans []string
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var alreadyErased *time.Time
 		if err := tx.QueryRow(ctx, `SELECT erased_at FROM people WHERE id = $1`, personID).
 			Scan(&alreadyErased); err != nil {
@@ -326,6 +441,13 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 			return fmt.Errorf("check for an account: %w", err)
 		}
 
+		// Their leads and test drives (#172, #173), found by their party and
+		// by the number and email they gave, before those are cleared.
+		leadsErased, drivesErased, err := eraseLeadsAndDrivesTx(ctx, tx, personID)
+		if err != nil {
+			return err
+		}
+
 		if _, err := tx.Exec(ctx, `
 			UPDATE people SET display_name = $2, email = NULL, phone = NULL,
 			                  erased_at = now(), updated_at = now()
@@ -338,6 +460,15 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 			                     endpoint_id = NULL, buyer_reference = NULL, updated_at = now()
 			WHERE person_id = $1`, personID); err != nil {
 			return fmt.Errorf("clear addresses: %w", err)
+		}
+		// A party that is no customer -- a private seller, a renter -- keeps
+		// its address on itself (#148). Its roles stay: that somebody sold
+		// the dealer a car on a date is part of the purchase's record.
+		if _, err := tx.Exec(ctx, `
+			UPDATE parties SET address_line1 = NULL, address_line2 = NULL,
+			                   postal_code = NULL, city = NULL, country = NULL, revision = revision + 1
+			WHERE person_id = $1`, personID); err != nil {
+			return fmt.Errorf("clear party addresses: %w", err)
 		}
 
 		// What they were before a correction is theirs too. The row stays and
@@ -359,8 +490,9 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 		// Who a document was meant for, where it was sent to somebody by name.
 		if _, err := tx.Exec(ctx, `
 			UPDATE invoice_deliveries SET recipient_name = $2
-			WHERE invoice_id IN (SELECT i.id FROM invoices i JOIN work_orders w ON w.id = i.work_order_id
-			                     JOIN customers c ON c.id = w.customer_id WHERE c.person_id = $1)`, personID, ErasedName); err != nil {
+			WHERE invoice_id IN (SELECT i.id FROM invoices i LEFT JOIN work_orders w ON w.id = i.work_order_id
+			                     JOIN customers c ON c.id IN (coalesce(i.customer_id, w.customer_id), customer_now(coalesce(i.customer_id, w.customer_id)))
+			                     WHERE c.person_id = $1)`, personID, ErasedName); err != nil {
 			return fmt.Errorf("clear the delivery log: %w", err)
 		}
 
@@ -379,14 +511,71 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, pe
 			"The technical history of vehicles, which belongs to the vehicle rather than to a person. " +
 			"Clocked hours, where the person was an employee, because they support payroll records."
 
+		// Their identity records (#153): a value the law has the shop keep
+		// stays until its expiry; the rest go now. That a check was made
+		// stays either way.
+		idRemoved, idKept, err := eraseIdentityTx(ctx, tx, personID)
+		if err != nil {
+			return err
+		}
+
+		// Calls about them not yet made: not made (#154).
+		if err := cancelPersonOutboxTx(ctx, tx, scope, personID); err != nil {
+			return err
+		}
+
+		// Why things were done about them, which can say who they are; that
+		// they were done stays (#151).
+		if err := eraseAuditReasonsTx(ctx, tx, personID); err != nil {
+			return err
+		}
+
+		// Contracts naming them (#150): blanked past their kind's retention,
+		// kept within it, and the record says which.
+		blanked, keptDocs, docScans, err := eraseDocumentsTx(ctx, tx, personID)
+		if err != nil {
+			return err
+		}
+		scans = docScans
+		clearedNow, keptNow := cleared, kept
+		if blanked > 0 {
+			clearedNow += fmt.Sprintf(" What %d contracts past their retention said, their naming of them and the scans of signed copies; that they existed, their hash and their signatures stay.", blanked)
+		}
+		if leadsErased > 0 {
+			clearedNow += fmt.Sprintf(" What %d enquiries about cars said about them; that they asked stays.", leadsErased)
+		}
+		if drivesErased > 0 {
+			clearedNow += fmt.Sprintf(" What was noted on %d test drives they took; that they drove and their licence was checked stays.", drivesErased)
+		}
+		if idRemoved > 0 {
+			clearedNow += fmt.Sprintf(" %d identity values held for a purpose that allowed it; that the checks were made stays.", idRemoved)
+		}
+		if idKept > 0 {
+			keptNow += fmt.Sprintf(" %d identity values a law has the shop keep for their purpose, until they expire.", idKept)
+		}
+		if keptDocs > 0 {
+			keptNow += fmt.Sprintf(" %d contracts still within the retention set for their kind, which they support.", keptDocs)
+		}
+
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO erasures (shop_id, person_id, erased_by, cleared, kept, reason)
 			VALUES ($1, $2, $3, $4, $5, nullif($6, ''))`,
-			scope.ShopID, personID, scope.UserID, cleared, kept, strings.TrimSpace(reason)); err != nil {
+			scope.ShopID, personID, scope.UserID, clearedNow, keptNow, strings.TrimSpace(reason)); err != nil {
 			return fmt.Errorf("record the erasure: %w", err)
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	// After the commit, as DeleteAttachment: the worst case is a file
+	// nobody references, never a row pointing at a file that is gone.
+	for _, k := range scans {
+		if err := files.Remove(k); err != nil {
+			return fmt.Errorf("remove the scan: %w", err)
+		}
+	}
+	return nil
 }
 
 // Erasure is a record that somebody was erased.
@@ -443,22 +632,53 @@ type PhotoRemover interface {
 // workshop catches what it was not aimed at -- another customer's plate, a
 // colleague, paperwork on a bench -- so the file is the personal data and it
 // has to go with the record of it.
-func DeleteAttachment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, photos PhotoRemover, attachmentID string) error {
+//
+// reason is why, and is required for a protocol's photograph: the protocol
+// is evidence, and what it lost is recorded on it (Protocol.Removals).
+func DeleteAttachment(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, photos PhotoRemover, attachmentID, reason string) error {
 	if !scope.Role.SeesCustomerPersonalData() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(attachmentID) {
 		return ErrNotFound
 	}
+	reason = strings.TrimSpace(reason)
+	if utf8.RuneCountInString(reason) > 300 {
+		return fmt.Errorf("%w: the reason is longer than 300 characters", ErrInvalid)
+	}
 
 	var key string
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		err := tx.QueryRow(ctx,
+		// A photograph on a protocol -- a purchase, a check-out, a check-in,
+		// a delivery -- is part of evidence that is frozen once finished.
+		// It can still go, because it is personal data, but the protocol
+		// keeps a record that it had one: when, by whom, and why (0067).
+		var inspectionID, itemID string
+		err := tx.QueryRow(ctx, `
+			SELECT it.inspection_id::text, it.id::text
+			FROM attachments a JOIN inspection_items it ON it.id = a.inspection_item_id
+			JOIN inspections i ON i.id = it.inspection_id
+			WHERE a.id = $1 AND i.subject <> 'work_order'`, attachmentID).Scan(&inspectionID, &itemID)
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+		case err != nil:
+			return fmt.Errorf("read the attachment's protocol: %w", err)
+		case reason == "":
+			return fmt.Errorf("%w: say why the photograph is removed; the protocol keeps that it was", ErrInvalid)
+		default:
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO protocol_photo_removals (shop_id, inspection_id, inspection_item_id, attachment_id, removed_by, reason)
+				VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid, $6)`,
+				scope.ShopID, inspectionID, itemID, attachmentID, scope.UserID, reason); err != nil {
+				return fmt.Errorf("record the removal: %w", err)
+			}
+		}
+		err = tx.QueryRow(ctx,
 			`DELETE FROM attachments WHERE id = $1 RETURNING storage_key`, attachmentID).Scan(&key)
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
-		return err
+		return finished(err)
 	})
 	if err != nil {
 		return err
@@ -494,11 +714,18 @@ type SweepResult struct {
 	Shares         int64
 	JobLinks       int64
 	ImportPreviews int64
+	// Identity values past their expiry, removed; the records stay (#153).
+	IdentityValues int64
+	// Vehicle lookups past their year, deleted (#155).
+	VehicleLookups int64
+	// Leads that never became a deal, the person erased from them (#172).
+	Leads int64
 }
 
 // Empty reports whether there was nothing to do.
 func (s SweepResult) Empty() bool {
-	return s.LoginAttempts == 0 && s.Shares == 0 && s.JobLinks == 0 && s.ImportPreviews == 0
+	return s.LoginAttempts == 0 && s.Shares == 0 && s.JobLinks == 0 && s.ImportPreviews == 0 && s.IdentityValues == 0 && s.VehicleLookups == 0 &&
+		s.Leads == 0
 }
 
 // Sweep applies the retention policy.
@@ -536,6 +763,30 @@ func Sweep(ctx context.Context, pool *pgxpool.Pool, shopID string) (SweepResult,
 		// a record. Keeping them is keeping a log of what somebody was typing.
 		// A file somebody uploaded and never applied holds what the file
 		// said, personal data among it. A week is time to come back to it.
+		// An identity value is held for its purpose's time and not a day
+		// longer; that a check was made stays.
+		step("identity values", func(ctx context.Context, tx pgx.Tx) error {
+			n, err := sweepIdentityTx(ctx, tx)
+			r.IdentityValues = n
+			return err
+		}),
+
+		// Who looked which registration up, and why, is kept a year.
+		step("vehicle lookups", func(ctx context.Context, tx pgx.Tx) error {
+			tag, err := tx.Exec(ctx, `DELETE FROM vehicle_lookups WHERE looked_up_at < now() - $1::interval`,
+				seconds(vehicleLookupRetention))
+			r.VehicleLookups = tag.RowsAffected()
+			return err
+		}),
+
+		// A lead that never became a deal keeps the person for the shop's
+		// period after it last moved; its figures stay.
+		step("leads", func(ctx context.Context, tx pgx.Tx) error {
+			n, err := sweepLeadsTx(ctx, tx)
+			r.Leads = n
+			return err
+		}),
+
 		step("import previews", func(ctx context.Context, tx pgx.Tx) error {
 			n, err := expireImportsTx(ctx, tx, importPreviewRetention)
 			r.ImportPreviews = n

@@ -31,7 +31,8 @@ ENV PATH=/usr/local/go/bin:$PATH
 DOCKERFILE
 
 for _ in $(seq 30); do
-    docker exec "$DB" pg_isready -U freesms -d freesms_test >/dev/null 2>&1 && break
+    # Over TCP: the init server answers on the socket only, then restarts.
+    docker exec "$DB" pg_isready -h 127.0.0.1 -U freesms -d freesms_test >/dev/null 2>&1 && break
     sleep 1
 done
 

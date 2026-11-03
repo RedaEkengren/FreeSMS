@@ -1,0 +1,52 @@
+{{define "content"}}
+{{$f := .Rental.RegisterForm}}
+<h1>{{.T "Rental register"}}</h1>
+<p class="waiting">{{.T "Who had which unit when, as the authority that granted the permit, or the police, may ask to see it. Every read is recorded with who read it, when and why."}}</p>
+
+<form method="post" action="/rental/register">
+  <label><span>{{.T "Why it is read"}}</span><input name="purpose" maxlength="300" value="{{$f.Purpose}}" required></label>
+  <h2>{{.T "Over a period"}}</h2>
+  <div class="pair">
+    <label><span>{{.T "From"}}</span><input type="date" name="from" value="{{$f.From}}"></label>
+    <label><span>{{.T "To"}}</span><input type="date" name="to" value="{{$f.To}}"></label>
+  </div>
+  <div class="pair">
+    {{if .Rental.Units}}<label><span>{{.T "Unit"}}</span><select name="unit"><option value="">{{.T "Every unit"}}</option>{{range .Rental.Units}}<option value="{{.ID}}"{{if eq .ID $f.Unit}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>{{end}}
+    <label><span>{{.T "Registration"}}</span><input name="registration" maxlength="20" value="{{$f.Registration}}"></label>
+  </div>
+  <h2>{{.T "Who had a registration at a moment"}}</h2>
+  <div class="pair">
+    <label><span>{{.T "Registration"}}</span><input name="who_registration" maxlength="20" value="{{$f.WhoRegistration}}"></label>
+    <label><span>{{.T "At"}}</span><input type="datetime-local" name="who_at" value="{{$f.WhoAt}}"></label>
+  </div>
+  <button type="submit">{{.T "Read the register"}}</button>
+  <button type="submit" class="secondary" formaction="/rental/register.csv">{{.T "Download as CSV"}}</button>
+</form>
+
+{{if .Rental.RegisterAsked}}
+{{if or $f.WhoRegistration $f.WhoAt}}
+<h2>{{.T "Who had %s" $f.WhoRegistration}}</h2>
+{{with .Rental.Who}}<p>{{.Reference}} &middot; {{.Unit}} &middot; {{.Renter}}</p>{{else}}<p>{{.T "Nobody had it out then."}}</p>{{end}}
+{{end}}
+{{if or $f.From $f.To}}
+<h2>{{.T "Rentals"}}</h2>
+{{if .Rental.Register}}
+<ul class="lines">
+  {{range .Rental.Register}}
+  <li>
+    <div class="row"><span><a href="/rental/bookings/{{.BookingID}}">{{.Reference}}</a> &middot; {{.Unit}}{{with .Registration}} &middot; {{.}}{{end}} &middot; {{.Renter}}</span>
+      <span class="tag{{if .Open}} late{{end}}">{{if .Open}}{{$.T "out now"}}{{else}}{{$.T ($.Rental.StateLabel .State)}}{{end}}</span></div>
+    <div class="waiting">{{$.T "Booked %s – %s" ($.Date ($.Local .Starts) "2 Jan 2006 15:04") ($.Date ($.Local .Ends) "2 Jan 2006 15:04")}}</div>
+    {{if .Out}}<div class="waiting">{{$.T "Out %s" ($.Date ($.Local .Out) "2 Jan 2006 15:04")}}{{if .In}} &middot; {{$.T "back %s" ($.Date ($.Local .In) "2 Jan 2006 15:04")}}{{end}}</div>{{end}}
+    {{range .Drivers}}<div class="waiting">{{.Name}}{{if .Main}} &middot; {{$.T "main driver"}}{{end}}{{if .Removed}} &middot; {{$.T "taken off"}}{{end}}
+      &middot; {{with .Check}}{{if .Passed}}{{$.T "licence checked"}}{{else}}{{$.T "licence check failed"}}{{end}} {{$.Date ($.Local .CheckedAt) "2 Jan 2006"}}{{else}}{{$.T "licence not checked"}}{{end}}</div>{{end}}
+    {{if .AgreementID}}<div class="waiting"><a href="/contracts/{{.AgreementID}}">{{.AgreementTitle}}</a></div>{{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p>{{.T "No rentals in that period."}}</p>
+{{end}}
+{{end}}
+{{end}}
+{{end}}

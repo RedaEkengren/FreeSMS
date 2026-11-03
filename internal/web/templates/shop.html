@@ -2,6 +2,8 @@
 <h1>{{.T "The workshop"}}</h1>
 <p class="waiting">{{.T "What goes at the top of an invoice. Changing it changes the next invoice and nothing that has already been sent: an issued document carries its own copy."}}</p>
 <p><a href="/checklists">{{.T "Inspection checklists"}}</a></p>
+{{if .Session.Scope.Role.RunsTheShop}}<p><a href="/outbox">{{.T "Calls to other services"}}</a></p>{{end}}
+{{if .Session.Scope.Role.RunsTheShop}}<p><a href="/payment-flows">{{.T "Money taken in person"}}</a>{{if .Runs "workshop"}} &middot; <a href="/technicians">{{.T "What technicians see"}}</a>{{end}}</p>{{end}}
 
 <form method="post" action="/shop" data-keep="shop-details">
   <label>
@@ -51,6 +53,10 @@
       </select></label>
     <label><span>{{.T "Electronic invoice address"}}</span><input name="endpoint_id" value="{{.Shop.EndpointID}}" placeholder="0007:5566778899"></label>
   </div>
+  {{if .GiroUnread}}<p class="error" role="alert">{{.T "The payment details do not read as a bankgiro or plusgiro number, so invoices get no bankgiro or plusgiro code to pay with and cannot be sent electronically. Write the number on its own, such as Bankgiro 123-4567."}}</p>{{end}}
+  {{/* The code on every invoice (#234): Swish with a number here; otherwise
+       a bankgiro or plusgiro code when the payment details are one. */}}
+  <label><span>{{.T "Swish number for invoices"}}</span><input name="swish_number" value="{{.Shop.SwishNumber}}" inputmode="numeric" maxlength="13" placeholder="123 456 78 90"></label>
 
   <label class="tick">
     <input type="checkbox" name="f_tax" value="yes" {{if .Shop.FTax}}checked{{end}}>
@@ -68,6 +74,7 @@
   <button type="submit">{{.T "Save"}}</button>
 </form>
 
+{{if .Runs "workshop"}}
 <h2>{{.T "Final check"}}</h2>
 {{/* Whether a car can be ready without its work being checked. Off unless
      the shop chooses a checklist. */}}
@@ -95,6 +102,49 @@
     <input name="invoice_fee" value="{{fmt .Charges.InvoiceFeeMinor}}" inputmode="decimal"></label>
   <button type="submit" class="secondary">{{.T "Save"}}</button>
 </form>
+{{end}}
+
+<h2 id="modules">{{.T "What the shop runs"}}</h2>
+<p class="waiting">{{.T "Customers, vehicles, invoices and payments are always there. A module that is switched off keeps what it recorded -- its invoices and its history stay readable -- and nothing new can be added to it."}}</p>
+{{with .ModuleOpen}}
+<div class="error" role="alert">
+  <p>{{$.T "Still open in %s:" ($.T .Module.Label)}}</p>
+  <ul>
+    {{range .Items}}<li><a href="{{.Link}}">{{if eq .Kind "job"}}{{$.T "Job #%d" .Number}}{{else if eq .Kind "clock"}}{{$.T "Clocked on to job #%d" .Number}}{{else if eq .Kind "deal"}}{{$.T "Deal #%d" .Number}}{{else if eq .Kind "reserved"}}{{$.T "Reserved car"}}{{else if eq .Kind "lead"}}{{$.T "Open lead"}}{{else if eq .Kind "test_drive"}}{{$.T "Test drive %s" ($.Date ($.Local .At) "Mon 2 Jan 15:04")}}{{else}}{{$.T "Booking %s" ($.Date ($.Local .At) "Mon 2 Jan 15:04")}}{{end}}</a> {{$.Dot .Registration .What}}</li>{{end}}
+  </ul>
+  <p>{{$.T "Switched off, these stay as they are, and nobody can carry on with them until it is switched on again."}}</p>
+</div>
+{{end}}
+<ul class="plain">
+  {{range .Modules}}
+  <li>
+    <form method="post" action="/shop/modules" class="row">
+      <input type="hidden" name="module" value="{{.Module}}">
+      <span><strong>{{$.T .Module.Label}}</strong>
+        {{if .On}}{{with .Since}}{{$.T "on since %s" ($.Date ($.Local .) "2 Jan 2006")}}{{end}}{{else}}{{$.T "switched off"}}{{end}}</span>
+      <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="500"{{if and $.ModuleOpen (eq $.ModuleOpen.Module .Module)}} value="{{$.ModuleReason}}"{{end}}></label>
+      {{if .On}}
+        {{if and $.ModuleOpen (eq $.ModuleOpen.Module .Module)}}
+        <label class="tick"><input type="checkbox" name="confirm" value="yes" required>
+          <span>{{$.T "I have seen what is open and want to switch it off"}}</span></label>
+        {{end}}
+        <input type="hidden" name="on" value="no">
+        <button type="submit" class="secondary">{{$.T "Switch off"}}</button>
+      {{else}}
+        <input type="hidden" name="on" value="yes">
+        <button type="submit">{{$.T "Switch on"}}</button>
+      {{end}}
+    </form>
+  </li>
+  {{end}}
+</ul>
+{{with .ModuleChanges}}
+<h3>{{$.T "Changes"}}</h3>
+<ul class="plain">
+  {{range $c := .}}<li class="waiting">{{$.Date ($.Local .At) "2 Jan 2006 15:04"}}:
+    {{if .Enabled}}{{if .By}}{{$.T "%s switched on by %s" ($.T .Module.Label) .By}}{{else}}{{$.T "%s switched on" ($.T .Module.Label)}}{{end}}{{else}}{{if .By}}{{$.T "%s switched off by %s" ($.T .Module.Label) .By}}{{else}}{{$.T "%s switched off" ($.T .Module.Label)}}{{end}}{{end}}{{with .Reason}} &middot; {{if $c.Ours}}{{$.T .}}{{else}}{{.}}{{end}}{{end}}</li>{{end}}
+</ul>
+{{end}}
 
 {{if not .Shop.OrgNumber}}
 <p class="error">{{.T "Without a company number and a VAT number an invoice from this workshop is not a complete invoice."}}</p>

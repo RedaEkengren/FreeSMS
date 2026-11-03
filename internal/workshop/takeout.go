@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // A part used to leave the shelf only on paper, at invoicing. Between the
@@ -45,7 +44,7 @@ func (p JobPart) NotPriced() bool { return p.TakenOut > p.Priced }
 // PartsOnJob lists the parts priced on a job or taken out to it.
 func PartsOnJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) ([]JobPart, error) {
 	var out []JobPart
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT p.id, p.number, p.name, p.unit,
 			       coalesce((SELECT sum(l.quantity) FROM work_order_lines l
@@ -89,7 +88,7 @@ func TakeOut(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID,
 	if !looksLikeUUID(partID) {
 		return ErrNotFound
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := openForParts(ctx, tx, jobID); err != nil {
 			return err
 		}
@@ -123,7 +122,7 @@ func PutBack(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID,
 	if !looksLikeUUID(partID) {
 		return ErrNotFound
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := openForParts(ctx, tx, jobID); err != nil {
 			return err
 		}
@@ -159,7 +158,7 @@ func TakeOutByCode(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		return "", "", fmt.Errorf("%w: scan or type the part's code", ErrInvalid)
 	}
 	var partID string
-	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err = inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		// The same match as the parts desk's scan page.
 		err := tx.QueryRow(ctx, `
 			SELECT p.id, p.number, p.name FROM parts p

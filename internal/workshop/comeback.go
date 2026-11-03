@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // A car that comes back.
@@ -160,7 +159,7 @@ func OpenComeback(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 	}
 
 	var jobID string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var vehicleID, state string
 		var originalCustomer *string
 		var number int64
@@ -212,7 +211,7 @@ func OpenComeback(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 			INSERT INTO work_orders (shop_id, number, vehicle_id, customer_id, complaint, state, created_by)
 			VALUES ($1, $2, $3, $4, $5, 'draft', $6) RETURNING id`,
 			scope.ShopID, next, vehicleID, customer, complaint, scope.UserID).Scan(&jobID); err != nil {
-			return fmt.Errorf("open the follow-up: %w", err)
+			return jobBlockError(err, "open the follow-up")
 		}
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO vehicle_presence (shop_id, work_order_id, event, recorded_by) VALUES ($1, $2, 'left', $3)`,
@@ -308,7 +307,7 @@ func Classify(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, comeb
 	case len(note) > 500:
 		return fmt.Errorf("%w: the reason is limited to 500 characters", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		current, err := lockComeback(ctx, tx, comebackID)
 		if err != nil {
 			return err
@@ -329,7 +328,7 @@ func AddComebackNote(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 	if note == "" || len(note) > 500 {
 		return fmt.Errorf("%w: write a note of up to 500 characters", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if _, err := lockComeback(ctx, tx, comebackID); err != nil {
 			return err
 		}
@@ -362,7 +361,7 @@ func FileClaim(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, come
 		return "", fmt.Errorf("%w: an amount cannot be negative", ErrInvalid)
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		current, err := lockComeback(ctx, tx, comebackID)
 		if err != nil {
 			return err
@@ -399,7 +398,7 @@ func AnswerClaim(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, cl
 	if len(note) > 500 {
 		return fmt.Errorf("%w: the note is limited to 500 characters", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var comebackID, current string
 		if err := tx.QueryRow(ctx, `SELECT comeback_id::text, status FROM comeback_claims WHERE id = $1 FOR UPDATE`, claimID).Scan(&comebackID, &current); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -433,7 +432,7 @@ func ComebackFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 	}
 	desk := scope.Role.SeesCustomerPersonalData()
 	var c Comeback
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		cs, err := comebacksTx(ctx, tx, `cb.follow_up_work_order_id = $1`, jobID, desk)
 		if err != nil {
 			return err
@@ -454,7 +453,7 @@ func ComebacksOf(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 	}
 	desk := scope.Role.SeesCustomerPersonalData()
 	var out []Comeback
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		out, err = comebacksTx(ctx, tx, `cb.original_work_order_id = $1`, jobID, desk)
 		return err

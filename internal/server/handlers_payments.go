@@ -15,7 +15,7 @@ func (s *Server) handleRecordPayment(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	id := r.PathValue("id")
 	p := workshop.NewPayment{Method: r.FormValue("method"), Reference: r.FormValue("reference"),
-		ConfirmedOverpayment: r.FormValue("confirm_over") != ""}
+		ConfirmedOverpayment: r.FormValue("confirm_over") != "", OverpaymentReason: r.FormValue("over_reason")}
 	if v := strings.TrimSpace(r.FormValue("amount")); v != "" {
 		negative := strings.HasPrefix(v, "-")
 		n, err := parseMinorUnits(strings.TrimPrefix(v, "-"))
@@ -46,7 +46,7 @@ func (s *Server) handleRecordPayment(w http.ResponseWriter, r *http.Request) {
 // reverses it.
 func (s *Server) handleReversePayment(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
-	if err := workshop.ReversePayment(r.Context(), s.pool, session.Scope, r.PathValue("id")); s.paymentError(w, r, err) {
+	if err := workshop.ReversePayment(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("reason")); s.paymentError(w, r, err) {
 		return
 	}
 	back := r.FormValue("invoice")
@@ -85,4 +85,29 @@ func (s *Server) paymentError(w http.ResponseWriter, r *http.Request, err error)
 		return true
 	}
 	return s.handoverError(w, r, err)
+}
+
+// handleRecordPaymentByReference records a payment found by its payment
+// reference (#234) -- the OCR number off the bank's line -- on the invoice
+// the reference is for, as the invoice's own form would. With the amount
+// the bank's line says, always: the invoice's own form takes a blank
+// amount as everything owed, settled at the counter, and a bank payment
+// is whatever arrived, part of it as often as not.
+func (s *Server) handleRecordPaymentByReference(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	// The lookup checks the role first, so a role that records no payment
+	// is refused as such whatever else the form lacks.
+	id, reference, err := workshop.InvoiceByPaymentReference(r.Context(), s.pool, session.Scope, r.FormValue("ocr"))
+	if s.paymentError(w, r, err) {
+		return
+	}
+	if strings.TrimSpace(r.FormValue("amount")) == "" {
+		s.renderError(w, r, http.StatusBadRequest, "Not recorded", "Say how much arrived, as the bank's line has it.")
+		return
+	}
+	if r.FormValue("reference") == "" {
+		r.Form.Set("reference", reference)
+	}
+	r.SetPathValue("id", id)
+	s.handleRecordPayment(w, r)
 }

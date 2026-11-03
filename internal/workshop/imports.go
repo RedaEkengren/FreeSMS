@@ -153,6 +153,9 @@ func PreviewImport(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if !scope.Role.RunsTheShop() {
 		return ImportBatch{}, access.ErrForbidden
 	}
+	if !importable(scope, kind) {
+		return ImportBatch{}, errNotImportable
+	}
 	parsed, err := ParseImport(kind, raw)
 	if err != nil {
 		return ImportBatch{}, err
@@ -712,6 +715,11 @@ func ApplyImport(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 		b, err := importBatchTx(ctx, tx, id, true)
 		if err != nil {
 			return err
+		}
+		// A batch read in while the workshop ran is not applied after it
+		// was switched off.
+		if !importable(scope, b.Kind) {
+			return errNotImportable
 		}
 		failed := 0
 		var undecided []string

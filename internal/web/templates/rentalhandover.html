@@ -1,0 +1,82 @@
+{{define "content"}}
+{{$p := .Rental.Protocol}}
+{{$in := eq $p.Subject "check_in"}}
+{{$open := and (not $p.CompletedAt) (not $p.AbandonedAt)}}
+<h1>{{if $in}}{{.T "Check-in"}}{{else}}{{.T "Check-out"}}{{end}} &middot; {{.Rental.Booking.Reference}}</h1>
+<p>{{.Rental.Booking.UnitLabel}} &middot; {{$p.TemplateName}}
+  {{if $p.CompletedAt}}<span class="tag pass">{{.T "done"}}</span>{{else if $p.AbandonedAt}}<span class="tag">{{.T "left unfinished"}}</span>{{end}}</p>
+
+{{if and (not $in) .Rental.Handovers.Damage}}
+{{/* Known damage, so it is recorded as known and not found again as new
+     at the return. */}}
+<h2>{{.T "Known damage"}}</h2>
+<ul class="lines">
+  {{range .Rental.Handovers.Damage}}<li><div class="row"><span>{{.Description}}</span><span>{{$.Date ($.Local .ObservedAt) "2 Jan 2006"}}</span></div></li>{{end}}
+</ul>
+{{end}}
+
+{{range $p.Items}}
+{{$c := $.Rental.Compared .ID}}
+<div class="card{{if and $c $c.New}} late{{end}}" id="item-{{.ID}}">
+  <div class="row">
+    <strong>{{.Label}}</strong>
+    <span class="tag{{if eq .Status "pass"}} pass{{else if eq .Status "attention"}} warranty{{else if eq .Status "fail"}} late{{end}}">{{$.T ($.Rental.StatusLabel .Status)}}</span>
+  </div>
+  {{if $in}}
+  <p class="waiting">{{if and $c $c.Out}}{{$.T "At check-out: %s" ($.T ($.Rental.StatusLabel $c.Out.Status))}}{{with $c.Out.Note}} &middot; {{.}}{{end}}{{else}}{{$.T "Not on the check-out"}}{{end}}
+    {{if and $c $c.New}} &middot; <strong>{{$.T "new since the check-out"}}</strong>{{else if and $c $c.Known}} &middot; {{$.T "known damage"}}{{end}}</p>
+  {{end}}
+  {{if .Note}}<p>{{.Note}}</p>{{end}}
+  {{if .Photos}}<div class="photos">{{range .Photos}}<img src="/rental/photos/{{.}}" alt="" loading="lazy">{{end}}</div>{{end}}
+  {{if $open}}
+  <form method="post" action="/rental/handovers/{{$p.ID}}/items/{{.ID}}" data-offline>
+    <button type="submit" disabled hidden aria-hidden="true" tabindex="-1"></button>
+    <label><span>{{$.T "Note"}}</span><input name="note" value="{{.Note}}" maxlength="300"></label>
+    <div class="actions mt-s">
+      <button name="status" value="pass" class="secondary">{{$.T "Pass"}}</button>
+      <button name="status" value="attention" class="secondary">{{$.T "Attention"}}</button>
+      <button name="status" value="fail" class="secondary">{{$.T "Fail"}}</button>
+    </div>
+  </form>
+  <form method="post" action="/rental/handovers/{{$p.ID}}/items/{{.ID}}/photo" enctype="multipart/form-data">
+    <input type="file" name="photo" accept="image/*" capture="environment" required>
+    <button type="submit" class="secondary mt-s">{{$.T "Add the photograph"}}</button>
+  </form>
+  {{end}}
+</div>
+{{end}}
+
+{{if $open}}
+<h2>{{if $in}}{{.T "Take it back"}}{{else}}{{.T "Hand it over"}}{{end}}</h2>
+<form method="post" action="/rental/handovers/{{$p.ID}}/finish" data-offline>
+  {{/* Which shape of this form it is: an older page, still in a phone's
+       queue, names only the findings ticked. */}}
+  <input type="hidden" name="finish_form" value="2">
+  {{/* Fuel or charge is asked of every unit, and may be left out: a
+       generator or a lift has a tank or a battery and no odometer. */}}
+  <div class="pair">
+    {{if .Rental.Handovers.HasOdometer}}<label><span>{{.T "Odometer, km"}}</span><input name="odometer" inputmode="numeric" pattern="[0-9 ]*" maxlength="9" required></label>{{end}}
+    <label><span>{{.T "Fuel or charge"}}</span><select name="fuel"><option value="">&ndash;</option>{{range .Rental.Eighths}}<option value="{{.}}">{{.}}/8</option>{{end}}</select></label>
+  </div>
+  <label class="tick"><input type="checkbox" name="renter_present" value="1" checked> {{.T "The renter is here"}}</label>
+  <label class="tick"><input type="checkbox" name="renter_accepted" value="1"> {{.T "The renter has seen the protocol and accepts it"}}</label>
+  {{if $in}}
+  {{with .Rental.NewFindings}}
+  <p class="waiting">{{$.T "Each new finding becomes a damage case to look at, including one found after this page was opened. It is not a charge. Untick one that was only dirt."}}</p>
+  {{range .}}<input type="hidden" name="shown" value="{{.In.ID}}"><label class="tick"><input type="checkbox" name="damage" value="{{.In.ID}}" checked> {{.Label}}{{with .In.Note}}: {{.}}{{end}}</label>{{end}}
+  {{end}}
+  {{end}}
+  <label><span>{{.T "Note"}}</span><input name="note" maxlength="300"></label>
+  <button type="submit" class="mt-m">{{if $in}}{{.T "Finish the check-in"}}{{else}}{{.T "Finish the check-out"}}{{end}}</button>
+</form>
+<p class="waiting">{{.T "Without a connection the answers and the finish are kept on this phone and sent when it is back. A photograph waits for a connection."}}</p>
+<details class="mt-l"><summary>{{.T "Leave it unfinished"}}</summary>
+<form method="post" action="/rental/handovers/{{$p.ID}}/abandon">
+  <label><span>{{.T "Why"}}</span><input name="reason" maxlength="300" required></label>
+  <button type="submit" class="secondary">{{.T "Leave it unfinished"}}</button>
+</form>
+</details>
+{{end}}
+
+<p class="mt-xl"><a href="/rental/bookings/{{.Rental.Booking.ID}}">{{.T "Back to the booking"}}</a></p>
+{{end}}

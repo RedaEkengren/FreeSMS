@@ -24,6 +24,7 @@ func (s *Server) sendLoop(ctx context.Context) {
 	defer tick.Stop()
 	for {
 		s.sendDue(ctx, time.Now())
+		s.runOutbox(ctx)
 		select {
 		case <-ctx.Done():
 			return

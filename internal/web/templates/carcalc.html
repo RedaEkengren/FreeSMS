@@ -1,0 +1,88 @@
+{{define "content"}}
+{{$c := .Dealer.Calculation}}
+<h1>{{.T "Before the bid"}}</h1>
+{{if .Error}}<p class="error" role="alert">{{.Sentence .Error}}</p>{{end}}
+
+{{if $c.ID}}
+<p class="waiting">
+  {{with .Dealer.Vehicle}}{{if .Registration}}{{.Registration}}{{else}}{{.VIN}}{{end}}{{if .Make}} &middot; {{.Make}} {{.Model}}{{end}}{{end}}
+  &middot; {{.T "Version %d of %d" $c.Version $c.LatestVersion}} &middot; {{$c.CreatedBy}}, {{.Date (.Local $c.CreatedAt) "2 Jan 2006 15:04"}}
+</p>
+{{if $c.Input.Note}}<p class="waiting">{{$c.Input.Note}}</p>{{end}}
+
+{{$r := .Dealer.Result}}
+{{if $r.NoSalePrice}}
+  <p class="empty">{{.T "No sale price expected yet, so there is no bid to work out."}}</p>
+{{else}}
+<ul class="lines">
+  <li>
+    <div class="row"><span>{{.T "Most to pay, ordinary VAT"}}</span>
+      <strong>{{if $r.Ordinary.Possible}}{{.Money $r.Ordinary.MaxBidMinor}}{{else}}{{.T "No price leaves the margin"}}{{end}}</strong></div>
+    <div class="waiting">{{.T "Before any VAT the seller charges. The sale carries %s in VAT." (.Money $r.Ordinary.SaleVATMinor)}}</div>
+  </li>
+  {{with $r.MarginScheme}}
+  <li>
+    <div class="row"><span>{{$.T "Most to pay, margin scheme"}}</span>
+      <strong>{{if .Possible}}{{$.Money .MaxBidMinor}}{{else}}{{$.T "No price leaves the margin"}}{{end}}</strong></div>
+    <div class="waiting">{{$.T "VAT on the margin alone: at this price the sale carries %s." ($.Money .SaleVATMinor)}}</div>
+  </li>
+  {{else}}
+  <li><div class="waiting">{{.T "No margin-scheme bid: the seller would not make the car eligible, or what kind of seller is not known yet."}}</div></li>
+  {{end}}
+  <li><div class="waiting">
+    {{.T "Costs %s, keeping it %s, margin wanted %s." (.Money $r.CostsMinor) (.Money $r.HoldingMinor) (.Money $r.TargetMarginMinor)}}
+    {{if $r.LossLeader}}<span class="tag late">{{.T "Sold at a loss on purpose"}}</span>{{end}}
+  </div></li>
+</ul>
+{{end}}
+
+{{if $c.AcceptedVersionID}}
+  {{if $c.Accepted}}
+    <p class="tag">{{.T "Bid %s on this version, %s." (.Money $c.AcceptedBidMinor) (.Date (.Local $c.AcceptedAt) "2 Jan 2006 15:04")}}</p>
+  {{else}}
+    <p class="waiting"><a href="/cars/calculations/{{$c.AcceptedVersionID}}">{{.T "The bid was made on another version."}}</a></p>
+  {{end}}
+{{else if .Session.Scope.Role.BuysVehicles}}
+<form method="post" action="/cars/calculations/{{$c.ID}}/accept">
+  <label><span>{{.T "Bid made, in kronor"}}</span><input name="bid" inputmode="decimal" required></label>
+  <button type="submit">{{.T "Record the bid on this version"}}</button>
+</form>
+{{end}}
+<h2>{{.T "Change it"}}</h2>
+{{end}}
+
+<form method="post" action="/cars/calculations">
+  {{if $c.ID}}
+    <input type="hidden" name="calculation" value="{{$c.CalculationID}}">
+    <input type="hidden" name="version" value="{{$c.LatestVersion}}">
+    <input type="hidden" name="vehicle" value="{{$c.VehicleID}}">
+    <input type="hidden" name="from" value="{{$c.ID}}">
+    {{if ne $c.Version $c.LatestVersion}}<p class="waiting">{{.T "Saving makes a new version from this one, after the newest."}}</p>{{end}}
+  {{else}}
+  <div class="pair">
+    <label><span>{{.T "Registration"}}</span><input name="registration" value="{{.Dealer.Field "registration"}}" autocapitalize="characters" autocomplete="off"></label>
+    <label><span>{{.T "Chassis number"}}</span><input name="vin" value="{{.Dealer.Field "vin"}}" autocapitalize="characters" autocomplete="off"></label>
+  </div>
+  {{end}}
+  <label><span>{{.T "Expected sale price, VAT included"}}</span><input name="sale" value="{{.Dealer.Field "sale"}}" inputmode="decimal"></label>
+  <label><span>{{.T "Who is selling it"}}</span>
+    <select name="seller_type">
+      <option value="">{{.T "Not known yet"}}</option>
+      {{range .Dealer.SellerTypes}}<option value="{{.}}"{{if eq . ($.Dealer.Field "seller_type")}} selected{{end}}>{{$.T ($.Dealer.SellerTypeLabel .)}}</option>{{end}}
+    </select>
+  </label>
+  <fieldset>
+    <legend>{{.T "Costs expected, excluding VAT"}}</legend>
+    {{range .Dealer.CostKinds}}
+    <label><span>{{$.T ($.Dealer.CostKindLabel .)}}</span><input name="cost_{{.}}" value="{{$.Dealer.Field (printf "cost_%s" .)}}" inputmode="decimal"></label>
+    {{end}}
+  </fieldset>
+  <div class="pair">
+    <label><span>{{.T "Days in stock"}}</span><input name="days" value="{{.Dealer.Field "days"}}" inputmode="numeric"></label>
+    <label><span>{{.T "Cost of a day"}}</span><input name="per_day" value="{{.Dealer.Field "per_day"}}" inputmode="decimal"></label>
+  </div>
+  <label><span>{{.T "Margin wanted, in kronor or as a percentage such as 12 %"}}</span><input name="margin" value="{{.Dealer.Field "margin"}}" inputmode="decimal"></label>
+  <label><span>{{.T "Note"}}</span><input name="note" value="{{.Dealer.Field "note"}}" maxlength="1000"></label>
+  <button type="submit">{{.T "Work it out"}}</button>
+</form>
+{{end}}

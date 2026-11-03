@@ -251,7 +251,7 @@ func TestMoneyOwedBackIsARefundTaskAndPayingItBackIsNotAReversal(t *testing.T) {
 			last = p.ID
 		}
 	}
-	if err := workshop.ReversePayment(ctx, pool, advisor(), last); err != nil {
+	if err := workshop.ReversePayment(ctx, pool, advisor(), last, "Registrerad av misstag"); err != nil {
 		t.Fatal(err)
 	}
 	if b, _ = workshop.BalanceFor(ctx, pool, advisor(), inv.ID); b.OutstandingMinor() >= 0 {
@@ -264,7 +264,7 @@ func TestAnOverpaymentIsOwedBack(t *testing.T) {
 	ctx := context.Background()
 	_, inv := issued(t, pool)
 	over := inv.GrossMinor + 5000
-	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{AmountMinor: &over, Method: "bank", PaidOn: time.Now(), ConfirmedOverpayment: true}); err != nil {
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{AmountMinor: &over, Method: "bank", PaidOn: time.Now(), ConfirmedOverpayment: true, OverpaymentReason: "Betalade två gånger"}); err != nil {
 		t.Fatal(err)
 	}
 	items, _ := workshop.Worklist(ctx, pool, advisor(), time.Now())

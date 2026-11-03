@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -224,14 +223,16 @@ var technicianMoves = map[State][]State{
 // Checked in SetState rather than in a handler, so a second caller cannot skip
 // it. The front desk and the owner may make any move the state machine allows;
 // a technician may make theirs.
-func MayTransition(role access.Role, from, to State) bool {
+//
+// With several roles held, a move any of them may make is allowed.
+func MayTransition(role access.Roles, from, to State) bool {
 	if !CanTransition(from, to) {
 		return false
 	}
 	if role.SeesCustomerPersonalData() {
 		return true
 	}
-	if role == access.RoleTechnician {
+	if role.Has(access.RoleTechnician) {
 		for _, s := range technicianMoves[from] {
 			if s == to {
 				return true
@@ -246,7 +247,7 @@ func MayTransition(role access.Role, from, to State) bool {
 func TechnicianStates(from State, hasWork bool) []State {
 	var out []State
 	for _, s := range AvailableStates(from, hasWork) {
-		if MayTransition(access.RoleTechnician, from, s) {
+		if MayTransition(access.Of(access.RoleTechnician), from, s) {
 			out = append(out, s)
 		}
 	}
@@ -302,7 +303,7 @@ func SetState(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID
 	if !scope.Role.Valid() {
 		return access.ErrForbidden
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		return setStateInScopeTx(ctx, tx, scope, jobID, to)
 	})
 }
@@ -458,7 +459,7 @@ func setStateTx(ctx context.Context, tx pgx.Tx, jobID string, to State) error {
 		`UPDATE work_orders SET state = $1, updated_at = now(),
 		        closed_at = CASE WHEN $1 IN ('closed', 'cancelled') THEN now() ELSE NULL END
 		 WHERE id = $2`, to, jobID); err != nil {
-		return fmt.Errorf("set state: %w", err)
+		return jobBlockError(err, "set state")
 	}
 
 	switch to {

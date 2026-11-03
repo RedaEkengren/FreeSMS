@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // Work sent to somebody else.
@@ -262,7 +261,7 @@ func RequestOutsourced(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		return "", fmt.Errorf("%w: an estimate cannot be negative", ErrInvalid)
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if err := lockJobTx(ctx, tx, in.JobID); err != nil {
 			return err
 		}
@@ -369,7 +368,7 @@ func RecordOutsourced(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 		in.Assignee = ""
 	}
 
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var jobID, lineID, status string
 		var hasLine bool
 		if err := tx.QueryRow(ctx, `
@@ -481,7 +480,7 @@ func OutsourcedFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		return nil, ErrNotFound
 	}
 	var out []Outsourced
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		out, err = outsourcedTx(ctx, tx, scope, `o.work_order_id = $1`, jobID)
 		return err
@@ -496,7 +495,7 @@ func OutsourcedOpen(ctx context.Context, pool *pgxpool.Pool, scope access.Scope)
 		return nil, access.ErrForbidden
 	}
 	var out []Outsourced
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		out, err = outsourcedTx(ctx, tx, scope, `
 			(SELECT e.kind FROM outsourced_events e
@@ -651,7 +650,7 @@ func unresolvedOutsourcedTx(ctx context.Context, tx pgx.Tx, jobID string) ([]str
 
 // outsourcedWaiting is what the counter and the parts desk should chase: work
 // that was due back and is not, and a supplier invoice nobody handed on.
-func outsourcedWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]WaitingItem, error) {
+func outsourcedWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ActionItem, error) {
 	if !scope.Role.SeesParts() {
 		return nil, access.ErrForbidden
 	}
@@ -659,13 +658,13 @@ func outsourcedWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 	if err != nil {
 		return nil, err
 	}
-	var out []WaitingItem
+	var out []ActionItem
 	for _, o := range all {
 		switch {
 		case o.Overdue:
-			out = append(out, WaitingItem{Kind: "outsourced_overdue", JobID: o.JobID, Number: o.JobNumber, Registration: o.Plate, Text: o.Supplier + ": " + o.Item})
+			out = append(out, ActionItem{Kind: "outsourced_overdue", SubjectID: o.JobID, Number: o.JobNumber, Registration: o.Plate, Text: o.Supplier + ": " + o.Item})
 		case o.InvoiceWaiting():
-			out = append(out, WaitingItem{Kind: "outsourced_invoice", JobID: o.JobID, Number: o.JobNumber, Registration: o.Plate, Text: o.Supplier + " " + o.InvoiceRef})
+			out = append(out, ActionItem{Kind: "outsourced_invoice", SubjectID: o.JobID, Number: o.JobNumber, Registration: o.Plate, Text: o.Supplier + " " + o.InvoiceRef})
 		}
 	}
 	return out, nil

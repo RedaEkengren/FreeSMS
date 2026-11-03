@@ -50,10 +50,12 @@ type DayEntry struct {
 	Invoice   string // the invoice's reference
 	InvoiceID string
 	Kind      string // "payment", "refund" or "reversal"
-	Amount    int64
-	Rounding  int64
-	Recorded  time.Time
-	Exported  bool
+	// Against a deposit or a payout rather than an invoice (#152): which.
+	Target   string // "invoice", "deposit" or "payout"
+	Amount   int64
+	Rounding int64
+	Recorded time.Time
+	Exported bool
 }
 
 // MethodFigures is what came and went by one way of paying.
@@ -121,6 +123,10 @@ type DayReview struct {
 type DayExportInfo struct {
 	DocsExported, DocsNot       int
 	EntriesExported, EntriesNot int
+	// Money into a deposit or out to a payout (#152), which goes to the
+	// books only once its accounts are decided (G2, #221): recorded, and
+	// not waiting on anybody's export.
+	EntriesUndecided int
 }
 
 // DayFigures is the whole of one day.
@@ -236,10 +242,14 @@ func dayTx(ctx context.Context, tx pgx.Tx, day string) (DayFigures, error) {
 
 	// Cash movement: entries dated the day, by the way of paying.
 	pay, err := tx.Query(ctx, `
-		SELECT p.id::text, p.series || '-' || p.number, i.series || '-' || i.number, i.id::text, p.method, p.amount_minor, p.rounding_minor,
-		       p.recorded_at, p.accounting_export_id IS NOT NULL, p.reverses_id IS NOT NULL
-		FROM invoice_payments p JOIN invoices i ON i.id = p.invoice_id
-		WHERE p.paid_on = $1::date ORDER BY p.method, p.number`, day)
+		SELECT p.id::text, p.series || '-' || p.number, coalesce(i.series || '-' || i.number, ''), coalesce(i.id::text, ''),
+		       p.method, p.amount_minor, p.rounding_minor,
+		       p.recorded_at, p.accounting_export_id IS NOT NULL, p.reverses_id IS NOT NULL,
+		       CASE WHEN p.invoice_id IS NOT NULL THEN 'invoice' WHEN p.deposit_id IS NOT NULL THEN 'deposit' ELSE 'payout' END
+		FROM invoice_payments p LEFT JOIN invoices i ON i.id = p.invoice_id
+		-- A deposit applied to an invoice moved no money: it is the
+		-- deposit's own row and the invoice's, not a way of paying.
+		WHERE p.paid_on = $1::date AND p.method <> 'deposit' ORDER BY p.method, p.number`, day)
 	if err != nil {
 		return d, fmt.Errorf("read payments: %w", err)
 	}
@@ -248,7 +258,7 @@ func dayTx(ctx context.Context, tx pgx.Tx, day string) (DayFigures, error) {
 		var e DayEntry
 		var method string
 		var reversal bool
-		if err := pay.Scan(&e.ID, &e.Reference, &e.Invoice, &e.InvoiceID, &method, &e.Amount, &e.Rounding, &e.Recorded, &e.Exported, &reversal); err != nil {
+		if err := pay.Scan(&e.ID, &e.Reference, &e.Invoice, &e.InvoiceID, &method, &e.Amount, &e.Rounding, &e.Recorded, &e.Exported, &reversal, &e.Target); err != nil {
 			pay.Close()
 			return d, fmt.Errorf("scan payment: %w", err)
 		}
@@ -270,9 +280,12 @@ func dayTx(ctx context.Context, tx pgx.Tx, day string) (DayFigures, error) {
 		}
 		m.Rounding += e.Rounding
 		m.Entries = append(m.Entries, e)
-		if e.Exported {
+		switch {
+		case e.Exported:
 			d.Exports.EntriesExported++
-		} else {
+		case e.Target != "invoice":
+			d.Exports.EntriesUndecided++
+		default:
 			d.Exports.EntriesNot++
 		}
 	}
@@ -320,9 +333,7 @@ func dayTx(ctx context.Context, tx pgx.Tx, day string) (DayFigures, error) {
 	// What is owed, now.
 	if err := tx.QueryRow(ctx, `
 		WITH open AS (
-		  SELECT i.gross_minor
-		         + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = i.id), 0)
-		         - coalesce((SELECT sum(p.amount_minor + p.rounding_minor) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) AS owed
+		  SELECT `+owedSQL("i")+` AS owed
 		  FROM invoices i WHERE i.credit_of_id IS NULL)
 		SELECT coalesce(sum(owed) FILTER (WHERE owed > 0), 0), coalesce(-sum(owed) FILTER (WHERE owed < 0), 0) FROM open`).Scan(&d.OwedToUs, &d.OwedBack); err != nil {
 		return d, fmt.Errorf("read what is owed: %w", err)
@@ -422,9 +433,7 @@ func exceptionsTx(ctx context.Context, tx pgx.Tx) (DayExceptions, error) {
 	if err := tx.QueryRow(ctx, `
 		SELECT count(*)::int FROM (
 		  SELECT i.id FROM invoices i WHERE i.credit_of_id IS NULL
-		    AND i.gross_minor
-		        + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = i.id), 0)
-		        - coalesce((SELECT sum(p.amount_minor + p.rounding_minor) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) < 0) x`).Scan(&e.RefundTasks); err != nil {
+		    AND `+owedSQL("i")+` < 0) x`).Scan(&e.RefundTasks); err != nil {
 		return e, fmt.Errorf("count refund tasks: %w", err)
 	}
 	return e, nil

@@ -10,6 +10,7 @@ import (
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/auth"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
+	"github.com/RedaEkengren/FreeSMS/internal/payref"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -49,7 +50,8 @@ func NeedsSetup(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
 //
 // locale is the language the workshop is created in: DEFAULT_LOCALE, because
 // whoever installed it has already said which language the workshop speaks.
-func Setup(ctx context.Context, pool *pgxpool.Pool, shopName, ownerName, email, password, locale string) (shopID string, err error) {
+// modules are what the shop runs (#143); none is Workshop alone.
+func Setup(ctx context.Context, pool *pgxpool.Pool, shopName, ownerName, email, password, locale string, modules []access.Module) (shopID string, err error) {
 	shopName = strings.TrimSpace(shopName)
 	ownerName = strings.TrimSpace(ownerName)
 	email = strings.TrimSpace(email)
@@ -131,10 +133,14 @@ func Setup(ctx context.Context, pool *pgxpool.Pool, shopName, ownerName, email, 
 		shopID, ownerName, email).Scan(&personID); err != nil {
 		return "", fmt.Errorf("create person: %w", err)
 	}
-	if _, err := tx.Exec(ctx,
-		`INSERT INTO users (shop_id, person_id, role, password_hash) VALUES ($1, $2, 'owner', $3)`,
-		shopID, personID, hash); err != nil {
+	var ownerID string
+	if err := tx.QueryRow(ctx,
+		`INSERT INTO users (shop_id, person_id, role, password_hash) VALUES ($1, $2, 'owner', $3) RETURNING id`,
+		shopID, personID, hash).Scan(&ownerID); err != nil {
 		return "", fmt.Errorf("create owner: %w", err)
+	}
+	if err := recordSetupModulesTx(ctx, tx, shopID, ownerID, modules); err != nil {
+		return "", err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -166,8 +172,11 @@ type ShopDetails struct {
 	// invoice is sent electronically; blank is allowed.
 	EndpointID    string
 	PaymentScheme string
-	Locale        string
-	Currency      string
+	// The shop's Swish number, ten digits, for the code a customer pays an
+	// invoice with (#234); blank for none.
+	SwishNumber string
+	Locale      string
+	Currency    string
 }
 
 // ShopDetailsFor returns the shop's own particulars.
@@ -180,16 +189,16 @@ func ShopDetailsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope)
 		return ShopDetails{}, access.ErrForbidden
 	}
 	var d ShopDetails
-	var line1, line2, postal, city, org, vat, phone, email, ref, endpoint, scheme *string
+	var line1, line2, postal, city, org, vat, phone, email, ref, endpoint, scheme, swish *string
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `
 			SELECT name, address_line1, address_line2, postal_code, city,
 			       org_number, vat_number, phone, email,
 			       payment_reference, payment_terms_days, f_tax, locale, currency,
-			       endpoint_id, payment_scheme
+			       endpoint_id, payment_scheme, swish_number
 			FROM shops WHERE id = $1`, scope.ShopID).
 			Scan(&d.Name, &line1, &line2, &postal, &city, &org, &vat, &phone, &email,
-				&ref, &d.PaymentTermsDays, &d.FTax, &d.Locale, &d.Currency, &endpoint, &scheme)
+				&ref, &d.PaymentTermsDays, &d.FTax, &d.Locale, &d.Currency, &endpoint, &scheme, &swish)
 	})
 	if err != nil {
 		return ShopDetails{}, fmt.Errorf("read shop details: %w", err)
@@ -198,7 +207,7 @@ func ShopDetailsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope)
 	d.PostalCode, d.City = deref(postal), deref(city)
 	d.OrgNumber, d.VATNumber = deref(org), deref(vat)
 	d.Phone, d.Email, d.PaymentReference = deref(phone), deref(email), deref(ref)
-	d.EndpointID, d.PaymentScheme = deref(endpoint), deref(scheme)
+	d.EndpointID, d.PaymentScheme, d.SwishNumber = deref(endpoint), deref(scheme), deref(swish)
 	d.Currency = strings.TrimSpace(d.Currency)
 	return d, nil
 }
@@ -223,6 +232,11 @@ func SaveDetails(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d 
 	default:
 		return fmt.Errorf("%w: the payment reference is a bankgiro, a plusgiro or an iban", ErrInvalid)
 	}
+	if typed := strings.TrimSpace(d.SwishNumber); typed != "" {
+		if d.SwishNumber = payref.SwishNumber(typed); d.SwishNumber == "" {
+			return fmt.Errorf("%w: a Swish number is ten digits", ErrInvalid)
+		}
+	}
 	// Blank keeps the language the shop has: a form that does not carry the
 	// field has not asked for English.
 	if d.Locale = strings.TrimSpace(d.Locale); d.Locale != "" {
@@ -241,7 +255,8 @@ func SaveDetails(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d 
 			  payment_reference = nullif($11,''),
 			  payment_terms_days = $12, f_tax = $13,
 			  locale = coalesce(nullif($14, ''), locale),
-			  endpoint_id = nullif($15,''), payment_scheme = nullif($16,'')
+			  endpoint_id = nullif($15,''), payment_scheme = nullif($16,''),
+			  swish_number = nullif($17,'')
 			WHERE id = $1`,
 			scope.ShopID, strings.TrimSpace(d.Name),
 			strings.TrimSpace(d.AddressLine1), strings.TrimSpace(d.AddressLine2),
@@ -249,7 +264,7 @@ func SaveDetails(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d 
 			strings.TrimSpace(d.OrgNumber), strings.TrimSpace(d.VATNumber),
 			strings.TrimSpace(d.Phone), strings.TrimSpace(d.Email),
 			strings.TrimSpace(d.PaymentReference), d.PaymentTermsDays, d.FTax, d.Locale,
-			strings.TrimSpace(d.EndpointID), d.PaymentScheme)
+			strings.TrimSpace(d.EndpointID), d.PaymentScheme, d.SwishNumber)
 		if err != nil {
 			return fmt.Errorf("save shop details: %w", err)
 		}

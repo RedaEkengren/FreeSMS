@@ -71,10 +71,29 @@ populated for employees who do not drive.
 
 Roles are checked the same way, in the business operation and not only in
 the handler that calls it today. Every exported function that takes an
-`access.Scope` checks its role, or is listed in `everyRole` in
-`internal/workshop/roles_test.go` with the reason any role may call it; the
-test reads the code and fails on anything else. `TestTheRoleMatrix` calls
-the privileged operations directly as each role.
+`access.Scope`, in every package under `internal/`, checks its role, or is
+listed in its package's `everyRole` map (a `_test.go` file) with the reason
+any role may call it; `TestEveryOperationSaysWhoMayCallItAndInWhichModule`
+(`internal/testsupport/contract.go`, which says which checks it recognises)
+reads the code and fails on anything else, including a package that takes
+scopes and declares no map. `TestTheRoleMatrix` calls the privileged
+operations directly as each role, and again with the workshop switched off.
+What a role may not see is asserted on the value it is handed
+(`testsupport.Handed`, `testsupport.FieldsLike`), never on a page.
+
+Modules are checked the same way
+([#143](https://github.com/RedaEkengren/FreeSMS/issues/143)). A shop runs
+any of Workshop, Dealer and Rental, recorded as rows in
+`shop_module_changes` and carried on `access.Scope.Modules` with the
+session. Every route is registered as Core's or a module's, and a module the
+shop does not run answers exactly as a path that does not exist. Every
+workshop operation reads through `inWorkshop` (or checks `scope.Require`)
+and refuses with `access.ErrModuleOff`; the ones that must keep working
+whatever is switched on -- documents, payments, customers, vehicles, people,
+privacy -- are listed in the package's `core` map
+(`internal/workshop/core_test.go`) with the reason, and the same contract
+test fails on anything else. Switched off, a module's history stays readable
+through Core; only new work is refused.
 
 So: a technician's default payload is the vehicle and the job. Customer
 personal data is opt-in per field, with a purpose. A field with no purpose does
@@ -115,9 +134,13 @@ not exist.
 
 - **No provider ships for vehicle lookup.** Swedish vehicle data comes under an
   agreement that is the shop's to hold. `VEHICLE_LOOKUP_URL` points at whatever
-  a shop has; empty is the default and is not a degraded mode. The intake form
-  does not yet know that: it offers "Look the registration up" whether or not
-  a provider is configured, and with none the button does nothing visible.
+  a shop has; empty is the default and is not a degraded mode, and the intake
+  form then offers no lookup at all. With one (#155), every lookup is a row in
+  `vehicle_lookups` -- who, which registration, why, which provider, what it
+  said, never an owner -- kept a year, read again for a day, and never
+  written over what a person typed. Only intake has a page; a purchase and a
+  rental unit have the operation (`LookUpVehicle`, `QueueVehicleLookups`)
+  waiting for theirs. It has not been run against a real provider.
 
 - **Invoices issued before 0021 have no seller on them.** The seller is
   snapshotted onto the document now, the way the buyer always was, and the
@@ -228,6 +251,16 @@ not exist.
   against the schema it leaves; the loader refuses one that does not say.
   Prefer safe -- split a rename across releases -- because restore means the
   pre-deploy dump and losing what was written since. See DEPLOY.md.
+- **A Core change that alters the workshop's golden output says why.** The
+  seeded shop's invoice, credit note, Peppol files, SIE export, board,
+  "waiting for you" list and figures are kept in
+  `internal/server/testdata/golden`, and `TestWorkshopGoldenOutput` and
+  `TestWorkshopGoldenOutputAfterAnUpgrade` (a database written by the release
+  before M6, migrated forward) compare against them. A diff is regenerated
+  with `-golden.update` in a commit of its own whose message says why a
+  workshop-only shop now sees something different -- never to turn a red
+  test green. `before-m6.sql` is never regenerated. See
+  [#142](https://github.com/RedaEkengren/FreeSMS/issues/142).
 - **Timestamps are `timestamptz` in UTC.** A technician clocking hours across
   the March DST change must not gain or lose an hour.
 
@@ -237,9 +270,19 @@ not exist.
   with an open source project. The shop's own time library is the answer, and
   it is a feature rather than a consolation — shops report the paid guides are
   frequently wrong anyway.
-- No payment processing, no cash register. Invoiced sales
-  are exempt from the Swedish certified cash register requirement; a cash
-  drawer would pull the project into scope for it.
+- No payment processing, no cash register. FreeSMS records money that moved
+  in the shop's own channels and is not a cash register; every payment form
+  and list says so. It does **not** say a shop is exempt from the Swedish
+  certified cash register requirement: an invoice series does not exempt a
+  sale paid in person on its own, Swish counts as a card payment, and new
+  technical requirements apply from 2027 (#156). What it does is issue a
+  cash invoice -- an invoice paid on issue, in one step, frozen as paid --
+  keep the shop's register of the ways it takes money in person with whether
+  its adviser has checked each (unchecked ones in use are on the owner's
+  list), and show the owner what was taken in person this financial year
+  against a threshold the shop sets. Whether that is enough for a given flow
+  is gate G2 (#221), and until it has answered the software records and
+  warns. A cash drawer would pull the project into scope for the rules.
 - No parts supplier ordering. It needs agreements rather than code, it cannot
   ship with an open project, and the competitors are criticised for theirs. The
   request and the return -- the parts of the job a shop actually loses money on

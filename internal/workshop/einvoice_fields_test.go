@@ -165,7 +165,7 @@ func TestTheElectronicAddressAndReferenceAreTheirsToHaveAndToHaveErased(t *testi
 		t.Errorf("the copy they are given leaves out what they gave for invoices: %+v", e.Addresses)
 	}
 
-	if err := workshop.ErasePerson(ctx, pool, advisor(), customerPersonID, "Asked"); err != nil {
+	if err := workshop.ErasePerson(ctx, pool, advisor(), &recordingRemover{}, customerPersonID, "Asked"); err != nil {
 		t.Fatal(err)
 	}
 	var country, endpoint, ref *string

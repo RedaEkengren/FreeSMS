@@ -22,7 +22,7 @@ func (s *Server) handleImportPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var kinds []workshop.Option
-	for _, k := range workshop.ImportKinds {
+	for _, k := range workshop.ImportKindsFor(session.Scope) {
 		kinds = append(kinds, workshop.Option{Value: k, Label: workshop.ImportKindLabel(k)})
 	}
 	s.render(w, r, http.StatusOK, "import", pageData{Title: "Import", Session: session, Batches: batches, Positions: kinds})

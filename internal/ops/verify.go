@@ -225,7 +225,8 @@ func verifyShop(ctx context.Context, tx pgx.Tx, files Files, sr *ShopReport) err
 	// A reversal reverses a payment on the same invoice, for the same money.
 	if n, err := count(`
 		SELECT count(*) FROM invoice_payments r JOIN invoice_payments p ON p.id = r.reverses_id
-		WHERE r.invoice_id <> p.invoice_id OR r.amount_minor <> -p.amount_minor`); err != nil {
+		WHERE r.invoice_id IS DISTINCT FROM p.invoice_id OR r.deposit_id IS DISTINCT FROM p.deposit_id
+		   OR r.payout_id IS DISTINCT FROM p.payout_id OR r.amount_minor <> -p.amount_minor`); err != nil {
 		return err
 	} else if n > 0 {
 		add("payment reversals", Fail, "%d reversals that do not undo the payment they point at", n)
@@ -251,6 +252,23 @@ func verifyShop(ctx context.Context, tx pgx.Tx, files Files, sr *ShopReport) err
 		add("jobs and invoices", Pass, "every invoiced job has its invoice and the other way round")
 	}
 
+	// A credit note is of the same thing as what it credits (#146): its
+	// source, its job, sale or rental, its customer. The trigger keeps it so
+	// on insert; a restore that bypassed triggers would not.
+	if n, err := count(`
+		SELECT count(*) FROM invoices c JOIN invoices o ON o.id = c.credit_of_id
+		WHERE c.source <> o.source
+		   OR c.work_order_id IS DISTINCT FROM o.work_order_id
+		   OR c.vehicle_sale_id IS DISTINCT FROM o.vehicle_sale_id
+		   OR c.rental_id IS DISTINCT FROM o.rental_id
+		   OR c.customer_id IS DISTINCT FROM o.customer_id`); err != nil {
+		return err
+	} else if n > 0 {
+		add("invoice sources", Fail, "%d credit notes are of something other than what they credit", n)
+	} else {
+		add("invoice sources", Pass, "every credit note is of what it credits")
+	}
+
 	// What was charged was agreed. Not a reason to refuse a restore -- a line
 	// can be put on an invoice marked as not agreed -- but a number to look at.
 	if n, err := count(`
@@ -262,6 +280,37 @@ func verifyShop(ctx context.Context, tx pgx.Tx, files Files, sr *ShopReport) err
 		add("approvals", Warn, "%d charged lines on finished jobs were never approved", n)
 	} else {
 		add("approvals", Pass, "every charged line on a finished job was approved")
+	}
+
+	// Every audit event is about something that is there (#151): a restore
+	// that lost a table, or a row, leaves an event naming nothing. A module
+	// that widens audit_events_subject_kind_check adds its branch here;
+	// TestEveryAuditSubjectKindIsOneVerifyCanFind fails until it does.
+	if n, err := count(`
+		SELECT count(*) FROM audit_events e
+		WHERE NOT CASE e.subject_kind
+		  WHEN 'shop'           THEN EXISTS (SELECT 1 FROM shops x WHERE x.id = e.subject_id)
+		  WHEN 'user'           THEN EXISTS (SELECT 1 FROM users x WHERE x.id = e.subject_id)
+		  WHEN 'resource_block' THEN EXISTS (SELECT 1 FROM resource_blocks x WHERE x.id = e.subject_id)
+		  WHEN 'document'       THEN EXISTS (SELECT 1 FROM document_records x WHERE x.id = e.subject_id)
+		  WHEN 'invoice'        THEN EXISTS (SELECT 1 FROM invoices x WHERE x.id = e.subject_id)
+		  WHEN 'payment'        THEN EXISTS (SELECT 1 FROM invoice_payments x WHERE x.id = e.subject_id)
+		  WHEN 'party'          THEN EXISTS (SELECT 1 FROM parties x WHERE x.id = e.subject_id)
+		  WHEN 'customer'       THEN EXISTS (SELECT 1 FROM customers x WHERE x.id = e.subject_id)
+		  WHEN 'vehicle'        THEN EXISTS (SELECT 1 FROM vehicles x WHERE x.id = e.subject_id)
+		  WHEN 'work_order'     THEN EXISTS (SELECT 1 FROM work_orders x WHERE x.id = e.subject_id)
+		  WHEN 'identity_record' THEN EXISTS (SELECT 1 FROM identity_records x WHERE x.id = e.subject_id)
+		  WHEN 'stock_unit'     THEN EXISTS (SELECT 1 FROM stock_units x WHERE x.id = e.subject_id)
+		  WHEN 'purchase'       THEN EXISTS (SELECT 1 FROM vehicle_purchases x WHERE x.id = e.subject_id)
+		  WHEN 'rental_booking' THEN EXISTS (SELECT 1 FROM rental_bookings x WHERE x.id = e.subject_id)
+		  WHEN 'test_drive'     THEN EXISTS (SELECT 1 FROM test_drives x WHERE x.id = e.subject_id)
+		  WHEN 'vehicle_sale'   THEN EXISTS (SELECT 1 FROM vehicle_sales x WHERE x.id = e.subject_id)
+		  ELSE false END`); err != nil {
+		return err
+	} else if n > 0 {
+		add("audit events", Fail, "%d events are about something that is not there", n)
+	} else {
+		add("audit events", Pass, "every event is about something that is there")
 	}
 
 	// The photographs a job refers to are on disk.

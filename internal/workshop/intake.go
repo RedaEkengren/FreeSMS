@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -62,7 +61,7 @@ func TakeInWith(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, reg
 	}
 
 	var jobID string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		jobID, err = takeInTx(ctx, tx, scope, registration, complaint, odometerKm, d)
 		return err
@@ -143,7 +142,7 @@ func TakeInBooking(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if in.TechnicianID != "" && !looksLikeUUID(in.TechnicianID) {
 		return "", false, fmt.Errorf("%w: choose who does the work", ErrInvalid)
 	}
-	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err = inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var status, name, phone, bookedTech, bookedTechName string
 		var existing *string
 		err := tx.QueryRow(ctx, `
@@ -244,7 +243,7 @@ func technicianNameTx(ctx context.Context, tx pgx.Tx, id string) (string, error)
 	var name string
 	err := tx.QueryRow(ctx, `
 		SELECT p.display_name FROM users u JOIN people p ON p.id = u.person_id
-		WHERE u.id = $1 AND u.active AND u.role = 'technician'`, id).Scan(&name)
+		WHERE u.id = $1 AND u.active AND EXISTS (SELECT 1 FROM staff_roles sr WHERE sr.user_id = u.id AND sr.role = 'technician')`, id).Scan(&name)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", fmt.Errorf("%w: that technician is not working here", ErrInvalid)
 	}
@@ -329,7 +328,7 @@ func TakeInWalkIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 		return "", fmt.Errorf("%w: choose who does the work", ErrInvalid)
 	}
 	var jobID string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if _, err := technicianNameTx(ctx, tx, in.TechnicianID); err != nil {
 			return err
 		}
@@ -428,7 +427,7 @@ func takeInTx(ctx context.Context, tx pgx.Tx, scope access.Scope, registration, 
 		RETURNING id`,
 		scope.ShopID, number, vehicleID, customerID, strings.TrimSpace(complaint), scope.UserID,
 	).Scan(&jobID); err != nil {
-		return "", fmt.Errorf("open job: %w", err)
+		return "", jobBlockError(err, "open job")
 	}
 
 	// Taking a car in is the car being left with us: the first row of

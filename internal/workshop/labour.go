@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -115,7 +114,7 @@ func SuggestFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, veh
 		return nil, access.ErrForbidden
 	}
 	var out []Suggestion
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var make, model, engine string
 		var year *int16
 		err := tx.QueryRow(ctx,
@@ -231,7 +230,7 @@ func LabourTimes(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([
 		return nil, access.ErrForbidden
 	}
 	var out []LabourTime
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT id, operation, coalesce(make, ''), coalesce(model, ''),
 			       year_from, year_to, coalesce(engine, ''),
@@ -280,7 +279,7 @@ func SaveLabourTime(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		return fmt.Errorf("%w: a model without a make is not a scope anybody can reason about", ErrInvalid)
 	}
 
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
 			INSERT INTO labour_times
 			  (shop_id, operation, make, model, year_from, year_to, engine,
@@ -303,7 +302,7 @@ func LabourRate(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (in
 		return 0, access.ErrForbidden
 	}
 	var rate int64
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `SELECT labour_rate_minor FROM shops WHERE id = $1`, scope.ShopID).Scan(&rate)
 	})
 	return rate, err
@@ -317,7 +316,7 @@ func SetLabourRate(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if minor < 0 {
 		return fmt.Errorf("%w: a rate cannot be negative", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `UPDATE shops SET labour_rate_minor = $1 WHERE id = $2`, minor, scope.ShopID)
 		return err
 	})

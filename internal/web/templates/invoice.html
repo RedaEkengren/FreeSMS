@@ -21,6 +21,7 @@
   <dt>{{$.T "Due"}}</dt><dd>{{$.Date ($.Local .Due) "2 Jan 2006"}}</dd>
 </dl>
 {{if .Payments}}
+<p class="waiting">{{$.T "These are notes that money arrived, not cash-register receipts: FreeSMS is not a cash register."}}</p>
 <ul class="lines">
   {{range .Payments}}
   <li>
@@ -29,9 +30,12 @@
       <span>{{$.Money .AmountMinor}}{{if .RoundingMinor}} + {{$.Money .RoundingMinor}} {{$.T "rounding"}}{{end}}</span>
     </div>
     <div class="waiting">{{$.T "Recorded by %s, %s" .RecordedBy ($.Date ($.Local .RecordedAt) "2 Jan 15:04")}}{{if .Reverses}} &middot; {{$.T "reverses a payment recorded in error"}}{{end}}</div>
-    {{if and (not .Reversed) (not .Reverses)}}
+    {{if .PaidOnIssue}}
+    <div class="waiting">{{$.T "Paid on issue: it stands with the invoice, and a mistake is corrected with a credit note."}}</div>
+    {{else if and (not .Reversed) (not .Reverses)}}
     <form method="post" action="/payments/{{.ID}}/reverse">
       <input type="hidden" name="invoice" value="/invoices/{{$.Balance.InvoiceID}}">
+      <label><span>{{$.T "Why it is reversed"}}</span><input name="reason" maxlength="300" required></label>
       <button type="submit" class="link">{{$.T "Recorded in error: reverse it"}}</button>
     </form>
     {{end}}
@@ -53,7 +57,9 @@
     <label><span>{{$.T "Reference"}}</span><input name="reference" placeholder="OCR"></label>
   </div>
   <label class="tick"><input type="checkbox" name="confirm_over" value="1"> <span>{{$.T "The customer really paid more than is owed"}}</span></label>
+  <label><span>{{$.T "Why, if they did"}}</span><input name="over_reason" maxlength="300"></label>
   <p class="waiting">{{$.T "Left empty, the amount is whatever is owed; in cash it is rounded to the krona and the difference kept apart."}}</p>
+  <p class="waiting">{{$.T "A payment recorded here is a note that money arrived, not a cash-register receipt: FreeSMS is not a cash register."}}</p>
   <button type="submit">{{$.T "Record the payment"}}</button>
 </form>
 </section>
@@ -136,7 +142,7 @@
 
 <div class="no-print">
   <button type="button" class="secondary" data-print>{{$.T "Print"}}</button>
-  <p class="mt-l"><a href="/jobs/{{.WorkOrderID}}">{{$.T "Back to the job"}}</a></p>
+  {{if and .WorkOrderID ($.Runs "workshop")}}<p class="mt-l"><a href="/jobs/{{.WorkOrderID}}">{{$.T "Back to the job"}}</a></p>{{end}}
 </div>
 {{end}}
 {{end}}

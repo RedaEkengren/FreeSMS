@@ -193,8 +193,11 @@ func PreviewCustomerMerge(ctx context.Context, pool *pgxpool.Pool, scope access.
 
 // MergeCustomers joins two customer records that are one. Jobs, ownership and
 // contacts move to the one kept; the other stays as a marked record. Issued
-// invoices carry the name they went out with and are not rewritten. Both
-// forms were opened against the versions given.
+// invoices carry the name they went out with and are not rewritten -- nor the
+// customer an invoice that is not a job's names, which its trigger keeps as
+// issued: those are read through the merge instead (customer_now, 0068), so
+// the kept card, the worklist and the person's export count them. Both forms
+// were opened against the versions given.
 func MergeCustomers(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, keepID, dropID string, keepRev, dropRev int, reason string) (MergePreview, error) {
 	if !scope.Role.SeesCustomerPersonalData() {
 		return MergePreview{}, access.ErrForbidden
@@ -269,7 +272,10 @@ func customerMergeTx(ctx context.Context, tx pgx.Tx, keepID, dropID string, lock
 		return p, fmt.Errorf("count contacts: %w", err)
 	}
 	if err := tx.QueryRow(ctx, `
-		SELECT count(*) FROM invoices i JOIN work_orders w ON w.id = i.work_order_id WHERE w.customer_id = $1`, dropID).Scan(&p.Invoices); err != nil {
+		WITH s AS (SELECT customer_ids_read_as($1) AS ids)
+		SELECT count(*) FROM invoices i, s
+		WHERE i.customer_id = ANY(s.ids)
+		   OR (i.customer_id IS NULL AND i.work_order_id IN (SELECT w.id FROM work_orders w, s WHERE w.customer_id = ANY(s.ids)))`, dropID).Scan(&p.Invoices); err != nil {
 		return p, fmt.Errorf("count invoices: %w", err)
 	}
 	fill := func(field, keepV, dropV string) {
@@ -349,6 +355,13 @@ func doCustomerMergeTx(ctx context.Context, tx pgx.Tx, scope access.Scope, keepI
 	}
 	if _, err := tx.Exec(ctx, `UPDATE customers SET merged_into = $2, merged_at = clock_timestamp(), revision = revision + 1, updated_at = now() WHERE id = $1`, dropID, keepID); err != nil {
 		return fmt.Errorf("mark merged: %w", err)
+	}
+	// Their parties are one too (#148). The other's roles stay on its party,
+	// with their periods, and are read through the merge (party_now).
+	if _, err := tx.Exec(ctx, `
+		UPDATE parties d SET merged_into = k.id, merged_at = clock_timestamp(), revision = d.revision + 1
+		FROM parties k WHERE d.customer_id = $2 AND k.customer_id = $1`, keepID, dropID); err != nil {
+		return fmt.Errorf("merge parties: %w", err)
 	}
 	summary := fmt.Sprintf("%d jobs, %d ownerships, %d contacts moved; %d issued invoices left as issued", p.Jobs, p.Ownerships, p.People, p.Invoices)
 	if err := logChangeTx(ctx, tx, scope, "merge", keepID, dropPerson, "merged in", p.Drop.Name, summary, reason); err != nil {
@@ -471,12 +484,32 @@ func vehicleMergeTx(ctx context.Context, tx pgx.Tx, keepID, dropID string, lock 
 	if clash && p.Blocked == "" {
 		p.Blocked = "They carry the same plate at the same time."
 	}
+	// A car the business books keeps its resource and its bookings on its
+	// own record (0070), which a merge does not move: merged away, they
+	// would be left on a record nothing reads through.
+	var keepRes, dropRes bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM resources WHERE vehicle_id = $1), EXISTS (SELECT 1 FROM resources WHERE vehicle_id = $2)`,
+		keepID, dropID).Scan(&keepRes, &dropRes); err != nil {
+		return p, fmt.Errorf("check resources: %w", err)
+	}
+	switch {
+	case p.Blocked != "":
+	case keepRes && dropRes:
+		p.Blocked = "Both are cars the business books, each with bookings of its own, so they are not put together."
+	case dropRes:
+		p.Blocked = "The other is a car the business books. Keep it, and merge this one into it."
+	}
 	return p, nil
 }
 
 // MergeVehicles joins two vehicle records that are one car. Jobs, plates,
 // ownership and readings move to the one kept; a plate the other still carried
 // becomes a plate it used to carry. Refused when the periods would overlap.
+// A protocol -- a check-out, a check-in, a purchase -- keeps the vehicle it
+// was made of, frozen as it is once finished, and is read through the merge
+// instead (vehicle_now, 0068), so the kept car's protocols include the other
+// one's and a check-out and check-in still go side by side.
 func MergeVehicles(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, keepID, dropID string, keepRev, dropRev int, reason string) (VehicleMergePreview, error) {
 	if !scope.Role.SeesCustomerPersonalData() {
 		return VehicleMergePreview{}, access.ErrForbidden
@@ -507,6 +540,11 @@ func MergeVehicles(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		}
 		for _, t := range []string{"vehicle_registrations", "vehicle_ownership", "odometer_readings", "work_orders", "attachments", "bookings"} {
 			if _, err := tx.Exec(ctx, `UPDATE `+t+` SET vehicle_id = $1 WHERE vehicle_id = $2`, keepID, dropID); err != nil {
+				// An open job moved onto a car the business has booked
+				// ahead is refused as opening it there would be.
+				if c := blockConflict(err); c != err {
+					return c
+				}
 				if isOverlap(err) {
 					return fmt.Errorf("%w: the periods overlap, so they cannot be put together", ErrInvalid)
 				}

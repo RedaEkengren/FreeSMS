@@ -1,0 +1,121 @@
+{{define "content"}}
+{{with .Rental.Unit}}
+<h1>{{.Label}}</h1>
+<p><span class="tag{{if eq .Status "out_of_fleet" "at_workshop" "blocked"}} late{{end}}">{{$.T ($.Rental.FleetLabel .Status)}}</span>
+  {{.Category}} &middot; {{if .Shipped}}{{$.T .ProfileName}}{{else}}{{.ProfileName}}{{end}}
+  {{if .VehicleID}} &middot; <a href="/vehicles/{{.VehicleID}}">{{.Registration}}{{if .Make}} {{.Make}} {{.Model}}{{end}}</a>{{end}}</p>
+
+{{if $.Rental.InTheWay}}
+<div class="error"><p>{{$.T "Rentals are booked on it after that. Move or cancel them first:"}}</p>
+<ul>{{range $.Rental.InTheWay}}<li>{{$.Date ($.Local .From) "Mon 2 Jan 15:04"}}{{if .To}} &ndash; {{$.Date ($.Local .To) "Mon 2 Jan 15:04"}}{{end}}</li>{{end}}</ul></div>
+{{end}}
+
+<h2>{{$.T "In the fleet"}}</h2>
+{{if .Memberships}}
+<ul class="lines">
+  {{range .Memberships}}
+  <li>
+    <div class="row"><span>{{$.Date ($.Local .JoinedAt) "2 Jan 2006 15:04"}} &ndash; {{if .LeftAt}}{{$.Date ($.Local .LeftAt) "2 Jan 2006 15:04"}}{{else}}{{$.T "now"}}{{end}}</span></div>
+    <div class="waiting">{{$.T ($.Rental.FleetLabel .JoinedHow)}}{{with .JoinedBy}} &middot; {{.}}{{end}}{{with .JoinedNote}} &middot; {{.}}{{end}}</div>
+    {{if .LeftAt}}<div class="waiting">{{$.T ($.Rental.FleetLabel .LeftHow)}}{{with .LeftBy}} &middot; {{.}}{{end}}{{with .LeftNote}} &middot; {{.}}{{end}}</div>
+    {{else}}
+    <details><summary>{{$.T "It leaves the fleet"}}</summary>
+    <form method="post" action="/rental/memberships/{{.ID}}/end">
+      <input type="hidden" name="unit" value="{{$.Rental.Unit.ID}}">
+      <div class="pair">
+        <label><span>{{$.T "When"}}</span><input type="datetime-local" name="at" value="{{$.Today}}" required></label>
+        <label><span>{{$.T "How"}}</span><select name="how">{{range $.Rental.LeftHow}}<option value="{{.}}">{{$.T ($.Rental.FleetLabel .)}}</option>{{end}}</select></label>
+      </div>
+      <label><span>{{$.T "Note"}}</span><input name="note" maxlength="300"></label>
+      <button type="submit" class="secondary">{{$.T "Take it out of the fleet"}}</button>
+    </form>
+    </details>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p>{{$.T "Never in the fleet yet."}}</p>
+{{end}}
+{{with $.Rental.FleetUse}}{{if .MembershipID}}
+<h2>{{$.T "Rental use and insurance"}}</h2>
+<p>{{if .Reported}}<span class="tag pass">{{$.T "reported into rental use"}}</span>{{else}}<span class="tag late">{{$.T "not reported into rental use"}}</span>{{end}}</p>
+<ul class="lines">
+  {{range .Reports}}<li><div class="row"><span>{{if eq .Direction "in"}}{{$.T "Reported into rental use"}}{{else}}{{$.T "Reported out of rental use"}}{{end}} &middot; {{$.Date .ReportedOn "2 Jan 2006"}}{{with .Reference}} &middot; {{.}}{{end}}</span><span>{{.RecordedBy}}</span></div></li>{{end}}
+  {{range .Insurances}}<li><div class="row"><span>{{.Insurer}} &middot; {{.PolicyRef}} &middot; {{$.Date .ValidFrom "2 Jan 2006"}} &ndash; {{if .ValidTo}}{{$.Date .ValidTo "2 Jan 2006"}}{{else}}{{$.T "until further notice"}}{{end}}</span>
+    <span class="tag{{if ne .CoversRental "yes"}} late{{end}}">{{if eq .CoversRental "yes"}}{{$.T "covers rental"}}{{else if eq .CoversRental "no"}}{{$.T "does not cover rental"}}{{else}}{{$.T "rental cover not known"}}{{end}}</span></div></li>{{end}}
+</ul>
+<p class="waiting">{{$.T $.Rental.RegisterSays}} <a href="{{$.Rental.RegisterLink}}" rel="noopener" target="_blank">Transportstyrelsen</a></p>
+<details><summary>{{$.T "Record a report"}}</summary>
+<form method="post" action="/rental/memberships/{{.MembershipID}}/report">
+  <input type="hidden" name="unit" value="{{$.Rental.Unit.ID}}">
+  <div class="pair">
+    <label><span>{{$.T "Into or out of rental use"}}</span><select name="direction"><option value="in">{{$.T "Into rental use"}}</option><option value="out">{{$.T "Out of rental use"}}</option></select></label>
+    <label><span>{{$.T "Reported on"}}</span><input type="date" name="on" required></label>
+  </div>
+  <label><span>{{$.T "Reference"}}</span><input name="reference" maxlength="200"></label>
+  <button type="submit" class="secondary">{{$.T "Record the report"}}</button>
+</form>
+</details>
+<details><summary>{{$.T "Record an insurance"}}</summary>
+<form method="post" action="/rental/memberships/{{.MembershipID}}/insurance">
+  <input type="hidden" name="unit" value="{{$.Rental.Unit.ID}}">
+  <div class="pair">
+    <label><span>{{$.T "Insurer"}}</span><input name="insurer" maxlength="120" required></label>
+    <label><span>{{$.T "Policy number"}}</span><input name="policy_ref" maxlength="100" required></label>
+  </div>
+  <div class="pair">
+    <label><span>{{$.T "Valid from"}}</span><input type="date" name="valid_from" required></label>
+    <label><span>{{$.T "Valid until, if it ends"}}</span><input type="date" name="valid_to"></label>
+  </div>
+  <label><span>{{$.T "Covers rental use"}}</span><select name="covers"><option value="yes">{{$.T "Yes"}}</option><option value="no">{{$.T "No"}}</option><option value="unknown">{{$.T "Not known"}}</option></select></label>
+  <button type="submit" class="secondary">{{$.T "Record the insurance"}}</button>
+</form>
+</details>
+{{end}}{{end}}
+{{if not .InFleet}}
+<form method="post" action="/rental/units/{{.ID}}/fleet">
+  <div class="pair">
+    <label><span>{{$.T "From"}}</span><input type="datetime-local" name="at" value="{{$.Today}}" required></label>
+    <label><span>{{$.T "How"}}</span><select name="how">{{range $.Rental.JoinedHow}}<option value="{{.}}">{{$.T ($.Rental.FleetLabel .)}}</option>{{end}}</select></label>
+  </div>
+  <label><span>{{$.T "Note"}}</span><input name="note" maxlength="300"></label>
+  <button type="submit">{{$.T "Put it in the fleet"}}</button>
+</form>
+{{end}}
+
+{{if .InFleet}}
+<h2>{{$.T "Bookings"}}</h2>
+<ul class="lines">
+  {{range $.Rental.Bookings}}{{if eq .UnitID $.Rental.Unit.ID}}
+  <li><div class="row"><a href="/rental/bookings/{{.ID}}">{{.Reference}} &middot; {{.RenterName}}</a><span>{{$.T ($.Rental.StateLabel .State)}}</span></div>
+    <div class="waiting">{{$.Date ($.Local .Starts) "Mon 2 Jan 15:04"}} &ndash; {{$.Date ($.Local .Ends) "Mon 2 Jan 15:04"}}</div></li>
+  {{end}}{{end}}
+</ul>
+<details open><summary>{{$.T "Book it"}}</summary>
+<form method="post" action="/rental/bookings">
+  <input type="hidden" name="unit" value="{{.ID}}">
+  <input type="hidden" name="key" value="{{$.Rental.Key}}">
+  <div class="pair">
+    <label><span>{{$.T "From"}}</span><input type="datetime-local" name="from" required></label>
+    <label><span>{{$.T "To"}}</span><input type="datetime-local" name="to" required></label>
+  </div>
+  <label><span>{{$.T "Renter"}}</span><select name="renter"><option value="">{{$.T "Someone new, below"}}</option>{{range $.Rental.Renters}}<option value="{{.ID}}">{{.Name}}{{with .Phone}} &middot; {{.}}{{end}}</option>{{end}}</select></label>
+  <div class="pair">
+    <label><span>{{$.T "New renter's name"}}</span><input name="renter_name" maxlength="200"></label>
+    <label><span>{{$.T "Telephone"}}</span><input name="renter_phone" type="tel" maxlength="40"></label>
+  </div>
+  <label><span>{{$.T "Email"}}</span><input name="renter_email" type="email" maxlength="200"></label>
+  {{if $.Rental.Plans}}<label><span>{{$.T "Price plan"}}</span><select name="plan"><option value="">{{$.T "The unit's own, or its category's"}}</option>{{range $.Rental.Plans}}{{if not .Archived}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}</select></label>{{end}}
+  {{range $.Rental.Extras}}{{if not .Archived}}<label class="check"><input type="checkbox" name="extra" value="{{.ID}}"> {{.Name}} ({{$.Money ($.Rental.GrossOf .PriceMinor .VATRateBp)}} / {{$.T ($.Rental.RentalWord .Per)}})</label>{{end}}{{end}}
+  <div class="pair">
+    <label><span>{{$.T "Agreed price for the rent, if not the plan's, kr per unit including VAT"}}</span><input name="rent_price" inputmode="decimal"></label>
+    <label><span>{{$.T "Why"}}</span><input name="rent_reason" maxlength="300"></label>
+  </div>
+  <label><span>{{$.T "Hold only, until (waiting for a deposit or an answer)"}}</span><input type="datetime-local" name="hold_until"></label>
+  <button type="submit">{{$.T "Book"}}</button>
+</form>
+</details>
+{{end}}
+{{end}}
+{{end}}

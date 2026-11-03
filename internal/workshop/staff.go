@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/mail"
+	"slices"
 	"strings"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
@@ -20,7 +21,9 @@ type StaffMember struct {
 	UserID string
 	Name   string
 	Email  string
+	// Their main role, and any others they hold (#145).
 	Role   access.Role
+	Others []access.Role
 	Active bool
 	// Given the planning of people (rotas, absences).
 	Planner bool
@@ -29,11 +32,55 @@ type StaffMember struct {
 	You bool
 }
 
-// StaffRoles are the roles somebody can be given, in the order a form offers
-// them: the common ones first.
-var StaffRoles = []access.Role{
-	access.RoleTechnician, access.RoleServiceAdvisor, access.RoleParts, access.RoleOwner, access.RoleAdmin,
+// Roles is every role the person holds, main role first.
+func (m StaffMember) Roles() access.Roles { return access.Of(m.Role, m.Others...) }
+
+// Choices is what the roles form offers for this person: the roles the shop
+// may give, and every role they already hold, in StaffRoles order. A role
+// whose module has been switched off is kept by the switch, and SetStaffRoles
+// rewrites what the form sends -- so a form that left it out would take it
+// away the next time anything else was ticked, and a main role it did not
+// list would fall back to the first option.
+func (m StaffMember) Choices(offered []access.Role) []access.Role {
+	held := m.Roles()
+	var out []access.Role
+	for _, r := range StaffRoles {
+		if slices.Contains(offered, r) || held.Has(r) {
+			out = append(out, r)
+		}
+	}
+	return out
 }
+
+// StaffRoles are the roles somebody can be given, in the order a form offers
+// them: the common ones first. RolesOffered is the ones a shop may give.
+var StaffRoles = []access.Role{
+	access.RoleTechnician, access.RoleServiceAdvisor, access.RoleParts,
+	access.RoleSales, access.RoleBuyer, access.RoleRentalAgent,
+	access.RoleOwner, access.RoleAdmin,
+}
+
+// RolesOffered is the roles this shop may give somebody: Core's, and those
+// of the modules it runs. A rental desk in a shop that does not rent has
+// nothing to do and would be a door left open for the day it does (#145).
+func RolesOffered(scope access.Scope) []access.Role {
+	var out []access.Role
+	for _, r := range StaffRoles {
+		if offered(scope, r) {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// offered reports whether the shop may give r. People are Core's whatever
+// the shop runs; this only decides which roles there are to give.
+func offered(scope access.Scope, r access.Role) bool {
+	return r.Valid() && (r.Module() == "" || scope.Offers(r.Module()))
+}
+
+// errRoleNotOffered is a role whose module the shop does not run.
+var errRoleNotOffered = fmt.Errorf("%w: that role belongs to a part of FreeSMS this shop does not run", ErrInvalid)
 
 // Staff lists everybody who signs in, for whoever runs the shop.
 func Staff(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]StaffMember, error) {
@@ -43,7 +90,8 @@ func Staff(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Staff
 	var out []StaffMember
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
-			SELECT u.id, p.display_name, coalesce(p.email, ''), u.role, u.active, u.plans_staff
+			SELECT u.id, p.display_name, coalesce(p.email, ''), u.role, u.active, u.plans_staff,
+			       ARRAY(SELECT r.role FROM user_roles r WHERE r.user_id = u.id AND r.role <> u.role ORDER BY r.role)
 			FROM users u JOIN people p ON p.id = u.person_id
 			ORDER BY NOT u.active, p.display_name`)
 		if err != nil {
@@ -53,10 +101,14 @@ func Staff(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Staff
 		for rows.Next() {
 			var m StaffMember
 			var role string
-			if err := rows.Scan(&m.UserID, &m.Name, &m.Email, &role, &m.Active, &m.Planner); err != nil {
+			var others []string
+			if err := rows.Scan(&m.UserID, &m.Name, &m.Email, &role, &m.Active, &m.Planner, &others); err != nil {
 				return fmt.Errorf("scan staff: %w", err)
 			}
 			m.Role, m.You = access.Role(role), m.UserID == scope.UserID
+			for _, o := range others {
+				m.Others = append(m.Others, access.Role(o))
+			}
 			out = append(out, m)
 		}
 		return rows.Err()
@@ -80,6 +132,8 @@ func AddStaff(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, name,
 		return "", fmt.Errorf("%w: a name, so colleagues know who it is", ErrInvalid)
 	case !role.Valid():
 		return "", fmt.Errorf("%w: %q is not a role", ErrInvalid, role)
+	case !offered(scope, role):
+		return "", errRoleNotOffered
 	}
 	if addr, err := mail.ParseAddress(email); err != nil || addr.Address != email {
 		return "", fmt.Errorf("%w: that does not look like an email address", ErrInvalid)
@@ -113,6 +167,83 @@ func AddStaff(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, name,
 		return "", fmt.Errorf("add staff: %w", err)
 	}
 	return userID, nil
+}
+
+// SetStaffRoles gives somebody their main role and any others (#145).
+//
+// The main role is the one the header names and their home page starts
+// from; a capability is theirs if any role they hold has it. A role is given
+// only if the shop runs its module, except one the person already holds:
+// switching a module off does not take people's roles away, it only stops
+// new work. Nobody changes their own roles -- an owner who took away their
+// own would be locked out of this page -- and the shop is never left without
+// an owner who can sign in. Takes effect on the person's next request, which
+// reads their roles with the session.
+func SetStaffRoles(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, userID string, main access.Role, others []access.Role) error {
+	if !scope.Role.RunsTheShop() {
+		return access.ErrForbidden
+	}
+	if !looksLikeUUID(userID) {
+		return ErrNotFound
+	}
+	if userID == scope.UserID {
+		return fmt.Errorf("%w: you cannot change your own roles; another owner can", ErrInvalid)
+	}
+	want := access.Of(main, others...)
+	if !want.Valid() {
+		return fmt.Errorf("%w: those are not all roles", ErrInvalid)
+	}
+	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var heldMain string
+		var heldOthers []string
+		err := tx.QueryRow(ctx, `
+			SELECT u.role, ARRAY(SELECT r.role FROM user_roles r WHERE r.user_id = u.id)
+			FROM users u WHERE u.id = $1 FOR UPDATE`, userID).Scan(&heldMain, &heldOthers)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("read roles: %w", err)
+		}
+		held := access.Of(access.Role(heldMain))
+		for _, r := range heldOthers {
+			held = append(held, access.Role(r))
+		}
+		for _, r := range want {
+			if !held.Has(r) && !offered(scope, r) {
+				return errRoleNotOffered
+			}
+		}
+		if held.Has(access.RoleOwner) && !want.Has(access.RoleOwner) {
+			n, err := auth.OtherOwners(ctx, tx, userID)
+			if err != nil {
+				return err
+			}
+			if n == 0 {
+				return fmt.Errorf("%w: that is the last owner who can sign in", ErrInvalid)
+			}
+		}
+		if _, err := tx.Exec(ctx, `UPDATE users SET role = $2 WHERE id = $1`, userID, string(want.Main())); err != nil {
+			return fmt.Errorf("set the main role: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM user_roles WHERE user_id = $1`, userID); err != nil {
+			return fmt.Errorf("clear the other roles: %w", err)
+		}
+		for _, r := range want[1:] {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO user_roles (shop_id, user_id, role, granted_by) VALUES ($1, $2, $3, NULLIF($4, '')::uuid)`,
+				scope.ShopID, userID, string(r), scope.UserID); err != nil {
+				return fmt.Errorf("give a role: %w", err)
+			}
+		}
+		// What somebody may do is responsibility moved: from what to what,
+		// and by whom, as an event (#151). Saving the same roles is no change.
+		from, to := roleList(held), roleList(want)
+		if from == to {
+			return nil
+		}
+		return auditTx(ctx, tx, scope, userID, "roles.changed", from, to, "", nil)
+	})
 }
 
 // SetStaffActive switches somebody off -- through auth.Deactivate, which ends
@@ -159,4 +290,20 @@ func staffError(err error) error {
 		return ErrNotFound
 	}
 	return err
+}
+
+// roleList is roles as an event records them: the main one first, then the
+// rest in order.
+func roleList(roles access.Roles) string {
+	if len(roles) == 0 {
+		return ""
+	}
+	rest := make([]string, 0, len(roles)-1)
+	for _, r := range roles[1:] {
+		if r != roles[0] && !slices.Contains(rest, string(r)) {
+			rest = append(rest, string(r))
+		}
+	}
+	slices.Sort(rest)
+	return strings.Join(append([]string{string(roles[0])}, rest...), ",")
 }

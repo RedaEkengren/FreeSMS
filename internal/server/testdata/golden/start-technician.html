@@ -1,0 +1,120 @@
+<!doctype html>
+
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Inne på verkstaden</title>
+<meta name="freesms-user" content="<id-1>">
+<link rel="stylesheet" href="/static/app.css?v=<version>">
+<script src="/static/htmx.min.js?v=<version>" defer></script>
+<script src="/static/keep.js?v=<version>" defer></script>
+<script src="/static/live.js?v=<version>" defer></script>
+</head>
+<body>
+
+<a class="skip" href="#main">Hoppa till innehållet</a>
+
+<header>
+  <nav>
+    <a class="brand" href="/">FreeSMS</a>
+    
+    <a href="/mine" class="nav" data-live-topics="board parts staff actions">Till mig <span id="mine-count" class="count"
+      hx-get="/mine/count" hx-trigger="load" hx-swap="outerHTML" hx-headers='{"X-FreeSMS-Live": "1"}'></span></a>
+    
+    
+    
+    
+    <a href="/time" class="nav">Mina timmar</a>
+    <a href="/rota" class="nav">Schema</a>
+    
+    <a href="/help" class="nav">Hjälp</a>
+    <a href="/search" class="nav">Sök</a>
+  </nav>
+  <form class="m-0" method="post" action="/logout">
+    
+    <a href="/account" class="who">Mekaniker</a>
+    <button class="link" type="submit">Logga ut</button>
+  </form>
+</header>
+
+
+<div id="held" class="held" role="status" hidden
+     data-waiting-one="%d sak väntar på att skickas."
+     data-waiting-other="%d saker väntar på att skickas."
+     data-waiting-signin-one="%d sak väntar på att skickas – logga in igen för att skicka den."
+     data-waiting-signin-other="%d saker väntar på att skickas – logga in igen för att skicka dem."
+     data-refused-one="%d sak nekades av servern."
+     data-refused-other="%d saker nekades av servern."
+     data-show="Visa och avfärda"
+     data-refused-title="Nekat av servern:"
+     data-dismiss="Avfärda dessa?"
+     data-held="Ingen anslutning. Det här hålls och skickas när det finns en anslutning."
+     data-needs-connection="Det här kräver en anslutning. Ingenting har skickats och ingenting har sparats."
+     data-updated="Sidan uppdaterades."
+     data-full="Den här enheten har inte plats för mer osänt arbete. Hitta en anslutning innan du fortsätter."></div>
+
+<div id="announce" class="sr-only" role="status" aria-live="polite"></div>
+<main id="main" tabindex="-1">
+
+<h1>Inne på verkstaden</h1>
+<div id="live-home" data-live="board parts actions">
+<section class="home-now" aria-labelledby="home-now">
+  <h2 id="home-now">Att göra nu</h2>
+  <ul class="figures">
+    <li class="figure action">1 jobb väntar på delar</li>
+    <li class="figure action">1 jobb efter utlovad tid</li>
+  </ul>
+</section>
+</div>
+<div id="live-jobs" data-live="board">
+
+  
+  <a class="card" href="/jobs/<id-2>">
+    <div class="row">
+      <span class="plate">XKR 907</span>
+      <span class="tag">Väntar på delar</span>
+    </div>
+    
+    <div class="vehicle">#1002 &middot; Saab 9-3 2004</div>
+    <div class="complaint">Service, and the glow plug light stays on.</div>
+    
+    
+    
+    
+  </a>
+  
+  <a class="card" href="/jobs/<id-3>">
+    <div class="row">
+      <span class="plate">ABC 12D</span>
+      <span class="tag">Fakturerad</span>
+    </div>
+    
+    <div class="vehicle">#1001 &middot; Volvo V70 2008</div>
+    <div class="complaint">Grinding from the front when braking. Pulls left.</div>
+    
+    
+    
+    
+  </a>
+  
+  <a class="card" href="/jobs/<id-4>">
+    <div class="row">
+      <span class="plate">MLR 224</span>
+      <span class="tag">Klar för hämtning</span>
+    </div>
+    
+    <div class="vehicle">#1003 &middot; Toyota Hilux 2016</div>
+    <div class="complaint">Annual service.</div>
+    
+    
+    
+    
+  </a>
+  
+
+</div>
+
+</main>
+</body>
+</html>

@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -71,6 +72,7 @@ type pageData struct {
 	Offer           workshop.Offer
 	Version         *workshop.EnquiryQuote
 	ShopExports     []workshop.ShopExport
+	Outbox          []workshop.OutboxEntry
 	Planner         plannerPage
 	Booking         workshop.Booking
 	BookingEvents   []workshop.BookingEvent
@@ -78,10 +80,22 @@ type pageData struct {
 	BookingPreview  *BookingPreview
 	FinalCheck      workshop.FinalCheck
 	FinalSetting    workshop.FinalCheckSettings
-	MyLocale        string
+	// What the shop runs, how that changed, and what is open in a module
+	// somebody tried to switch off.
+	Modules       []workshop.ModuleState
+	ModuleChanges []workshop.ModuleChange
+	ModuleOpen    *workshop.OpenBusiness
+	ModuleReason  string
+	// What a checklist may be made for in this shop (#147).
+	Subjects []string
+	MyLocale string
 	// What is waiting for the person signed in, and the header's count of it.
-	Waiting      []workshop.WaitingItem
-	WaitingCount int
+	Waiting []workshop.ActionItem
+	// The home page's cards and the top of the queue, on the home page only.
+	Home *workshop.Home
+	// Some of the queue's providers failed: what is shown is not all.
+	WaitingIncomplete bool
+	WaitingCount      int
 	// Messages to the customer on a job, what there is to tell, and how.
 	Messages []workshop.OutboundMessage
 	Tell     []string
@@ -100,6 +114,11 @@ type pageData struct {
 	Totals     money.Totals
 	Invoices   []workshop.Invoice
 	Document   workshop.Document
+	// A contract (#150), the customer's link to it once made, and whether
+	// the page is the customer's own copy.
+	Contract         workshop.DocumentRecord
+	ContractLink     string
+	ContractCustomer bool
 	// What an invoice lacks to be written as an electronic invoice.
 	Missing                    []string
 	Balance                    workshop.Balance
@@ -184,6 +203,7 @@ type pageData struct {
 
 	Query   string
 	Results []workshop.SearchResult
+	Found   []workshop.Found
 	Vehicle workshop.Vehicle
 
 	TimeMine    []workshop.TimeEntry
@@ -207,6 +227,19 @@ type pageData struct {
 	PeriodTo    time.Time
 	Lookup      vehicledata.Vehicle
 	LookupNote  string
+	// The answer a lookup gave, with its source and age, for the intake
+	// form to say; the VIN it gave when it differs from the one typed.
+	Looked *workshop.VehicleLookup
+	// The ways money is taken in person, and the year's figure (#156).
+	PaymentFlows []workshop.PaymentFlow
+	// What technicians see (#225): the owner's settings, and on a job
+	// what is opened for the technician reading it.
+	TechView           *workshop.TechnicianViewSettings
+	TechJob            workshop.TechnicianJob
+	CounterFlows       []workshop.CounterFlow
+	Turnover           workshop.InPersonTurnover
+	LookupConflict     string
+	LookupRegistration string
 
 	// Whether a vehicle lookup provider is configured at all. Empty is the
 	// default and is not a degraded mode -- a shop without an arrangement
@@ -225,6 +258,21 @@ type pageData struct {
 	StaffForm staffForm
 	Roles     []access.Role
 	Changed   bool
+
+	// Dealer
+	// The vehicle's cycles through stock (#160), for whoever buys or sells
+	// cars.
+	StockUnits []workshop.StockUnit
+	// What a car-sales page shows (handlers_dealer.go).
+	Dealer *dealerData
+	// The leads pages (handlers_leads.go).
+	Leads leadsData
+	// The test-drive pages (handlers_testdrives.go).
+	Drives driveData
+	// The deal pages (handlers_deals.go).
+	Deals dealData
+	// Rental: every rental page's data, in one place.
+	Rental rentalData
 }
 
 // intakeBooking is the booking behind an intake, with the people the desk
@@ -268,6 +316,17 @@ type intakeForm struct {
 	ShopName  string
 	OwnerName string
 	Email     string
+	// What the shop is to run; nil before the form has been sent.
+	Modules []access.Module
+}
+
+// Runs reports whether the setup form has m ticked: what was sent, or the
+// workshop alone before anything was.
+func (f intakeForm) Runs(m access.Module) bool {
+	if f.Modules == nil {
+		return m == access.Workshop
+	}
+	return slices.Contains(f.Modules, m)
 }
 
 // setupForm is intakeForm under a name that says which page it belongs to.
@@ -291,6 +350,17 @@ var templateFuncs = template.FuncMap{
 	"date":  func(t time.Time) string { return t.Format("2006-01-02") },
 	"asset": web.Asset,
 }
+
+// AvailableModules is what this release offers a shop to run.
+func (d pageData) AvailableModules() []access.Module { return workshop.Available }
+
+// Runs reports whether the reader's shop runs a module, for a menu or a card
+// that belongs to it. Only presentation: the routes and the operations behind
+// them check for themselves (#143).
+func (d pageData) Runs(m string) bool { return d.Session.Scope.Uses(access.Module(m)) }
+
+// SubjectLabel is what a checklist is for, in words (#147).
+func (d pageData) SubjectLabel(s string) string { return workshop.SubjectLabel(s) }
 
 // MessageAbouts are what a message to a customer can be about, as the page
 // names them.
@@ -456,11 +526,14 @@ func (d pageData) Plural(key string, count int) string {
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "planclash", "lineedit", "enquiries", "enquiry", "proposal", "offer", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "einvoice", "shop", "customer", "day", "followup", "comeback", "outsourced", "outsourcedlist", "import", "importbatch", "start", "invoiceexample", "help", "credit", "rebill", "docview", "summary", "summarydoc", "supply", "order", "timeline", "duplicates", "merge", "customers", "customercard", "sell", "checklists", "part", "staff", "account", "mine", "rota", "schedule", "receivables", "setup", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "planclash", "lineedit", "enquiries", "enquiry", "proposal", "offer", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "einvoice", "shop", "customer", "day", "followup", "comeback", "outsourced", "outsourcedlist", "import", "importbatch", "start", "invoiceexample", "help", "credit", "rebill", "docview", "summary", "summarydoc", "supply", "order", "timeline", "duplicates", "merge", "customers", "customercard", "sell", "checklists", "part", "staff", "account", "mine", "rota", "schedule", "receivables", "setup", "contract", "outbox", "paymentflows", "technicians", "home", "error"}
+	// Dealer
+	pages = append(pages, "carcalc", "leads", "lead", "testdrive", "deal")
+	pages = append(pages, rentalPages...)
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).Funcs(templateFuncs).ParseFS(web.Templates,
-			"templates/layout.html", "templates/_document.html", "templates/"+name+".html")
+			"templates/layout.html", "templates/_document.html", "templates/_home.html", "templates/"+name+".html")
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", name, err)
 		}
@@ -610,4 +683,12 @@ func (d pageData) NotAgreedLines() int {
 		}
 	}
 	return n
+}
+
+// CashMethods are the ways a cash invoice is paid at the counter (#156).
+func (d pageData) CashMethods() []string { return workshop.CashMethods }
+
+// CashMethodsAll are the ways a payment flow takes money in person.
+func (d pageData) CashMethodsAll() []string {
+	return append(append([]string{}, workshop.CashMethods...), "other")
 }

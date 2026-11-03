@@ -44,6 +44,7 @@ type parsed struct {
 	Seller        string `xml:"AccountingSupplierParty>Party>PartyLegalEntity>RegistrationName"`
 	SellerBranch  string `xml:"PaymentMeans>PayeeFinancialAccount>FinancialInstitutionBranch>ID"`
 	SellerAccount string `xml:"PaymentMeans>PayeeFinancialAccount>ID"`
+	PaymentID     string `xml:"PaymentMeans>PaymentID"`
 	TaxTotal      amount `xml:"TaxTotal>TaxAmount"`
 	Subtotals     []struct {
 		Taxable  amount `xml:"TaxableAmount"`
@@ -105,6 +106,20 @@ func TestAnInvoiceIsWrittenAsPeppolBIS3(t *testing.T) {
 	}
 	if p.SellerBranch != "SE:BANKGIRO" || p.SellerAccount != "1234567" {
 		t.Errorf("payment means: %q %q", p.SellerBranch, p.SellerAccount)
+	}
+	// Without a payment reference, the invoice's number; with one, the
+	// reference, which is what a bank checking OCR numbers takes.
+	if p.PaymentID != "A-14" {
+		t.Errorf("paid with %q and no reference", p.PaymentID)
+	}
+	in := sample()
+	in.PaymentID = "1460"
+	b, err = in.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := read(t, b); p.PaymentID != "1460" {
+		t.Errorf("paid with %q, the reference is 1460", p.PaymentID)
 	}
 	if len(p.Lines) != 3 || p.Lines[0].Quantity.Unit != "HUR" || p.Lines[0].Quantity.Value != "2.5" || p.Lines[1].Quantity.Unit != "LTR" || p.Lines[0].Unit.Value != "895.00" {
 		t.Errorf("lines: %+v", p.Lines)

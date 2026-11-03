@@ -1,17 +1,11 @@
 package workshop_test
 
-import (
-	"go/ast"
-	"go/parser"
-	"go/token"
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
-)
-
 // everyRole is the exported business operations any signed-in role may call,
-// each with the reason. Everything else that takes a scope checks its role
+// each with the reason. "Any role" means any role the workshop has: the
+// workshop's operations read through inWorkshop, which refuses a person
+// holding no workshop role -- car sales, rental -- with ErrForbidden (#145). Read from the source by the permission contract
+// (#144, internal/testsupport/contract.go), which fails on an operation that
+// checks no role and is not here. Everything else that takes a scope checks its role
 // itself, where the data is read or written -- not in the handler that
 // happens to call it today.
 //
@@ -36,7 +30,6 @@ var everyRole = map[string]string{
 	"PresenceFor":        "whether the car is here, which a technician needs before looking for it; no customer data",
 	"PartsOnJob":         "which parts are priced and taken out on a job: numbers and names, no cost, no customer data",
 	"FinalCheckFor":      "whether the work is signed off, which the technician needs before saying it is ready; no customer data",
-	"ChangePassword":     "the caller's own password, checked against the current one",
 	"MyLocale":           "the caller's own language", "SetMyLocale": "the caller's own language",
 	"SetMyTheme": "the caller's own light or dark",
 	"AlertSound": "the caller's own setting", "SetAlertSound": "the caller's own setting",
@@ -44,6 +37,8 @@ var everyRole = map[string]string{
 	// Each role is given its own kind of item, decided inside by role; the
 	// technician's carry the job and the shop's own words, never a customer.
 	"WaitingFor": "what is waiting for the caller, per role", "CountWaiting": "how many of WaitingFor",
+	"SearchAll": "each provider asks only what the caller's role may find, in its own query",
+	"HomeFor":   "each card is read only for the roles it says may see it",
 
 	// The job as the person holding the spanner sees it. Job carries the
 	// vehicle and the work, and no customer field exists on it to leak.
@@ -52,7 +47,8 @@ var everyRole = map[string]string{
 
 	// What the technician reports and the front desk acts on.
 	"ReportFinding": "a technician's report", "FindingsFor": "the reports on a job",
-	"RequestPart": "a technician's request", "PartRequestsFor": "the requests on a job",
+	"AskDeskToContact": "a technician's request that the desk ring the customer",
+	"RequestPart":      "a technician's request", "PartRequestsFor": "the requests on a job",
 	"RequestParts": "a technician's request, with how many",
 
 	// The inspection is done by whoever has the car. The customer's link,
@@ -63,64 +59,18 @@ var everyRole = map[string]string{
 	"Templates":   "the checklists to start one from",
 	"PhotoInShop": "whether a photograph belongs to the shop, for serving it",
 
+	// Which roles a shop has to give: a list of role names, the same for
+	// everybody in the shop, and no person's data.
+	"RolesOffered": "the roles the shop's modules have, no person's data",
+
+	"ImportKindsFor":  "the kinds of record the shop's modules have, no person's data",
+	"SubjectsOffered": "the subjects the shop's modules have, no person's data",
+
+	// Protocols other than a job's: delegate to endProtocol, which reads the
+	// subject and checks the role for it (subjectAllows).
+	"CompleteProtocol": "delegates to endProtocol, which checks the role for the protocol's subject",
+	"AbandonProtocol":  "delegates to endProtocol, which checks the role for the protocol's subject",
+
 	// Delegates to TakeInWith, which checks.
 	"TakeIn": "delegates to TakeInWith",
-}
-
-// Every exported operation that takes a scope either checks the role itself
-// or is in everyRole with a reason.
-//
-// Found otherwise: AddLine, InvoicesFor, the time library, the customer's
-// links and auth.Deactivate relied on the one handler that called them. None
-// was reachable over HTTP by the wrong role; the next caller would not have
-// known it had to check.
-func TestEveryOperationSaysWhoMayCallIt(t *testing.T) {
-	checked := 0
-	for _, dir := range []string{".", "../auth"} {
-		fset := token.NewFileSet()
-		pkgs, err := parser.ParseDir(fset, dir, func(fi os.FileInfo) bool {
-			return !strings.HasSuffix(fi.Name(), "_test.go")
-		}, 0)
-		if err != nil {
-			t.Fatalf("parse %s: %v", dir, err)
-		}
-		for _, pkg := range pkgs {
-			for name, file := range pkg.Files {
-				src, _ := os.ReadFile(name)
-				for _, decl := range file.Decls {
-					fn, ok := decl.(*ast.FuncDecl)
-					if !ok || fn.Recv != nil || !fn.Name.IsExported() || !takesScope(fn) {
-						continue
-					}
-					checked++
-					body := string(src[fset.Position(fn.Body.Pos()).Offset:fset.Position(fn.Body.End()).Offset])
-					checks := strings.Contains(body, "scope.Role.") || strings.Contains(body, "(scope.Role,") ||
-						strings.Contains(body, "scope.PlansStaff()")
-					_, open := everyRole[fn.Name.Name]
-					switch {
-					case !checks && !open:
-						t.Errorf("%s (%s) takes a scope and checks no role; check it, or add it to everyRole with the reason",
-							fn.Name.Name, filepath.Base(name))
-					case checks && open:
-						t.Errorf("%s checks a role and is also listed as open to every role; one of the two is wrong",
-							fn.Name.Name)
-					}
-				}
-			}
-		}
-	}
-	if checked < 60 {
-		t.Errorf("only %d operations found; the parser has stopped seeing them", checked)
-	}
-}
-
-func takesScope(fn *ast.FuncDecl) bool {
-	for _, p := range fn.Type.Params.List {
-		if se, ok := p.Type.(*ast.SelectorExpr); ok && se.Sel.Name == "Scope" {
-			if x, ok := se.X.(*ast.Ident); ok && x.Name == "access" {
-				return true
-			}
-		}
-	}
-	return false
 }

@@ -38,7 +38,35 @@ var ExportTables = []string{
 	"stock_movements", "price_bands", "labour_times", "erasures", "shop_exports",
 	"bookings", "booking_events", "staff_absences", "shop_closures", "rotas", "rota_hours", "shift_changes", "outbound_messages", "message_events",
 	"work_order_state_changes", "quotes", "quote_lines", "quote_decisions", "enquiries", "enquiry_lines", "job_assignments", "job_plans", "work_order_line_revisions", "job_tasks", "job_task_events", "record_changes", "customer_people", "job_notes",
-	"supplier_orders", "supplier_order_lines", "supplier_line_etas", "supplier_receipts", "supplier_returns", "job_recommendations", "delivery_summaries", "invoice_deliveries", "invoice_corrections", "receivable_cases", "receivable_events", "day_settlements", "day_reviews", "comebacks", "comeback_claims", "comeback_events", "outsourced_work", "outsourced_events", "import_batches", "import_refs", "setup_steps",
+	"supplier_orders", "supplier_order_lines", "supplier_line_etas", "supplier_receipts", "supplier_returns", "job_recommendations", "delivery_summaries", "invoice_deliveries", "invoice_corrections", "receivable_cases", "receivable_events", "day_settlements", "day_reviews", "comebacks", "comeback_claims", "comeback_events", "outsourced_work", "outsourced_events", "import_batches", "import_refs", "setup_steps", "shop_module_changes", "user_roles", "protocol_photo_removals", "parties", "party_roles", "resources", "resource_block_jobs", "resource_retirements", "audit_events", "deposits", "deposit_applications", "vehicle_lookups", "cash_invoices", "payment_flows", "payment_flow_checks", "cash_register_settings", "payouts", "bank_statement_lines", "payment_matches", "identity_retention_settings", "outbox", "outbox_events", "document_templates", "document_template_versions", "document_record_parties", "document_retention_settings",
+	// What technicians see (#225): the shop's decisions, with who and why.
+	"technician_view_changes", "technician_view_exceptions",
+	// Dealer: a car's cycles through stock, what was paid for it and the
+	// checks before the money left (#160-#162).
+	"stock_units", "vehicle_purchases", "stock_checks", "purchase_loans", "stock_check_overrides",
+	// What a buyer worked out before bidding (#163).
+	"purchase_calculations", "purchase_calculation_costs", "purchase_calculation_acceptances",
+	// What a car cost beyond its price (#164).
+	"stock_cost_entries", "stock_cost_settings",
+	// Each sale of a stock car, and when one fell through.
+	"stock_unit_sales",
+	// What the shop was asked about its cars, and by whom (#172).
+	"leads", "lead_events", "lead_contacts", "lead_settings",
+	// Test drives, the licence seen and the keys out and back (#173).
+	"test_drives", "test_drive_licence_checks", "test_drive_events", "test_drive_settings",
+	// Deals, their terms, defects and what each buyer answered (#175).
+	"vehicle_sales", "vehicle_sale_terms", "vehicle_sale_buyers", "vehicle_sale_lines", "vehicle_sale_defects",
+	"vehicle_sale_defect_answers", "vehicle_sale_events",
+	// Rental
+	"rental_permits", "rental_permit_revocations", "rental_profiles", "rental_units", "fleet_memberships",
+	"rate_plans", "rate_plan_seasons", "rental_extras", "rental_bookings", "rental_booking_events", "rental_booking_lines",
+	"rental_drivers", "rental_licence_checks",
+	// Each end of a rental, and what a return found (#194).
+	"rental_handovers", "damage_cases",
+	// A fleet vehicle's paperwork, and handover gaps let go (#202).
+	"fleet_rental_reports", "fleet_insurances", "rental_gap_overrides",
+	// How long the rental register is kept (#200).
+	"rental_register_retention",
 }
 
 // exportQueries are tables exported with chosen columns, because one of
@@ -48,6 +76,38 @@ var exportQueries = map[string]string{
 	"inspection_shares": `SELECT id, shop_id, inspection_id, created_by, created_at, expires_at, revoked_at FROM inspection_shares`,
 	"invoice_links":     `SELECT id, shop_id, invoice_id, created_by, created_at, expires_at, revoked_at, revoked_by, first_opened_at, last_opened_at, opens FROM invoice_links`,
 	"job_links":         `SELECT id, shop_id, work_order_id, enquiry_id, created_by, created_at, expires_at, revoked_at FROM job_links`,
+	// A period as its two ends and a buffer in seconds, which a spreadsheet
+	// reads; a range and an interval have no common written form (#149).
+	"resource_blocks": `SELECT id, shop_id, resource_id, kind, status, lower(period) AS starts_at, upper(period) AS ends_at,
+		extract(epoch FROM buffer_before)::bigint AS buffer_before_seconds, extract(epoch FROM buffer_after)::bigint AS buffer_after_seconds,
+		expires_at, source_kind, source_id, request_key, reason, created_at, created_by, ended_at, ended_by FROM resource_blocks`,
+	// Hashes as hex, which a reader can compare with the one printed on a
+	// paper copy; a link's token never leaves, as an invoice link's (#150).
+	"document_records": `SELECT id, shop_id, kind, subject_kind, subject_id, template_version_id, title, body, data,
+		encode(content_sha256, 'hex') AS content_sha256, supersedes_id, created_at, created_by, erased_at FROM document_records`,
+	"document_signatures": `SELECT id, shop_id, document_id, document_party_id, method, signed_at, recorded_by, provider_ref,
+		evidence_key, witnessed_by, encode(document_sha256, 'hex') AS document_sha256 FROM document_signatures`,
+	"document_record_links": `SELECT id, shop_id, document_id, created_by, created_at, expires_at, revoked_at, revoked_by,
+		first_opened_at, last_opened_at, opens FROM document_record_links`,
+	// Sealed as they are held, never opened: the export is not a way round
+	// the key (#153). README.txt says how to open them with it.
+	"identity_records": `SELECT id, shop_id, party_id, kind, purpose, legal_basis, recorded_by, recorded_at, expires_at,
+		key_id, encode(sealed, 'base64') AS sealed_base64, CASE WHEN verification_ref IS NULL THEN NULL ELSE 'held' END AS verification_ref,
+		ended_at, ended_by, end_reason, value_removed_at FROM identity_records`,
+	"resource_block_changes": `SELECT id, shop_id, block_id, change, lower(old_period) AS old_starts_at, upper(old_period) AS old_ends_at,
+		lower(new_period) AS new_starts_at, upper(new_period) AS new_ends_at, by_user, at, reason FROM resource_block_changes`,
+	// Dealer: the evidence as document ids separated by spaces, and how long
+	// a check stands in seconds, which a spreadsheet reads (#161, #162).
+	"vat_eligibility": `SELECT id, shop_id, purchase_id, seller_type, eligible,
+		array_to_string(evidence_document_ids::text[], ' ') AS evidence_document_ids, note, supersedes_id, reason,
+		recorded_at, recorded_by FROM vat_eligibility`,
+	"stock_check_settings": `SELECT id, shop_id, seq, kind, required, extract(epoch FROM max_age)::bigint AS max_age_seconds,
+		changed_at, changed_by FROM stock_check_settings`,
+	// Rental: a profile's cleaning buffer in seconds, as a block's buffers.
+	"rental_profile_versions": `SELECT id, shop_id, profile_id, version, permit_required, registration_required,
+		licence_check_required, licence_categories, reporting_required, check_out_template_id, check_in_template_id,
+		extract(epoch FROM cleaning_buffer)::bigint AS cleaning_buffer_seconds, mileage_allowance, default_deposit_minor,
+		minimum_age, sublet_banned, unconfirmed, created_at, created_by, insurance_required FROM rental_profile_versions`,
 }
 
 // exportExcluded are the tables that do not go, and why.
@@ -283,6 +343,9 @@ func writeTable(ctx context.Context, tx pgx.Tx, z *zip.Writer, table string) (in
 			return n, err
 		}
 		for i, v := range values {
+			// As stored: this is data for software and a restore, and a
+			// value is not rewritten for a spreadsheet (SpreadsheetCell is
+			// for the files people open, as the rental register's).
 			record[i] = exportValue(v, fields[i].DataTypeOID)
 		}
 		if err := cw.Write(record); err != nil {
@@ -364,6 +427,13 @@ anonymised, with the erasure recorded in erasures.csv.
 
 Not included, by design: passwords, sign-in sessions, the tokens of
 customer links, failed sign-in attempts, half-typed drafts.
+
+Identity records (identity_records.csv) are exported sealed, never in
+the clear: sealed_base64 is the nonce (12 bytes) followed by the
+AES-256-GCM ciphertext, sealed with the shop's key named in key_id, and
+the associated data is shop_id/id/party_id/kind in lower case, separated
+by "/". Whoever holds the shop's key can open them; without it nobody
+can, which is the point. A reference to a check is shown only as held.
 
 manifest.json says when this was taken, by which release, and how many
 rows each file holds.

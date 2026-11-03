@@ -14,6 +14,15 @@ import (
 
 const customerPerson = "22222222-2222-2222-2222-222222222223"
 
+// otherRoles is a person holding these roles in a shop that runs every
+// module.
+func otherRoles(roles access.Roles) access.Scope {
+	s := advisor()
+	s.Role = roles
+	s.Modules = access.Modules
+	return s
+}
+
 // Who may call what, by calling it: the business operations that price,
 // read documents, keep the time library and the stock prices, and handle a
 // person's data, each called directly -- no handler in front -- as every
@@ -36,9 +45,22 @@ func TestTheRoleMatrix(t *testing.T) {
 
 	roles := map[string]access.Scope{
 		"technician": technician(), "parts": partsDeskScope(), "front desk": advisor(), "owner": owner(),
+		// Car sales and rental (#145), in a shop that runs every module so
+		// that the refusal is their role's, not the module's. They have no
+		// part in any operation here: the workshop's refuse them in
+		// inWorkshop, Core's by capability.
+		"sales":           otherRoles(access.Of(access.RoleSales)),
+		"buyer":           otherRoles(access.Of(access.RoleBuyer)),
+		"rental desk":     otherRoles(access.Of(access.RoleRentalAgent)),
+		"sales and buyer": otherRoles(access.Of(access.RoleSales, access.RoleBuyer)),
+		"parts and tech": func() access.Scope {
+			s := partsDeskScope()
+			s.Role = access.Of(access.RoleParts, access.RoleTechnician)
+			return s
+		}(),
 	}
 	frontDesk := []string{"front desk", "owner"}
-	stock := []string{"parts", "front desk", "owner"}
+	stock := []string{"parts", "front desk", "owner", "parts and tech"}
 
 	// Each call reports what it handed back, so a refusal can be checked to
 	// have handed back nothing.
@@ -126,6 +148,27 @@ func TestTheRoleMatrix(t *testing.T) {
 		}
 	}
 
+	// And per module (#144): each operation again, as a role that may call
+	// it, in a shop that has switched the workshop off. The workshop's refuse
+	// with ErrModuleOff and hand back nothing; Core's go on.
+	for _, op := range ops {
+		if len(op.allowed) == 0 {
+			continue
+		}
+		off := roles[op.allowed[0]]
+		off.Modules = nil
+		payload, err := op.do(off)
+		_, isCore := core[op.name]
+		switch {
+		case isCore && errors.Is(err, access.ErrModuleOff):
+			t.Errorf("%s is Core and refused with the workshop off", op.name)
+		case !isCore && !errors.Is(err, access.ErrModuleOff):
+			t.Errorf("%s with the workshop off: %v, want ErrModuleOff", op.name, err)
+		case !isCore && payload != 0:
+			t.Errorf("%s with the workshop off: refused, and handed back something anyway", op.name)
+		}
+	}
+
 	// The refused writes changed nothing. The allowed ones above added one
 	// line each for the front desk and the owner, and nothing else.
 	_, lines, _ := workshop.JobByID(ctx, pool, advisor(), job)
@@ -141,7 +184,7 @@ func TestOnlyTheFrontDeskErasesAPerson(t *testing.T) {
 	addTechnician(t, pool)
 	ctx := context.Background()
 	for _, s := range []access.Scope{technician(), partsDeskScope()} {
-		if err := workshop.ErasePerson(ctx, pool, s, customerPerson, "asked"); !errors.Is(err, access.ErrForbidden) {
+		if err := workshop.ErasePerson(ctx, pool, s, &recordingRemover{}, customerPerson, "asked"); !errors.Is(err, access.ErrForbidden) {
 			t.Errorf("ErasePerson as %s: %v, want forbidden", s.Role, err)
 		}
 	}

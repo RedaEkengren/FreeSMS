@@ -1,0 +1,22 @@
+{{define "content"}}
+<h1>{{.T "Calls to other services"}}</h1>
+<p class="waiting">{{.T "What FreeSMS was to ask of another service -- a signing service, a payment provider -- and could not, or what a person has to do by hand because no service is connected. Nothing else waits on these."}}</p>
+{{if .Outbox}}
+<ul class="lines">
+  {{range .Outbox}}
+  <li>
+    <div class="row"><span>{{$.T .KindLabel}}</span><span class="tag">{{$.T .StateLabel}}</span></div>
+    <div class="waiting">{{$.Date ($.Local .At) "2 Jan 15:04"}}{{if .Attempts}} &middot; {{$.N "%d attempt" .Attempts}}{{end}}{{if .Detail}} &middot; {{.Detail}}{{end}}</div>
+    <form method="post" action="/outbox/{{.ID}}/retry" class="inline"><button type="submit" class="link">{{$.T "Try again"}}</button></form>
+    <form method="post" action="/outbox/{{.ID}}/done" class="inline"><button type="submit" class="link">{{$.T "Done by hand"}}</button></form>
+    <form method="post" action="/outbox/{{.ID}}/cancel" class="inline">
+      <label><span>{{$.T "Why it is cancelled"}}</span><input name="reason" maxlength="300" required></label>
+      <button type="submit" class="link">{{$.T "Cancel it"}}</button>
+    </form>
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p>{{.T "Nothing is waiting."}}</p>
+{{end}}
+{{end}}

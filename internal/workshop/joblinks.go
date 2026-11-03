@@ -35,7 +35,7 @@ func CreateJobLink(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	token := base64.RawURLEncoding.EncodeToString(raw)
 	sum := sha256.Sum256([]byte(token))
 
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var exists bool
 		if err := tx.QueryRow(ctx, `SELECT true FROM work_orders WHERE id = $1 FOR UPDATE`, jobID).Scan(&exists); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -138,13 +138,18 @@ func JobStatus(ctx context.Context, pool *pgxpool.Pool, shopID, token string) (C
 		st.CarAway, st.ExpectedBack = !p.Here, p.ExpectedBack
 
 		// The newest version, while the job is still open for answering: a
-		// finished job is not asked anything.
+		// finished job is not asked anything, and neither is one the desk has
+		// taken back to a draft or an estimate -- its buttons would be refused.
 		if !settled(state) && state != StateReady {
 			q, err := latestQuoteTx(ctx, tx, jobID)
 			if err != nil {
 				return err
 			}
-			if q != nil {
+			back, err := takenBackTx(ctx, tx, jobID, state, q)
+			if err != nil {
+				return err
+			}
+			if q != nil && !back {
 				cq := &CustomerQuote{ID: q.ID, Version: q.Version, Lines: q.Lines,
 					NetMinor: q.NetMinor, VATMinor: q.VATMinor, GrossMinor: q.GrossMinor}
 				if q.Decision != nil {

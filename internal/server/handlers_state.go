@@ -291,9 +291,22 @@ func (s *Server) handleInvoice(w http.ResponseWriter, r *http.Request) {
 
 	var opts []workshop.IssueOption
 	if r.FormValue("confirm_unagreed") != "" {
-		opts = append(opts, workshop.InvoiceUnagreedLines())
+		opts = append(opts, workshop.InvoiceUnagreedLines(r.FormValue("unagreed_reason")))
 	}
-	_, err := workshop.Issue(r.Context(), s.pool, session.Scope, id, opts...)
+	var err error
+	if method := r.FormValue("paid_now"); method != "" {
+		// Paid at the counter as it is invoiced: one step, a cash invoice
+		// (#156). Neither is written if either fails. Chosen as one of the
+		// shop's payment flows, the flow says the way of paying.
+		var flow string
+		if fid, ok := strings.CutPrefix(method, "flow:"); ok {
+			flow, method = fid, ""
+		}
+		_, err = workshop.IssueAndPay(r.Context(), s.pool, session.Scope, id, workshop.CashSale{FlowID: flow,
+			Payments: []workshop.CashPayment{{Method: method, Reference: r.FormValue("paid_reference")}}}, opts...)
+	} else {
+		_, err = workshop.Issue(r.Context(), s.pool, session.Scope, id, opts...)
+	}
 
 	var illegal workshop.ErrIllegalTransition
 	switch {
@@ -314,6 +327,10 @@ func (s *Server) handleInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	case errors.Is(err, workshop.ErrUnagreedLines):
 		s.renderError(w, r, http.StatusConflict, "Not invoiced", trimInvalid(err))
+		return
+	case errors.Is(err, workshop.ErrInvalid):
+		// A cash invoice's payment that does not add up: nothing written.
+		s.renderError(w, r, http.StatusBadRequest, "Not invoiced", trimInvalid(err))
 		return
 	case err != nil:
 		s.fault(w, r, "issue invoice", err)

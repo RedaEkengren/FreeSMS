@@ -109,7 +109,7 @@ func (s *Server) handleHelp(w http.ResponseWriter, r *http.Request) {
 		}
 	case "":
 		// The page for whoever is asking.
-		role = map[string]string{"technician": "workshop", "owner": "owner", "admin": "owner"}[string(session.Scope.Role)]
+		role = map[string]string{"technician": "workshop", "owner": "owner", "admin": "owner"}[string(session.Scope.Role.Main())]
 		if role == "" {
 			role = "reception"
 		}

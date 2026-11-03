@@ -1,0 +1,70 @@
+<!doctype html>
+
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Till mig</title>
+<meta name="freesms-user" content="<id-1>">
+<link rel="stylesheet" href="/static/app.css?v=<version>">
+<script src="/static/htmx.min.js?v=<version>" defer></script>
+<script src="/static/keep.js?v=<version>" defer></script>
+<script src="/static/live.js?v=<version>" defer></script>
+</head>
+<body>
+
+<a class="skip" href="#main">Hoppa till innehållet</a>
+
+<header>
+  <nav>
+    <a class="brand" href="/">FreeSMS</a>
+    
+    <a href="/mine" class="nav" data-live-topics="board parts staff actions">Till mig <span id="mine-count" class="count"
+      hx-get="/mine/count" hx-trigger="load" hx-swap="outerHTML" hx-headers='{"X-FreeSMS-Live": "1"}'></span></a>
+    
+    
+    
+    
+    <a href="/time" class="nav">Mina timmar</a>
+    <a href="/rota" class="nav">Schema</a>
+    
+    <a href="/help" class="nav">Hjälp</a>
+    <a href="/search" class="nav">Sök</a>
+  </nav>
+  <form class="m-0" method="post" action="/logout">
+    
+    <a href="/account" class="who">Mekaniker</a>
+    <button class="link" type="submit">Logga ut</button>
+  </form>
+</header>
+
+
+<div id="held" class="held" role="status" hidden
+     data-waiting-one="%d sak väntar på att skickas."
+     data-waiting-other="%d saker väntar på att skickas."
+     data-waiting-signin-one="%d sak väntar på att skickas – logga in igen för att skicka den."
+     data-waiting-signin-other="%d saker väntar på att skickas – logga in igen för att skicka dem."
+     data-refused-one="%d sak nekades av servern."
+     data-refused-other="%d saker nekades av servern."
+     data-show="Visa och avfärda"
+     data-refused-title="Nekat av servern:"
+     data-dismiss="Avfärda dessa?"
+     data-held="Ingen anslutning. Det här hålls och skickas när det finns en anslutning."
+     data-needs-connection="Det här kräver en anslutning. Ingenting har skickats och ingenting har sparats."
+     data-updated="Sidan uppdaterades."
+     data-full="Den här enheten har inte plats för mer osänt arbete. Hitta en anslutning innan du fortsätter."></div>
+
+<div id="announce" class="sr-only" role="status" aria-live="polite"></div>
+<main id="main" tabindex="-1">
+
+<h1>Till mig</h1>
+
+<div id="live-mine" data-live="board parts actions">
+
+  <p class="empty">Inget väntar på dig.</p>
+
+</div>
+
+</main>
+</body>
+</html>

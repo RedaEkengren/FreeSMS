@@ -8,7 +8,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -84,7 +83,7 @@ func CatalogueEntryByID(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		return CatalogueEntry{}, ErrNotFound
 	}
 	var e CatalogueEntry
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		err := tx.QueryRow(ctx, `
 			SELECT id, number, name, unit, coalesce(location, ''), cost_minor, price_minor,
 			       (minimum_quantity * 1000)::bigint, active,
@@ -105,7 +104,7 @@ func RetiredParts(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (
 		return nil, access.ErrForbidden
 	}
 	var out []CatalogueEntry
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT id, number, name FROM parts WHERE NOT active ORDER BY number`)
 		if err != nil {
 			return fmt.Errorf("list retired parts: %w", err)
@@ -159,7 +158,7 @@ func SavePart(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, e Cat
 	}
 	codes := append([]string{e.Number}, e.Codes...)
 
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		// A scan finds a part by its number or by any code, so neither may
 		// already belong to another part: the scanner would find whichever
 		// came first, which is a wrong part with no warning.
@@ -239,7 +238,7 @@ func SetPartActive(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if !looksLikeUUID(id) {
 		return ErrNotFound
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `UPDATE parts SET active = $2, updated_at = now() WHERE id = $1`, id, active)
 		if err != nil {
 			return fmt.Errorf("set part active: %w", err)

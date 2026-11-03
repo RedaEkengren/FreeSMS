@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
+	"github.com/RedaEkengren/FreeSMS/internal/payref"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,7 +23,7 @@ import (
 // Separate series exist for separate books -- a second workshop, a parts
 // counter -- and each is numbered independently, so the concept has to be in
 // the schema from the start even while there is only one.
-const DefaultSeries = "A"
+const DefaultSeries = payref.DefaultSeries
 
 // ErrAlreadyInvoiced is returned when a work order already has an invoice.
 var ErrAlreadyInvoiced = errors.New("workshop: this order has already been invoiced")
@@ -37,11 +39,26 @@ var ErrAlreadyCredited = fmt.Errorf("%w: this invoice has already been credited"
 // ErrNothingToInvoice is returned for an order with no chargeable lines.
 var ErrNothingToInvoice = errors.New("workshop: there is nothing on this order to charge for")
 
+// Invoice sources (#146): what an invoice was issued for. Every invoice
+// says, and a credit note says the same as what it credits.
+const (
+	SourceWorkshop    = "workshop"
+	SourceVehicleSale = "vehicle_sale"
+	SourceRental      = "rental"
+	SourceManual      = "manual"
+)
+
+// ErrNotAJobsDocument is a message about an invoice that is not a job's.
+var ErrNotAJobsDocument = fmt.Errorf("%w: only a workshop invoice can be sent as a message yet; hand this one over and write down how", ErrInvalid)
+
 // Invoice is an issued document.
 type Invoice struct {
-	ID           string
-	Series       string
-	Number       int64
+	ID     string
+	Series string
+	Number int64
+	// What it was issued for, and the job when that was the workshop's;
+	// empty for any other source.
+	Source       string
 	WorkOrderID  string
 	CreditOfID   *string
 	IssuedAt     time.Time
@@ -63,14 +80,24 @@ func (i Invoice) Gross() string { return money.Format(i.GrossMinor) }
 // to, until somebody says that is what they mean.
 var ErrUnagreedLines = fmt.Errorf("%w: a line was put on after the customer agreed and has no agreement; put it to the customer, take it off, or tick that it is to be invoiced anyway", ErrInvalid)
 
-type issueOptions struct{ unagreed bool }
+type issueOptions struct {
+	unagreed bool
+	why      string
+}
 
 // IssueOption changes how Issue behaves.
 type IssueOption func(*issueOptions)
 
 // InvoiceUnagreedLines lets Issue include lines the customer has not agreed
-// to. The invoice still marks them.
-func InvoiceUnagreedLines() IssueOption { return func(o *issueOptions) { o.unagreed = true } }
+// to, for the reason given, which is required. The invoice still marks
+// them, and the decision is its own event: who, when, which lines and why
+// (#151).
+func InvoiceUnagreedLines(reason string) IssueOption {
+	return func(o *issueOptions) { o.unagreed, o.why = true, reason }
+}
+
+// ErrUnagreedNoReason is invoicing lines nobody agreed to without saying why.
+var ErrUnagreedNoReason = fmt.Errorf("%w: say why the lines nobody agreed to are invoiced, in 300 characters or fewer", ErrInvalid)
 
 // Issue turns a work order into an invoice and moves it to invoiced.
 //
@@ -88,7 +115,22 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 	}
 
 	var inv Invoice
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		inv, err = issueTx(ctx, tx, scope, workOrderID, o)
+		return err
+	})
+	if err != nil {
+		return Invoice{}, err
+	}
+	return inv, nil
+}
+
+// issueTx is Issue inside the caller's transaction, which runs in the
+// workshop: a cash invoice issues and is paid in the same one (#156).
+func issueTx(ctx context.Context, tx pgx.Tx, scope access.Scope, workOrderID string, o issueOptions) (Invoice, error) {
+	var inv Invoice
+	err := func() error {
 		// The lock first, then the question.
 		//
 		// This used to ask whether an invoice existed and only afterwards take
@@ -158,18 +200,24 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 			return ErrNothingToInvoice
 		}
 		// A line put on after the customer said yes is not part of what they
-		// said yes to. Invoicing it is possible, but somebody decides to.
-		if !o.unagreed && !wasDeclined {
-			var n int
+		// said yes to. Invoicing it is possible, but somebody decides to,
+		// and says why.
+		var unagreed []string
+		if !wasDeclined {
 			if err := tx.QueryRow(ctx, `
-				SELECT count(*) FROM work_order_lines
+				SELECT coalesce(array_agg(id::text ORDER BY position, id), '{}') FROM work_order_lines
 				WHERE work_order_id = $1 AND cost_bearer = 'customer' AND declined_at IS NULL
 				  AND withdrawn_at IS NULL AND approved_at IS NULL AND customer_decision_id IS NULL`,
-				workOrderID).Scan(&n); err != nil {
-				return fmt.Errorf("count unagreed lines: %w", err)
+				workOrderID).Scan(&unagreed); err != nil {
+				return fmt.Errorf("read unagreed lines: %w", err)
 			}
-			if n > 0 {
-				return ErrUnagreedLines
+		}
+		if len(unagreed) > 0 && !o.unagreed {
+			return ErrUnagreedLines
+		}
+		if len(unagreed) > 0 {
+			if o.why, err = checkReason(o.why, ErrUnagreedNoReason); err != nil {
+				return err
 			}
 		}
 		// Förbrukningsmaterial and the invoicing fee, as lines of their own
@@ -206,8 +254,12 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 			   net_minor, vat_minor, gross_minor,
 			   ` + electronicColumns + `)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
-			        $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)
+			        $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34)
 			RETURNING id, issued_at`
+		ocr, err := paymentOCR(DefaultSeries, number)
+		if err != nil {
+			return err
+		}
 		args := append([]any{
 			scope.ShopID, DefaultSeries, number, workOrderID, scope.UserID,
 			*name, address, orgNumber, vatNumber,
@@ -215,7 +267,7 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 			sold.Phone, sold.Email, sold.PaymentReference,
 			sold.PaymentTermsDays, sold.FTax,
 			totals.NetMinor, totals.VATMinor, totals.GrossMinor,
-		}, electronicArgs(sold, buyer)...)
+		}, electronicArgs(sold, buyer, ocr)...)
 		if err := tx.QueryRow(ctx, insert, args...).Scan(&inv.ID, &inv.IssuedAt); err != nil {
 			if dup := alreadyThere(err, ErrAlreadyInvoiced); errors.Is(dup, ErrAlreadyInvoiced) {
 				return dup
@@ -226,6 +278,12 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 		if err := copyLines(ctx, tx, scope.ShopID, inv.ID, lines, 1); err != nil {
 			return err
 		}
+		if len(unagreed) > 0 {
+			if err := auditTx(ctx, tx, scope, inv.ID, "invoice.unagreed_lines_invoiced", "", "", o.why,
+				map[string]any{"work_order_id": workOrderID, "lines": unagreed, "count": len(unagreed)}); err != nil {
+				return err
+			}
+		}
 
 		// The parts leave the shelf here, in the transaction that issues the
 		// document. Anywhere else and the two can disagree.
@@ -233,12 +291,12 @@ func Issue(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, workOrde
 			return err
 		}
 
-		inv.Series, inv.Number = DefaultSeries, number
+		inv.Series, inv.Number, inv.Source = DefaultSeries, number, SourceWorkshop
 		inv.WorkOrderID = workOrderID
 		inv.CustomerName = *name
 		inv.NetMinor, inv.VATMinor, inv.GrossMinor = totals.NetMinor, totals.VATMinor, totals.GrossMinor
 		return nil
-	})
+	}()
 	if err != nil {
 		return Invoice{}, err
 	}
@@ -263,9 +321,9 @@ func InvoicesFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, wo
 		return nil, access.ErrForbidden
 	}
 	var out []Invoice
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
-			SELECT id, series, number, work_order_id, credit_of_id, issued_at,
+			SELECT id, series, number, coalesce(work_order_id::text, ''), credit_of_id, issued_at,
 			       customer_name, net_minor, vat_minor, gross_minor
 			FROM invoices WHERE work_order_id = $1 ORDER BY issued_at, number`, workOrderID)
 		if err != nil {
@@ -387,6 +445,8 @@ type invoiceLine struct {
 	CreditsLineID string
 	// UN/ECE Recommendation 20 code for the unit; see unitCode.
 	UnitCode string
+	// A car sold under the margin scheme (#177).
+	MarginScheme bool
 }
 
 func chargeableLines(ctx context.Context, tx pgx.Tx, workOrderID string) ([]invoiceLine, error) {
@@ -444,13 +504,13 @@ func writeInvoiceLines(ctx context.Context, tx pgx.Tx, shopID, invoiceID string,
 		INSERT INTO invoice_lines
 		  (shop_id, invoice_id, position, kind, description, quantity,
 		   unit_price_minor, vat_rate_bp, net_minor, vat_minor, credits_line_id,
-		   unit_code, vat_category)
+		   unit_code, vat_category, margin_scheme)
 		VALUES ($1,$2,$3,$4,$5,($6::bigint)::numeric / 1000,$7,$8,$9,$10,nullif($11, '')::uuid,
-		        nullif($12, ''), nullif($13, ''))`
+		        nullif($12, ''), nullif($13, ''), $14)`
 	for _, l := range lines {
 		if _, err := tx.Exec(ctx, insert, shopID, invoiceID, l.Position, l.Kind, l.Description,
 			l.QuantityMilli, l.UnitPriceMinor, l.VATRateBasis, l.NetMinor, l.VATMinor, l.CreditsLineID,
-			l.UnitCode, vatCategory(l.VATRateBasis)); err != nil {
+			l.UnitCode, vatCategory(l.VATRateBasis), l.MarginScheme); err != nil {
 			return fmt.Errorf("write invoice line %d: %w", l.Position, err)
 		}
 	}
@@ -483,6 +543,9 @@ type Seller struct {
 	Country       string
 	EndpointID    string
 	PaymentScheme string
+
+	// The shop's Swish number, for the code a customer pays with (#234).
+	SwishNumber string
 }
 
 // Buyer is what an electronic invoice wants of the customer beyond the paper
@@ -494,13 +557,17 @@ type Buyer struct {
 }
 
 // electronicColumns are the columns of an invoice that exist for the
-// electronic invoice, in the order electronicArgs gives their values.
+// electronic invoice, and for paying it (#234), in the order electronicArgs
+// gives their values.
 const electronicColumns = `seller_street, seller_postal_code, seller_city, seller_country,
 			   seller_endpoint_id, seller_payment_scheme,
 			   customer_postal_code, customer_city, customer_country,
-			   customer_endpoint_id, customer_reference`
+			   customer_endpoint_id, customer_reference,
+			   seller_swish_number, payment_ocr`
 
-func electronicArgs(s Seller, b Buyer) []any {
+// electronicArgs are their values. ocr is the payment reference the
+// invoice is paid with, "" for a credit note, which nothing is paid to.
+func electronicArgs(s Seller, b Buyer, ocr string) []any {
 	blank := func(v string) *string {
 		if v = strings.TrimSpace(v); v == "" {
 			return nil
@@ -511,7 +578,27 @@ func electronicArgs(s Seller, b Buyer) []any {
 		blank(s.Street), blank(s.PostalCode), blank(s.City), blank(s.Country),
 		blank(s.EndpointID), blank(s.PaymentScheme),
 		b.PostalCode, b.City, b.Country, b.EndpointID, b.Reference,
+		blank(s.SwishNumber), blank(ocr),
 	}
+}
+
+// paymentOCR is an invoice's payment reference: the number alone in the
+// default series, as it always was, and with the series in it in any
+// other, so the same number in two series is two references and a payment
+// finds the one it pays (payref.OCRFor). A series no reference can be
+// made for -- not capital letters and digits, or too long -- gives none:
+// the invoice is issued without a reference, as invoices before #234 were,
+// rather than not at all, and is paid by its number.
+func paymentOCR(series string, number int64) (string, error) {
+	ocr, err := payref.OCRFor(series, number)
+	if err != nil && series != DefaultSeries {
+		slog.Warn("invoice issued without a payment reference", "series", series, "number", number, "why", err)
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("make the payment reference: %w", err)
+	}
+	return ocr, nil
 }
 
 // unitCode is the UN/ECE Recommendation 20 code an electronic invoice needs on
@@ -551,15 +638,15 @@ func vatCategory(rateBasis int) string {
 // and that decision belongs where the shop's own details are entered.
 func readSeller(ctx context.Context, tx pgx.Tx, shopID string) (Seller, error) {
 	var s Seller
-	var line1, line2, postal, city, org, vat, phone, email, ref, country, endpoint, scheme *string
+	var line1, line2, postal, city, org, vat, phone, email, ref, country, endpoint, scheme, swish *string
 	err := tx.QueryRow(ctx, `
 		SELECT name, address_line1, address_line2, postal_code, city,
 		       org_number, vat_number, phone, email,
 		       payment_reference, payment_terms_days, f_tax,
-		       country, endpoint_id, payment_scheme
+		       country, endpoint_id, payment_scheme, swish_number
 		FROM shops WHERE id = $1`, shopID).
 		Scan(&s.Name, &line1, &line2, &postal, &city, &org, &vat, &phone, &email,
-			&ref, &s.PaymentTermsDays, &s.FTax, &country, &endpoint, &scheme)
+			&ref, &s.PaymentTermsDays, &s.FTax, &country, &endpoint, &scheme, &swish)
 	if err != nil {
 		return Seller{}, fmt.Errorf("read seller: %w", err)
 	}
@@ -580,6 +667,7 @@ func readSeller(ctx context.Context, tx pgx.Tx, shopID string) (Seller, error) {
 	s.Country, s.EndpointID, s.PaymentScheme = deref(country), deref(endpoint), deref(scheme)
 	s.OrgNumber, s.VATNumber = deref(org), deref(vat)
 	s.Phone, s.Email, s.PaymentReference = deref(phone), deref(email), deref(ref)
+	s.SwishNumber = deref(swish)
 	return s, nil
 }
 
@@ -634,6 +722,9 @@ type Document struct {
 	IssuedBy string
 	Lines    []DocumentLine
 	Bands    []money.VATBand
+	// The statement a margin-scheme sale carries, frozen in Swedish as
+	// issued (#177); empty for every other document.
+	MarginSchemeStatement string
 
 	// Set on a credit note, and on an invoice that has been credited: both
 	// halves need to point at the other, because a document that has been
@@ -642,6 +733,18 @@ type Document struct {
 	CreditedBy []string
 
 	Registration string
+
+	// Set on a cash invoice: paid when it was issued, and how (#156).
+	// Frozen with it.
+	PaidOnIssue *PaidOnIssue
+
+	// The payment reference frozen at issue (#234): the invoice number, a
+	// length digit and a check digit. Empty on a credit note and on an
+	// invoice issued before references were kept.
+	PaymentOCR string
+	// What is still owed on it as it is read: its total, less what credit
+	// notes took off and what was paid. The payment code asks for this.
+	OwedMinor int64
 }
 
 // Known reports whether this document carries a seller at all. Anything issued
@@ -673,7 +776,26 @@ type DocumentLine struct {
 	VATMinor       int64
 	UnitCode       string
 	VATCategory    string
+	// A car sold under the margin scheme (#177): at its gross price, with
+	// no VAT shown and outside the VAT bands.
+	MarginScheme bool
 }
+
+// MarginSchemeMinor is what the document's margin-scheme cars come to, at
+// their gross price.
+func (d Document) MarginSchemeMinor() int64 {
+	var t int64
+	for _, l := range d.Lines {
+		if l.MarginScheme {
+			t += l.NetMinor
+		}
+	}
+	return t
+}
+
+// OrdinaryNetMinor is the net of everything taxed as usual: the document's
+// net less its margin-scheme cars, which have no net the buyer is shown.
+func (d Document) OrdinaryNetMinor() int64 { return d.NetMinor - d.MarginSchemeMinor() }
 
 // Quantity renders thousandths the way a work order line does.
 func (l DocumentLine) Quantity() string {
@@ -693,7 +815,12 @@ func DocumentByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 
 	var d Document
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		return documentTx(ctx, tx, id, &d)
+		if err := documentTx(ctx, tx, id, &d); err != nil {
+			return err
+		}
+		var err error
+		d.PaidOnIssue, err = paidOnIssueTx(ctx, tx, d.ID)
+		return err
 	})
 	if err != nil {
 		return Document{}, err
@@ -717,12 +844,12 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 	// No join to shops. The seller is read from the document's own
 	// columns, which is the whole point of freezing them.
 	var sName, sAddr, sOrg, sVat, sPhone, sEmail, sRef *string
-	var sStreet, sPostal, sCity, sCountry, sEndpoint, sScheme *string
+	var sStreet, sPostal, sCity, sCountry, sEndpoint, sScheme, sSwish, ocr *string
 	var cPostal, cCity, cCountry, cEndpoint, cRef *string
 	var sTerms *int
 	var sFTax *bool
 	err := tx.QueryRow(ctx, `
-		SELECT i.id, i.series, i.number, i.work_order_id, i.credit_of_id, i.issued_at,
+		SELECT i.id, i.series, i.number, coalesce(i.work_order_id::text, ''), i.credit_of_id, i.issued_at, i.source,
 		       i.customer_name, i.customer_address, i.customer_org_number,
 		       i.customer_vat_number, i.currency,
 		       i.net_minor, i.vat_minor, i.gross_minor,
@@ -734,7 +861,9 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 		       i.seller_endpoint_id, i.seller_payment_scheme,
 		       i.customer_postal_code, i.customer_city, i.customer_country,
 		       i.customer_endpoint_id, i.customer_reference,
-		       p.display_name, coalesce(r.registration, '')
+		       p.display_name, coalesce(r.registration, ''),
+		       i.seller_swish_number, i.payment_ocr,
+		       `+owedSQL("i")+`
 		FROM invoices i
 		LEFT JOIN users u ON u.id = i.issued_by
 		LEFT JOIN people p ON p.id = u.person_id
@@ -742,13 +871,13 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 		LEFT JOIN vehicle_registrations r
 		       ON r.vehicle_id = w.vehicle_id AND r.valid_to IS NULL
 		WHERE i.id = $1`, id).
-		Scan(&d.ID, &d.Series, &d.Number, &d.WorkOrderID, &creditOf, &d.IssuedAt,
+		Scan(&d.ID, &d.Series, &d.Number, &d.WorkOrderID, &creditOf, &d.IssuedAt, &d.Source,
 			&d.CustomerName, &address, &org, &vat, &d.Currency,
 			&d.NetMinor, &d.VATMinor, &d.GrossMinor,
 			&sName, &sAddr, &sOrg, &sVat, &sPhone, &sEmail, &sRef, &sTerms, &sFTax,
 			&sStreet, &sPostal, &sCity, &sCountry, &sEndpoint, &sScheme,
 			&cPostal, &cCity, &cCountry, &cEndpoint, &cRef,
-			&issuedBy, &d.Registration)
+			&issuedBy, &d.Registration, &sSwish, &ocr, &d.OwedMinor)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Not visible under this shop's policy is the same answer as not
 		// existing. A different answer tells the caller a document exists
@@ -773,7 +902,9 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 		Country:          deref(sCountry),
 		EndpointID:       deref(sEndpoint),
 		PaymentScheme:    deref(sScheme),
+		SwishNumber:      deref(sSwish),
 	}
+	d.PaymentOCR = deref(ocr)
 	if sTerms != nil {
 		d.Seller.PaymentTermsDays = *sTerms
 	}
@@ -814,10 +945,14 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 		return err
 	}
 
+	if err := tx.QueryRow(ctx, `SELECT coalesce(margin_scheme_statement, '') FROM invoices WHERE id = $1`, id).
+		Scan(&d.MarginSchemeStatement); err != nil {
+		return fmt.Errorf("read the statement: %w", err)
+	}
 	rows, err := tx.Query(ctx, `
 		SELECT position, kind, description,
 		       (quantity * 1000)::bigint, unit_price_minor, vat_rate_bp,
-		       net_minor, vat_minor, coalesce(unit_code, ''), coalesce(vat_category, '')
+		       net_minor, vat_minor, coalesce(unit_code, ''), coalesce(vat_category, ''), margin_scheme
 		FROM invoice_lines WHERE invoice_id = $1 ORDER BY position`, id)
 	if err != nil {
 		return fmt.Errorf("read invoice lines: %w", err)
@@ -827,7 +962,7 @@ func documentTx(ctx context.Context, tx pgx.Tx, id string, d *Document) error {
 		var l DocumentLine
 		if err := rows.Scan(&l.Position, &l.Kind, &l.Description,
 			&l.QuantityMilli, &l.UnitPriceMinor, &l.VATRateBasis,
-			&l.NetMinor, &l.VATMinor, &l.UnitCode, &l.VATCategory); err != nil {
+			&l.NetMinor, &l.VATMinor, &l.UnitCode, &l.VATCategory, &l.MarginScheme); err != nil {
 			return fmt.Errorf("scan invoice line: %w", err)
 		}
 		d.Lines = append(d.Lines, l)
@@ -840,6 +975,11 @@ func bandsFrom(lines []DocumentLine) []money.VATBand {
 	byRate := map[int]*money.VATBand{}
 	var rates []int
 	for _, l := range lines {
+		// A car under the margin scheme is outside the bands: its VAT is
+		// in its margin, which the buyer is never shown.
+		if l.MarginScheme {
+			continue
+		}
 		b, ok := byRate[l.VATRateBasis]
 		if !ok {
 			b = &money.VATBand{RateBasisPoints: l.VATRateBasis}

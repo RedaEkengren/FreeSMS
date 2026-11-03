@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // Closing a job used to be a button somebody had to remember, the last one in
@@ -23,6 +22,10 @@ import (
 // any other alone. Called from the moments that can finish one: money
 // arriving and the car being collected, in the same transaction.
 func closeIfFinishedTx(ctx context.Context, tx pgx.Tx, jobID string) error {
+	if jobID == "" {
+		// An invoice that is not a job's (#146) has no job to close.
+		return nil
+	}
 	var state State
 	if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1 FOR UPDATE`, jobID).Scan(&state); err != nil {
 		return fmt.Errorf("read order: %w", err)
@@ -72,7 +75,7 @@ func CloseJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID
 	if len(reason) > 500 {
 		return fmt.Errorf("%w: keep the reason under 500 characters", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var state State
 		if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1 FOR UPDATE`, jobID).Scan(&state); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {

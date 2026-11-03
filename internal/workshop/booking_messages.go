@@ -73,7 +73,7 @@ func QueueBookingMessage(ctx context.Context, pool *pgxpool.Pool, scope access.S
 		return "", fmt.Errorf("%w: nowhere to send it, or nothing to say", ErrInvalid)
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var status string
 		var starts time.Time
 		if err := tx.QueryRow(ctx, `SELECT status, starts_at FROM bookings WHERE id = $1 FOR UPDATE`, bookingID).Scan(&status, &starts); err != nil {
@@ -177,7 +177,7 @@ func BookingMessagesFor(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		return nil, ErrNotFound
 	}
 	var out []OutboundMessage
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT m.id, m.about, m.channel, m.recipient, m.not_before, m.created_at, coalesce(p.display_name, ''),
 			       e.event, e.at, coalesce(e.detail, '')
@@ -219,7 +219,7 @@ func CorrectBookingContact(ctx context.Context, pool *pgxpool.Pool, scope access
 	if err != nil {
 		return err
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `UPDATE bookings SET customer_name = nullif($2, ''), customer_phone = nullif($3, '') WHERE id = $1`, bookingID, name, phone)
 		if err != nil {
 			return fmt.Errorf("correct contact: %w", err)
@@ -245,7 +245,7 @@ func ConfirmBookingByHand(ctx context.Context, pool *pgxpool.Pool, scope access.
 	if how == "" || len([]rune(how)) > 200 {
 		return fmt.Errorf("%w: say how, in 200 characters or fewer", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var exists bool
 		if err := tx.QueryRow(ctx, `SELECT exists(SELECT 1 FROM bookings WHERE id = $1)`, bookingID).Scan(&exists); err != nil {
 			return fmt.Errorf("read booking: %w", err)
@@ -273,7 +273,7 @@ func BookingsNeedingAttention(ctx context.Context, pool *pgxpool.Pool, scope acc
 		return nil, access.ErrForbidden
 	}
 	var out []BookingNeedingAttention
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT b.id::text, b.starts_at, b.what FROM bookings b
 			WHERE b.status = 'booked' AND b.starts_at > now()

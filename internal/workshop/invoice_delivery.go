@@ -84,11 +84,17 @@ func SendDocument(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 	var id string
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var jobID string
-		if err := tx.QueryRow(ctx, `SELECT work_order_id::text FROM invoices WHERE id = $1`, invoiceID).Scan(&jobID); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT coalesce(work_order_id::text, '') FROM invoices WHERE id = $1`, invoiceID).Scan(&jobID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrNotFound
 			}
 			return fmt.Errorf("read invoice: %w", err)
+		}
+		// A message is a job's today (outbound_messages.work_order_id): the
+		// outbox that sends anything else comes with #156. Until then an
+		// invoice that is not the workshop's is handed over, and says so.
+		if jobID == "" {
+			return ErrNotAJobsDocument
 		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE invoice_links SET revoked_at = clock_timestamp(), revoked_by = $2
@@ -336,9 +342,7 @@ func undeliveredTx(ctx context.Context, tx pgx.Tx, since time.Time) ([]Undeliver
 		WHERE NOT coalesce(s.reached, false) AND (s.tries = 0 OR coalesce(s.failed, false))
 		  -- A document whose invoice is paid up has evidently been received;
 		  -- chasing it is for what is still owed.
-		  AND (o.gross_minor
-		       + coalesce((SELECT sum(c.gross_minor) FROM invoices c WHERE c.credit_of_id = o.id), 0)
-		       - coalesce((SELECT sum(p.amount_minor + p.rounding_minor) FROM invoice_payments p WHERE p.invoice_id = o.id), 0)) <> 0
+		  AND (`+owedSQL("o")+`) <> 0
 		ORDER BY s.issued_at`, since)
 	if err != nil {
 		return nil, fmt.Errorf("list undelivered: %w", err)

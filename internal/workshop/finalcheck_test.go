@@ -141,6 +141,45 @@ func TestOnlyWhoeverRunsTheShopSetsTheFinalCheck(t *testing.T) {
 	}
 }
 
+// Every job's final check is started from its checklist, and a job's
+// inspection starts only from a checklist for jobs. So the final check's
+// checklist must be one, and stay one: otherwise no job could be signed
+// off until somebody found the setting.
+func TestTheFinalChecksChecklistStaysOneForJobs(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	addTechnician(t, pool)
+	requireFinalCheck(t, pool, false)
+	all := everything(owner())
+	if err := workshop.SetTemplateSubjects(ctx, pool, all, templateID, []string{workshop.SubjectPurchase}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("jobs taken off the final check's checklist: %v, want refused", err)
+	}
+	if err := workshop.SetTemplateSubjects(ctx, pool, all, templateID, []string{workshop.SubjectWorkOrder, workshop.SubjectPurchase}); err != nil {
+		t.Errorf("the final check's checklist also for purchases: %v", err)
+	}
+	if _, err := workshop.StartInspection(ctx, pool, technician(), working(t, pool), templateID); err != nil {
+		t.Errorf("the final check started after its checklist was shared: %v", err)
+	}
+
+	purchases, err := workshop.SaveChecklistTemplate(ctx, pool, owner(), "", "Inköp", []string{"Lack"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.SetTemplateSubjects(ctx, pool, all, purchases, []string{workshop.SubjectPurchase}); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.SaveFinalCheck(ctx, pool, owner(), workshop.FinalCheckSettings{TemplateID: purchases}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a purchase checklist as the final check: %v, want refused", err)
+	}
+	// Another final check chosen, the first is free to stop being for jobs.
+	if err := workshop.SaveFinalCheck(ctx, pool, owner(), workshop.FinalCheckSettings{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.SetTemplateSubjects(ctx, pool, all, templateID, []string{workshop.SubjectPurchase}); err != nil {
+		t.Errorf("jobs taken off a checklist that is no longer the final check: %v", err)
+	}
+}
+
 // answer gives a started check's items these results, in order; "" leaves
 // one unanswered.
 func answer(t *testing.T, pool *pgxpool.Pool, who access.Scope, id string, results ...string) {

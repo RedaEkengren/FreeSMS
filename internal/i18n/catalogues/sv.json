@@ -1562,6 +1562,18 @@
     "Waiting for the customer's answer.": {
       "other": "Väntar på kundens svar."
     },
+    "the job was taken back from the customer; put the quote to them again first": {
+      "other": "jobbet har tagits tillbaka från kunden; lägg fram offerten för kunden igen först"
+    },
+    "Taken back from the customer: their answer is written down once the quote is put to them again.": {
+      "other": "Tagen tillbaka från kunden: svaret skrivs ner när offerten har lagts fram för kunden igen."
+    },
+    "The workshop is still working on the quote": {
+      "other": "Verkstaden arbetar fortfarande med offerten"
+    },
+    "You can answer it once the workshop has finished it.": {
+      "other": "Du kan svara på den när verkstaden är klar med den."
+    },
     "Nothing has been put to the customer yet.": {
       "other": "Inget har lagts fram för kunden än."
     },
@@ -2368,8 +2380,186 @@
     "Both have an owner at the same time. Sell one of them first, so the dates agree.": {
       "other": "Båda har en ägare samtidigt. Sälj den ena först, så att datumen stämmer."
     },
+    "Why, if they did": {
+      "other": "Varför, om de gjorde det"
+    },
+    "Why they are invoiced anyway": {
+      "other": "Varför de faktureras ändå"
+    },
+    "say why the lines nobody agreed to are invoiced, in 300 characters or fewer": {
+      "other": "säg varför raderna som ingen godkänt faktureras, med högst 300 tecken"
+    },
+    "say why more than is owed is recorded, in 300 characters or fewer": {
+      "other": "säg varför mer än det som är skyldigt registreras, med högst 300 tecken"
+    },
+    "that is not something with a history": {
+      "other": "det är inte något som har en historik"
+    },
+    "Why it is reversed": {
+      "other": "Varför den rättas"
+    },
+    "A payment recorded here is a note that money arrived, not a cash-register receipt: FreeSMS is not a cash register.": {
+      "other": "En betalning som registreras här är en anteckning om att pengar har kommit in, inte ett kassakvitto: FreeSMS är inget kassaregister."
+    },
+    "Deposits and payouts: %d recorded, which go to the books once their accounts are decided.": {
+      "other": "Depositioner och utbetalningar: %d registrerade, som förs till bokföringen när deras konton är bestämda."
+    },
+    "deposit": {
+      "other": "deposition"
+    },
+    "payout": {
+      "other": "utbetalning"
+    },
+    "Bank reference": {
+      "other": "Bankreferens"
+    },
+    "Swish reference": {
+      "other": "Swish-referens"
+    },
+    "Terminal receipt number": {
+      "other": "Kvittonummer från terminalen"
+    },
+    "say why the payment is reversed, in 300 characters or fewer": {
+      "other": "säg varför betalningen rättas, med högst 300 tecken"
+    },
+    "say why the money is given back, in 300 characters or fewer": {
+      "other": "säg varför pengarna betalas tillbaka, med högst 300 tecken"
+    },
+    "that is not what it can be for": {
+      "other": "det är inte något den kan gälla"
+    },
+    "that payment has already been recorded": {
+      "other": "den betalningen är redan registrerad"
+    },
+    "that request was already used to record another payment": {
+      "other": "den begäran användes redan för att registrera en annan betalning"
+    },
+    "that is more than is left of the payment to give back": {
+      "other": "det är mer än det som återstår av betalningen att betala tillbaka"
+    },
+    "only money received is refunded": {
+      "other": "bara pengar som har tagits emot betalas tillbaka"
+    },
+    "that payment has been reversed, so there is nothing of it to give back": {
+      "other": "den betalningen är återförd, så det finns inget av den att betala tillbaka"
+    },
+    "that payment has refunds; reverse them first, then the payment": {
+      "other": "den betalningen har återbetalningar; återför dem först och sedan betalningen"
+    },
+    "say how much, above nothing": {
+      "other": "säg hur mycket, mer än noll"
+    },
+    "a provider's id needs the provider, and the other way round": {
+      "other": "ett id från en betaltjänst behöver betaltjänsten, och tvärtom"
+    },
+    "a reference is longer than it can be": {
+      "other": "en referens är längre än den får vara"
+    },
+    "that is more than the deposit holds": {
+      "other": "det är mer än depositionen rymmer"
+    },
+    "that is more than is owed on the invoice": {
+      "other": "det är mer än det som är skyldigt på fakturan"
+    },
+    "that is more than the deposit still holds": {
+      "other": "det är mer än det som finns kvar av depositionen"
+    },
+    "a statement line is typed or imported": {
+      "other": "en kontoutdragsrad skrivs in eller importeras"
+    },
+    "a statement line needs its day and an amount": {
+      "other": "en kontoutdragsrad behöver sin dag och ett belopp"
+    },
+    "cash and a deposit applied never reach the bank": {
+      "other": "kontanter och en tillämpad deposition når aldrig banken"
+    },
+    "the line is for a different amount": {
+      "other": "raden gäller ett annat belopp"
+    },
+    "that payment or that line is already matched": {
+      "other": "den betalningen eller den raden är redan avstämd"
+    },
+    "that is not a purpose an identity record can be held for": {
+      "other": "det är inte ett ändamål som en identitetsuppgift får sparas för"
+    },
+    "that purpose does not need that kind of record": {
+      "other": "det ändamålet behöver inte den sortens uppgift"
+    },
+    "for that purpose only a reference to the check is kept, not the value": {
+      "other": "för det ändamålet sparas bara en hänvisning till kontrollen, inte själva uppgiften"
+    },
+    "give either the value or a reference to the check, not both and not neither": {
+      "other": "ange antingen uppgiften eller en hänvisning till kontrollen, inte båda och inte ingen"
+    },
+    "that value has been removed; that the check was made is all that is kept": {
+      "other": "den uppgiften är borttagen; bara att kontrollen gjordes finns kvar"
+    },
+    "that purpose has already ended": {
+      "other": "det ändamålet har redan upphört"
+    },
+    "that record holds a reference to a check, not a value": {
+      "other": "den posten innehåller en hänvisning till en kontroll, inte en uppgift"
+    },
+    "say why the purpose has ended, in 300 characters or fewer": {
+      "other": "säg varför ändamålet har upphört, med högst 300 tecken"
+    },
+    "that is longer than it can be": {
+      "other": "det är längre än det får vara"
+    },
+    "between a day and ten years": {
+      "other": "mellan en dag och tio år"
+    },
+    "that call is not waiting for anybody": {
+      "other": "det anropet väntar inte på någon"
+    },
+    "that call is already done or cancelled": {
+      "other": "det anropet är redan gjort eller avbrutet"
+    },
+    "say why the call is cancelled, in 300 characters or fewer": {
+      "other": "säg varför anropet avbryts, med högst 300 tecken"
+    },
+    "Calls to other services": {
+      "other": "Anrop till andra tjänster"
+    },
+    "What FreeSMS was to ask of another service -- a signing service, a payment provider -- and could not, or what a person has to do by hand because no service is connected. Nothing else waits on these.": {
+      "other": "Det som FreeSMS skulle be en annan tjänst om – en signeringstjänst, en betaltjänst – och inte kunde, eller det som en person måste göra för hand eftersom ingen tjänst är ansluten. Inget annat väntar på dessa."
+    },
+    "Try again": {
+      "other": "Försök igen"
+    },
+    "Done by hand": {
+      "other": "Gjort för hand"
+    },
+    "Why it is cancelled": {
+      "other": "Varför det avbryts"
+    },
+    "Nothing is waiting.": {
+      "other": "Inget väntar."
+    },
+    "A signature asked for": {
+      "other": "En begärd underskrift"
+    },
+    "A call to another service": {
+      "other": "Ett anrop till en annan tjänst"
+    },
+    "To do by hand": {
+      "other": "Att göra för hand"
+    },
+    "Given up": {
+      "other": "Uppgivet"
+    },
+    "%d attempt": {
+      "one": "%d försök",
+      "other": "%d försök"
+    },
     "They carry the same plate at the same time.": {
       "other": "De har samma skylt samtidigt."
+    },
+    "Both are cars the business books, each with bookings of its own, so they are not put together.": {
+      "other": "Båda är bilar som företaget bokar, med egna bokningar, så de slås inte ihop."
+    },
+    "The other is a car the business books. Keep it, and merge this one into it.": {
+      "other": "Den andra är en bil som företaget bokar. Behåll den och slå ihop den här med den."
     },
     "%d issued invoice stays exactly as issued": {
       "one": "%d utfärdad faktura står kvar precis som den utfärdades",
@@ -5471,6 +5661,15 @@
     "nothing can be added to a %s order": {
       "other": "inget kan läggas till på en %s order"
     },
+    "a line needs a quantity; to take one off, withdraw it": {
+      "other": "en rad behöver en mängd; dra tillbaka raden för att ta bort den"
+    },
+    "that booking starts on a day that has already gone; if it is meant, tick that and book it again": {
+      "other": "bokningen börjar en dag som redan har varit; om det är meningen, kryssa i det och boka igen"
+    },
+    "It is meant to be on a day that has gone": {
+      "other": "Den ska ligga på en dag som redan har varit"
+    },
     "quantity cannot be negative": {
       "other": "mängden kan inte vara negativ"
     },
@@ -6191,8 +6390,8 @@
     "The shop's own times. The paid guides get these wrong often enough that shops keep their own anyway; this is that, written down.": {
       "other": "Verkstadens egna tider. De betalda tidböckerna har ofta fel, så verkstäder för ändå sina egna; det här är det, nedskrivet."
     },
-    "There is no national identity number and no driving licence field anywhere in this system. A field with no purpose does not exist.": {
-      "other": "Det finns inget personnummer och inget fält för körkort någonstans i det här systemet. Ett fält utan syfte finns inte."
+    "No person, customer or party carries a national identity number or a driving licence. Where car sales or rental must check one, it is kept apart: for one stated purpose, sealed with a key the database does not hold, every read logged, and removed when the purpose ends. A field with no purpose does not exist.": {
+      "other": "Ingen person, kund eller part har ett personnummer eller ett körkort i sina uppgifter. Där bilförsäljning eller uthyrning måste kontrollera ett hålls det för sig: för ett angivet ändamål, krypterat med en nyckel som databasen inte har, varje läsning loggad, och borttaget när ändamålet upphör. Ett fält utan ändamål finns inte."
     },
     "They exist to slow down guessing over minutes. Keeping them longer would be keeping a record of who tried to sign in, with no remaining purpose.": {
       "other": "De finns för att bromsa gissning under några minuter. Att spara dem längre vore att föra en förteckning över vem som försökte logga in, utan kvarvarande syfte."
@@ -6837,6 +7036,1739 @@
     },
     "light, dark, or the device's": {
       "other": "ljust, mörkt eller enhetens"
-    }
+    },
+    "Workshop": {
+      "other": "Verkstad"
+    },
+    "Car sales": {
+      "other": "Bilhandel"
+    },
+    "Rental": {
+      "other": "Uthyrning"
+    },
+    "What the shop runs": {
+      "other": "Vad företaget använder"
+    },
+    "Customers, vehicles, invoices and payments are always there. A module that is switched off keeps what it recorded -- its invoices and its history stay readable -- and nothing new can be added to it.": {
+      "other": "Kunder, fordon, fakturor och betalningar finns alltid. En modul som stängs av behåller det den har registrerat – dess fakturor och historik går fortfarande att läsa – men inget nytt kan läggas till i den."
+    },
+    "Still open in %s:": {
+      "other": "Fortfarande öppet i %s:"
+    },
+    "Job #%d": {
+      "other": "Jobb #%d"
+    },
+    "Clocked on to job #%d": {
+      "other": "Instämplad på jobb #%d"
+    },
+    "Booking %s": {
+      "other": "Bokning %s"
+    },
+    "Switched off, these stay as they are, and nobody can carry on with them until it is switched on again.": {
+      "other": "Avstängda ligger de kvar som de är, och ingen kan fortsätta med dem förrän modulen slås på igen."
+    },
+    "on since %s": {
+      "other": "på sedan %s"
+    },
+    "I have seen what is open and want to switch it off": {
+      "other": "Jag har sett vad som är öppet och vill stänga av den"
+    },
+    "Switch on": {
+      "other": "Slå på"
+    },
+    "Changes": {
+      "other": "Ändringar"
+    },
+    "%s switched on": {
+      "other": "%s slogs på"
+    },
+    "%s switched off": {
+      "other": "%s stängdes av"
+    },
+    "%s switched on by %s": {
+      "other": "%s slogs på av %s"
+    },
+    "%s switched off by %s": {
+      "other": "%s stängdes av, av %s"
+    },
+    "Switched off": {
+      "other": "Avstängt"
+    },
+    "That is part of something this shop has switched off. What it recorded before is still here; nothing new can be added to it.": {
+      "other": "Det hör till något som är avstängt här. Det som registrerades tidigare finns kvar, men inget nytt kan läggas till."
+    },
+    "there is no such module": {
+      "other": "den modulen finns inte"
+    },
+    "that module is not part of this release yet": {
+      "other": "den modulen finns inte i den här versionen ännu"
+    },
+    "the reason is longer than 500 characters": {
+      "other": "anledningen är längre än 500 tecken"
+    },
+    "Every shop before modules was a workshop": {
+      "other": "Varje företag var en verkstad innan det fanns moduler"
+    },
+    "Chosen at setup": {
+      "other": "Valt när FreeSMS sattes upp"
+    },
+    "Run since before modules were recorded": {
+      "other": "Använd sedan innan moduler registrerades"
+    },
+    "The form did not arrive whole.": {
+      "other": "Formuläret kom inte fram helt."
+    },
+    "that role belongs to a part of FreeSMS this shop does not run": {
+      "other": "den rollen hör till en del av FreeSMS som verkstaden inte använder"
+    },
+    "those are not all roles": {
+      "other": "det är inte roller allihop"
+    },
+    "you cannot change your own roles; another owner can": {
+      "other": "du kan inte ändra dina egna roller; en annan ägare kan"
+    },
+    "Also": {
+      "other": "Dessutom"
+    },
+    "Save the roles": {
+      "other": "Spara rollerna"
+    },
+    "Salesperson": {
+      "other": "Säljare"
+    },
+    "Buyer": {
+      "other": "Inköpare"
+    },
+    "Rental desk": {
+      "other": "Hyresdisk"
+    },
+    "only a workshop invoice can be sent as a message yet; hand this one over and write down how": {
+      "other": "bara en verkstadsfaktura kan skickas som meddelande än; lämna över den här och skriv ner hur"
+    },
+    "%q is not a source this issues": {
+      "other": "%q är inte en källa som fakturerar här"
+    },
+    "a VAT rate is between 0 and 100 per cent": {
+      "other": "en momssats ligger mellan 0 och 100 procent"
+    },
+    "a line is labour, a part, sublet work, consumables or a fee": {
+      "other": "en rad är arbete, en del, köpt arbete, förbrukningsmaterial eller en avgift"
+    },
+    "a line is of more than nothing; a correction is a credit note": {
+      "other": "en rad gäller mer än ingenting; en rättelse är en kreditfaktura"
+    },
+    "every line says what it is": {
+      "other": "varje rad säger vad den är"
+    },
+    "%q is not a protocol's subject": {
+      "other": "%q är inte något ett protokoll kan gälla"
+    },
+    "a checklist is for at least one thing": {
+      "other": "en checklista gäller minst en sak"
+    },
+    "a protocol supersedes a finished one of the same thing and the same vehicle": {
+      "other": "ett protokoll ersätter ett avslutat protokoll om samma sak och samma fordon"
+    },
+    "say why it was left, in 300 characters or fewer": {
+      "other": "säg varför det lämnades, med högst 300 tecken"
+    },
+    "that checklist is not one for this": {
+      "other": "den checklistan är inte till för det här"
+    },
+    "the protocol is finished; start a new one that supersedes it": {
+      "other": "protokollet är avslutat; börja ett nytt som ersätter det"
+    },
+    "the request key is too long": {
+      "other": "förfrågans nyckel är för lång"
+    },
+    "Workshop jobs": {
+      "other": "Verkstadsjobb"
+    },
+    "Buying a car in": {
+      "other": "Inköp av bil"
+    },
+    "Handing a car over": {
+      "other": "Leverans av bil"
+    },
+    "Handing a rental out": {
+      "other": "Utlämning vid hyra"
+    },
+    "Taking a rental back": {
+      "other": "Återlämning vid hyra"
+    },
+    "Used for": {
+      "other": "Används till"
+    },
+    "Save what it is for": {
+      "other": "Spara vad den används till"
+    },
+    "This service is no longer available": {
+      "other": "Den här tjänsten finns inte längre"
+    },
+    "Please contact the shop.": {
+      "other": "Kontakta verkstaden."
+    },
+    "those records belong to a part of FreeSMS this shop does not run": {
+      "other": "de uppgifterna hör till en del av FreeSMS som verkstaden inte använder"
+    },
+    "say why the photograph is removed; the protocol keeps that it was": {
+      "other": "skriv varför fotot tas bort; protokollet behåller att det fanns"
+    },
+    "the reason is longer than 300 characters": {
+      "other": "anledningen är längre än 300 tecken"
+    },
+    "that request was already used to start a protocol of something else": {
+      "other": "den begäran har redan använts för att börja ett protokoll om något annat"
+    },
+    "the final check is done on a job, so its checklist must be one for jobs": {
+      "other": "slutkontrollen görs på ett jobb, så dess checklista måste vara en för jobb"
+    },
+    "a customer is made with the customer's own record": {
+      "other": "en kund läggs upp med kundens eget kort"
+    },
+    "a customer's party is the one kept; merge the other into it": {
+      "other": "kundens part är den som behålls; slå ihop den andra med den"
+    },
+    "a party cannot be merged into itself": {
+      "other": "en part kan inte slås ihop med sig själv"
+    },
+    "a party is either a person or a company": {
+      "other": "en part är antingen en person eller ett företag"
+    },
+    "a party needs a name, in 200 characters or fewer": {
+      "other": "en part behöver ett namn, högst 200 tecken"
+    },
+    "a person and a company are not the same party": {
+      "other": "en person och ett företag är inte samma part"
+    },
+    "both are customers; merge them as customers": {
+      "other": "båda är kunder; slå ihop dem som kunder"
+    },
+    "somebody here already has that email address": {
+      "other": "någon här har redan den e-postadressen"
+    },
+    "that is not a role a party can have": {
+      "other": "det är inte en roll en part kan ha"
+    },
+    "that party has been merged into another": {
+      "other": "den parten har slagits ihop med en annan"
+    },
+    "that role has already ended": {
+      "other": "den rollen har redan upphört"
+    },
+    "the party already has that role": {
+      "other": "parten har redan den rollen"
+    },
+    "this party is a customer; change the details on the customer": {
+      "other": "den här parten är en kund; ändra uppgifterna på kunden"
+    },
+    "a buffer is time added, not taken away": {
+      "other": "en buffert är tid som läggs till, inte dras ifrån"
+    },
+    "a hold has to run out later than now": {
+      "other": "en preliminär bokning måste löpa ut senare än nu"
+    },
+    "a job in the workshop blocks its car through the job": {
+      "other": "ett jobb i verkstaden blockerar sin bil genom jobbet"
+    },
+    "a resource that is not a vehicle needs a name, in 120 characters or fewer": {
+      "other": "en resurs som inte är ett fordon behöver ett namn, högst 120 tecken"
+    },
+    "it is taken then": {
+      "other": "den är upptagen då"
+    },
+    "it is taken then by a delivery": {
+      "other": "den är upptagen då av en leverans"
+    },
+    "it is taken then by a job in the workshop": {
+      "other": "den är upptagen då av ett jobb i verkstaden"
+    },
+    "it is taken then by a rental": {
+      "other": "den är upptagen då av en uthyrning"
+    },
+    "it is taken then by a service block": {
+      "other": "den är upptagen då av en service"
+    },
+    "it is taken then by a test drive": {
+      "other": "den är upptagen då av en provkörning"
+    },
+    "say when it starts": {
+      "other": "ange när det börjar"
+    },
+    "say why it is replanned, in 300 characters or fewer": {
+      "other": "ange varför det planeras om, högst 300 tecken"
+    },
+    "something is still booked on it; release or replan that first": {
+      "other": "något är fortfarande bokat på den; släpp eller planera om det först"
+    },
+    "that has been taken out of use": {
+      "other": "den har tagits ur bruk"
+    },
+    "that is no longer booked": {
+      "other": "det är inte längre bokat"
+    },
+    "that is not a use a resource can be booked for": {
+      "other": "det är inte något en resurs kan bokas för"
+    },
+    "the hold has run out or been let go; book it again": {
+      "other": "den preliminära bokningen har löpt ut eller släppts; boka igen"
+    },
+    "what it is for needs both its kind and which one": {
+      "other": "vad det gäller behöver både sitt slag och vilket"
+    },
+    "a correction supersedes a document of the same kind about the same thing": {
+      "other": "en rättelse ersätter ett dokument av samma slag om samma sak"
+    },
+    "a document is between parties; name at least one": {
+      "other": "ett dokument är mellan parter; ange minst en"
+    },
+    "a document is frozen once produced; a correction is a new one that supersedes it": {
+      "other": "ett dokument är låst när det har skapats; en rättelse är ett nytt som ersätter det"
+    },
+    "a document needs a title, in 200 characters or fewer": {
+      "other": "ett dokument behöver en rubrik, högst 200 tecken"
+    },
+    "a paper signature needs the scan or who saw it signed": {
+      "other": "en underskrift på papper behöver den inskannade kopian eller vem som såg den skrivas"
+    },
+    "a party is named once in each part": {
+      "other": "en part anges en gång i varje roll"
+    },
+    "a provider's signature needs its reference": {
+      "other": "en underskrift via en tjänst behöver tjänstens referens"
+    },
+    "a template needs a name, in 120 characters or fewer": {
+      "other": "en mall behöver ett namn, högst 120 tecken"
+    },
+    "a template needs its text, in 20 000 characters or fewer": {
+      "other": "en mall behöver sin text, högst 20 000 tecken"
+    },
+    "a template stays the kind it was made for": {
+      "other": "en mall förblir det slag den gjordes för"
+    },
+    "between 1 and 30 years": {
+      "other": "mellan 1 och 30 år"
+    },
+    "signed on paper, in person or through a provider": {
+      "other": "undertecknad på papper, på plats eller via en tjänst"
+    },
+    "that document has already been superseded": {
+      "other": "det dokumentet har redan ersatts"
+    },
+    "that document has been superseded; sign the one that replaced it": {
+      "other": "det dokumentet har ersatts; skriv under det som ersatte det"
+    },
+    "that is not a kind of document": {
+      "other": "det är inte ett slags dokument"
+    },
+    "that is not a part a party can have in a document": {
+      "other": "det är inte en roll en part kan ha i ett dokument"
+    },
+    "that is not something a document can be about": {
+      "other": "det är inte något ett dokument kan gälla"
+    },
+    "that party has already signed": {
+      "other": "den parten har redan skrivit under"
+    },
+    "that template is not one for this kind of document": {
+      "other": "den mallen är inte en för det här slaget av dokument"
+    },
+    "the evidence is longer than it can be": {
+      "other": "underlaget är längre än det får vara"
+    },
+    "what was signed is not this document as it is; show it again and sign that": {
+      "other": "det som skrevs under är inte det här dokumentet som det ser ut nu; visa det igen och skriv under det"
+    },
+    "A contract is for those who made it with the customer.": {
+      "other": "Ett avtal är för dem som gjorde det med kunden."
+    },
+    "No such document.": {
+      "other": "Det finns inget sådant dokument."
+    },
+    "Document": {
+      "other": "Dokument"
+    },
+    "Not signed": {
+      "other": "Inte underskriven"
+    },
+    "Parties": {
+      "other": "Parter"
+    },
+    "Signed": {
+      "other": "Underskriven"
+    },
+    "The customer's link, shown this once:": {
+      "other": "Kundens länk, som visas bara den här gången:"
+    },
+    "This document has been replaced by a correction, and is not signed any more.": {
+      "other": "Det här dokumentet har ersatts av en rättelse och skrivs inte längre under."
+    },
+    "What this document said has been erased at a person's request. That it existed, and who signed it, is kept.": {
+      "other": "Det som stod i dokumentet har raderats på en persons begäran. Att det fanns, och vem som skrev under, finns kvar."
+    },
+    "witnessed by": {
+      "other": "bevittnad av"
+    },
+    "Not signed by anybody yet": {
+      "other": "Inte underskriven av någon ännu"
+    },
+    "Signed by some of the parties": {
+      "other": "Underskriven av några av parterna"
+    },
+    "Signed by every party": {
+      "other": "Underskriven av alla parter"
+    },
+    "Purchase agreement": {
+      "other": "Inköpsavtal"
+    },
+    "Sales contract": {
+      "other": "Köpeavtal"
+    },
+    "Test-drive agreement": {
+      "other": "Provkörningsavtal"
+    },
+    "Consignment agreement": {
+      "other": "Förmedlingsavtal"
+    },
+    "Rental agreement": {
+      "other": "Hyresavtal"
+    },
+    "The seller": {
+      "other": "Säljaren"
+    },
+    "The renter": {
+      "other": "Hyrestagaren"
+    },
+    "The consignor": {
+      "other": "Uppdragsgivaren"
+    },
+    "The driver": {
+      "other": "Föraren"
+    },
+    "The guarantor": {
+      "other": "Borgensmannen"
+    },
+    "on paper": {
+      "other": "på papper"
+    },
+    "in person, on the screen": {
+      "other": "på plats, på skärmen"
+    },
+    "through a signing service": {
+      "other": "via en signeringstjänst"
+    },
+    "The buyer": {
+      "other": "Köparen"
+    },
+    "that is a reversal of a deposit's application, or its other half cannot be found": {
+      "other": "det är en återföring av en avräknad deposition, eller så går dess andra halva inte att hitta"
+    },
+    "Nothing is registered under that number. Type what you can.": {
+      "other": "Inget fordon är registrerat på det numret. Skriv in det du kan."
+    },
+    "The lookup service did not answer. Type what you can; this does not stop you.": {
+      "other": "Uppslagstjänsten svarade inte. Skriv in det du kan; det hindrar dig inte."
+    },
+    "Filled in from the registration. Change anything that is wrong.": {
+      "other": "Ifyllt från registreringsnumret. Ändra det som är fel."
+    },
+    "From %s, as it stood at %s. What you typed is kept.": {
+      "other": "Från %s, som det såg ut %s. Det du skrev in behålls."
+    },
+    "Look it up again": {
+      "other": "Slå upp igen"
+    },
+    "Roadworthiness test": {
+      "other": "Kontrollbesiktning"
+    },
+    "Vehicle tax": {
+      "other": "Fordonsskatt"
+    },
+    "Driving ban": {
+      "other": "Körförbud"
+    },
+    "Last recorded odometer": {
+      "other": "Senast registrerade mätarställning"
+    },
+    "not provided by the service": {
+      "other": "lämnas inte av tjänsten"
+    },
+    "none": {
+      "other": "ingen"
+    },
+    "The service gives the chassis number %s, not the one typed. Check it on the car; the one typed is kept.": {
+      "other": "Tjänsten anger chassinumret %s, inte det som skrevs in. Kontrollera det på bilen; det som skrevs in behålls."
+    },
+    "A registration looked up": {
+      "other": "Ett registreringsnummer som slås upp"
+    },
+    "that is more than the customer paid beyond the invoice; if the invoice was wrong, credit it first": {
+      "other": "det är mer än kunden har betalat utöver fakturan; om fakturan var fel, skriv först en kreditfaktura"
+    },
+    "a car taken in is looked up at the counter, not in a list": {
+      "other": "en bil som tas in slås upp vid disken, inte i en lista"
+    },
+    "that is not a reason to look a registration up": {
+      "other": "det är inget skäl att slå upp ett registreringsnummer"
+    },
+    "a cash invoice is paid in cash, by card or by Swish at the counter": {
+      "other": "en kontantfaktura betalas kontant, med kort eller med Swish i disken"
+    },
+    "a payment through a flow is paid the way the flow takes money": {
+      "other": "en betalning genom ett betalflöde görs på det sätt som flödet tar emot pengar"
+    },
+    "a flow takes cash, card, Swish or something else": {
+      "other": "ett betalflöde tar emot kontanter, kort, Swish eller något annat"
+    },
+    "a threshold above nothing, and a month from 1 to 12": {
+      "other": "ett gränsbelopp över noll, och en månad från 1 till 12"
+    },
+    "keep the note to 1000 characters": {
+      "other": "håll anteckningen inom 1000 tecken"
+    },
+    "name the flow, in 100 characters or fewer": {
+      "other": "namnge betalflödet, med högst 100 tecken"
+    },
+    "say how it is paid, in up to five parts": {
+      "other": "säg hur det betalas, i högst fem delar"
+    },
+    "say when it was checked": {
+      "other": "säg när det kontrollerades"
+    },
+    "say who checked it": {
+      "other": "säg vem som kontrollerade det"
+    },
+    "the payments add up to more or less than the invoice; only the last may be the rest": {
+      "other": "betalningarna blir mer eller mindre än fakturan; bara den sista får vara resten"
+    },
+    "that payment is how a cash invoice was paid on issue, and stands; correct the invoice with a credit note": {
+      "other": "den betalningen är hur en kontantfaktura betalades när den utfärdades, och står kvar; rätta fakturan med en kreditfaktura"
+    },
+    "Paid on issue: it stands with the invoice, and a mistake is corrected with a credit note.": {
+      "other": "Betald när den utfärdades: den står kvar med fakturan, och ett fel rättas med en kreditfaktura."
+    },
+    "there is a flow by that name already": {
+      "other": "det finns redan ett betalflöde med det namnet"
+    },
+    "Money taken in person": {
+      "other": "Pengar som tas emot på plats"
+    },
+    "These are notes that money arrived, not cash-register receipts: FreeSMS is not a cash register.": {
+      "other": "Det här är anteckningar om att betalningar kom in, inte kassakvitton: FreeSMS är inget kassaregister."
+    },
+    "Issued and paid in one step: the invoice says it was paid. A recorded payment is not a cash-register receipt, and FreeSMS is not a cash register.": {
+      "other": "Utfärdad och betald i ett steg: fakturan säger att den är betald. En registrerad betalning är inget kassakvitto, och FreeSMS är inget kassaregister."
+    },
+    "Not paid now": {
+      "other": "Inte betald nu"
+    },
+    "Paid now, at the counter": {
+      "other": "Betald nu, i disken"
+    },
+    "Card at the counter for rental extras": {
+      "other": "Kort i disken för hyrtillägg"
+    },
+    "Checked by": {
+      "other": "Kontrollerat av"
+    },
+    "Checked by %s on %s": {
+      "other": "Kontrollerat av %s den %s"
+    },
+    "Four price base amounts in 2026 is 236 800 kr. The amount changes each year; set what your adviser tells you.": {
+      "other": "Fyra prisbasbelopp är 236 800 kr år 2026. Beloppet ändras varje år; ange det din rådgivare säger."
+    },
+    "FreeSMS records payments; it is not a cash register, and a recorded payment is not a cash-register receipt. Whether a way of taking money at the counter needs a certified cash register is a question for your adviser. Note each way you take money in person and when your adviser checked it.": {
+      "other": "FreeSMS registrerar betalningar; det är inget kassaregister, och en registrerad betalning är inget kassakvitto. Om ett sätt att ta betalt i disken kräver ett certifierat kassaregister är en fråga för din rådgivare. Anteckna varje sätt ni tar emot pengar på plats och när rådgivaren kontrollerade det."
+    },
+    "None noted yet.": {
+      "other": "Inga antecknade än."
+    },
+    "Note it": {
+      "other": "Anteckna det"
+    },
+    "Record the check": {
+      "other": "Registrera kontrollen"
+    },
+    "Save the threshold": {
+      "other": "Spara gränsbeloppet"
+    },
+    "Taken in cash, by card or by Swish since %s": {
+      "other": "Mottaget kontant, med kort eller med Swish sedan %s"
+    },
+    "The financial year starts in month": {
+      "other": "Räkenskapsåret börjar i månad"
+    },
+    "This financial year": {
+      "other": "Det här räkenskapsåret"
+    },
+    "Threshold, kr": {
+      "other": "Gränsbelopp, kr"
+    },
+    "Ways of taking money in person": {
+      "other": "Sätt att ta emot pengar på plats"
+    },
+    "What they said": {
+      "other": "Vad de sa"
+    },
+    "Withdraw the check": {
+      "other": "Dra tillbaka kontrollen"
+    },
+    "Your threshold": {
+      "other": "Ert gränsbelopp"
+    },
+    "checked": {
+      "other": "kontrollerat"
+    },
+    "reached": {
+      "other": "nått"
+    },
+    "A way of taking money in person is in use and not checked against the cash register rules: %s": {
+      "other": "Ett sätt att ta emot pengar på plats används och är inte kontrollerat mot reglerna om kassaregister: %s"
+    },
+    "%d cash invoice issued through it": {
+      "one": "%d kontantfaktura utfärdad genom det",
+      "other": "%d kontantfakturor utfärdade genom det"
+    },
+    "Waiting for a signature: %s": {
+      "other": "Väntar på underskrift: %s"
+    },
+    "%d call to another service was given up": {
+      "one": "%d anrop till en annan tjänst har getts upp",
+      "other": "%d anrop till andra tjänster har getts upp"
+    },
+    "%d call to another service is a task to do by hand": {
+      "one": "%d anrop till en annan tjänst ska göras för hand",
+      "other": "%d anrop till andra tjänster ska göras för hand"
+    },
+    "Some items could not be loaded.": {
+      "other": "En del kunde inte hämtas."
+    },
+    "Start page": {
+      "other": "Startsida"
+    },
+    "What to do now": {
+      "other": "Att göra nu"
+    },
+    "How the business is doing": {
+      "other": "Hur verksamheten går"
+    },
+    "Everything waiting for you": {
+      "other": "Allt som väntar på dig"
+    },
+    "%d more is waiting for you": {
+      "one": "%d sak till väntar på dig",
+      "other": "%d saker till väntar på dig"
+    },
+    "Some of this could not be loaded.": {
+      "other": "En del av detta kunde inte hämtas."
+    },
+    "%d car ready": {
+      "one": "%d bil klar",
+      "other": "%d bilar klara"
+    },
+    "%d job waiting for the customer's decision": {
+      "one": "%d jobb väntar på kundens beslut",
+      "other": "%d jobb väntar på kundens beslut"
+    },
+    "%d job waiting for parts": {
+      "one": "%d jobb väntar på delar",
+      "other": "%d jobb väntar på delar"
+    },
+    "%d job past its promised time": {
+      "one": "%d jobb efter utlovad tid",
+      "other": "%d jobb efter utlovad tid"
+    },
+    "%d job in progress": {
+      "one": "%d pågående jobb",
+      "other": "%d pågående jobb"
+    },
+    "Work ready to invoice, before VAT": {
+      "other": "Arbete klart att fakturera, före moms"
+    },
+    "registration": {
+      "other": "registreringsnummer"
+    },
+    "a plate it used to carry": {
+      "other": "ett registreringsnummer den haft"
+    },
+    "description": {
+      "other": "beskrivning"
+    },
+    "owner": {
+      "other": "ägare"
+    },
+    "customer": {
+      "other": "kund"
+    },
+    "job number": {
+      "other": "jobbnummer"
+    },
+    "unidentified vehicle": {
+      "other": "oidentifierat fordon"
+    },
+    "a search is at most %d characters, with no null character": {
+      "other": "en sökning är högst %d tecken, utan nolltecken"
+    },
+    "What technicians see": {
+      "other": "Vad mekanikerna ser"
+    },
+    "say what the customer should be asked": {
+      "other": "skriv vad kunden ska tillfrågas om"
+    },
+    "an exception ends after today, or not at all": {
+      "other": "ett undantag upphör tidigast i morgon, eller inte alls"
+    },
+    "an exception is for one of the shop's technicians": {
+      "other": "ett undantag gäller en av verkstadens mekaniker"
+    },
+    "that is not something a technician can be shown": {
+      "other": "det är inget som kan visas för en mekaniker"
+    },
+    "Ask the front desk to contact the customer": {
+      "other": "Be disken kontakta kunden"
+    },
+    "Hourly rate": {
+      "other": "Timpris"
+    },
+    "May we replace the rear pads too?": {
+      "other": "Får vi byta bakre beläggen också?"
+    },
+    "The customer agreed to at most": {
+      "other": "Kunden har godkänt högst"
+    },
+    "The customer's details are shown to you for this job, and may be used only for it.": {
+      "other": "Kundens uppgifter visas för dig för det här jobbet och får bara användas för det."
+    },
+    "What the customer should be asked": {
+      "other": "Vad kunden ska tillfrågas om"
+    },
+    "before VAT": {
+      "other": "exklusive moms"
+    },
+    "contact the customer": {
+      "other": "kontakta kunden"
+    },
+    "%s, %s: %s": {
+      "other": "%s, %s: %s"
+    },
+    "A technician is always shown the work, the vehicle and its registration, the parts and the time. Anything else is shown only when you open it here: for every technician, or for one person. A personal identity number, an identity document, payment details, the customer register and the shop's finance are never shown to a technician, and cannot be opened.": {
+      "other": "En mekaniker ser alltid arbetet, fordonet och dess registreringsnummer, delarna och tiden. Allt annat visas bara när du öppnar det här: för alla mekaniker eller för en person. Personnummer, id-handlingar, betalningsuppgifter, kundregistret och verkstadens ekonomi visas aldrig för en mekaniker och kan inte öppnas."
+    },
+    "End it": {
+      "other": "Avsluta"
+    },
+    "For every technician": {
+      "other": "För alla mekaniker"
+    },
+    "For one person": {
+      "other": "För en person"
+    },
+    "Hide it": {
+      "other": "Dölj"
+    },
+    "None in force.": {
+      "other": "Inga gäller nu."
+    },
+    "Open it for them": {
+      "other": "Öppna för personen"
+    },
+    "Shown": {
+      "other": "Visas"
+    },
+    "The customer's details are shown to a technician for their own jobs only, and may be used only for the job.": {
+      "other": "Kundens uppgifter visas för en mekaniker bara på hens egna jobb och får bara användas för jobbet."
+    },
+    "Until, if it ends": {
+      "other": "Till och med, om det upphör"
+    },
+    "hidden": {
+      "other": "dolt"
+    },
+    "shown": {
+      "other": "visas"
+    },
+    "not invoiced": {
+      "other": "inte fakturerat"
+    },
+    "invoiced": {
+      "other": "fakturerat"
+    },
+    "paid": {
+      "other": "betalt"
+    },
+    "Cost the customer agreed to, at most": {
+      "other": "Det högsta belopp kunden har godkänt"
+    },
+    "Price of each line, and the total": {
+      "other": "Pris per rad, och summan"
+    },
+    "The shop's hourly rate": {
+      "other": "Verkstadens timpris"
+    },
+    "Customer's name, on their own jobs": {
+      "other": "Kundens namn, på egna jobb"
+    },
+    "Customer's telephone number, on their own jobs": {
+      "other": "Kundens telefonnummer, på egna jobb"
+    },
+    "Whether the job is invoiced and paid": {
+      "other": "Om jobbet är fakturerat och betalt"
+    },
+    "Scan to pay": {
+      "other": "Skanna för att betala"
+    },
+    "a payment reference is 2 to 25 digits": {
+      "other": "en betalningsreferens är 2 till 25 siffror"
+    },
+    "no invoice has that payment reference": {
+      "other": "ingen faktura har den betalningsreferensen"
+    },
+    "that reference's check digit is wrong; check it against the invoice": {
+      "other": "referensens kontrollsiffra stämmer inte; jämför med fakturan"
+    },
+    "a Swish number is ten digits": {
+      "other": "ett Swishnummer är tio siffror"
+    },
+    "Scan to pay with %s": {
+      "other": "Skanna för att betala med %s"
+    },
+    "A payment, by its reference": {
+      "other": "En betalning, efter dess referens"
+    },
+    "Paid on": {
+      "other": "Betald den"
+    },
+    "Payment reference (OCR)": {
+      "other": "Betalningsreferens (OCR)"
+    },
+    "Swish number for invoices": {
+      "other": "Swishnummer för fakturor"
+    },
+    "Swish": {
+      "other": "Swish"
+    },
+    "Say how much arrived, as the bank's line has it.": {
+      "other": "Ange hur mycket som kom in, som det står på bankens rad."
+    },
+    "The payment details do not read as a bankgiro or plusgiro number, so invoices get no bankgiro or plusgiro code to pay with and cannot be sent electronically. Write the number on its own, such as Bankgiro 123-4567.": {
+      "other": "Betalningsuppgifterna går inte att läsa som ett bankgiro- eller plusgironummer, så fakturorna får ingen bankgiro- eller plusgirokod att betala med och kan inte skickas elektroniskt. Skriv numret för sig, till exempel Bankgiro 123-4567."
+    },
+    "%s, %s: the reason was erased at a person's request": {"other": "%s, %s: anledningen raderades på en persons begäran"},
+    "that reference's length digit is wrong, so part of it is missing; check it against the invoice": {"other": "referensens längdsiffra stämmer inte, så en del av den saknas; jämför med fakturan"},
+    "a car in stock needs its chassis number or its registration, because the margin scheme is accounted car by car": {"other": "en lagerbil behöver sitt chassinummer eller sitt registreringsnummer, eftersom vinstmarginalbeskattningen redovisas bil för bil"},
+    "that car is already in stock; finish its cycle before starting another": {"other": "bilen finns redan i lager; avsluta dess lagervarv innan ett nytt börjar"},
+    "that is not a way a car comes into stock": {"other": "så kan en bil inte komma in i lager"},
+    "a car cannot go straight from there to there": {"other": "en bil kan inte gå direkt därifrån dit"},
+    "that cycle is over; a car that comes back starts a new one": {"other": "lagervarvet är avslutat; en bil som kommer tillbaka börjar ett nytt"},
+    "something is still booked on the car; release or replan that first": {"other": "något är fortfarande bokat på bilen; släpp eller planera om det först"},
+    "say why the cycle ends without a sale, in 300 characters or fewer": {"other": "säg varför lagervarvet slutar utan försäljning, med högst 300 tecken"},
+    "that request was already used to take another car in": {"other": "den begäran har redan använts för att ta in en annan bil"},
+    "In preparation": {"other": "I förberedelse"},
+    "For sale": {"other": "Till salu"},
+    "Reserved": {"other": "Reserverad"},
+    "Delivered": {"other": "Levererad"},
+    "Closed without a sale": {"other": "Avslutad utan försäljning"},
+    "Bought": {"other": "Inköpt"},
+    "Traded in": {"other": "Inbytt"},
+    "On consignment": {"other": "I förmedling"},
+    "Bought back": {"other": "Återköpt"},
+    "From the rental fleet": {"other": "Från hyrflottan"},
+    "Imported": {"other": "Importerad"},
+    "Sold, not yet delivered": {"other": "Såld, inte levererad"},
+    "Written off (scrapped or lost)": {"other": "Avskriven (skrotad eller förlorad)"},
+    "In stock": {"other": "I lager"},
+    "Sold on behalf of its owner; not the dealer's car": {"other": "Säljs för ägarens räkning; inte handlarens bil"},
+    "a car bought, consigned or imported comes into stock through its purchase, its agreement or its import": {"other": "en bil som köps in, tas i förmedling eller importeras kommer in i lager genom sitt inköp, sitt avtal eller sin import"},
+    "a purchase opens a car's cycle as bought, traded in or bought back": {"other": "ett inköp öppnar bilens lagervarv som inköpt, inbytt eller återköpt"},
+    "say the day it was bought, and not a day still to come": {"other": "ange dagen den köptes, och inte en dag som inte har kommit än"},
+    "say what was paid, from nothing up to a billion kronor": {"other": "ange vad som betalades, från noll upp till en miljard kronor"},
+    "paid in another currency, say which, how much in it, the rate and where the rate came from": {"other": "betalt i en annan valuta: ange vilken, hur mycket i den, kursen och var kursen kommer ifrån"},
+    "that is not a kind of seller": {"other": "det är inte en sorts säljare"},
+    "an odometer reading is a whole number of kilometres, under ten million": {"other": "en mätarställning är ett helt antal kilometer, under tio miljoner"},
+    "evidence is a document kept here, named once": {"other": "underlag är ett dokument som finns här, angivet en gång"},
+    "a note is at most 1000 characters": {"other": "en anteckning är högst 1000 tecken"},
+    "that request was already used to record another purchase": {"other": "den begäran har redan använts för att registrera ett annat inköp"},
+    "the assessment was corrected by somebody else meanwhile; read it again": {"other": "bedömningen rättades av någon annan under tiden; läs den igen"},
+    "the car's sale has been invoiced, so its VAT eligibility can no longer be corrected": {"other": "bilens försäljning är fakturerad, så dess rätt till vinstmarginalbeskattning kan inte längre rättas"},
+    "say why the assessment is corrected, in 300 characters or fewer": {"other": "säg varför bedömningen rättas, med högst 300 tecken"},
+    "A private person": {"other": "En privatperson"},
+    "A company that could not deduct VAT on the car": {"other": "Ett företag som inte kunde dra av momsen på bilen"},
+    "A VAT-registered company that charged VAT": {"other": "Ett momsregistrerat företag som tog ut moms"},
+    "A Swedish dealer that sold it under the margin scheme": {"other": "En svensk handlare som sålde den med vinstmarginalbeskattning"},
+    "A dealer in another EU country that sold it under the margin scheme": {"other": "En handlare i ett annat EU-land som sålde den med vinstmarginalbeskattning"},
+    "A purchase from another EU country under reverse charge": {"other": "Ett inköp från ett annat EU-land med omvänd skattskyldighet"},
+    "An import from outside the EU": {"other": "En import från ett land utanför EU"},
+    "A new means of transport (at most 6 months or 6,000 km)": {"other": "Ett nytt transportmedel (högst 6 månader eller 6 000 km)"},
+    "Not eligible until the evidence is added": {"other": "Inte berättigad förrän underlaget har lagts till"},
+    "Not eligible until the accountant has said what evidence a margin-scheme invoice from an EU dealer needs (#221)": {"other": "Inte berättigad förrän redovisningskonsulten har sagt vilket underlag en faktura med vinstmarginalbeskattning från en EU-handlare behöver (#221)"},
+    "Not eligible until the accountant has said how a car bought back after a rescinded sale is treated (#221)": {"other": "Inte berättigad förrän redovisningskonsulten har sagt hur en bil som köpts tillbaka efter ett hävt köp behandlas (#221)"},
+    "that is not a check": {"other": "det är inte en kontroll"},
+    "a check passed, failed or is not known": {"other": "en kontroll är godkänd, underkänd eller okänd"},
+    "a note is at most 500 characters": {"other": "en anteckning är högst 500 tecken"},
+    "a check stands for between an hour and 30 days": {"other": "en kontroll gäller mellan en timme och 30 dagar"},
+    "that car's cycle is over; check it again in a new one": {"other": "bilens lagervarv är avslutat; kontrollera den igen i ett nytt"},
+    "say what is owed on the car, above nothing": {"other": "ange vad som är skuld på bilen, mer än noll"},
+    "say the reference the loan is settled with, in 100 characters or fewer": {"other": "ange referensen lånet löses med, med högst 100 tecken"},
+    "that lender's loan is already recorded on this purchase": {"other": "den långivarens lån finns redan registrerat på inköpet"},
+    "not every check the shop requires has passed in time; check again, or have the owner let it through with a reason": {"other": "inte alla kontroller som verksamheten kräver är godkända i tid; kontrollera igen, eller låt ägaren släppa igenom betalningen med en motivering"},
+    "say why the money may leave anyway, in 300 characters or fewer": {"other": "säg varför pengarna får betalas ut ändå, med högst 300 tecken"},
+    "a payout for a car names the purchase it pays, so its checks can be read": {"other": "en utbetalning för en bil anger inköpet den betalar, så att dess kontroller kan läsas"},
+    "No driving ban": {"other": "Inget körförbud"},
+    "No credit purchase or undisclosed lender": {"other": "Inget kreditköp eller okänd långivare"},
+    "No unpaid vehicle tax or fees": {"other": "Ingen obetald fordonsskatt eller avgift"},
+    "Inspection status known": {"other": "Besiktningsstatus känd"},
+    "Not leased, or the lessor has consented": {"other": "Inte leasad, eller leasegivaren har samtyckt"},
+    "Chassis number matches the registration": {"other": "Chassinumret stämmer med registreringen"},
+    "Odometer fits earlier readings": {"other": "Mätarställningen stämmer med tidigare avläsningar"},
+    "Lower than a reading held before": {"other": "Lägre än en tidigare avläsning"},
+    "Before the bid": {"other": "Inför budet"},
+    "Version %d of %d": {"other": "Version %d av %d"},
+    "No sale price expected yet, so there is no bid to work out.": {"other": "Inget förväntat försäljningspris än, så det finns inget bud att räkna fram."},
+    "Most to pay, ordinary VAT": {"other": "Högst att betala, vanlig moms"},
+    "No price leaves the margin": {"other": "Inget pris ger marginalen"},
+    "Before any VAT the seller charges. The sale carries %s in VAT.": {"other": "Före moms som säljaren tar ut. Försäljningen bär %s i moms."},
+    "Most to pay, margin scheme": {"other": "Högst att betala, vinstmarginalbeskattning"},
+    "VAT on the margin alone: at this price the sale carries %s.": {"other": "Moms bara på marginalen: till det priset bär försäljningen %s."},
+    "No margin-scheme bid: the seller would not make the car eligible, or what kind of seller is not known yet.": {"other": "Inget bud med vinstmarginalbeskattning: säljaren gör inte bilen berättigad, eller så är det inte känt än vilken sorts säljare det är."},
+    "Costs %s, keeping it %s, margin wanted %s.": {"other": "Kostnader %s, att ha den i lager %s, önskad marginal %s."},
+    "Sold at a loss on purpose": {"other": "Säljs med förlust med avsikt"},
+    "Bid %s on this version, %s.": {"other": "Bud %s på den här versionen, %s."},
+    "The bid was made on another version.": {"other": "Budet lades på en annan version."},
+    "Bid made, in kronor": {"other": "Lagt bud, i kronor"},
+    "Record the bid on this version": {"other": "Registrera budet på den här versionen"},
+    "Saving makes a new version from this one, after the newest.": {"other": "Att spara gör en ny version av den här, efter den nyaste."},
+    "Expected sale price, VAT included": {"other": "Förväntat försäljningspris, inklusive moms"},
+    "Who is selling it": {"other": "Vem som säljer den"},
+    "Not known yet": {"other": "Inte känt än"},
+    "Costs expected, excluding VAT": {"other": "Förväntade kostnader, exklusive moms"},
+    "Days in stock": {"other": "Dagar i lager"},
+    "Cost of a day": {"other": "Kostnad per dag"},
+    "Margin wanted, in kronor or as a percentage such as 12 %": {"other": "Önskad marginal, i kronor eller som procent, till exempel 12 %"},
+    "Work it out": {"other": "Räkna fram"},
+    "What a car may be bought for is the buyer's.": {"other": "Vad en bil får köpas för är inköparens sak."},
+    "Say what was bid, as a number.": {"other": "Ange vad som bjöds, som ett tal."},
+    "The sale price expected is not a number.": {"other": "Det förväntade försäljningspriset är inte ett tal."},
+    "A cost is not a number.": {"other": "En kostnad är inte ett tal."},
+    "The days in stock are a whole number.": {"other": "Dagarna i lager är ett heltal."},
+    "The cost of a day in stock is not a number.": {"other": "Kostnaden för en dag i lager är inte ett tal."},
+    "The margin wanted is not a number.": {"other": "Den önskade marginalen är inte ett tal."},
+    "Reconditioning": {"other": "Rekonditionering"},
+    "Workshop work": {"other": "Verkstadsarbete"},
+    "Transport": {"other": "Transport"},
+    "Registration and fees": {"other": "Registrering och avgifter"},
+    "Advertising": {"other": "Annonsering"},
+    "the sale price expected is from nothing up to a billion kronor": {"other": "det förväntade försäljningspriset är från noll upp till en miljard kronor"},
+    "a cost is a kind of cost and an amount from nothing up to a hundred million kronor": {"other": "en kostnad är en sorts kostnad och ett belopp från noll upp till hundra miljoner kronor"},
+    "a calculation has at most 50 costs": {"other": "en kalkyl har högst 50 kostnader"},
+    "the days in stock are from none to ten years, and the cost of a day up to a million kronor": {"other": "dagarna i lager är från noll till tio år, och kostnaden för en dag högst en miljon kronor"},
+    "the margin wanted is an amount or a share of the sale price, not both, and within the sale price either way": {"other": "den önskade marginalen är ett belopp eller en andel av försäljningspriset, inte båda, och inom försäljningspriset i båda fallen"},
+    "a bid has already been made on this calculation": {"other": "ett bud har redan lagts på den här kalkylen"},
+    "a later version of this calculation was saved meanwhile; read it again": {"other": "en senare version av kalkylen sparades under tiden; läs den igen"},
+    "a bid is from nothing up to a billion kronor": {"other": "ett bud är från noll upp till en miljard kronor"},
+    "that calculation is for another car": {"other": "den kalkylen gäller en annan bil"},
+    "say the car's registration or its chassis number": {"other": "ange bilens registreringsnummer eller chassinummer"},
+    "that is longer than a car's details are": {"other": "det är längre än en bils uppgifter är"},
+    "a model year is four digits": {"other": "en årsmodell är fyra siffror"},
+    "that is not a kind of cost": {"other": "det är inte en sorts kostnad"},
+    "a cost is up to a hundred million kronor either way, and its VAT within it": {"other": "en kostnad är högst hundra miljoner kronor åt något håll, och dess moms ryms i den"},
+    "say the day it was spent, and not a day still to come": {"other": "ange dagen kostnaden uppstod, och inte en dag som inte har kommit än"},
+    "a reference is at most 100 characters and a note 500": {"other": "en referens är högst 100 tecken och en anteckning 500"},
+    "in another currency, say which, how much in it, the rate and where the rate came from": {"other": "i en annan valuta: ange vilken, hur mycket i den, kursen och var kursen kommer ifrån"},
+    "that cost has already been reversed": {"other": "den kostnaden är redan återförd"},
+    "a reversal is not reversed; enter the cost again instead": {"other": "en återföring återförs inte; registrera kostnaden igen i stället"},
+    "that job was not opened on a car in stock": {"other": "det jobbet öppnades inte på en lagerbil"},
+    "an hour's cost is from nothing up to a hundred thousand kronor": {"other": "kostnaden för en timme är från noll upp till hundra tusen kronor"},
+    "say why the cost is reversed, in 300 characters or fewer": {"other": "säg varför kostnaden återförs, med högst 300 tecken"},
+    "a payout for a car names the purchase it pays, and is to its seller or to a lender on it": {"other": "en utbetalning för en bil anger inköpet den betalar, och går till säljaren eller till en långivare på inköpet"},
+    "a consigned car's principal is paid under the consignment agreement, which this release does not keep yet": {"other": "uppdragsgivaren för en förmedlad bil får betalt enligt förmedlingsavtalet, som den här versionen ännu inte håller"},
+    "every check the shop requires has passed in time, so there is nothing to let through": {"other": "alla kontroller som verksamheten kräver är godkända i tid, så det finns inget att släppa igenom"},
+    "that job is still open; its cost is posted once it is done": {"other": "jobbet är fortfarande öppet; dess kostnad bokförs när det är klart"},
+    "Rental settings": {
+      "other": "Uthyrningsinställningar"
+    },
+    "Write the buffer and the age as whole numbers, and the deposit as an amount.": {
+      "other": "Skriv bufferten och åldern som heltal och depositionen som ett belopp."
+    },
+    "a deposit is nothing or more": {
+      "other": "en deposition är noll eller mer"
+    },
+    "a licence check needs at least one accepted category": {
+      "other": "en körkortskontroll behöver minst en godkänd behörighet"
+    },
+    "a minimum age is between 15 and 99, or none": {
+      "other": "en lägsta ålder är mellan 15 och 99, eller ingen"
+    },
+    "a permit expires on or after the day it was decided": {
+      "other": "ett tillstånd upphör samma dag som det beslutades eller senare"
+    },
+    "a permit is revoked on or after the day it was decided": {
+      "other": "ett tillstånd återkallas samma dag som det beslutades eller senare"
+    },
+    "a profile starts from a car, a trailer, a machine or equipment": {
+      "other": "en profil utgår från en bil, ett släp, en maskin eller utrustning"
+    },
+    "give the permit's reference from Transportstyrelsen, in 100 characters or fewer": {
+      "other": "ange tillståndets beteckning från Transportstyrelsen, högst 100 tecken"
+    },
+    "give the profile a name, in 80 characters or fewer": {
+      "other": "ge profilen ett namn, högst 80 tecken"
+    },
+    "name the person the permit makes responsible, in 200 characters or fewer": {
+      "other": "ange den person som tillståndet anger som ansvarig, högst 200 tecken"
+    },
+    "say when the permit was decided": {
+      "other": "ange när tillståndet beslutades"
+    },
+    "say why the permit was revoked, in 300 characters or fewer": {
+      "other": "ange varför tillståndet återkallades, högst 300 tecken"
+    },
+    "that checklist is not one for a check-out or a check-in": {
+      "other": "den checklistan är inte avsedd för utlämning eller återlämning"
+    },
+    "that is not a Swedish licence category": {
+      "other": "det är ingen svensk körkortsbehörighet"
+    },
+    "that permit is already recorded as revoked": {
+      "other": "det tillståndet är redan registrerat som återkallat"
+    },
+    "the cleaning buffer is between nothing and seven days": {
+      "other": "städbufferten är mellan noll och sju dagar"
+    },
+    "there is already a profile by that name": {
+      "other": "det finns redan en profil med det namnet"
+    },
+    "A booking keeps the rules it was made under. Changing a profile changes the bookings made after it, never one already made.": {
+      "other": "En bokning behåller de regler den gjordes under. En ändrad profil gäller bokningar som görs efter ändringen, aldrig en som redan är gjord."
+    },
+    "A mileage allowance applies": {
+      "other": "En körsträcka ingår"
+    },
+    "A registered vehicle is required": {
+      "other": "Ett registrerat fordon krävs"
+    },
+    "A rental permit is required": {
+      "other": "Biluthyrningstillstånd krävs"
+    },
+    "Add a profile of your own": {
+      "other": "Lägg till en egen profil"
+    },
+    "Add the profile": {
+      "other": "Lägg till profilen"
+    },
+    "Check-in checklist": {
+      "other": "Checklista vid återlämning"
+    },
+    "Check-out checklist": {
+      "other": "Checklista vid utlämning"
+    },
+    "Cleaning buffer, minutes": {
+      "other": "Städbuffert, minuter"
+    },
+    "Decided on": {
+      "other": "Beslutat den"
+    },
+    "Decided on %s": {
+      "other": "Beslutat den %s"
+    },
+    "Default deposit, kr": {
+      "other": "Standarddeposition, kr"
+    },
+    "Every driver's licence is checked before handover": {
+      "other": "Varje förares körkort kontrolleras före utlämning"
+    },
+    "Expires on, if it does": {
+      "other": "Upphör den, om det gör det"
+    },
+    "Licence categories accepted": {
+      "other": "Godkända körkortsbehörigheter"
+    },
+    "Minibus": {
+      "other": "Minibuss"
+    },
+    "Minimum age of a driver": {
+      "other": "Lägsta ålder för förare"
+    },
+    "No permit recorded. A profile that needs one cannot be handed over.": {
+      "other": "Inget tillstånd registrerat. En enhet vars profil kräver tillstånd kan inte lämnas ut."
+    },
+    "Permit reference": {
+      "other": "Tillståndets beteckning"
+    },
+    "Record a permit or a renewal": {
+      "other": "Registrera ett tillstånd eller en förnyelse"
+    },
+    "Record that it was revoked": {
+      "other": "Registrera att det återkallades"
+    },
+    "Record the permit": {
+      "other": "Registrera tillståndet"
+    },
+    "Record the revocation": {
+      "other": "Registrera återkallelsen"
+    },
+    "Rental permit": {
+      "other": "Biluthyrningstillstånd"
+    },
+    "Reported for rental use in the vehicle register": {
+      "other": "Anmält för uthyrning i vägtrafikregistret"
+    },
+    "Responsible person": {
+      "other": "Ansvarig person"
+    },
+    "Responsible: %s": {
+      "other": "Ansvarig: %s"
+    },
+    "Revoked from": {
+      "other": "Återkallat från"
+    },
+    "Save as a new version": {
+      "other": "Spara som ny version"
+    },
+    "Starting from": {
+      "other": "Utgår från"
+    },
+    "The rental permit (biluthyrningstillstånd) is your business's, granted by Transportstyrelsen. FreeSMS records it and refuses to hand over a unit whose profile needs one when none stands for the whole rental.": {
+      "other": "Biluthyrningstillståndet är ert företags, beviljat av Transportstyrelsen. FreeSMS registrerar det och vägrar lämna ut en enhet vars profil kräver tillstånd när inget gäller för hela hyrperioden."
+    },
+    "The renter may not lend it on": {
+      "other": "Hyrestagaren får inte låna ut eller hyra ut den vidare"
+    },
+    "What each kind of unit needs": {
+      "other": "Vad varje slags enhet kräver"
+    },
+    "Your terms, not the law:": {
+      "other": "Era villkor, inte lagens:"
+    },
+    "not confirmed": {
+      "other": "inte bekräftat"
+    },
+    "revoked from %s": {
+      "other": "återkallat från %s"
+    },
+    "until revoked": {
+      "other": "tills vidare"
+    },
+    "version %d": {
+      "other": "version %d"
+    },
+    "Car": {
+      "other": "Bil"
+    },
+    "Trailer": {
+      "other": "Släp"
+    },
+    "Machine": {
+      "other": "Maskin"
+    },
+    "Equipment": {
+      "other": "Utrustning"
+    },
+    "There is no rental permit that stands for the whole rental.": {
+      "other": "Det finns inget biluthyrningstillstånd som gäller för hela hyrperioden."
+    },
+    "Whether the rental marking in the vehicle register is needed before the first rental, and for which kinds of vehicle, is not confirmed.": {
+      "other": "Det är inte bekräftat om uthyrningsmarkeringen i vägtrafikregistret behövs före första uthyrningen, och för vilka slags fordon."
+    },
+    "Lag 1998:492 covers cars and off-road vehicles. Whether a trailer counts is not confirmed, so no permit is required by default.": {
+      "other": "Lag 1998:492 gäller bilar och terrängmotorfordon. Det är inte bekräftat om ett släp räknas, så inget tillstånd krävs som standard."
+    },
+    "Lag 1998:492 covers cars and off-road vehicles. Whether a machine or tractor counts is not confirmed, so no permit is required by default.": {
+      "other": "Lag 1998:492 gäller bilar och terrängmotorfordon. Det är inte bekräftat om en maskin eller traktor räknas, så inget tillstånd krävs som standard."
+    },
+    "The duty to check a licence (16 § lag 1998:492) may not apply to a trailer. It is checked by default, because a heavy trailer needs BE.": {
+      "other": "Skyldigheten att kontrollera körkort (16 § lag 1998:492) gäller kanske inte ett släp. Det kontrolleras ändå som standard, eftersom ett tungt släp kräver BE."
+    },
+    "Whether a machine needs a registration or a licence depends on what it is. Neither is required by default.": {
+      "other": "Om en maskin behöver registrering eller körkort beror på vad det är. Inget av dem krävs som standard."
+    },
+    "Add a unit": {"other": "Lägg till en enhet"},
+    "Add the unit": {"other": "Lägg till enheten"},
+    "another unit has that fleet number": {"other": "en annan enhet har det flottnumret"},
+    "Category": {"other": "Kategori"},
+    "Fleet number": {"other": "Flottnummer"},
+    "give the registration of a vehicle, or a name for something that has none": {"other": "ange registreringsnumret för ett fordon, eller ett namn för något som saknar ett"},
+    "give the unit a category its prices are set by, in 60 characters or fewer": {"other": "ge enheten en kategori som priserna sätts efter, högst 60 tecken"},
+    "give the unit a fleet number, in 40 characters or fewer": {"other": "ge enheten ett flottnummer, högst 40 tecken"},
+    "In the fleet": {"other": "I hyrflottan"},
+    "it is in the fleet then already": {"other": "den är redan i hyrflottan då"},
+    "It leaves the fleet": {"other": "Den lämnar hyrflottan"},
+    "it leaves the fleet after it joined": {"other": "den lämnar hyrflottan efter att den kom in"},
+    "Never in the fleet yet.": {"other": "Har aldrig varit i hyrflottan."},
+    "Nothing to rent out yet.": {"other": "Inget att hyra ut ännu."},
+    "Or a name, for something unregistered": {"other": "Eller ett namn, för något oregistrerat"},
+    "Put it in the fleet": {"other": "Ta in den i hyrflottan"},
+    "Registration, for a vehicle": {"other": "Registreringsnummer, för ett fordon"},
+    "Rentals are booked on it after that. Move or cancel them first:": {"other": "Det finns hyror bokade på den efter det. Flytta eller avboka dem först:"},
+    "Rental unit": {"other": "Hyresenhet"},
+    "Rented under": {"other": "Hyrs ut enligt"},
+    "say how it joins the fleet": {"other": "ange hur den kommer in i hyrflottan"},
+    "say how it leaves the fleet": {"other": "ange hur den lämnar hyrflottan"},
+    "say when it joins the fleet": {"other": "ange när den kommer in i hyrflottan"},
+    "Small van": {"other": "Liten skåpbil"},
+    "Take it out of the fleet": {"other": "Ta ut den ur hyrflottan"},
+    "that is already a rental unit": {"other": "det är redan en hyresenhet"},
+    "that period in the fleet has already ended": {"other": "den perioden i hyrflottan har redan avslutats"},
+    "Units": {"other": "Enheter"},
+    "Bought for the fleet": {"other": "Köpt till hyrflottan"},
+    "Moved from sales stock": {"other": "Flyttad från försäljningslagret"},
+    "Leased in": {"other": "Inleasad"},
+    "Already the business's": {"other": "Redan företagets"},
+    "Other": {"other": "Annat"},
+    "Moved to sales stock": {"other": "Flyttad till försäljningslagret"},
+    "Lease returned": {"other": "Leasing återlämnad"},
+    "Scrapped": {"other": "Skrotad"},
+    "Out of the fleet": {"other": "Utanför hyrflottan"},
+    "Available": {"other": "Ledig"},
+    "Rented out": {"other": "Uthyrd"},
+    "At the workshop": {"other": "På verkstaden"},
+    "Sold off": {"other": "Såld"},
+    "Taken by other use": {"other": "Upptagen av annat"},
+    "Across two seasons": {"other": "Över två säsonger"},
+    "Add an extra": {"other": "Lägg till ett tillval"},
+    "Add a plan": {"other": "Lägg till en prisplan"},
+    "Add the extra": {"other": "Lägg till tillvalet"},
+    "Add the plan": {"other": "Lägg till prisplanen"},
+    "Add the prices": {"other": "Lägg till priserna"},
+    "An excess reduction may be insurance rather than part of the rental, and what is outside the scope of VAT is your adviser's decision: both are marked as not confirmed.": {"other": "En självriskreducering kan vara en försäkring snarare än en del av hyran, och vad som ligger utanför momsens tillämpningsområde avgör er rådgivare: båda markeras som inte bekräftade."},
+    "an extra is at a VAT rate, or outside the scope of VAT at none": {"other": "ett tillval har en momssats, eller ligger utanför momsen utan sats"},
+    "an extra is charged per rental or per day": {"other": "ett tillval tas betalt per hyra eller per dag"},
+    "a plan prices a category of units or one unit": {"other": "en prisplan gäller en kategori enheter eller en enhet"},
+    "a price is nothing or more": {"other": "ett pris är noll eller mer"},
+    "archived": {"other": "arkiverad"},
+    "Archive the plan": {"other": "Arkivera prisplanen"},
+    "a rental ends after it starts": {"other": "en hyra slutar efter att den börjar"},
+    "a season ends after it starts": {"other": "en säsong slutar efter att den börjar"},
+    "a season prices at least one of an hour, a day, a weekend, a week and a month, none below nothing": {"other": "en säsong prissätter minst en av timme, dag, helg, vecka och månad, ingen under noll"},
+    "at least %d minutes": {"other": "minst %d minuter"},
+    "Charged": {"other": "Debiteras"},
+    "day": {"other": "dag"},
+    "%d km a day included": {"other": "%d km per dag ingår"},
+    "%d minutes' grace": {"other": "%d minuters marginal"},
+    "Extras": {"other": "Tillval"},
+    "For a category": {"other": "För en kategori"},
+    "From %s": {"other": "Från %s"},
+    "give the extra a name, in 80 characters or fewer": {"other": "ge tillvalet ett namn, högst 80 tecken"},
+    "give the plan a name, in 80 characters or fewer": {"other": "ge prisplanen ett namn, högst 80 tecken"},
+    "Grace, minutes": {"other": "Marginal, minuter"},
+    "Km included a day": {"other": "Km som ingår per dag"},
+    "month": {"other": "månad"},
+    "No extras yet.": {"other": "Inga tillval ännu."},
+    "No plans yet.": {"other": "Inga prisplaner ännu."},
+    "No prices yet.": {"other": "Inga priser ännu."},
+    "no rate plan prices that unit; add one first": {"other": "ingen prisplan gäller den enheten; lägg till en först"},
+    "one unit": {"other": "en enhet"},
+    "Or for one unit": {"other": "Eller för en enhet"},
+    "outside the scope of VAT": {"other": "utanför momsens tillämpningsområde"},
+    "Outside the scope of VAT": {"other": "Utanför momsens tillämpningsområde"},
+    "per day": {"other": "per dag"},
+    "Per day, kr": {"other": "Per dag, kr"},
+    "Per extra km, kr": {"other": "Per extra km, kr"},
+    "Per hour, kr": {"other": "Per timme, kr"},
+    "Per month, kr": {"other": "Per månad, kr"},
+    "per rental": {"other": "per hyra"},
+    "Per weekend, kr": {"other": "Per helg, kr"},
+    "Per week, kr": {"other": "Per vecka, kr"},
+    "Plans": {"other": "Prisplaner"},
+    "Priced by the season it starts in": {"other": "Prissätts efter säsongen då hyran börjar"},
+    "Price including VAT, kr": {"other": "Pris inklusive moms, kr"},
+    "Prices are shown including VAT. A booking keeps the prices it was confirmed at; a new season or an archived plan changes no booking already made.": {"other": "Priserna visas inklusive moms. En bokning behåller priserna den bekräftades till; en ny säsong eller en arkiverad prisplan ändrar ingen bokning som redan är gjord."},
+    "Prices from a day": {"other": "Priser från en dag"},
+    "Rental prices": {"other": "Hyrespriser"},
+    "say how a rental across two seasons is priced": {"other": "ange hur en hyra över två säsonger prissätts"},
+    "Shortest rental, minutes": {"other": "Kortaste hyra, minuter"},
+    "%s per extra km": {"other": "%s per extra km"},
+    "Split where the new season starts": {"other": "Delas där den nya säsongen börjar"},
+    "Stop offering it": {"other": "Sluta erbjuda det"},
+    "take an extra between once and 99 times": {"other": "ta ett tillval mellan en och 99 gånger"},
+    "that extra is not offered any more": {"other": "det tillvalet erbjuds inte längre"},
+    "that is not a kind of extra": {"other": "det är inget slags tillval"},
+    "that plan is archived": {"other": "den prisplanen är arkiverad"},
+    "the minimum is at most a year and the grace at most a day, neither below nothing": {"other": "minsta hyrtid är högst ett år och marginalen högst en dag, ingen under noll"},
+    "the plan has a season then already": {"other": "prisplanen har redan en säsong då"},
+    "the plan has no price for a rental this long": {"other": "prisplanen har inget pris för en så lång hyra"},
+    "the plan has no season for the day the rental starts": {"other": "prisplanen har ingen säsong för dagen då hyran börjar"},
+    "VAT %d%%": {"other": "Moms %d %%"},
+    "VAT treatment not confirmed": {"other": "Momsbehandlingen inte bekräftad"},
+    "week": {"other": "vecka"},
+    "weekend": {"other": "helg"},
+    "Write prices as amounts and kilometres and minutes as whole numbers.": {"other": "Skriv priser som belopp och kilometer och minuter som heltal."},
+    "Write the VAT rate as a whole per cent.": {"other": "Skriv momssatsen som ett helt antal procent."},
+    "rental": {"other": "hyra"},
+    "Extra driver": {"other": "Extra förare"},
+    "Child seat": {"other": "Bilbarnstol"},
+    "Excess reduction": {"other": "Självriskreducering"},
+    "Cancellation fee": {"other": "Avbokningsavgift"},
+    "No-show fee": {"other": "Avgift vid utebliven hämtning"},
+    "Young driver": {"other": "Ung förare"},
+    "Agreed price for the rent, if not the plan's, kr per unit including VAT": {"other": "Överenskommet pris för hyran, om inte prisplanens, kr per enhet inklusive moms"},
+    "Agreed when it was booked. A later change to a plan or an extra does not change it.": {"other": "Överenskommet vid bokningen. En senare ändring av en prisplan eller ett tillval ändrar det inte."},
+    "a hold runs out later than now and before the rental starts": {"other": "en preliminär bokning löper ut senare än nu och innan hyran börjar"},
+    "a move keeps the rental as long as it was; extend it to make it longer": {"other": "en flytt behåller hyrans längd; förläng den för att göra den längre"},
+    "an extension ends later than the rental does now": {"other": "en förlängning slutar senare än hyran gör nu"},
+    "a renter is a no-show only once the rental was due to start": {"other": "en hyrestagare har uteblivit först när hyran skulle ha börjat"},
+    "Book": {"other": "Boka"},
+    "Confirm the booking": {"other": "Bekräfta bokningen"},
+    "Extend it": {"other": "Förläng den"},
+    "Held until %s": {"other": "Preliminärt bokad till %s"},
+    "Hold only, until (waiting for a deposit or an answer)": {"other": "Bara preliminärt, till (i väntan på deposition eller svar)"},
+    "Kilometres included": {"other": "Kilometer som ingår"},
+    "New renter's name": {"other": "Ny hyrestagares namn"},
+    "No bookings ahead.": {"other": "Inga kommande bokningar."},
+    "Nothing goes out or comes back today.": {"other": "Inget lämnas ut eller kommer tillbaka i dag."},
+    "Of which VAT": {"other": "Varav moms"},
+    "out past its return": {"other": "försenad återlämning"},
+    "Price": {"other": "Pris"},
+    "Priced at %s net; changed by %s: %s": {"other": "Prissatt till %s exklusive moms; ändrat av %s: %s"},
+    "Price plan": {"other": "Prisplan"},
+    "Rental booking": {"other": "Hyresbokning"},
+    "Renter": {"other": "Hyrestagare"},
+    "say why the price is changed, in 300 characters or fewer": {"other": "ange varför priset ändras, högst 300 tecken"},
+    "Someone new, below": {"other": "Någon ny, nedan"},
+    "that party is not a renter": {"other": "den parten är ingen hyrestagare"},
+    "that request was already used for another booking": {"other": "den begäran har redan använts för en annan bokning"},
+    "the booking is not in a state that allows that": {"other": "bokningen är inte i ett läge som tillåter det"},
+    "the hold has run out; book it again": {"other": "den preliminära bokningen har löpt ut; boka igen"},
+    "there is no such line to change the price of": {"other": "det finns ingen sådan rad att ändra priset på"},
+    "The renter did not come": {"other": "Hyrestagaren kom inte"},
+    "the unit": {"other": "enheten"},
+    "the unit is not in the fleet for all of that time": {"other": "enheten är inte i hyrflottan under hela den tiden"},
+    "the unit is out past its return on another rental; book it once it is back": {"other": "enheten är ute förbi sin återlämning på en annan hyra; boka den när den är tillbaka"},
+    "The unit is out with somebody else past its return, and may not be back in time.": {"other": "Enheten är ute hos någon annan förbi sin återlämning och kanske inte är tillbaka i tid."},
+    "The unit's own, or its category's": {"other": "Enhetens egen, eller kategorins"},
+    "Today": {"other": "I dag"},
+    "Until": {"other": "Till"},
+    "Held": {"other": "Preliminär"},
+    "Hold run out": {"other": "Preliminär bokning utlöpt"},
+    "Confirmed": {"other": "Bekräftad"},
+    "Returned": {"other": "Återlämnad"},
+    "No-show": {"other": "Uteblev"},
+    "Requested": {"other": "Efterfrågad"},
+    "Moved": {"other": "Flyttad"},
+    "Extended": {"other": "Förlängd"},
+    "To hand over today: %s": {"other": "Ska lämnas ut i dag: %s"},
+    "Due back today: %s": {"other": "Ska tillbaka i dag: %s"},
+    "Out past its return: %s": {"other": "Försenad återlämning: %s"},
+    "May not be back in time for this rental: %s": {"other": "Kanske inte tillbaka i tid till den här hyran: %s"},
+    "%d rental to hand over today": {"one": "%d hyra att lämna ut i dag", "other": "%d hyror att lämna ut i dag"},
+    "%d rental due back today": {"one": "%d hyra ska tillbaka i dag", "other": "%d hyror ska tillbaka i dag"},
+    "%d rental out past its return": {"one": "%d hyra är försenad", "other": "%d hyror är försenade"},
+    "Change the booking": {"other": "Ändra bokningen"},
+    "Out with the renter": {"other": "Utlämnad"},
+    "Add a driver": {"other": "Lägg till en förare"},
+    "Add the driver": {"other": "Lägg till föraren"},
+    "Agreement": {"other": "Avtal"},
+    "A licence was shown": {"other": "Ett körkort visades"},
+    "an agreement is made for a booking that is held, confirmed or out": {"other": "ett avtal görs för en bokning som är preliminär, bekräftad eller utlämnad"},
+    "Before handover": {"other": "Före utlämning"},
+    "Card shown at the counter": {"other": "Kortet visat i disken"},
+    "Categories it holds": {"other": "Behörigheter det har"},
+    "Check the licence": {"other": "Kontrollera körkortet"},
+    "Driver": {"other": "Förare"},
+    "Drivers": {"other": "Förare"},
+    "drivers are changed before the unit is handed over, or added while it is out": {"other": "förare ändras innan enheten lämnas ut, eller läggs till medan den är ute"},
+    "From the template": {"other": "Från mallen"},
+    "How it was checked": {"other": "Hur det kontrollerades"},
+    "How %s accepted it": {"other": "Hur %s godkände det"},
+    "In person, here": {"other": "På plats, här"},
+    "licence checked": {"other": "körkort kontrollerat"},
+    "licence check failed": {"other": "körkortskontrollen godkändes inte"},
+    "licence not checked": {"other": "körkort inte kontrollerat"},
+    "main driver": {"other": "huvudförare"},
+    "Main driver": {"other": "Huvudförare"},
+    "Make a new version": {"other": "Gör en ny version"},
+    "Make the agreement": {"other": "Gör avtalet"},
+    "missing": {"other": "saknas"},
+    "New driver's name": {"other": "Ny förares namn"},
+    "No agreement made yet. The handover can go ahead without one being signed; accepting is recorded here.": {"other": "Inget avtal gjort ännu. Utlämningen kan ske utan att det är undertecknat; godkännandet registreras här."},
+    "Nobody is named to drive yet.": {"other": "Ingen är angiven som förare ännu."},
+    "No licence number and no picture are kept: only what is asked here, for as long as the licence check's purpose allows.": {"other": "Inget körkortsnummer och ingen bild sparas: bara det som efterfrågas här, så länge körkortskontrollens ändamål tillåter."},
+    "Nothing is missing for the handover.": {"other": "Inget saknas för utlämningen."},
+    "Record that it was accepted": {"other": "Registrera att det godkändes"},
+    "say how the licence was checked, in 200 characters or fewer": {"other": "ange hur körkortet kontrollerades, högst 200 tecken"},
+    "say until when the licence is valid": {"other": "ange till när körkortet gäller"},
+    "say why the driver is taken off, in 300 characters or fewer": {"other": "ange varför föraren tas bort, högst 300 tecken"},
+    "Signed on paper": {"other": "Undertecknat på papper"},
+    "taken off": {"other": "borttagen"},
+    "Take off the rental": {"other": "Ta bort från hyran"},
+    "that driver has been taken off the rental": {"other": "den föraren har tagits bort från hyran"},
+    "that is not a rental agreement template": {"other": "det är ingen mall för hyresavtal"},
+    "that person is already a driver of this rental": {"other": "den personen är redan förare för den här hyran"},
+    "the rental already has a main driver": {"other": "hyran har redan en huvudförare"},
+    "this rental's profile needs no licence check": {"other": "den här hyrans profil kräver ingen körkortskontroll"},
+    "Valid until": {"other": "Giltigt till"},
+    "version of %s": {"other": "version från %s"},
+    "Who saw it signed, on paper": {"other": "Vem som såg det undertecknas, på papper"},
+    "%s has not shown a valid licence for this rental.": {"other": "%s har inte visat ett giltigt körkort för den här hyran."},
+    "No driver is named for the rental.": {"other": "Ingen förare är angiven för hyran."},
+    "No licence was shown.": {"other": "Inget körkort visades."},
+    "The licence does not hold a category this unit needs.": {"other": "Körkortet har ingen behörighet som enheten kräver."},
+    "The licence is not valid for the whole rental.": {"other": "Körkortet gäller inte under hela hyrestiden."},
+    "a rental is at most five years": {"other": "en hyra är högst fem år"},
+    "say how the licence was checked": {"other": "ange hur körkortet kontrollerades"},
+    "keep the note to 80 characters, with no licence or identity number in it": {"other": "håll anteckningen inom 80 tecken, utan körkorts- eller personnummer"},
+    "The card, looked at": {"other": "Kortet, granskat"},
+    "A digital licence, looked at": {"other": "Ett digitalt körkort, granskat"},
+    "A foreign licence, looked at": {"other": "Ett utländskt körkort, granskat"},
+    "Another way, in the note": {"other": "Annat sätt, i anteckningen"},
+    "Note, with no licence or identity number": {"other": "Anteckning, utan körkorts- eller personnummer"},
+    "a driver's licence does not last until the new end; check it again before extending": {"other": "en förares körkort gäller inte till det nya slutet; kontrollera det igen innan hyran förlängs"},
+    "that is more than a licence check can say; shorten the note": {"other": "det är mer än en körkortskontroll kan rymma; korta anteckningen"},
+    "that car is in stock for sale then; it joins the fleet once its cycle in stock has ended": {"other": "bilen finns i lager för försäljning då; den kommer in i hyrflottan när dess lagervarv har avslutats"},
+    "that car is in the rental fleet; end its time in the fleet before it comes into stock": {"other": "bilen finns i hyrflottan; avsluta dess tid i hyrflottan innan den tas in i lager"},
+    "a lead is won by the deal made from it": {"other": "ett lead vinns genom affären som görs av det"},
+    "a name is at most 200 characters, a phone number 40, an email 200, wishes 1000 and a note 500": {"other": "ett namn är högst 200 tecken, ett telefonnummer 40, en e-postadress 200, önskemål 1000 och en anteckning 500"},
+    "a next step is a day, and what to do in 500 characters or fewer": {"other": "ett nästa steg är en dag, och vad som ska göras med högst 500 tecken"},
+    "keep a lead's details from one month to ten years": {"other": "spara ett leads uppgifter från en månad till tio år"},
+    "say how the enquiry came in": {"other": "ange hur förfrågan kom in"},
+    "say how they were reached": {"other": "ange hur kontakten togs"},
+    "say which car, or what they are looking for": {"other": "ange vilken bil, eller vad de letar efter"},
+    "say who it is: a name with a phone number or an email": {"other": "ange vem det är: ett namn med telefonnummer eller e-postadress"},
+    "say why the lead was lost": {"other": "ange varför leadet förlorades"},
+    "that is not an email address": {"other": "det är ingen e-postadress"},
+    "that is not where a lead can be moved": {"other": "dit kan ett lead inte flyttas"},
+    "that lead is closed; take it up again first": {"other": "det leadet är avslutat; ta upp det igen först"},
+    "that lead's details have been erased": {"other": "det leadets uppgifter har raderats"},
+    "that person does not sell cars here": {"other": "den personen säljer inte bilar här"},
+    "that phone number has too few or too many digits": {"other": "telefonnumret har för få eller för många siffror"},
+    "that request was already used for another enquiry": {"other": "den begäran har redan använts för en annan förfrågan"},
+    "Lead": {"other": "Lead"},
+    "Deal #%d": {"other": "Affär #%d"},
+    "Reserved car": {"other": "Reserverad bil"},
+    "Open lead": {"other": "Öppet lead"},
+    "Test drive %s": {"other": "Provkörning %s"},
+    "Leads": {"other": "Leads"},
+    "Say how many months.": {"other": "Ange hur många månader."},
+    "All leads": {"other": "Alla leads"},
+    "Contacts": {"other": "Kontakter"},
+    "Give it up": {"other": "Släpp det"},
+    "Give the lead to them": {"other": "Ge leadet till dem"},
+    "Lost because": {"other": "Förlorat för att"},
+    "Move the lead": {"other": "Flytta leadet"},
+    "Next step": {"other": "Nästa steg"},
+    "Nobody has been in touch yet.": {"other": "Ingen har varit i kontakt ännu."},
+    "Now": {"other": "Nu"},
+    "Record a contact": {"other": "Registrera en kontakt"},
+    "Record the contact": {"other": "Registrera kontakten"},
+    "Set the next step": {"other": "Sätt nästa steg"},
+    "Take the lead": {"other": "Ta leadet"},
+    "%d more open lead is another salesperson's": {"one": "%d öppet lead till är en annan säljares", "other": "%d öppna leads till är andra säljares"},
+    "A lead that never became a deal keeps the person's details for %d months after it last moved.": {"other": "Ett lead som aldrig blev en affär behåller personens uppgifter i %d månader efter att det senast rörde sig."},
+    "Add it to this lead": {"other": "Lägg till det i det här leadet"},
+    "Any car": {"other": "Valfri bil"},
+    "Any car: say what they want below": {"other": "Valfri bil: skriv vad de vill ha nedan"},
+    "Came in by": {"other": "Kom in via"},
+    "Closed leads too": {"other": "Även avslutade leads"},
+    "Details erased": {"other": "Uppgifterna raderade"},
+    "Go to": {"other": "Går till"},
+    "If they are asking about another car, record it as a lead of its own for the same person.": {"other": "Om de frågar om en annan bil, registrera det som ett eget lead för samma person."},
+    "Months a lead that never became a deal keeps the person's details": {"other": "Månader som ett lead som aldrig blev en affär behåller personens uppgifter"},
+    "Move their leads": {"other": "Flytta deras leads"},
+    "New lead": {"other": "Nytt lead"},
+    "Next: %s": {"other": "Nästa: %s"},
+    "No leads.": {"other": "Inga leads."},
+    "Open leads only": {"other": "Bara öppna leads"},
+    "Personal data on leads": {"other": "Personuppgifter i leads"},
+    "Record it as another lead": {"other": "Registrera det som ett till lead"},
+    "Record the lead": {"other": "Registrera leadet"},
+    "The car is reserved or sold: offer another": {"other": "Bilen är reserverad eller såld: erbjud en annan"},
+    "Their open leads": {"other": "Deras öppna leads"},
+    "This person already has an open lead": {"other": "Den här personen har redan ett öppet lead"},
+    "What they want": {"other": "Vad de vill ha"},
+    "When somebody leaves": {"other": "När någon slutar"},
+    "New": {"other": "Ny"},
+    "Contacted": {"other": "Kontaktad"},
+    "Test drive booked": {"other": "Provkörning bokad"},
+    "Offer made": {"other": "Erbjudande lämnat"},
+    "Won": {"other": "Vunnen"},
+    "Lost": {"other": "Förlorad"},
+    "Walk-in": {"other": "Besök"},
+    "Ad form": {"other": "Annonsformulär"},
+    "Website": {"other": "Webbplats"},
+    "Bought elsewhere": {"other": "Köpte någon annanstans"},
+    "Financing": {"other": "Finansiering"},
+    "The car was sold": {"other": "Bilen såldes"},
+    "Trade-in value": {"other": "Inbytesvärde"},
+    "No response": {"other": "Inget svar"},
+    "Changed their mind": {"other": "Ändrade sig"},
+    "Text message": {"other": "Sms"},
+    "In person": {"other": "På plats"},
+    "A lead's next step is due: %s": {"other": "Ett leads nästa steg ska göras: %s"},
+    "A lead's next step is due": {"other": "Ett leads nästa steg ska göras"},
+    "The car a lead asked about is reserved or sold: %s": {"other": "Bilen ett lead frågade om är reserverad eller såld: %s"},
+    "A new lead nobody has: %s": {"other": "Ett nytt lead som ingen har: %s"},
+    "A new lead nobody has": {"other": "Ett nytt lead som ingen har"},
+    "a note is at most 300 characters on a check and 500 on a drive": {"other": "en anteckning är högst 300 tecken på en kontroll och 500 på en provkörning"},
+    "a test drive ends after it starts, within a day, and does not start in the past": {"other": "en provkörning slutar efter att den börjar, inom ett dygn, och börjar inte bakåt i tiden"},
+    "say how the licence was checked, and what it allows in categories such as B": {"other": "ange hur körkortet kontrollerades, och vilka behörigheter det har, till exempel B"},
+    "say what the odometer shows, in whole kilometres": {"other": "ange vad vägmätaren visar, i hela kilometer"},
+    "say where they may drive in 300 characters or fewer": {"other": "ange var de får köra med högst 300 tecken"},
+    "that car is not in stock to be driven": {"other": "den bilen finns inte i lager att provköra"},
+    "that is not this drive's agreement": {"other": "det är inte den här provkörningens avtal"},
+    "that request was already used for another test drive": {"other": "den begäran har redan använts för en annan provkörning"},
+    "the agreement is not signed; whoever runs the shop may let the drive start with a note why": {"other": "avtalet är inte undertecknat; den som driver verksamheten kan låta provkörningen börja med en anteckning om varför"},
+    "the car is reserved for another customer": {"other": "bilen är reserverad för en annan kund"},
+    "the car is reserved for another customer, and this shop does not let it be driven meanwhile": {"other": "bilen är reserverad för en annan kund, och här får den inte provköras under tiden"},
+    "the driver's identity, licence and age have not been checked and found good for today": {"other": "förarens identitet, körkort och ålder har inte kontrollerats och godkänts för i dag"},
+    "the odometer cannot show less on return than when the drive started": {"other": "vägmätaren kan inte visa mindre vid återlämningen än när provkörningen började"},
+    "the test drive is not where that can be done": {"other": "provkörningen är inte där det kan göras"},
+    "the youngest driver is from 16 to 99": {"other": "den yngsta föraren är mellan 16 och 99 år"},
+    "Book a test drive": {"other": "Boka en provkörning"},
+    "Say what the odometer shows, in whole kilometres.": {"other": "Ange vad vägmätaren visar, i hela kilometer."},
+    "Test drive": {"other": "Provkörning"},
+    "Anything seen on the car": {"other": "Något som syns på bilen"},
+    "Book it anyway": {"other": "Boka ändå"},
+    "Book the test drive": {"other": "Boka provkörningen"},
+    "Cancel the test drive": {"other": "Avboka provkörningen"},
+    "Categories": {"other": "Behörigheter"},
+    "Checked": {"other": "Kontrollerat"},
+    "Driver's name": {"other": "Förarens namn"},
+    "For the lead from %s": {"other": "För leadet från %s"},
+    "Hand the keys over": {"other": "Lämna över nycklarna"},
+    "Licence": {"other": "Körkort"},
+    "Make it again": {"other": "Gör det igen"},
+    "Not checked": {"other": "Inte kontrollerat"},
+    "Not good for today": {"other": "Inte godkänt för i dag"},
+    "Not made": {"other": "Inte gjort"},
+    "Odometer back": {"other": "Vägmätare vid återlämning"},
+    "Odometer out": {"other": "Vägmätare vid utlämning"},
+    "Old enough to drive our cars": {"other": "Gammal nog att köra våra bilar"},
+    "Read the agreement": {"other": "Läs avtalet"},
+    "Record the signature": {"other": "Registrera underskriften"},
+    "Signed here, in person": {"other": "Undertecknat här, på plats"},
+    "Take the keys back": {"other": "Ta tillbaka nycklarna"},
+    "Template": {"other": "Mall"},
+    "Their identity has been seen": {"other": "Deras identitet har kontrollerats"},
+    "Where they may drive": {"other": "Var de får köra"},
+    "Why it goes without a signed agreement": {"other": "Varför den går utan undertecknat avtal"},
+    "valid until %s": {"other": "giltigt till %s"},
+    "Out on the drive": {"other": "Ute på provkörning"},
+    "A test drive is not back: %s": {"other": "En provkörning har inte kommit tillbaka: %s"},
+    "Test-drive agreement (needs legal review)": {"other": "Provkörningsavtal (behöver juridisk granskning)"},
+    "Say who drives: their name and phone number.": {"other": "Ange vem som kör: namn och telefonnummer."},
+    "Say when it starts and for how many minutes.": {"other": "Ange när den börjar och hur många minuter."},
+    "say who drives: a name of up to 200 characters and a phone number": {"other": "ange vem som kör: ett namn på högst 200 tecken och ett telefonnummer"},
+    "a deal has one to four buyers, each named once": {"other": "en affär har en till fyra köpare, var och en angiven en gång"},
+    "a defect is answered by one of the deal's buyers, on paper with the scan, in person, or electronically": {"other": "ett fel besvaras av en av affärens köpare, på papper med inskanning, på plats eller elektroniskt"},
+    "a price is from nothing up to a billion kronor": {"other": "ett pris är från noll upp till en miljard kronor"},
+    "a warranty and a note are at most 1000 characters, a place 300 and payment terms 500": {"other": "en garanti och en anteckning är högst 1000 tecken, en plats 300 och betalningsvillkor 500"},
+    "an extra has a description, a quantity, a price and a VAT rate": {"other": "ett tillval har en beskrivning, ett antal, ett pris och en momssats"},
+    "describe the defect in 1000 characters or fewer": {"other": "beskriv felet med högst 1000 tecken"},
+    "say whether the buyer is a consumer or a business": {"other": "ange om köparen är en konsument eller ett företag"},
+    "say why the deal is cancelled, in 300 characters or fewer": {"other": "ange varför affären avbryts, med högst 300 tecken"},
+    "that car is not in stock to be sold": {"other": "den bilen finns inte i lager att säljas"},
+    "that is not a sales contract template": {"other": "det är ingen mall för köpeavtal"},
+    "that is not a way a sale is taxed": {"other": "det är inget sätt att beskatta en försäljning"},
+    "that request was already used for another deal": {"other": "den begäran har redan använts för en annan affär"},
+    "the car already has a deal being agreed or contracted; cancel that first": {"other": "bilen har redan en affär som förhandlas eller är avtalad; avbryt den först"},
+    "the contract cannot be completed yet": {"other": "avtalet kan inte slutföras ännu"},
+    "the deal is not where that can be done": {"other": "affären är inte där det kan göras"},
+    "the deal was changed by somebody else meanwhile; read it again": {"other": "affären ändrades av någon annan under tiden; läs den igen"},
+    "this car may not be sold under the margin scheme: its purchase does not make it eligible": {"other": "den här bilen får inte säljas med vinstmarginalbeskattning: inköpet gör den inte berättigad"},
+    "the car's purchase was assessed again and no longer allows the margin scheme; choose how the sale is taxed and make the contract again": {"other": "bilens inköp har bedömts om och tillåter inte längre vinstmarginalbeskattning; välj hur försäljningen beskattas och upprätta avtalet igen"},
+    "somebody made a new one meanwhile; read it again before making another": {"other": "någon gjorde ett nytt under tiden; läs det igen innan du gör ett till"},
+    "Deal": {"other": "Affär"},
+    "Deals": {"other": "Affärer"},
+    "A known defect, as you tell the buyer": {"other": "Ett känt fel, som du berättar det för köparen"},
+    "Accepted, here": {"other": "Godtaget, här"},
+    "Add the defect": {"other": "Lägg till felet"},
+    "All deals": {"other": "Alla affärer"},
+    "Before the contract is complete": {"other": "Innan avtalet är klart"},
+    "Buyer's name": {"other": "Köparens namn"},
+    "Buyer: %s": {"other": "Köpare: %s"},
+    "Buyers": {"other": "Köpare"},
+    "Cancel the deal": {"other": "Avbryt affären"},
+    "Cancelled deals too": {"other": "Även avbrutna affärer"},
+    "Change the terms": {"other": "Ändra villkoren"},
+    "Complete the contract": {"other": "Slutför avtalet"},
+    "Contract": {"other": "Avtal"},
+    "Delivered on": {"other": "Levereras den"},
+    "Description": {"other": "Beskrivning"},
+    "How the sale is taxed": {"other": "Hur försäljningen beskattas"},
+    "Its purchase does not make this car eligible for the margin scheme.": {"other": "Inköpet gör inte den här bilen berättigad till vinstmarginalbeskattning."},
+    "Known defects": {"other": "Kända fel"},
+    "Make it again from the terms as they stand": {"other": "Gör det igen från villkoren som de är nu"},
+    "Make the contract": {"other": "Gör avtalet"},
+    "New deal": {"other": "Ny affär"},
+    "No deals.": {"other": "Inga affärer."},
+    "No known defects stated.": {"other": "Inga kända fel angivna."},
+    "Not answered": {"other": "Inte besvarat"},
+    "Not chosen yet": {"other": "Inte valt ännu"},
+    "Open deals only": {"other": "Bara öppna affärer"},
+    "Open the deal": {"other": "Öppna affären"},
+    "Payment": {"other": "Betalning"},
+    "Price before VAT, in kronor": {"other": "Pris före moms, i kronor"},
+    "Price of the car": {"other": "Pris för bilen"},
+    "Price of the car, VAT included, in kronor": {"other": "Pris för bilen, inklusive moms, i kronor"},
+    "Read the contract": {"other": "Läs avtalet"},
+    "Sold with the car": {"other": "Säljs med bilen"},
+    "The buyer is": {"other": "Köparen är"},
+    "The contract says \"%s\" to a consumer. A general \"as is\" clause does not exempt you from the Consumer Sales Act; state each known defect instead.": {"other": "Avtalet säger \"%s\" till en konsument. En allmän klausul om \"befintligt skick\" befriar dig inte från konsumentköplagen; ange i stället varje känt fel."},
+    "To pay in all": {"other": "Att betala totalt"},
+    "Warranty": {"other": "Garanti"},
+    "Where": {"other": "Var"},
+    "A consumer": {"other": "En konsument"},
+    "A business": {"other": "Ett företag"},
+    "Margin scheme": {"other": "Vinstmarginalbeskattning"},
+    "Ordinary VAT": {"other": "Vanlig moms"},
+    "Being agreed": {"other": "Förhandlas"},
+    "Contracted": {"other": "Avtalad"},
+    "On paper, scanned": {"other": "På papper, inskannat"},
+    "Electronically": {"other": "Elektroniskt"},
+    "Choose how the sale is taxed.": {"other": "Välj hur försäljningen beskattas."},
+    "Make the contract from the terms as they stand.": {"other": "Gör avtalet från villkoren som de är nu."},
+    "Every buyer signs the contract.": {"other": "Varje köpare skriver under avtalet."},
+    "Every buyer accepts each known defect on its own.": {"other": "Varje köpare godtar varje känt fel för sig."},
+    "Say the car's price in kronor.": {"other": "Ange bilens pris i kronor."},
+    "Say who buys: their name, and a phone number or email.": {"other": "Ange vem som köper: namn och telefonnummer eller e-postadress."},
+    "Each extra needs a quantity, a price in kronor and a VAT rate in per cent.": {"other": "Varje tillval behöver ett antal, ett pris i kronor och en momssats i procent."},
+    "Sales contract (draft, needs legal review)": {"other": "Köpeavtal (utkast, behöver juridisk granskning)"},
+    "The deal": {"other": "Affären"},
+    "Open a deal": {"other": "Öppna en affär"},
+    "out of date: the terms or the known defects have changed since": {"other": "inaktuellt: villkoren eller de kända felen har ändrats sedan dess"},
+    "the contract is complete and states everything; change the terms or state a defect first": {"other": "avtalet är klart och anger allt; ändra villkoren eller ange ett fel först"},
+    "From the shipped contract, a draft that needs legal review.": {"other": "Från det medföljande avtalet, ett utkast som behöver juridisk granskning."},
+    "From the shipped agreement, a draft that needs legal review.": {"other": "Från det medföljande avtalet, ett utkast som behöver juridisk granskning."},
+    "say which of the shop's contract templates to use": {"other": "ange vilken av verksamhetens avtalsmallar som ska användas"},
+    "say which of the shop's agreement templates to use": {"other": "ange vilken av verksamhetens avtalsmallar för provkörning som ska användas"},
+    "A deal stands, with another salesperson": {"other": "Det finns en affär, hos en annan säljare"},
+    "the contract is not complete; a deal is invoiced once it is": {"other": "avtalet är inte klart; en affär faktureras när det är klart"},
+    "the sale has been invoiced, so its terms are frozen; credit the invoice first": {"other": "försäljningen har fakturerats, så villkoren är låsta; kreditera fakturan först"},
+    "a car is sold on a vehicle sale's invoice, under the margin scheme at no VAT of its own": {"other": "en bil säljs på en bilförsäljnings faktura, med vinstmarginalbeskattning utan egen moms"},
+    "Sold under the margin scheme": {"other": "Såld med vinstmarginalbeskattning"},
+    "Invoice the sale": {"other": "Fakturera försäljningen"},
+    "Invoiced as %s": {"other": "Fakturerad som %s"},
+    "a car sale in this period cannot be exported yet: how it is posted waits on the accountant": {"other": "en bilförsäljning i perioden kan inte exporteras ännu: hur den bokförs väntar på revisorn"},
+    "What you typed, not saved": {"other": "Det du skrev, inte sparat"},
+    "Somebody saved the terms while you were changing them. The form below holds theirs; carry over what you still want.": {"other": "Någon sparade villkoren medan du ändrade dem. Formuläret nedan har deras; för över det du fortfarande vill ha."},
+    "a line priced with its VAT is one of it": {"other": "en rad prissatt med moms är en av den"},
+    "the sale comes to nothing, so there is nothing to invoice": {"other": "försäljningen uppgår till ingenting, så det finns inget att fakturera"},
+    "a car sold under the margin scheme is reduced by crediting its line, not by an adjustment": {"other": "en bil som sålts med vinstmarginalbeskattning sätts ned genom att dess rad krediteras, inte genom en justering"},
+    "a car sale is invoiced again through its deal, whose terms say who buys": {"other": "en bilförsäljning faktureras på nytt genom sin affär, vars villkor säger vem som köper"},
+    "the sale has been invoiced; credit the invoice before cancelling the deal": {"other": "försäljningen har fakturerats; kreditera fakturan innan affären avbryts"},
+    "a booking is checked in once it is out, and only once": {"other": "en bokning återlämnas när den är ute, och bara en gång"},
+    "a booking is checked out once it is confirmed, and only once": {"other": "en bokning lämnas ut när den är bekräftad, och bara en gång"},
+    "a handover is a check-out or a check-in": {"other": "en överlämning är en utlämning eller en återlämning"},
+    "read the odometer, in whole kilometres": {"other": "läs av mätarställningen, i hela kilometer"},
+    "that protocol was left; start the handover again": {"other": "det protokollet lämnades oavslutat; börja överlämningen igen"},
+    "the fuel or charge is read in eighths, from empty to full": {"other": "bränsle eller laddning läses i åttondelar, från tomt till fullt"},
+    "the renter accepts the protocol only when there": {"other": "hyrestagaren godkänner protokollet bara på plats"},
+    "the unit is still out on another rental; check that in first": {"other": "enheten är fortfarande ute på en annan hyra; återlämna den först"},
+    "the unit's profile has no checklist for this; choose one in the rental settings first": {"other": "enhetens profil har ingen checklista för detta; välj en i uthyrningsinställningarna först"},
+    "something is still missing before the handover; the booking lists it": {"other": "något saknas fortfarande före utlämningen; bokningen visar vad"},
+    "%s each, net": {"other": "%s styck, exklusive moms"},
+    "Carry on with the check-in": {"other": "Fortsätt med återlämningen"},
+    "Carry on with the check-out": {"other": "Fortsätt med utlämningen"},
+    "Check it in": {"other": "Ta emot den"},
+    "Check it out": {"other": "Lämna ut den"},
+    "Checked in": {"other": "Återlämnad"},
+    "Checked out": {"other": "Utlämnad"},
+    "Damage on the unit": {"other": "Skador på enheten"},
+    "Handover": {"other": "Överlämning"},
+    "Nothing here is charged until a person confirms it.": {"other": "Inget här debiteras förrän någon har bekräftat det."},
+    "The return suggests": {"other": "Återlämningen föreslår"},
+    "fuel or charge %d/8": {"other": "bränsle eller laddning %d/8"},
+    "lower than before": {"other": "lägre än tidigare"},
+    "observed": {"other": "observerad"},
+    "the protocol": {"other": "protokollet"},
+    "the renter accepted the protocol": {"other": "hyrestagaren godkände protokollet"},
+    "the renter was not there": {"other": "hyrestagaren var inte på plats"},
+    "the renter was there": {"other": "hyrestagaren var på plats"},
+    "At check-out: %s": {"other": "Vid utlämning: %s"},
+    "Back to the booking": {"other": "Tillbaka till bokningen"},
+    "Check-in": {"other": "Återlämning"},
+    "Check-out": {"other": "Utlämning"},
+    "Each new finding becomes a damage case to look at, including one found after this page was opened. It is not a charge. Untick one that was only dirt.": {"other": "Varje nytt fynd blir ett skadeärende att titta på, också ett som hittats efter att sidan öppnades. Det är ingen debitering. Avmarkera ett som bara var smuts."},
+    "Finish the check-in": {"other": "Avsluta återlämningen"},
+    "Finish the check-out": {"other": "Avsluta utlämningen"},
+    "Fuel or charge": {"other": "Bränsle eller laddning"},
+    "Known damage": {"other": "Kända skador"},
+    "Leave it unfinished": {"other": "Lämna den oavslutad"},
+    "Not on the check-out": {"other": "Fanns inte vid utlämningen"},
+    "The renter has seen the protocol and accepts it": {"other": "Hyrestagaren har sett protokollet och godkänner det"},
+    "The renter is here": {"other": "Hyrestagaren är på plats"},
+    "Without a connection the answers and the finish are kept on this phone and sent when it is back. A photograph waits for a connection.": {"other": "Utan uppkoppling sparas svaren och avslutet i telefonen och skickas när uppkopplingen är tillbaka. Ett foto väntar på uppkoppling."},
+    "known damage": {"other": "känd skada"},
+    "left unfinished": {"other": "lämnad oavslutad"},
+    "new since the check-out": {"other": "nytt sedan utlämningen"},
+    "%s km over the allowance": {"other": "%s km över det som ingår"},
+    "%s eighths of fuel or charge short": {"other": "%s åttondelar bränsle eller laddning saknas"},
+    "%s minutes late": {"other": "%s minuter sent"},
+    "a report is into rental use or out of it": {"other": "en anmälan gäller in i eller ur uthyrningsverksamhet"},
+    "an insurance runs from a day, and to the same day or later": {"other": "en försäkring gäller från en dag, och till samma dag eller senare"},
+    "give the insurer and the policy number": {"other": "ange försäkringsbolag och försäkringsnummer"},
+    "keep the reference to 200 characters": {"other": "håll referensen inom 200 tecken"},
+    "only a missing report or insurance can be let go, and only while it is missing": {"other": "bara en saknad anmälan eller försäkring kan släppas, och bara medan den saknas"},
+    "say on which day it was reported": {"other": "ange vilken dag den anmäldes"},
+    "say whether the insurance covers rental use": {"other": "ange om försäkringen gäller för uthyrning"},
+    "say why it is let go, in 300 characters or fewer": {"other": "ange varför den släpps, med högst 300 tecken"},
+    "Let go by %s: %s": {"other": "Släppt av %s: %s"},
+    "Let it go": {"other": "Släpp den"},
+    "Let it go for this rental": {"other": "Släpp den för den här hyran"},
+    "Covers rental use": {"other": "Gäller för uthyrning"},
+    "Insurer": {"other": "Försäkringsbolag"},
+    "Into or out of rental use": {"other": "In i eller ur uthyrning"},
+    "Into rental use": {"other": "In i uthyrning"},
+    "Not known": {"other": "Okänt"},
+    "Out of rental use": {"other": "Ur uthyrning"},
+    "Policy number": {"other": "Försäkringsnummer"},
+    "Record a report": {"other": "Registrera en anmälan"},
+    "Record an insurance": {"other": "Registrera en försäkring"},
+    "Record the insurance": {"other": "Registrera försäkringen"},
+    "Record the report": {"other": "Registrera anmälan"},
+    "Rental use and insurance": {"other": "Uthyrning och försäkring"},
+    "Reported into rental use": {"other": "Anmäld till uthyrning"},
+    "Reported on": {"other": "Anmäld den"},
+    "Reported out of rental use": {"other": "Avanmäld från uthyrning"},
+    "Valid from": {"other": "Gäller från"},
+    "Valid until, if it ends": {"other": "Gäller till, om den upphör"},
+    "Yes": {"other": "Ja"},
+    "covers rental": {"other": "gäller för uthyrning"},
+    "does not cover rental": {"other": "gäller inte för uthyrning"},
+    "not reported into rental use": {"other": "inte anmäld till uthyrning"},
+    "rental cover not known": {"other": "okänt om den gäller för uthyrning"},
+    "reported into rental use": {"other": "anmäld till uthyrning"},
+    "until further notice": {"other": "tills vidare"},
+    "The unit has not been reported into rental use in the vehicle register.": {"other": "Enheten är inte anmäld till uthyrningsverksamhet i vägtrafikregistret."},
+    "No insurance covering rental use is recorded for every day of the rental.": {"other": "Ingen försäkring som gäller för uthyrning finns registrerad för varje dag av hyran."},
+    "Report the vehicle out of rental use in Transportstyrelsen's e-service for vehicles in commercial traffic, then record it here.": {"other": "Avanmäl fordonet från uthyrning i Transportstyrelsens e-tjänst för fordon i yrkestrafik och registrera det sedan här."},
+    "Report the vehicle into rental use in Transportstyrelsen's e-service for vehicles in commercial traffic, then record it here.": {"other": "Anmäl fordonet till uthyrning i Transportstyrelsens e-tjänst för fordon i yrkestrafik och registrera det sedan här."},
+    "Report into rental use in the vehicle register: %s": {"other": "Anmäl till uthyrning i vägtrafikregistret: %s"},
+    "Out of the fleet, and still reported into rental use: %s": {"other": "Utanför hyrflottan men fortfarande anmäld till uthyrning: %s"},
+    "Its insurance for rental use ends soon: %s": {"other": "Försäkringen för uthyrning upphör snart: %s"},
+    "The rental permit ends soon": {"other": "Biluthyrningstillståndet upphör snart"},
+    "Something is missing before this handover: %s": {"other": "Något saknas före den här utlämningen: %s"},
+    "say why the register is read, in 300 characters or fewer": {"other": "ange varför registret läses, med högst 300 tecken"},
+    "a register is read over a period, from a day to a later one": {"other": "ett register läses över en period, från en dag till en senare"},
+    "give the registration and the moment": {"other": "ange registreringsnummer och tidpunkt"},
+    "keep the register between 1 and 240 months, and say on what basis": {"other": "spara registret mellan 1 och 240 månader, och ange på vilken grund"},
+    "Insured for rental use for the whole rental": {"other": "Försäkrad för uthyrning under hela hyran"},
+    "Whether a trailer or a machine must be insured for rental use, beyond its ordinary insurance, is not confirmed. It is required by default.": {"other": "Om ett släp eller en maskin måste vara försäkrad för uthyrning, utöver sin vanliga försäkring, är inte bekräftat. Det krävs som standard."},
+    "the unit is not insured for rental use for the longer rental; record the insurance first": {"other": "enheten är inte försäkrad för uthyrning under den längre hyran; registrera försäkringen först"},
+    "Its insurance for rental use has ended: %s": {"other": "Försäkringen för uthyrning har upphört: %s"},
+    "Rental register": {"other": "Uthyrningsregister"},
+    "Booked %s – %s": {"other": "Bokad %s – %s"},
+    "Download as CSV": {"other": "Ladda ner som CSV"},
+    "Every unit": {"other": "Alla enheter"},
+    "No rentals in that period.": {"other": "Inga hyror under den perioden."},
+    "Nobody had it out then.": {"other": "Ingen hade den ute då."},
+    "Out %s": {"other": "Ute %s"},
+    "Over a period": {"other": "Under en period"},
+    "Read the register": {"other": "Läs registret"},
+    "Rentals": {"other": "Hyror"},
+    "Unit": {"other": "Enhet"},
+    "Who had %s": {"other": "Vem hade %s"},
+    "Who had a registration at a moment": {"other": "Vem hade ett registreringsnummer vid en tidpunkt"},
+    "Who had which unit when, as the authority that granted the permit, or the police, may ask to see it. Every read is recorded with who read it, when and why.": {"other": "Vem som hade vilken enhet när, som myndigheten som gav tillståndet, eller polisen, kan begära att få se. Varje läsning registreras med vem som läste, när och varför."},
+    "Why it is read": {"other": "Varför det läses"},
+    "out now": {"other": "ute nu"},
+    "Decide how long it is kept": {"other": "Bestäm hur länge det sparas"},
+    "Decided by %s on %s": {"other": "Beslutat av %s den %s"},
+    "How long the rental register is kept has not been decided. Nothing is erased for it until it is.": {"other": "Hur länge uthyrningsregistret sparas är inte beslutat. Inget raderas för det förrän det är beslutat."},
+    "Kept %d months after a rental ends: %s": {"other": "Sparas %d månader efter att en hyra har slutat: %s"},
+    "Months after a rental ends": {"other": "Månader efter att en hyra har slutat"},
+    "On what basis": {"other": "På vilken grund"},
+    "Read the rental register": {"other": "Läs uthyrningsregistret"},
+    "Record the decision": {"other": "Registrera beslutet"},
+    "for the period booked before, which no longer stands": {"other": "för den tidigare bokade perioden, som inte längre gäller"}
   }
 }

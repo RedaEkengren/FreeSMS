@@ -8,6 +8,7 @@ import (
 	"image/jpeg"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -30,8 +31,12 @@ const (
 	vehicleID = "55555555-5555-5555-5555-555555555555"
 )
 
+// workshopOnly is what an ordinary shop runs: the workshop and nothing else,
+// as every shop did before there were modules.
+var workshopOnly = []access.Module{access.Workshop}
+
 func advisor() access.Scope {
-	return access.Scope{ShopID: shopID, UserID: userID, Role: access.RoleServiceAdvisor}
+	return access.Scope{ShopID: shopID, UserID: userID, Role: access.Of(access.RoleServiceAdvisor), Modules: workshopOnly}
 }
 
 // A workshop with two invoices, a credit, a payment and its reversal, and a
@@ -108,7 +113,7 @@ func workshopWithBooks(t *testing.T) (*pgxpool.Pool, *storage.Store, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := workshop.ReversePayment(ctx, pool, advisor(), paid.ID); err != nil {
+	if err := workshop.ReversePayment(ctx, pool, advisor(), paid.ID, "Registrerad av misstag"); err != nil {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(t.TempDir(), "attachments")
@@ -174,6 +179,8 @@ func TestWhatABrokenRestoreLooksLikeIsNoticed(t *testing.T) {
 		"a payment taken back on another invoice": {"payment reversals", `UPDATE invoice_payments SET invoice_id = (SELECT id FROM invoices WHERE number = 1) WHERE reverses_id IS NOT NULL`},
 		"a job invoiced and no invoice": {"jobs and invoices", `UPDATE work_orders SET state = 'invoiced' WHERE id = (SELECT w.id FROM work_orders w WHERE NOT EXISTS (SELECT 1 FROM invoices i WHERE i.work_order_id = w.id) LIMIT 1);
 			INSERT INTO work_orders (shop_id, number, vehicle_id, customer_id, state) SELECT shop_id, 99, vehicle_id, customer_id, 'invoiced' FROM work_orders LIMIT 1`},
+		"an event about something not there": {"audit events", `INSERT INTO audit_events (shop_id, subject_kind, subject_id, event)
+			SELECT id, 'invoice', '99999999-0000-0000-0000-000000000000', 'payment.recorded' FROM shops LIMIT 1`},
 		"a photograph that did not come back": {"photographs", `INSERT INTO attachments (shop_id, work_order_id, storage_key, content_type, byte_size)
 			SELECT shop_id, id, 'abcdef0123456789abcdef0123456789', 'image/jpeg', 100 FROM work_orders LIMIT 1`},
 	} {
@@ -242,5 +249,85 @@ func TestAPhotographThatIsThereAndTheOneThatIsTruncated(t *testing.T) {
 	rep, _ = ops.Verify(ctx, pool, store)
 	if c := find(t, rep, "photographs"); c.Level != ops.Fail {
 		t.Errorf("a truncated photograph = %+v", c)
+	}
+}
+
+// Every kind of thing an audit event may be about is one the audit check
+// can find (#151). The list is read from the database's own CHECK, so a
+// module that widens it -- as Dealer and Rental did -- fails here until
+// verify.go has a branch for it and this test a row: otherwise a healthy
+// restore of a shop running that module is reported as broken.
+func TestEveryAuditSubjectKindIsOneVerifyCanFind(t *testing.T) {
+	pool, store, _ := workshopWithBooks(t)
+	ctx := context.Background()
+	var def string
+	if err := pool.QueryRow(ctx, `SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'audit_events_subject_kind_check'`).Scan(&def); err != nil {
+		t.Fatal(err)
+	}
+	var kinds []string
+	for _, m := range regexp.MustCompile(`'([a-z_]+)'`).FindAllStringSubmatch(def, -1) {
+		kinds = append(kinds, m[1])
+	}
+	if len(kinds) < 10 {
+		t.Fatalf("read %v from %s", kinds, def)
+	}
+	// One row of each, by the fewest columns its table will take: the
+	// check asks only whether the subject is there. Foreign keys and
+	// triggers are off on this connection, so nothing else need exist.
+	const id = "99999999-9999-9999-9999-9999999999"
+	subjects := map[string]string{
+		"shop":           `SELECT '` + shopID + `'::uuid`,
+		"user":           `SELECT '` + userID + `'::uuid`,
+		"vehicle":        `SELECT '` + vehicleID + `'::uuid`,
+		"customer":       `SELECT id FROM customers LIMIT 1`,
+		"party":          `SELECT id FROM parties LIMIT 1`,
+		"invoice":        `SELECT id FROM invoices LIMIT 1`,
+		"payment":        `SELECT id FROM invoice_payments LIMIT 1`,
+		"work_order":     `SELECT id FROM work_orders LIMIT 1`,
+		"resource_block": `INSERT INTO resource_blocks (id, shop_id, resource_id, kind, period, status) VALUES ('` + id + `01', '` + shopID + `', gen_random_uuid(), 'workshop', tstzrange(now(), NULL), 'confirmed') RETURNING id`,
+		"document": `INSERT INTO document_records (id, shop_id, created_by, kind, subject_kind, subject_id, template_version_id, title, content_sha256, body, data)
+		             VALUES ('` + id + `02', '` + shopID + `', '` + userID + `', 'sales_contract', 'sale', gen_random_uuid(), gen_random_uuid(), 'x', sha256('x'), 'x', '{}') RETURNING id`,
+		"identity_record": `INSERT INTO identity_records (id, shop_id, party_id, kind, purpose, legal_basis, recorded_by, expires_at, verification_ref)
+		             VALUES ('` + id + `03', '` + shopID + `', gen_random_uuid(), 'licence_check', 'rental', 'contract', '` + userID + `', now() + interval '1 day', 'x') RETURNING id`,
+		"stock_unit": `INSERT INTO stock_units (id, shop_id, vehicle_id, resource_id, reason) VALUES ('` + id + `04', '` + shopID + `', '` + vehicleID + `', gen_random_uuid(), 'purchase') RETURNING id`,
+		"purchase": `INSERT INTO vehicle_purchases (id, shop_id, stock_unit_id, seller_party_id, purchased_on, tax_purchase_price_minor)
+		             VALUES ('` + id + `05', '` + shopID + `', gen_random_uuid(), gen_random_uuid(), current_date, 0) RETURNING id`,
+		"rental_booking": `INSERT INTO rental_bookings (id, shop_id, block_id, number, unit_id, renter_party_id, starts_at, ends_at, profile_version_id)
+		             VALUES ('` + id + `06', '` + shopID + `', gen_random_uuid(), 1, gen_random_uuid(), gen_random_uuid(), now(), now() + interval '1 day', gen_random_uuid()) RETURNING id`,
+		"test_drive": `INSERT INTO test_drives (id, shop_id, stock_unit_id, driver_party_id, block_id, starts_at, ends_at)
+		             VALUES ('` + id + `07', '` + shopID + `', gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), now(), now() + interval '1 hour') RETURNING id`,
+		"vehicle_sale": `INSERT INTO vehicle_sales (id, shop_id, stock_unit_id, salesperson_id)
+		             VALUES ('` + id + `08', '` + shopID + `', gen_random_uuid(), '` + userID + `') RETURNING id`,
+	}
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Release()
+	if _, err := conn.Exec(ctx, `SET session_replication_role = replica`); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _, _ = conn.Exec(ctx, `RESET session_replication_role`) }()
+	for _, kind := range kinds {
+		q, ok := subjects[kind]
+		if !ok {
+			t.Errorf("audit events may be about a %q, and this test does not know one: add it here and to verify.go's audit check", kind)
+			continue
+		}
+		var subject string
+		if err := conn.QueryRow(ctx, q).Scan(&subject); err != nil {
+			t.Fatalf("a %s: %v", kind, err)
+		}
+		if _, err := conn.Exec(ctx, `INSERT INTO audit_events (shop_id, subject_kind, subject_id, event) VALUES ($1, $2, $3, 'test.seen')`,
+			shopID, kind, subject); err != nil {
+			t.Fatalf("an event about a %s: %v", kind, err)
+		}
+	}
+	rep, err := ops.Verify(ctx, pool, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := find(t, rep, "audit events"); c.Level != ops.Pass {
+		t.Errorf("one event about each kind of subject there is: %+v", c)
 	}
 }

@@ -301,7 +301,7 @@ func TestErasingACustomerBlanksWhatWasSaidAboutThem(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := cardOf(t, pool, fixtureCustomer)
-	if err := workshop.ErasePerson(ctx, pool, advisor(), c.PersonID, "Asked"); err != nil {
+	if err := workshop.ErasePerson(ctx, pool, advisor(), &recordingRemover{}, c.PersonID, "Asked"); err != nil {
 		t.Fatal(err)
 	}
 	es, _ := workshop.TimelineFor(ctx, pool, advisor(), job)

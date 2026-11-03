@@ -28,6 +28,13 @@ import (
 // A price correction is money. It does not put anything back on a shelf: a part
 // that physically comes back is its own movement, confirmed on its own.
 
+// errCreditSchemeAdjustment is an adjustment asked of a margin-scheme
+// invoice (#177).
+var errCreditSchemeAdjustment = fmt.Errorf("%w: a car sold under the margin scheme is reduced by crediting its line, not by an adjustment", ErrInvalid)
+
+// errRebillSale is a car sale's invoice rebilled (#177).
+var errRebillSale = fmt.Errorf("%w: a car sale is invoiced again through its deal, whose terms say who buys", ErrInvalid)
+
 // ErrNothingToCredit is returned when there is nothing left of an invoice to
 // credit.
 var ErrNothingToCredit = ErrAlreadyCredited
@@ -118,7 +125,7 @@ func newKey() string {
 // the transaction ends.
 func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRequest, lock bool) (creditPlan, error) {
 	var p creditPlan
-	q := `SELECT id, series, number, work_order_id, credit_of_id IS NOT NULL, customer_name,
+	q := `SELECT id, series, number, coalesce(work_order_id::text, ''), credit_of_id IS NOT NULL, customer_name,
 	             customer_address, customer_org_number, customer_vat_number,
 	             net_minor, vat_minor, gross_minor,
 	             customer_postal_code, customer_city, customer_country,
@@ -168,13 +175,14 @@ func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRe
 		creditedQty, creditedNet int64
 		creditedVAT              int64
 		unitCode                 string
+		marginScheme             bool
 	}
 	rows, err := tx.Query(ctx, `
 		SELECT l.id::text, l.position, l.kind, l.description, (l.quantity * 1000)::bigint, l.unit_price_minor, l.vat_rate_bp, l.net_minor, l.vat_minor,
 		       coalesce((SELECT -sum((c.quantity * 1000)::bigint) FROM invoice_lines c WHERE c.credits_line_id = l.id), 0),
 		       coalesce((SELECT -sum(c.net_minor) FROM invoice_lines c WHERE c.credits_line_id = l.id), 0),
 		       coalesce((SELECT -sum(c.vat_minor) FROM invoice_lines c WHERE c.credits_line_id = l.id), 0),
-		       coalesce(l.unit_code, '')
+		       coalesce(l.unit_code, ''), l.margin_scheme
 		FROM invoice_lines l WHERE l.invoice_id = $1 ORDER BY l.position`, invoiceID)
 	if err != nil {
 		return p, fmt.Errorf("read invoice lines: %w", err)
@@ -183,7 +191,7 @@ func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRe
 	byPos := map[int]*orig{}
 	for rows.Next() {
 		var o orig
-		if err := rows.Scan(&o.id, &o.position, &o.kind, &o.description, &o.qty, &o.unit, &o.rate, &o.net, &o.vat, &o.creditedQty, &o.creditedNet, &o.creditedVAT, &o.unitCode); err != nil {
+		if err := rows.Scan(&o.id, &o.position, &o.kind, &o.description, &o.qty, &o.unit, &o.rate, &o.net, &o.vat, &o.creditedQty, &o.creditedNet, &o.creditedVAT, &o.unitCode, &o.marginScheme); err != nil {
 			rows.Close()
 			return p, fmt.Errorf("scan invoice line: %w", err)
 		}
@@ -241,8 +249,18 @@ func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRe
 		}
 		p.lines = append(p.lines, invoiceLine{
 			Kind: o.kind, Description: o.description, QuantityMilli: -qty, UnitPriceMinor: o.unit, VATRateBasis: o.rate,
-			NetMinor: -net, VATMinor: -vat, CreditsLineID: o.id, UnitCode: o.unitCode,
+			NetMinor: -net, VATMinor: -vat, CreditsLineID: o.id, UnitCode: o.unitCode, MarginScheme: o.marginScheme,
 		})
+	}
+	// A car under the margin scheme is reduced by crediting its line, which
+	// works its VAT out again (creditedSchemeTx); an adjustment would carry
+	// ordinary VAT and take none of the scheme's back.
+	if len(req.Adjustments) > 0 {
+		for _, o := range origs {
+			if o.marginScheme {
+				return p, errCreditSchemeAdjustment
+			}
+		}
 	}
 	for _, a := range req.Adjustments {
 		desc := strings.TrimSpace(a.Description)
@@ -388,7 +406,7 @@ func IssueCredit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in
 		var existing *string
 		if err := tx.QueryRow(ctx, `SELECT credit_invoice_id::text FROM invoice_corrections WHERE original_invoice_id = $1 AND request_key = $2`,
 			invoiceID, req.Key).Scan(&existing); err == nil && existing != nil {
-			return tx.QueryRow(ctx, `SELECT id, series, number, work_order_id, customer_name, issued_at, net_minor, vat_minor, gross_minor, credit_of_id
+			return tx.QueryRow(ctx, `SELECT id, series, number, coalesce(work_order_id::text, ''), customer_name, issued_at, net_minor, vat_minor, gross_minor, credit_of_id
 				FROM invoices WHERE id = $1`, *existing).Scan(&note.ID, &note.Series, &note.Number, &note.WorkOrderID, &note.CustomerName,
 				&note.IssuedAt, &note.NetMinor, &note.VATMinor, &note.GrossMinor, &note.CreditOfID)
 		} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -414,6 +432,10 @@ func IssueCredit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in
 			net += l.NetMinor
 			vat += l.VATMinor
 		}
+		statement, schemeVAT, err := creditedSchemeTx(ctx, tx, invoiceID, p.lines)
+		if err != nil {
+			return err
+		}
 		const insert = `
 			INSERT INTO invoices
 			  (shop_id, series, number, work_order_id, credit_of_id, issued_by,
@@ -422,9 +444,14 @@ func IssueCredit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in
 			   seller_phone, seller_email, seller_payment_reference,
 			   seller_payment_terms_days, seller_f_tax,
 			   net_minor, vat_minor, gross_minor,
-			   ` + electronicColumns + `)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
-			        $23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33)
+			   ` + electronicColumns + `,
+			   source, vehicle_sale_id, rental_id, customer_id, margin_scheme_statement, margin_scheme_vat_minor)
+			SELECT $1,$2,$3,NULLIF($4, '')::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
+			       $23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,
+			       -- What it credits is what it is of (#146), read from the
+			       -- original rather than passed along, so it cannot differ.
+			       o.source, o.vehicle_sale_id, o.rental_id, o.customer_id, $36, $37
+			FROM invoices o WHERE o.id = $5
 			RETURNING id, issued_at`
 		args := append([]any{
 			scope.ShopID, p.original.Series, number, p.original.WorkOrderID, p.original.ID, scope.UserID,
@@ -433,7 +460,8 @@ func IssueCredit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, in
 			sold.Phone, sold.Email, sold.PaymentReference,
 			sold.PaymentTermsDays, sold.FTax,
 			net, vat, net + vat,
-		}, electronicArgs(sold, p.buyer)...)
+		}, electronicArgs(sold, p.buyer, "")...)
+		args = append(args, statement, schemeVAT)
 		if err := tx.QueryRow(ctx, insert, args...).Scan(&note.ID, &note.IssuedAt); err != nil {
 			return fmt.Errorf("write credit note: %w", err)
 		}
@@ -496,10 +524,14 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 		var orig Invoice
 		var isCredit bool
 		var vehicleID string
+		var saleID, rentalID *string
 		if err := tx.QueryRow(ctx, `
-			SELECT i.id, i.series, i.number, i.work_order_id, i.credit_of_id IS NOT NULL, i.net_minor, i.vat_minor, i.gross_minor, w.vehicle_id::text
-			FROM invoices i JOIN work_orders w ON w.id = i.work_order_id WHERE i.id = $1 FOR UPDATE OF i`, invoiceID).Scan(
-			&orig.ID, &orig.Series, &orig.Number, &orig.WorkOrderID, &isCredit, &orig.NetMinor, &orig.VATMinor, &orig.GrossMinor, &vehicleID); err != nil {
+			SELECT i.id, i.series, i.number, coalesce(i.work_order_id::text, ''), i.credit_of_id IS NOT NULL,
+			       i.net_minor, i.vat_minor, i.gross_minor, coalesce(w.vehicle_id::text, ''),
+			       i.source, i.vehicle_sale_id::text, i.rental_id::text
+			FROM invoices i LEFT JOIN work_orders w ON w.id = i.work_order_id WHERE i.id = $1 FOR UPDATE OF i`, invoiceID).Scan(
+			&orig.ID, &orig.Series, &orig.Number, &orig.WorkOrderID, &isCredit, &orig.NetMinor, &orig.VATMinor, &orig.GrossMinor, &vehicleID,
+			&orig.Source, &saleID, &rentalID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrNotFound
 			}
@@ -508,9 +540,15 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 		if isCredit {
 			return fmt.Errorf("%w: a credit note cannot be rebilled", ErrInvalid)
 		}
+		// A car sale is invoiced again through its deal (#177): its terms
+		// say who buys and how it is taxed, and are frozen while an invoice
+		// stands.
+		if orig.Source == SourceVehicleSale {
+			return errRebillSale
+		}
 		var existing *string
 		if err := tx.QueryRow(ctx, `SELECT replacement_invoice_id::text FROM invoice_corrections WHERE original_invoice_id = $1 AND kind = 'rebill'`, invoiceID).Scan(&existing); err == nil && existing != nil {
-			if err := tx.QueryRow(ctx, `SELECT id, series, number, work_order_id, customer_name, issued_at, net_minor, vat_minor, gross_minor
+			if err := tx.QueryRow(ctx, `SELECT id, series, number, coalesce(work_order_id::text, ''), customer_name, issued_at, net_minor, vat_minor, gross_minor
 				FROM invoices WHERE id = $1`, *existing).Scan(&out.ID, &out.Series, &out.Number, &out.WorkOrderID, &out.CustomerName, &out.IssuedAt, &out.NetMinor, &out.VATMinor, &out.GrossMinor); err != nil {
 				return fmt.Errorf("read replacement: %w", err)
 			}
@@ -533,41 +571,36 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 			return fmt.Errorf("%w: credit the whole invoice first; a replacement is for an invoice that has been taken back", ErrInvalid)
 		}
 
-		var name, address, org, vat *string
-		var buyer Buyer
-		var customerID string
-		if err := tx.QueryRow(ctx, `
-			SELECT c.id::text, coalesce(CASE WHEN c.kind = 'company' THEN c.company_name END, p.display_name),
-			       nullif(concat_ws(', ', c.address_line1, c.address_line2, concat_ws(' ', c.postal_code, c.city)), ''),
-			       c.org_number, c.vat_number,
-			       c.postal_code, c.city, c.country, c.endpoint_id, c.buyer_reference
-			FROM customers c LEFT JOIN people p ON p.id = c.person_id
-			WHERE c.id = $1 AND c.merged_into IS NULL`, req.CustomerID).Scan(&customerID, &name, &address, &org, &vat,
-			&buyer.PostalCode, &buyer.City, &buyer.Country, &buyer.EndpointID, &buyer.Reference); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrNotFound
-			}
-			return fmt.Errorf("read buyer: %w", err)
+		b, err := buyerTx(ctx, tx, req.CustomerID)
+		if err != nil {
+			return err
 		}
-		if name == nil || *name == "" {
-			return ErrNoCustomer
-		}
+		customerID, name, address, org, vat, buyer := b.customerID, &b.name, b.address, b.org, b.vat, b.buyer
 
-		var number int64
-		if err := tx.QueryRow(ctx, `SELECT coalesce(max(number), 0) + 1 FROM work_orders`).Scan(&number); err != nil {
-			return fmt.Errorf("next order number: %w", err)
-		}
+		// A workshop invoice is rebilled through a correction job of its
+		// own, so the job's history says who paid in the end. Any other
+		// source keeps its sale or rental, and names the new customer
+		// (#146): the chain is invoice_corrections either way.
 		var jobID string
-		if err := tx.QueryRow(ctx, `
-			INSERT INTO work_orders (shop_id, number, vehicle_id, customer_id, complaint, state, created_by, corrects_work_order_id)
-			VALUES ($1, $2, $3, $4, $5, 'invoiced', $6, $7) RETURNING id`,
-			scope.ShopID, number, vehicleID, customerID, fmt.Sprintf("Correction of invoice %s-%d", orig.Series, orig.Number), scope.UserID, orig.WorkOrderID).Scan(&jobID); err != nil {
-			return fmt.Errorf("open the correction: %w", err)
+		var newCustomer *string
+		if orig.Source == SourceWorkshop {
+			var number int64
+			if err := tx.QueryRow(ctx, `SELECT coalesce(max(number), 0) + 1 FROM work_orders`).Scan(&number); err != nil {
+				return fmt.Errorf("next order number: %w", err)
+			}
+			if err := tx.QueryRow(ctx, `
+				INSERT INTO work_orders (shop_id, number, vehicle_id, customer_id, complaint, state, created_by, corrects_work_order_id)
+				VALUES ($1, $2, $3, $4, $5, 'invoiced', $6, $7) RETURNING id`,
+				scope.ShopID, number, vehicleID, customerID, fmt.Sprintf("Correction of invoice %s-%d", orig.Series, orig.Number), scope.UserID, orig.WorkOrderID).Scan(&jobID); err != nil {
+				return fmt.Errorf("open the correction: %w", err)
+			}
+		} else {
+			newCustomer = &customerID
 		}
 
 		rows, err := tx.Query(ctx, `
 			SELECT position, kind, description, (quantity * 1000)::bigint, unit_price_minor, vat_rate_bp, net_minor, vat_minor,
-			       coalesce(unit_code, '')
+			       coalesce(unit_code, ''), margin_scheme
 			FROM invoice_lines WHERE invoice_id = $1 AND credits_line_id IS NULL ORDER BY position`, invoiceID)
 		if err != nil {
 			return fmt.Errorf("read lines: %w", err)
@@ -575,7 +608,7 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 		var lines []invoiceLine
 		for rows.Next() {
 			var l invoiceLine
-			if err := rows.Scan(&l.Position, &l.Kind, &l.Description, &l.QuantityMilli, &l.UnitPriceMinor, &l.VATRateBasis, &l.NetMinor, &l.VATMinor, &l.UnitCode); err != nil {
+			if err := rows.Scan(&l.Position, &l.Kind, &l.Description, &l.QuantityMilli, &l.UnitPriceMinor, &l.VATRateBasis, &l.NetMinor, &l.VATMinor, &l.UnitCode, &l.MarginScheme); err != nil {
 				rows.Close()
 				return fmt.Errorf("scan line: %w", err)
 			}
@@ -601,10 +634,20 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 			   seller_phone, seller_email, seller_payment_reference,
 			   seller_payment_terms_days, seller_f_tax,
 			   net_minor, vat_minor, gross_minor,
-			   ` + electronicColumns + `)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
-			        $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)
+			   ` + electronicColumns + `,
+			   source, vehicle_sale_id, rental_id, customer_id, margin_scheme_statement, margin_scheme_vat_minor)
+			VALUES ($1,$2,$3,NULLIF($4, '')::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
+			        $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,
+			        $35, $36::uuid, $37::uuid, $38::uuid,
+			        -- The same sale billed again: what the original kept for
+			        -- the books under the margin scheme (#177).
+			        (SELECT margin_scheme_statement FROM invoices WHERE id = $39),
+			        (SELECT margin_scheme_vat_minor FROM invoices WHERE id = $39))
 			RETURNING id, issued_at`
+		ocr, err := paymentOCR(orig.Series, newNumber)
+		if err != nil {
+			return err
+		}
 		args := append([]any{
 			scope.ShopID, orig.Series, newNumber, jobID, scope.UserID,
 			*name, address, org, vat,
@@ -612,7 +655,8 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 			sold.Phone, sold.Email, sold.PaymentReference,
 			sold.PaymentTermsDays, sold.FTax,
 			orig.NetMinor, orig.VATMinor, orig.GrossMinor,
-		}, electronicArgs(sold, buyer)...)
+		}, electronicArgs(sold, buyer, ocr)...)
+		args = append(args, orig.Source, saleID, rentalID, newCustomer, invoiceID)
 		if err := tx.QueryRow(ctx, insert, args...).Scan(&out.ID, &out.IssuedAt); err != nil {
 			return fmt.Errorf("write replacement: %w", err)
 		}
@@ -625,6 +669,7 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 			return fmt.Errorf("record the correction: %w", err)
 		}
 		out.Series, out.Number, out.WorkOrderID, out.CustomerName = orig.Series, newNumber, jobID, *name
+		out.Source = orig.Source
 		out.NetMinor, out.VATMinor, out.GrossMinor = orig.NetMinor, orig.VATMinor, orig.GrossMinor
 		return nil
 	})
@@ -632,6 +677,40 @@ func RebillTo(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, invoi
 		return Invoice{}, err
 	}
 	return out, nil
+}
+
+// billedTo is a customer as they are now, to be copied onto a document.
+type billedTo struct {
+	customerID, name  string
+	address, org, vat *string
+	buyer             Buyer
+}
+
+// buyerTx reads a customer as an invoice is addressed to them: the name a
+// company or a person goes by, the address on one line, the numbers, and
+// the parts an electronic invoice takes apart. A merged customer is not
+// billed; the one they were merged into is.
+func buyerTx(ctx context.Context, tx pgx.Tx, customerID string) (billedTo, error) {
+	var b billedTo
+	var name *string
+	if err := tx.QueryRow(ctx, `
+		SELECT c.id::text, coalesce(CASE WHEN c.kind = 'company' THEN c.company_name END, p.display_name),
+		       nullif(concat_ws(', ', c.address_line1, c.address_line2, concat_ws(' ', c.postal_code, c.city)), ''),
+		       c.org_number, c.vat_number,
+		       c.postal_code, c.city, c.country, c.endpoint_id, c.buyer_reference
+		FROM customers c LEFT JOIN people p ON p.id = c.person_id
+		WHERE c.id = $1 AND c.merged_into IS NULL`, customerID).Scan(&b.customerID, &name, &b.address, &b.org, &b.vat,
+		&b.buyer.PostalCode, &b.buyer.City, &b.buyer.Country, &b.buyer.EndpointID, &b.buyer.Reference); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return billedTo{}, ErrNotFound
+		}
+		return billedTo{}, fmt.Errorf("read buyer: %w", err)
+	}
+	if name == nil || *name == "" {
+		return billedTo{}, ErrNoCustomer
+	}
+	b.name = *name
+	return b, nil
 }
 
 // Correction is a step in correcting a document.
@@ -701,4 +780,55 @@ func CorrectionsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		return more.Err()
 	})
 	return out, err
+}
+
+// creditedSchemeTx is what a credit note of invoiceID keeps for the books
+// under the margin scheme (#177): the original's statement, and the scheme
+// VAT it takes back. Under the scheme the VAT is a fifth of the margin, and
+// a credit off the car's price comes off the margin whole, so the VAT is
+// worked out again rather than taken back in proportion: what is still due
+// on the price left after every credit, this one included, against the
+// tax purchase price of the car's purchase (money.MarginScheme); the credit
+// takes back the rest of what the invoice kept. 10 000 kr off a 40 000 kr
+// margin takes back 2 000 kr; a price below the purchase price leaves none
+// due. Nothing when the credit takes back no margin-scheme line.
+func creditedSchemeTx(ctx context.Context, tx pgx.Tx, invoiceID string, lines []invoiceLine) (statement, schemeVAT any, err error) {
+	var credited int64
+	for _, l := range lines {
+		if l.MarginScheme {
+			credited -= l.NetMinor
+		}
+	}
+	if credited == 0 {
+		return nil, nil, nil
+	}
+	var text *string
+	var origVAT, purchase *int64
+	var origNet, prevNet, prevVAT int64
+	if err := tx.QueryRow(ctx, `
+		SELECT o.margin_scheme_statement, o.margin_scheme_vat_minor,
+		       (SELECT p.tax_purchase_price_minor FROM vehicle_sales s JOIN vehicle_purchases p ON p.stock_unit_id = s.stock_unit_id
+		         WHERE s.id = o.vehicle_sale_id),
+		       coalesce((SELECT sum(l.net_minor) FROM invoice_lines l WHERE l.invoice_id = o.id AND l.margin_scheme), 0),
+		       coalesce((SELECT -sum(c.net_minor) FROM invoice_lines c JOIN invoice_lines l ON l.id = c.credits_line_id
+		                 WHERE l.invoice_id = o.id AND l.margin_scheme), 0),
+		       coalesce((SELECT sum(n.margin_scheme_vat_minor) FROM invoices n WHERE n.credit_of_id = o.id), 0)
+		FROM invoices o WHERE o.id = $1`, invoiceID).Scan(&text, &origVAT, &purchase, &origNet, &prevNet, &prevVAT); err != nil {
+		return nil, nil, fmt.Errorf("read the margin scheme: %w", err)
+	}
+	if origVAT == nil || purchase == nil {
+		return text, nil, nil
+	}
+	left := origNet - prevNet - credited
+	if left < 0 {
+		left = 0
+	}
+	due, err := money.MarginScheme(left, *purchase, 2500)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: %v", ErrInvalid, err)
+	}
+	// What the invoice kept, less what earlier credits took back (prevVAT
+	// is below nothing), less what is still due.
+	back := *origVAT + prevVAT - due.VATMinor
+	return text, -back, nil
 }

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -60,7 +59,7 @@ func SurchargesFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 		return Surcharges{}, access.ErrForbidden
 	}
 	var s Surcharges
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		s, _, err = readSurcharges(ctx, tx)
 		return err
@@ -80,7 +79,7 @@ func SaveSurcharges(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 	case s.ConsumablesCapMinor != nil && *s.ConsumablesCapMinor < 0, s.InvoiceFeeMinor < 0:
 		return fmt.Errorf("%w: an amount cannot be below nothing", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
 			UPDATE shops SET consumables_basis = $2, consumables_cap_minor = $3, invoice_fee_minor = $4
 			WHERE id = $1`, scope.ShopID, s.ConsumablesBasis, s.ConsumablesCapMinor, s.InvoiceFeeMinor)
@@ -162,15 +161,18 @@ func chargeLine(kind, text string, net int64, rate int) invoiceLine {
 }
 
 // PreviewSurcharges is what the surcharges would add to a job invoiced now.
+// The counter's, and whoever else is shown the job's prices and its total
+// (access.FieldLinePrices): the total they see is the one the invoice
+// prints, surcharges included.
 func PreviewSurcharges(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) ([]SurchargeLine, error) {
-	if !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesCustomerPersonalData() && !scope.SeesOnJob(access.FieldLinePrices) {
 		return nil, access.ErrForbidden
 	}
 	if !looksLikeUUID(jobID) {
 		return nil, ErrNotFound
 	}
 	var out []SurchargeLine
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		s, locale, err := readSurcharges(ctx, tx)
 		if err != nil || !s.Charged() {
 			return err

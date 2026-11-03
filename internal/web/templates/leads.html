@@ -1,0 +1,99 @@
+{{define "content"}}
+{{$d := .Leads}}
+<h1>{{.T "Leads"}}</h1>
+{{if .Error}}<p class="error" role="alert">{{.Sentence .Error}}</p>{{end}}
+
+{{with $d.Same}}
+<section class="callout">
+  <h2>{{$.T "This person already has an open lead"}}</h2>
+  {{if .Hidden}}<p class="waiting">{{$.N "%d more open lead is another salesperson's" .Hidden}}</p>{{end}}
+  <ul class="lines">
+    {{range .Leads}}
+    <li>
+      <div class="row"><a href="/cars/leads/{{.ID}}">{{.Contact}}</a>
+        <span class="tag">{{$.T ($d.Word .Status)}}</span></div>
+      <div class="waiting">{{if .Car}}{{.Car}}{{else}}{{.Wishes}}{{end}}</div>
+      <form method="post" action="/cars/leads/{{.ID}}/contacts">
+        <input type="hidden" name="how" value="other">
+        <input type="hidden" name="note" value="{{index $d.Form "note"}}">
+        <button type="submit" class="secondary">{{$.T "Add it to this lead"}}</button>
+      </form>
+    </li>
+    {{end}}
+  </ul>
+  <p class="waiting">{{$.T "If they are asking about another car, record it as a lead of its own for the same person."}}</p>
+</section>
+{{end}}
+
+<p>{{if $d.Closed}}<a href="/cars/leads">{{.T "Open leads only"}}</a>{{else}}<a href="/cars/leads?closed=1">{{.T "Closed leads too"}}</a>{{end}}</p>
+{{if $d.Leads}}
+<ul class="lines">
+  {{range $d.Leads}}
+  <li>
+    <div class="row"><a href="/cars/leads/{{.ID}}">{{if .Erased}}{{$.T "Details erased"}}{{else}}{{.Contact}}{{end}}</a>
+      <span class="tag{{if .CarGone}} late{{end}}">{{$.T ($d.Word .Status)}}</span></div>
+    <div class="waiting">
+      {{if .Car}}{{.Car}}{{else}}{{$.T "Any car"}}{{end}}
+      &middot; {{$.T ($d.Word .Channel)}}
+      &middot; {{if .SalespersonName}}{{.SalespersonName}}{{else}}{{$.T "Nobody has it"}}{{end}}
+      {{with .NextStepOn}}&middot; {{$.T "Next: %s" ($.Date . "2 Jan")}}{{end}}
+      {{if .CarGone}}&middot; {{$.T "The car is reserved or sold: offer another"}}{{end}}
+    </div>
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p class="empty">{{.T "No leads."}}</p>
+{{end}}
+
+<h2>{{.T "New lead"}}</h2>
+<form method="post" action="/cars/leads">
+  <input type="hidden" name="key" value="{{$d.Key}}">
+  {{if $d.Same}}<input type="hidden" name="alongside" value="1">{{end}}
+  <label><span>{{.T "Name"}}</span><input name="name" maxlength="200" value="{{index $d.Form "name"}}" autocomplete="off"></label>
+  <div class="pair">
+    <label><span>{{.T "Phone"}}</span><input name="phone" type="tel" maxlength="40" value="{{index $d.Form "phone"}}"></label>
+    <label><span>{{.T "Email"}}</span><input name="email" type="email" maxlength="200" value="{{index $d.Form "email"}}"></label>
+  </div>
+  <label><span>{{.T "Car"}}</span>
+    <select name="unit">
+      <option value="">{{.T "Any car: say what they want below"}}</option>
+      {{range $d.Cars}}<option value="{{.UnitID}}"{{if eq .UnitID (index $d.Form "unit")}} selected{{end}}>{{.Car}} &middot; {{$.T .StatusLabel}}</option>{{end}}
+    </select></label>
+  <label><span>{{.T "What they want"}}</span><textarea name="wishes" maxlength="1000" rows="2">{{index $d.Form "wishes"}}</textarea></label>
+  <div class="pair">
+    <label><span>{{.T "Came in by"}}</span>
+      <select name="channel" required>
+        {{range $d.Channels}}<option value="{{.}}"{{if eq . (index $d.Form "channel")}} selected{{end}}>{{$.T ($d.Word .)}}</option>{{end}}
+      </select></label>
+    <label><span>{{.T "Salesperson"}}</span>
+      <select name="salesperson">
+        <option value="">{{.T "Nobody yet"}}</option>
+        {{range $d.Sellers}}{{if or .You $.Session.Scope.Role.RunsTheShop}}<option value="{{.UserID}}"{{if eq .UserID (index $d.Form "salesperson")}} selected{{end}}>{{.Name}}</option>{{end}}{{end}}
+      </select></label>
+  </div>
+  <label><span>{{.T "What was said"}}</span><textarea name="note" maxlength="1000" rows="2">{{index $d.Form "note"}}</textarea></label>
+  <button type="submit">{{if $d.Same}}{{.T "Record it as another lead"}}{{else}}{{.T "Record the lead"}}{{end}}</button>
+</form>
+
+{{if .Session.Scope.Role.RunsTheShop}}
+<h2>{{.T "When somebody leaves"}}</h2>
+<form method="post" action="/cars/leads/reassign">
+  <div class="pair">
+    <label><span>{{.T "Their open leads"}}</span>
+      <select name="from" required>{{range $d.Sellers}}<option value="{{.UserID}}">{{.Name}}</option>{{end}}</select></label>
+    <label><span>{{.T "Go to"}}</span>
+      <select name="to"><option value="">{{.T "Nobody yet"}}</option>{{range $d.Sellers}}<option value="{{.UserID}}">{{.Name}}</option>{{end}}</select></label>
+  </div>
+  <button type="submit" class="secondary">{{.T "Move their leads"}}</button>
+</form>
+<h2>{{.T "Personal data on leads"}}</h2>
+<form method="post" action="/cars/leads/settings">
+  <label><span>{{.T "Months a lead that never became a deal keeps the person's details"}}</span>
+    <input name="months" type="number" min="1" max="120" value="{{$d.Months}}" required></label>
+  <button type="submit" class="secondary">{{.T "Save"}}</button>
+</form>
+{{else}}
+<p class="waiting">{{.T "A lead that never became a deal keeps the person's details for %d months after it last moved." $d.Months}}</p>
+{{end}}
+{{end}}

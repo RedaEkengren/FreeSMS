@@ -46,7 +46,7 @@ func TestAnOverpaymentIsShownAsWhatIsOwedBack(t *testing.T) {
 	}
 	desk := signIn(t, ts, advisorEmail)
 	day := time.Now().Format("2006-01-02")
-	postStatus(t, desk, ts.URL+"/invoices/"+invoice+"/payments", url.Values{"amount": {"1500"}, "paid_on": {day}, "method": {"bank"}, "confirm_over": {"1"}})
+	postStatus(t, desk, ts.URL+"/invoices/"+invoice+"/payments", url.Values{"amount": {"1500"}, "paid_on": {day}, "method": {"bank"}, "confirm_over": {"1"}, "over_reason": {"Betalade två gånger"}})
 	_, body := page(t, desk, ts.URL+"/invoices/"+invoice)
 	owed := regexp.MustCompile(`Owed back to the customer</dt>\s*<dd[^>]*>\s*([^<]*)`).FindStringSubmatch(body)
 	if owed == nil {
@@ -91,7 +91,133 @@ func TestAPaymentThatCannotBeRightIsNotRecordedUnasked(t *testing.T) {
 		t.Errorf("a payment on a settled invoice answered %d, want 400", got)
 	}
 	more.Set("confirm_over", "1")
+	more.Set("over_reason", "Betalade två gånger")
 	if got := postStatus(t, desk, pay, more); got != http.StatusSeeOther {
 		t.Errorf("a confirmed overpayment answered %d, want 303", got)
+	}
+}
+
+// #134: every page that shows money owed back shows it as an amount under a
+// label that says which way it runs, in English and in Swedish. The
+// receivables list printed it with a minus sign beside "owed back to the
+// customer"; the job page and the customer card show no balance at all, and
+// are read to make sure they do not start to with the sign on.
+func TestMoneyOwedBackHasNoMinusSignOnAnyPage(t *testing.T) {
+	ts, pool := testServer(t)
+	ctx := context.Background()
+	var invoice, customer string
+	if err := database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx, `SELECT customer_id::text FROM work_orders WHERE id = $1`, jobA).Scan(&customer); err != nil {
+			return err
+		}
+		return tx.QueryRow(ctx, `
+			INSERT INTO invoices (shop_id, series, number, work_order_id, customer_name, net_minor, vat_minor, gross_minor, seller_name, seller_payment_terms_days)
+			VALUES ($1, 'A', 79, $2, 'Test Kund', 100000, 25000, 125000, 'Shop A', 30) RETURNING id::text`, shopA, jobA).Scan(&invoice)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	desk := signIn(t, ts, advisorEmail)
+	day := time.Now().Format("2006-01-02")
+	if got := postStatus(t, desk, ts.URL+"/invoices/"+invoice+"/payments", url.Values{
+		"amount": {"1500"}, "paid_on": {day}, "method": {"bank"}, "confirm_over": {"1"}, "over_reason": {"Betalade två gånger"}}); got != http.StatusSeeOther {
+		t.Fatalf("the overpayment answered %d", got)
+	}
+	minus := regexp.MustCompile(`[-−]\s*(SEK\s*)?250[.,]00`)
+
+	for _, lang := range []string{"en", "sv"} {
+		if err := database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+			_, err := tx.Exec(ctx, `UPDATE shops SET locale = $2 WHERE id = $1`, shopA, lang)
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range []struct {
+			path        string
+			showsTheSum bool
+		}{
+			{"/invoices/" + invoice, true},
+			{"/invoices/" + invoice + "/followup", true},
+			{"/receivables", true},
+			{"/jobs/" + jobA, false},
+			{"/customers/" + customer, false},
+		} {
+			status, body := page(t, desk, ts.URL+p.path)
+			if status != http.StatusOK {
+				t.Errorf("%s %s answered %d", lang, p.path, status)
+				continue
+			}
+			if m := minus.FindString(body); m != "" {
+				t.Errorf("%s %s shows the amount owed back as %q", lang, p.path, m)
+			}
+			if p.showsTheSum && !regexp.MustCompile(`250[.,]00`).MatchString(body) {
+				t.Errorf("%s %s does not show the 250.00 owed back", lang, p.path)
+			}
+		}
+	}
+}
+
+// #131: the question about a line nobody agreed to, and the decision to
+// invoice it anyway, are the front desk's. The technician's page of the same
+// job does not ask it, and a technician who posts the tick is refused.
+//
+// The technician's page does show the line table with its prices, for every
+// line, agreed or not; that is how the job page has always been built and is
+// not changed here.
+func TestATechnicianIsNotAskedAboutALineNobodyAgreedTo(t *testing.T) {
+	ts, pool := testServer(t)
+	desk, tech := signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	job := ts.URL + "/jobs/" + jobA
+
+	postStatus(t, desk, job+"/lines", url.Values{"kind": {"labour"}, "description": {"Service"}, "quantity": {"1"}, "unit_price": {"1000"}})
+	for _, to := range []string{"estimated", "awaiting_approval", "approved", "in_progress"} {
+		if to == "approved" {
+			agreeAtTheCounter(t, ts.URL, jobA, desk, pool)
+		}
+		if status := postStatus(t, desk, job+"/state", url.Values{"state": {to}}); status != http.StatusSeeOther {
+			t.Fatalf("moving to %s answered %d", to, status)
+		}
+	}
+	if status := postStatus(t, desk, job+"/lines", url.Values{"kind": {"labour"}, "description": {"Extra wiper blades"},
+		"quantity": {"1"}, "unit_price": {"4321"}}); status != http.StatusSeeOther {
+		t.Fatalf("adding the extra line answered %d", status)
+	}
+	if status := postStatus(t, tech, job+"/state", url.Values{"state": {"ready"}}); status != http.StatusSeeOther {
+		t.Fatalf("marking it ready answered %d", status)
+	}
+
+	_, counter := page(t, desk, job)
+	if !strings.Contains(counter, "Invoice it with the lines nobody agreed to") {
+		t.Fatalf("the front desk is not asked about the unagreed line:\n%s", firstLines(counter, 60))
+	}
+	_, spanner := page(t, tech, job)
+	if !strings.Contains(spanner, "Extra wiper blades") {
+		t.Error("the technician does not see the work")
+	}
+	for _, hidden := range []string{"Invoice it with the lines nobody agreed to", "has no agreement", "confirm_unagreed"} {
+		if strings.Contains(spanner, hidden) {
+			t.Errorf("the technician's page shows %q", hidden)
+		}
+	}
+	if status := postStatus(t, tech, job+"/invoice", url.Values{"confirm_unagreed": {"1"}}); status != http.StatusForbidden {
+		t.Errorf("a technician invoicing with the tick answered %d, want 403", status)
+	}
+}
+
+// #137: a well-formed id that is no job is not found, on the two routes that
+// used to answer 500 for it.
+func TestStartingAnInspectionOrClockingOutOfNoJobIsNotFound(t *testing.T) {
+	ts, pool := testServer(t)
+	tech := signIn(t, ts, techEmail)
+	var template string
+	if err := database.InShop(context.Background(), pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `INSERT INTO inspection_templates (shop_id, name) VALUES ($1, 'Service check') RETURNING id::text`, shopA).Scan(&template)
+	}); err != nil {
+		t.Fatalf("a template to start with: %v", err)
+	}
+	const nothing = "aaaaaaaa-0000-0000-0000-0000000000ff"
+	for _, path := range []string{"/jobs/" + nothing + "/inspect", "/jobs/" + nothing + "/clock-out"} {
+		if got := postStatus(t, tech, ts.URL+path, url.Values{"template_id": {template}}); got != http.StatusNotFound {
+			t.Errorf("POST %s answered %d, want 404", path, got)
+		}
 	}
 }

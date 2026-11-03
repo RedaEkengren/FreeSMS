@@ -136,6 +136,7 @@ func (s *Server) bookingForm(r *http.Request) (workshop.NewBooking, error) {
 		CustomerPhone: r.FormValue("customer_phone"),
 		What:          r.FormValue("what"),
 		PartsNeeded:   r.FormValue("parts_needed") == "yes",
+		ConfirmedPast: r.FormValue("confirm_past") != "",
 	}
 	if v := strings.TrimSpace(r.FormValue("estimate_hours")); v != "" {
 		h, err := parseScaled(v, 2)
@@ -206,7 +207,11 @@ func (s *Server) handleBookingAction(w http.ResponseWriter, r *http.Request) {
 			s.renderError(w, r, http.StatusBadRequest, "Not moved", ferr.Error())
 			return
 		}
-		err = workshop.MoveBooking(r.Context(), s.pool, session.Scope, id, nb.Starts, nb.Ends, nb.TechnicianID)
+		var opts []workshop.MoveOption
+		if nb.ConfirmedPast {
+			opts = append(opts, workshop.MoveIntoThePast())
+		}
+		err = workshop.MoveBooking(r.Context(), s.pool, session.Scope, id, nb.Starts, nb.Ends, nb.TechnicianID, opts...)
 	case "cancel":
 		err = workshop.CancelBooking(r.Context(), s.pool, session.Scope, id, r.FormValue("reason"))
 	case "no_show":

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -68,6 +67,9 @@ type Finding struct {
 	ReportedAt  time.Time
 	HandledAt   *time.Time
 	WorkOrderID string
+	// The technician asks the front desk to contact the customer (#225),
+	// without being shown who they are or their number.
+	AsksContact bool
 }
 
 // Handled reports whether the front desk has dealt with it.
@@ -91,7 +93,7 @@ func RequestParts(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, j
 	if quantity <= 0 {
 		return fmt.Errorf("%w: ask for at least one", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		_, err := requestPartsTx(ctx, tx, scope, jobID, description, quantity)
 		return err
 	})
@@ -126,11 +128,11 @@ func requestPartsTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID, d
 
 // OpenPartRequests is the parts desk's list: what is being waited for.
 func OpenPartRequests(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]PartRequest, error) {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return nil, access.ErrForbidden
 	}
 	var out []PartRequest
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT pr.id, pr.work_order_id, pr.description,
 			       coalesce(p.display_name, ''), pr.requested_at,
@@ -168,7 +170,7 @@ func OpenPartRequests(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 
 // MarkPartArrived records everything still owed on a request as delivered.
 func MarkPartArrived(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, requestID string) error {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return access.ErrForbidden
 	}
 	return ReceivePart(ctx, pool, scope, requestID, 0, "delivery")
@@ -183,7 +185,7 @@ func MarkPartArrived(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 // waiting on three parts, or on the second half of one, does not look ready
 // to work on because something turned up.
 func ReceivePart(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, requestID string, quantity float64, source string) error {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(requestID) {
@@ -195,7 +197,7 @@ func ReceivePart(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, re
 	if quantity < 0 {
 		return fmt.Errorf("%w: a negative arrival is a return to the supplier", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		_, _, err := receiveRequestTx(ctx, tx, scope, requestID, quantity, source)
 		return err
 	})
@@ -244,7 +246,7 @@ func receiveRequestTx(ctx context.Context, tx pgx.Tx, scope access.Scope, reques
 // no longer needed. A job waiting on a part that is never coming has to stop
 // waiting; what did arrive stays recorded.
 func CancelPartRequest(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, requestID, reason string) error {
-	if scope.Role != access.RoleParts && !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesParts() {
 		return access.ErrForbidden
 	}
 	if !looksLikeUUID(requestID) {
@@ -254,7 +256,7 @@ func CancelPartRequest(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 	if reason == "" {
 		return fmt.Errorf("%w: say why it is not coming", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var jobID string
 		err := tx.QueryRow(ctx, `
 			UPDATE part_requests SET cancelled_at = now(), note = $2
@@ -300,7 +302,7 @@ func resumeIfNothingOwedTx(ctx context.Context, tx pgx.Tx, jobID string) error {
 // PartRequestsFor lists a job's requests, arrived and outstanding.
 func PartRequestsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) ([]PartRequest, error) {
 	var out []PartRequest
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT pr.id, pr.work_order_id, pr.description,
 			       coalesce(p.display_name, ''), pr.requested_at, pr.arrived_at, pr.cancelled_at,
@@ -336,14 +338,28 @@ func PartRequestsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 // fact for the front desk to turn into a quote; handing the technician the
 // pricing form asks the wrong person the wrong question.
 func ReportFinding(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID, note string) error {
+	return reportFinding(ctx, pool, scope, jobID, note, false)
+}
+
+// AskDeskToContact asks the front desk to contact a job's customer, saying
+// why: a technician who is not shown the customer's number still gets them
+// rung (#225). The desk sees it with the job's findings.
+func AskDeskToContact(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID, why string) error {
+	if strings.TrimSpace(why) == "" {
+		return fmt.Errorf("%w: say what the customer should be asked", ErrInvalid)
+	}
+	return reportFinding(ctx, pool, scope, jobID, why, true)
+}
+
+func reportFinding(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID, note string, contact bool) error {
 	if strings.TrimSpace(note) == "" {
 		return fmt.Errorf("%w: say what you found", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `
-			INSERT INTO findings (shop_id, work_order_id, note, reported_by)
-			SELECT $1, w.id, $2, $3 FROM work_orders w WHERE w.id = $4`,
-			scope.ShopID, strings.TrimSpace(note), scope.UserID, jobID)
+			INSERT INTO findings (shop_id, work_order_id, note, reported_by, asks_contact)
+			SELECT $1, w.id, $2, $3, $5 FROM work_orders w WHERE w.id = $4`,
+			scope.ShopID, strings.TrimSpace(note), scope.UserID, jobID, contact)
 		if err != nil {
 			return fmt.Errorf("record the finding: %w", err)
 		}
@@ -357,9 +373,9 @@ func ReportFinding(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 // FindingsFor lists what has been reported on a job.
 func FindingsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) ([]Finding, error) {
 	var out []Finding
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
-			SELECT f.id, f.note, coalesce(p.display_name, ''), f.reported_at, f.handled_at, f.work_order_id
+			SELECT f.id, f.note, coalesce(p.display_name, ''), f.reported_at, f.handled_at, f.work_order_id, f.asks_contact
 			FROM findings f
 			LEFT JOIN users u  ON u.id = f.reported_by
 			LEFT JOIN people p ON p.id = u.person_id
@@ -371,7 +387,7 @@ func FindingsFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		defer rows.Close()
 		for rows.Next() {
 			var f Finding
-			if err := rows.Scan(&f.ID, &f.Note, &f.ReportedBy, &f.ReportedAt, &f.HandledAt, &f.WorkOrderID); err != nil {
+			if err := rows.Scan(&f.ID, &f.Note, &f.ReportedBy, &f.ReportedAt, &f.HandledAt, &f.WorkOrderID, &f.AsksContact); err != nil {
 				return fmt.Errorf("scan finding: %w", err)
 			}
 			out = append(out, f)
@@ -390,7 +406,7 @@ func HandleFinding(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if !scope.Role.SeesCustomerPersonalData() {
 		return access.ErrForbidden
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx,
 			`UPDATE findings SET handled_at = now(), handled_by = $1
 			 WHERE id = $2 AND handled_at IS NULL`, scope.UserID, findingID)

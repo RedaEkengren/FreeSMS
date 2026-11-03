@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
 )
 
@@ -163,7 +162,7 @@ type lineOp struct {
 
 func changeLine(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string, position, expected int, op lineOp) (LineChange, error) {
 	var out LineChange
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		c, err := changeLineTx(ctx, tx, scope, jobID, position, expected, op)
 		out = c
 		if err != nil {
@@ -543,7 +542,7 @@ func LineHistory(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		return nil, access.ErrForbidden
 	}
 	var out []LineRevision
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT r.revision, r.change, r.kind, r.description, (r.quantity * 1000)::bigint,
 			       r.unit_price_minor, r.vat_rate_bp, r.cost_bearer, coalesce(r.part_id::text, ''),

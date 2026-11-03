@@ -21,6 +21,14 @@ account, and then stops working.</p>
     <span>Password — at least {{.MinPassword}} characters, no other rules</span>
     <input type="password" name="password" autocomplete="new-password" required>
   </label>
+  <fieldset>
+    <legend>What this shop runs</legend>
+    <input type="hidden" name="modules_asked" value="1">
+    {{range .AvailableModules}}
+    <label><input type="checkbox" name="module" value="{{.}}" {{if $.Form.Runs .}}checked{{end}}> {{.Label}}</label>
+    {{end}}
+    <p class="waiting">Customers, vehicles, invoices and payments are always there. More can be switched on later, under the shop's settings.</p>
+  </fieldset>
   <button type="submit">Create the workshop</button>
 </form>
 {{end}}

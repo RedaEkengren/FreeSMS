@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
-	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // A final check before a car is ready, as a checklist the shop may require.
@@ -31,7 +30,7 @@ func FinalCheckSettingsFor(ctx context.Context, pool *pgxpool.Pool, scope access
 		return FinalCheckSettings{}, access.ErrForbidden
 	}
 	var s FinalCheckSettings
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		s, err = finalCheckSettingsTx(ctx, tx, scope.ShopID)
 		return err
@@ -60,17 +59,23 @@ func SaveFinalCheck(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 	if s.TemplateID != "" && !looksLikeUUID(s.TemplateID) {
 		return fmt.Errorf("%w: no such checklist", ErrInvalid)
 	}
-	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if s.TemplateID != "" {
-			var active bool
+			var active, forJobs bool
 			var items int
 			if err := tx.QueryRow(ctx, `
-				SELECT t.active, (SELECT count(*) FROM inspection_template_items i WHERE i.template_id = t.id)
-				FROM inspection_templates t WHERE t.id = $1`, s.TemplateID).Scan(&active, &items); err != nil || !active {
+				SELECT t.active, 'work_order' = ANY(t.subjects),
+				       (SELECT count(*) FROM inspection_template_items i WHERE i.template_id = t.id)
+				FROM inspection_templates t WHERE t.id = $1`, s.TemplateID).Scan(&active, &forJobs, &items); err != nil || !active {
 				return fmt.Errorf("%w: no such checklist", ErrInvalid)
 			}
 			if items == 0 {
 				return fmt.Errorf("%w: a checklist with nothing on it cannot sign work off", ErrInvalid)
+			}
+			// A job's inspection starts only from a checklist for jobs, so
+			// one that is not could never be started, and no job signed off.
+			if !forJobs {
+				return errFinalCheckForJobs
 			}
 		}
 		_, err := tx.Exec(ctx, `
@@ -79,6 +84,9 @@ func SaveFinalCheck(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		return err
 	})
 }
+
+// errFinalCheckForJobs is a final check whose checklist is not one for jobs.
+var errFinalCheckForJobs = fmt.Errorf("%w: the final check is done on a job, so its checklist must be one for jobs", ErrInvalid)
 
 // FinalCheck is where a job stands against the shop's final check.
 type FinalCheck struct {
@@ -94,7 +102,7 @@ type FinalCheck struct {
 // FinalCheckFor reads where a job stands.
 func FinalCheckFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jobID string) (FinalCheck, error) {
 	var fc FinalCheck
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		fc, err = finalCheckTx(ctx, tx, scope.ShopID, jobID)
 		return err
