@@ -713,7 +713,7 @@ func (s *Server) handleLicenceCheck(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusBadRequest, "Not accepted", "")
 		return
 	}
-	l := workshop.LicenceShown{Shown: r.FormValue("shown") != "", Categories: r.Form["categories"],
+	l := workshop.LicenceShown{Shown: r.FormValue("shown") != "", AgeOK: r.FormValue("age_ok") != "", Categories: r.Form["categories"],
 		Method: r.FormValue("method"), Note: r.FormValue("note")}
 	if until, ok := s.formDate(r, "valid_until"); !ok {
 		s.renderError(w, r, http.StatusBadRequest, "That date did not parse", "Use the picker.")

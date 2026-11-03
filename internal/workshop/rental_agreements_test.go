@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -113,13 +114,13 @@ func TestEveryDriverShowsALicenceForEachRental(t *testing.T) {
 		}
 		return ok
 	}
-	if check(main, workshop.LicenceShown{Shown: true, Categories: []string{"C"}, ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}) {
+	if check(main, workshop.LicenceShown{Shown: true, AgeOK: true, Categories: []string{"C"}, ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}) {
 		t.Error("a C licence passed for a B car")
 	}
-	if check(main, workshop.LicenceShown{Shown: true, Categories: []string{"B"}, ValidUntil: in2031(11, 0), Method: workshop.LicenceCardInspected}) {
+	if check(main, workshop.LicenceShown{Shown: true, AgeOK: true, Categories: []string{"B"}, ValidUntil: in2031(11, 0), Method: workshop.LicenceCardInspected}) {
 		t.Error("a licence that runs out during the rental passed")
 	}
-	if !check(main, workshop.LicenceShown{Shown: true, Categories: []string{"am", "B"}, ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}) {
+	if !check(main, workshop.LicenceShown{Shown: true, AgeOK: true, Categories: []string{"am", "B"}, ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}) {
 		t.Error("a valid B licence did not pass")
 	}
 	if got := codes(id); len(got) != 0 {
@@ -181,7 +182,7 @@ func TestATrailerNeedsNoLicenceCheck(t *testing.T) {
 		t.Errorf("a tent: %+v, %v", gaps, err)
 	}
 	d, _ := workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, renter, true)
-	if _, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), d, workshop.LicenceShown{Shown: true, Categories: []string{"B"},
+	if _, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), d, workshop.LicenceShown{Shown: true, AgeOK: true, Categories: []string{"B"},
 		ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("a licence check nobody needs: %v", err)
 	}
@@ -317,7 +318,7 @@ func TestALicenceCheckKeepsNoNumber(t *testing.T) {
 		t.Fatal(err)
 	}
 	shown := func(method, note string) error {
-		_, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true,
+		_, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true, AgeOK: true,
 			Categories: []string{"B"}, ValidUntil: day("2035-01-01"), Method: method, Note: note})
 		return err
 	}
@@ -351,7 +352,7 @@ func TestALicenceCheckIsAskedAgainstTheRentalAsItIsNow(t *testing.T) {
 		t.Fatal(err)
 	}
 	driver, _ := workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, v.renter, true)
-	if ok, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true,
+	if ok, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true, AgeOK: true,
 		Categories: []string{"B"}, ValidUntil: day("2031-06-10"), Method: workshop.LicenceCardInspected}); err != nil || !ok {
 		t.Fatalf("a licence valid past the end: %v, %v", ok, err)
 	}
@@ -373,7 +374,7 @@ func TestALicenceCheckIsAskedAgainstTheRentalAsItIsNow(t *testing.T) {
 		t.Fatal(err)
 	}
 	d2, _ := workshop.AddRentalDriver(ctx, pool, rentalDesk(), late, v.renter, true)
-	if ok, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), d2, workshop.LicenceShown{Shown: true,
+	if ok, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), d2, workshop.LicenceShown{Shown: true, AgeOK: true,
 		Categories: []string{"B"}, ValidUntil: day("2031-07-11"), Method: workshop.LicenceCardInspected}); err != nil || ok {
 		t.Errorf("a licence that ends the day before the rental does, by the shop's clock: %v, %v", ok, err)
 	}
@@ -391,7 +392,7 @@ func TestARentalOutIsNotExtendedPastADriversLicence(t *testing.T) {
 		t.Fatal(err)
 	}
 	driver, _ := workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, v.renter, true)
-	if _, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true,
+	if _, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true, AgeOK: true,
 		Categories: []string{"B"}, ValidUntil: day("2031-06-10"), Method: workshop.LicenceCardInspected}); err != nil {
 		t.Fatal(err)
 	}
@@ -425,7 +426,7 @@ func TestALicenceNoteRefusesIdentifiersHoweverWritten(t *testing.T) {
 		if cats == nil {
 			cats = []string{"B"}
 		}
-		_, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true,
+		_, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true, AgeOK: true,
 			Categories: cats, ValidUntil: day("2035-01-01"), Method: workshop.LicenceForeignInspected, Note: note})
 		return err
 	}
@@ -478,7 +479,7 @@ func TestCancellingARentalEndsItsLicenceChecksPurpose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true, Categories: []string{"B"},
+	if _, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true, AgeOK: true, Categories: []string{"B"},
 		ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}); err != nil {
 		t.Fatal(err)
 	}
@@ -499,5 +500,45 @@ func TestCancellingARentalEndsItsLicenceChecksPurpose(t *testing.T) {
 	}
 	if open, kept := held(); open != 0 || kept != 1 {
 		t.Errorf("after cancelling: %d still open, %d kept; want none open and the check kept", open, kept)
+	}
+}
+
+// A driver not seen to be the profile's minimum age fails the licence
+// check, whatever else the licence says, so the rental is not handed over
+// to them (#193's edge case). No date of birth is kept: only whether the
+// age was seen.
+func TestADriverNotSeenToBeOldEnoughFailsTheCheck(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	id, err := v.book(pool, in2031(10, 9), in2031(12, 9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver, err := workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, v.renter, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	licence := workshop.LicenceShown{Shown: true, Categories: []string{"B"}, ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}
+	if ok, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, licence); err != nil || ok {
+		t.Errorf("a valid B licence, the age not seen: passed %v, %v", ok, err)
+	}
+	lacksLicence := func() bool {
+		t.Helper()
+		gaps, err := workshop.RentalBookingGaps(ctx, pool, rentalDesk(), id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return slices.ContainsFunc(gaps, func(g workshop.HandoverGap) bool { return g.Code == workshop.GapLicence })
+	}
+	if !lacksLicence() {
+		t.Error("the booking does not lack a licence check after the age was not seen")
+	}
+	licence.AgeOK = true
+	if ok, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, licence); err != nil || !ok {
+		t.Errorf("the age seen: passed %v, %v", ok, err)
+	}
+	if lacksLicence() {
+		t.Error("still lacking a licence check after a passing one")
 	}
 }

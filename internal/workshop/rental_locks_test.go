@@ -95,7 +95,7 @@ func aDriverOnABooking(t *testing.T, pool *pgxpool.Pool) (rentable, string, stri
 }
 
 func licenceShown() workshop.LicenceShown {
-	return workshop.LicenceShown{Shown: true, Categories: []string{"B"}, ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}
+	return workshop.LicenceShown{Shown: true, AgeOK: true, Categories: []string{"B"}, ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}
 }
 
 // A driver taken off while their licence is being checked: the check, in

@@ -88,6 +88,7 @@
     <form method="post" action="/rental/drivers/{{.ID}}/check">
       <input type="hidden" name="booking" value="{{$.Rental.Booking.ID}}">
       <label class="check"><input type="checkbox" name="shown" value="1" checked> {{$.T "A licence was shown"}}</label>
+      <label class="check"><input type="checkbox" name="age_ok" value="1"> {{$.T "The driver is at least the minimum age for this unit"}}</label>
       <div class="choices"><span>{{$.T "Categories it holds"}}</span>
         {{range $.Rental.LicenceCategories}}<label class="check"><input type="checkbox" name="categories" value="{{.}}"> {{.}}</label> {{end}}</div>
       <div class="pair">

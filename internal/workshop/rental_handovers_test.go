@@ -61,7 +61,7 @@ func handoverReady(t *testing.T, pool *pgxpool.Pool) (rentable, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ok, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true, Categories: []string{"B"},
+	if ok, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true, AgeOK: true, Categories: []string{"B"},
 		ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}); err != nil || !ok {
 		t.Fatalf("the licence check: %v, %v", ok, err)
 	}

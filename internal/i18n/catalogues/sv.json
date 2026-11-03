@@ -8432,6 +8432,8 @@
     "that phone number has too few or too many digits": {"other": "telefonnumret har för få eller för många siffror"},
     "that request was already used for another enquiry": {"other": "den begäran har redan använts för en annan förfrågan"},
     "Lead": {"other": "Lead"},
+    "The driver was not seen to be the minimum age this unit is rented from.": {"other": "Det har inte setts att föraren har den lägsta ålder som enheten hyrs ut från."},
+    "The driver is at least the minimum age for this unit": {"other": "Föraren har minst den lägsta åldern för den här enheten"},
     "Add a key": {"other": "Lägg till en nyckel"},
     "Add to the service book": {"other": "Lägg till i serviceboken"},
     "Damage": {"other": "Skador"},
