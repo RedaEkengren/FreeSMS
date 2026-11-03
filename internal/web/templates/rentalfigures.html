@@ -1,0 +1,27 @@
+{{define "content"}}
+<h1>{{.T "Rental figures"}}</h1>
+<form method="get" action="/rental/figures">
+  <label><span>{{.T "Month"}}</span><input type="month" name="month" value="{{.Rental.MonthValue}}"></label>
+  <button type="submit" class="secondary">{{.T "Show"}}</button>
+</form>
+<p class="waiting">{{.T "Rented is from the actual check-out to the check-in. Available is time in the fleet less closed days it was not out. Rent is spread over the days rented; other charges count in the month invoiced; a credited invoice counts nothing. Congestion tax and fines passed on, damage compensation and deposits are not rental revenue. Cost waits on recording what the shop's own work on a unit costs."}}</p>
+{{if .Rental.Figures}}
+<table>
+  <thead><tr><th>{{.T "Unit"}}</th><th>{{.T "Available, hours"}}</th><th>{{.T "Rented, hours"}}</th><th>{{.T "Utilisation"}}</th><th>{{.T "Downtime, hours"}}</th><th>{{.T "Buffers, hours"}}</th><th>{{.T "Revenue, net"}}</th><th>{{.T "Damage compensation"}}</th><th>{{.T "Passed on"}}</th></tr></thead>
+  <tbody>
+  {{range .Rental.Figures}}
+  <tr><th scope="row">{{.Unit}}</th><td>{{$.Num ($.Rental.WholeHours .Available)}}</td><td>{{$.Num ($.Rental.WholeHours .Rented)}}</td><td>{{$.Num ($.Rental.Percent1 .Utilisation)}} %</td>
+    <td>{{$.Num ($.Rental.WholeHours .Downtime)}}</td><td>{{$.Num ($.Rental.WholeHours .Buffers)}}</td><td>{{$.Money .RevenueMinor}}</td><td>{{$.Money .DamageMinor}}</td><td>{{$.Money .PassedOnMinor}}</td></tr>
+  {{end}}
+  </tbody>
+  <tbody>
+  {{range .Rental.FigureTotals}}
+  <tr><th scope="row">{{.Unit}}</th><td>{{$.Num ($.Rental.WholeHours .Available)}}</td><td>{{$.Num ($.Rental.WholeHours .Rented)}}</td><td>{{$.Num ($.Rental.Percent1 .Utilisation)}} %</td>
+    <td>{{$.Num ($.Rental.WholeHours .Downtime)}}</td><td>{{$.Num ($.Rental.WholeHours .Buffers)}}</td><td>{{$.Money .RevenueMinor}}</td><td>{{$.Money .DamageMinor}}</td><td>{{$.Money .PassedOnMinor}}</td></tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p>{{.T "No unit was in the fleet that month."}}</p>
+{{end}}
+{{end}}

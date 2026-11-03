@@ -39,3 +39,22 @@ func TestAFileOfChargesIsShownBeforeItIsSaved(t *testing.T) {
 		t.Errorf("the page does not list the charge")
 	}
 }
+
+// The rental figures are the owner's page: the rental desk is refused
+// (#203).
+func TestTheRentalFiguresAreTheOwners(t *testing.T) {
+	ts, pool := testServer(t)
+	seedRentalDesk(t, func(t *testing.T, stmts []string) { seedShop(t, pool, shopA, stmts) })
+	owner := signIn(t, ts, ownerEmail)
+	resp, err := owner.Get(ts.URL + "/rental/figures?month=2026-10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body := readBody(t, resp); resp.StatusCode != http.StatusOK || !strings.Contains(body, `name="month" value="2026-10"`) {
+		t.Errorf("the owner's figures: %d %s", resp.StatusCode, body)
+	}
+	desk := signIn(t, ts, rentalEmail)
+	if resp, _ := desk.Get(ts.URL + "/rental/figures"); resp.StatusCode != http.StatusForbidden {
+		t.Errorf("the rental desk's view of the figures: %d", resp.StatusCode)
+	}
+}

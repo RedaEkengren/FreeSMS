@@ -149,6 +149,7 @@ func (s *Server) handleRentalFineDecide(w http.ResponseWriter, r *http.Request) 
 // fineRoutes registers the charges for vehicles.
 func (s *Server) fineRoutes(m routeMux) {
 	m.HandleFunc("GET /rental/fines", s.requireSession(s.handleRentalFines))
+	m.HandleFunc("GET /rental/figures", s.requireSession(s.handleRentalFigures))
 	m.HandleFunc("POST /rental/fines", s.requireSession(s.handleRentalFineRecord))
 	m.HandleFunc("POST /rental/fines/import", s.requireSession(s.handleRentalFineImport))
 	m.HandleFunc("POST /rental/fines/{id}/{what}", s.requireSession(s.handleRentalFineDecide))

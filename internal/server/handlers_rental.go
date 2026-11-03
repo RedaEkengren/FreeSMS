@@ -19,7 +19,7 @@ import (
 
 // rentalPages are the templates Rental adds.
 var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "rentalprices", "rentalbooking", "rentalhandover", "rentalregister",
-	"rentaldamage", "rentalfines"}
+	"rentaldamage", "rentalfines", "rentalfigures"}
 
 // rentalData is what Rental's pages are given.
 type rentalData struct {
@@ -60,6 +60,11 @@ type rentalData struct {
 	Deposit workshop.RentalDeposit
 	// A booking's return charges, and how each kind is taxed (#195).
 	Charges []workshop.RentalCharge
+	// The units' figures for a month, and per category (#203).
+	Figures      []workshop.UnitFigures
+	FigureTotals []workshop.UnitFigures
+	// The month shown, as the month field holds it.
+	MonthValue string
 	// Charges for vehicles (#198), and an import's preview and its file.
 	Fines       []workshop.Fine
 	FinePreview []workshop.Fine
