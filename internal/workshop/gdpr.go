@@ -55,6 +55,9 @@ type PersonExport struct {
 	Roles []ExportedPartyRole `json:"roles,omitempty"`
 	// Contracts naming them (#150), as they were produced.
 	Contracts []ExportedContract `json:"contracts,omitempty"`
+	// Cars they asked about (#172) and drove (#173).
+	Leads      []ExportedLead      `json:"leads,omitempty"`
+	TestDrives []ExportedTestDrive `json:"test_drives,omitempty"`
 
 	// Written out rather than left for somebody to infer.
 	Notes []string `json:"notes"`
@@ -68,6 +71,29 @@ type ExportedContract struct {
 	ErasedAt  *time.Time `json:"erased_at,omitempty"`
 	Signed    bool       `json:"signed_by_you"`
 	KeptUntil time.Time  `json:"kept_until"`
+}
+
+type ExportedLead struct {
+	Asked    time.Time `json:"asked"`
+	Channel  string    `json:"channel"`
+	Car      string    `json:"car,omitempty"`
+	Wishes   string    `json:"wishes,omitempty"`
+	Name     string    `json:"name,omitempty"`
+	Phone    string    `json:"phone,omitempty"`
+	Email    string    `json:"email,omitempty"`
+	Status   string    `json:"status"`
+	Contacts []string  `json:"contacts,omitempty"`
+}
+
+type ExportedTestDrive struct {
+	Car         string     `json:"car"`
+	From        time.Time  `json:"from"`
+	To          time.Time  `json:"to"`
+	Area        string     `json:"area,omitempty"`
+	Categories  []string   `json:"licence_categories,omitempty"`
+	ValidUntil  *time.Time `json:"licence_valid_until,omitempty"`
+	LicenceNote string     `json:"licence_note,omitempty"`
+	Notes       []string   `json:"notes,omitempty"`
 }
 
 type ExportedPartyRole struct {
@@ -285,6 +311,11 @@ func ExportPerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 		}
 		roles.Close()
 
+		// The cars they asked about and drove.
+		if err := exportLeadsAndDrivesTx(ctx, tx, personID, &e); err != nil {
+			return err
+		}
+
 		years, err := retentionTx(ctx, tx)
 		if err != nil {
 			return err
@@ -410,6 +441,13 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fi
 			return fmt.Errorf("check for an account: %w", err)
 		}
 
+		// Their leads and test drives (#172, #173), found by their party and
+		// by the number and email they gave, before those are cleared.
+		leadsErased, drivesErased, err := eraseLeadsAndDrivesTx(ctx, tx, personID)
+		if err != nil {
+			return err
+		}
+
 		if _, err := tx.Exec(ctx, `
 			UPDATE people SET display_name = $2, email = NULL, phone = NULL,
 			                  erased_at = now(), updated_at = now()
@@ -502,6 +540,12 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fi
 		clearedNow, keptNow := cleared, kept
 		if blanked > 0 {
 			clearedNow += fmt.Sprintf(" What %d contracts past their retention said, their naming of them and the scans of signed copies; that they existed, their hash and their signatures stay.", blanked)
+		}
+		if leadsErased > 0 {
+			clearedNow += fmt.Sprintf(" What %d enquiries about cars said about them; that they asked stays.", leadsErased)
+		}
+		if drivesErased > 0 {
+			clearedNow += fmt.Sprintf(" What was noted on %d test drives they took; that they drove and their licence was checked stays.", drivesErased)
 		}
 		if idRemoved > 0 {
 			clearedNow += fmt.Sprintf(" %d identity values held for a purpose that allowed it; that the checks were made stays.", idRemoved)
@@ -674,11 +718,14 @@ type SweepResult struct {
 	IdentityValues int64
 	// Vehicle lookups past their year, deleted (#155).
 	VehicleLookups int64
+	// Leads that never became a deal, the person erased from them (#172).
+	Leads int64
 }
 
 // Empty reports whether there was nothing to do.
 func (s SweepResult) Empty() bool {
-	return s.LoginAttempts == 0 && s.Shares == 0 && s.JobLinks == 0 && s.ImportPreviews == 0 && s.IdentityValues == 0 && s.VehicleLookups == 0
+	return s.LoginAttempts == 0 && s.Shares == 0 && s.JobLinks == 0 && s.ImportPreviews == 0 && s.IdentityValues == 0 && s.VehicleLookups == 0 &&
+		s.Leads == 0
 }
 
 // Sweep applies the retention policy.
@@ -729,6 +776,14 @@ func Sweep(ctx context.Context, pool *pgxpool.Pool, shopID string) (SweepResult,
 			tag, err := tx.Exec(ctx, `DELETE FROM vehicle_lookups WHERE looked_up_at < now() - $1::interval`,
 				seconds(vehicleLookupRetention))
 			r.VehicleLookups = tag.RowsAffected()
+			return err
+		}),
+
+		// A lead that never became a deal keeps the person for the shop's
+		// period after it last moved; its figures stay.
+		step("leads", func(ctx context.Context, tx pgx.Tx) error {
+			n, err := sweepLeadsTx(ctx, tx)
+			r.Leads = n
 			return err
 		}),
 

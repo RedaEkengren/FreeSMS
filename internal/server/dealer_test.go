@@ -144,16 +144,24 @@ func dealerShopOwner() access.Scope {
 func TestNoCarSalesRouteServesAnotherShopsRow(t *testing.T) {
 	ts, pool := testServer(t)
 	dealerShop(t, pool)
-	const calcB = "bbbbbbbb-0000-0000-0000-0000000000ca"
+	const calcB, leadB = "bbbbbbbb-0000-0000-0000-0000000000ca", "bbbbbbbb-0000-0000-0000-0000000000cb"
 	seedShop(t, pool, shopB, []string{
 		`INSERT INTO purchase_calculations (id, shop_id, calculation_id, version, vehicle_id, note)
 		 VALUES ('` + calcB + `','` + shopB + `','` + calcB + `',1,'` + vehicleB + `','` + secretB + `')`,
+		`INSERT INTO leads (id, shop_id, contact_name, contact_email, wishes, channel)
+		 VALUES ('` + leadB + `','` + shopB + `','` + secretB + `','b@example.test','` + secretB + `','phone')`,
+		`INSERT INTO lead_events (shop_id, lead_id, kind, status) VALUES ('` + shopB + `','` + leadB + `','status','new')`,
 	})
 	for _, email := range []string{ownerEmail, buyerEmail, salesEmail, techEmail} {
 		c := signIn(t, ts, email)
 		for _, try := range []struct{ method, path string }{
 			{http.MethodGet, "/cars/calculations/" + calcB},
 			{http.MethodPost, "/cars/calculations/" + calcB + "/accept"},
+			{http.MethodGet, "/cars/leads/" + leadB},
+			{http.MethodPost, "/cars/leads/" + leadB + "/contacts"},
+			{http.MethodPost, "/cars/leads/" + leadB + "/status"},
+			{http.MethodPost, "/cars/leads/" + leadB + "/assign"},
+			{http.MethodPost, "/cars/leads/" + leadB + "/next"},
 		} {
 			var status int
 			var body string

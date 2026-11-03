@@ -265,6 +265,12 @@ type pageData struct {
 	StockUnits []workshop.StockUnit
 	// What a car-sales page shows (handlers_dealer.go).
 	Dealer *dealerData
+	// The leads pages (handlers_leads.go).
+	Leads leadsData
+	// The test-drive pages (handlers_testdrives.go).
+	Drives driveData
+	// The deal pages (handlers_deals.go).
+	Deals dealData
 	// Rental: every rental page's data, in one place.
 	Rental rentalData
 }
@@ -522,7 +528,7 @@ func (d pageData) Plural(key string, count int) string {
 func parseTemplates() (map[string]*template.Template, error) {
 	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "planclash", "lineedit", "enquiries", "enquiry", "proposal", "offer", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "einvoice", "shop", "customer", "day", "followup", "comeback", "outsourced", "outsourcedlist", "import", "importbatch", "start", "invoiceexample", "help", "credit", "rebill", "docview", "summary", "summarydoc", "supply", "order", "timeline", "duplicates", "merge", "customers", "customercard", "sell", "checklists", "part", "staff", "account", "mine", "rota", "schedule", "receivables", "setup", "contract", "outbox", "paymentflows", "technicians", "home", "error"}
 	// Dealer
-	pages = append(pages, "carcalc")
+	pages = append(pages, "carcalc", "leads", "lead", "testdrive", "deal")
 	pages = append(pages, rentalPages...)
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {

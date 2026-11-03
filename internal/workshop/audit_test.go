@@ -184,6 +184,9 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 	unit := takeIn(t, pool, workshop.StockFromDefleet)
 	moveStock(t, pool, unit.ID, workshop.StockForSale)
 	made["stock_unit.opened"], made["stock_unit.moved"] = subject{"stock_unit", unit.ID}, subject{"stock_unit", unit.ID}
+	// A job on it posted its cost when ready, then went back to work (#164).
+	jobTakenBackToWork(t, pool)
+	made["stock_cost.reversed"] = subject{"stock_unit", unit.ID}
 	// A car bought (#161), its eligibility corrected.
 	bought := boughtCar(t, pool)
 	if _, err := workshop.CorrectVATEligibility(ctx, pool, buyerScope(), bought.ID, workshop.SellerCompanyChargedVAT, nil, "Säljaren var ett företag"); err != nil {
@@ -195,6 +198,8 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	made["stock_checks.overridden"] = subject{"stock_unit", bought.StockUnitID}
+	// A test drive let go before its agreement was signed (#173).
+	made["test_drive.started_unsigned"] = subject{"test_drive", unsignedDrive(t, pool)}
 	// Rental
 	rentalAudited(t, pool, func(event, kind, id string) { made[event] = subject{kind, id} })
 

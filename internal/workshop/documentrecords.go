@@ -430,6 +430,19 @@ func ProduceDocument(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 	if err := mayDocument(scope.Role, scope, n.Kind, true); err != nil {
 		return "", err
 	}
+	var id string
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		id, err = produceDocumentTx(ctx, tx, scope, n)
+		return err
+	})
+	return id, err
+}
+
+// produceDocumentTx is ProduceDocument in the caller's transaction, for a
+// module that must produce a document and tie it to its subject in one
+// step. The caller has checked the role (mayDocument).
+func produceDocumentTx(ctx context.Context, tx pgx.Tx, scope access.Scope, n NewDocumentRecord) (string, error) {
 	n.Title = strings.TrimSpace(n.Title)
 	switch {
 	case !slices.Contains(documentSubjects, n.SubjectKind):
@@ -453,78 +466,75 @@ func ProduceDocument(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 		n.Data = map[string]string{}
 	}
 	var id string
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		tpl, err := templateBodyTx(ctx, tx, n.TemplateVersionID, n.Kind)
-		if err != nil {
-			return err
+	tpl, err := templateBodyTx(ctx, tx, n.TemplateVersionID, n.Kind)
+	if err != nil {
+		return "", err
+	}
+	if n.Supersedes != "" {
+		var same bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM document_records WHERE id = $1 AND kind = $2 AND subject_id = $3)`,
+			n.Supersedes, n.Kind, n.SubjectID).Scan(&same); err != nil {
+			return "", fmt.Errorf("read what it supersedes: %w", err)
 		}
-		if n.Supersedes != "" {
-			var same bool
-			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM document_records WHERE id = $1 AND kind = $2 AND subject_id = $3)`,
-				n.Supersedes, n.Kind, n.SubjectID).Scan(&same); err != nil {
-				return fmt.Errorf("read what it supersedes: %w", err)
-			}
-			if !same {
-				return fmt.Errorf("%w: a correction supersedes a document of the same kind about the same thing", ErrInvalid)
-			}
+		if !same {
+			return "", fmt.Errorf("%w: a correction supersedes a document of the same kind about the same thing", ErrInvalid)
 		}
-		// Naming a party copies its name and address onto the document, so
-		// it is reading the party: only one the caller may see (PartyByID),
-		// and read the way the party's own page reads it.
-		seen := partyRolesSeen(scope.Role, PartyRoles)
-		parties := make([]DocumentParty, len(n.Parties))
-		for i, p := range n.Parties {
-			var visible bool
-			if err := tx.QueryRow(ctx, `
-				SELECT EXISTS (SELECT 1 FROM party_roles r WHERE r.party_id = ANY((SELECT party_ids_read_as(party_now($1)))::uuid[]) AND r.role = ANY($2))`,
-				p.PartyID, seen).Scan(&visible); err != nil {
-				return fmt.Errorf("read party: %w", err)
-			}
-			if !visible {
-				return ErrNotFound
-			}
-			var pa Party
-			err := tx.QueryRow(ctx, `SELECT`+partyColumns+partyJoins+` WHERE pa.id = $1`, p.PartyID, false).Scan(
-				&pa.ID, &pa.Kind, &pa.Name, &pa.OrgNumber, &pa.Phone, &pa.Email, &pa.Address, &pa.CustomerID, &pa.MergedInto, &pa.Revision)
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrNotFound
-			}
-			if err != nil {
-				return fmt.Errorf("read party: %w", err)
-			}
-			if pa.MergedInto != "" {
-				return errPartyMerged
-			}
-			parties[i] = DocumentParty{PartyID: p.PartyID, Role: p.Role, Name: pa.Name, OrgNumber: pa.OrgNumber, Address: pa.Address}
-		}
-		body := render(tpl, n.Data)
-		data, err := json.Marshal(n.Data)
-		if err != nil {
-			return err
-		}
-		hash := contentHash(n.Kind, n.Title, body, n.Data, parties)
+	}
+	// Naming a party copies its name and address onto the document, so
+	// it is reading the party: only one the caller may see (PartyByID),
+	// and read the way the party's own page reads it.
+	seen := partyRolesSeen(scope.Role, PartyRoles)
+	parties := make([]DocumentParty, len(n.Parties))
+	for i, p := range n.Parties {
+		var visible bool
 		if err := tx.QueryRow(ctx, `
-			INSERT INTO document_records (shop_id, kind, subject_kind, subject_id, template_version_id, title, body, data,
-			                              content_sha256, supersedes_id, created_by)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULLIF($10, '')::uuid, $11) RETURNING id`,
-			scope.ShopID, n.Kind, n.SubjectKind, n.SubjectID, n.TemplateVersionID, n.Title, body, data, hash,
-			n.Supersedes, scope.UserID).Scan(&id); err != nil {
-			return docError(err)
+			SELECT EXISTS (SELECT 1 FROM party_roles r WHERE r.party_id = ANY((SELECT party_ids_read_as(party_now($1)))::uuid[]) AND r.role = ANY($2))`,
+			p.PartyID, seen).Scan(&visible); err != nil {
+			return "", fmt.Errorf("read party: %w", err)
 		}
-		for i, p := range parties {
-			if _, err := tx.Exec(ctx, `
-				INSERT INTO document_record_parties (shop_id, document_id, party_id, position, role, name, org_number, address)
-				VALUES ($1, $2, $3, $4, $5, $6, nullif($7, ''), nullif($8, ''))`,
-				scope.ShopID, id, p.PartyID, i+1, p.Role, p.Name, p.OrgNumber, p.Address); err != nil {
-				if isUniqueViolation(err, "document_record_parties_document_id_party_id_role_key") {
-					return fmt.Errorf("%w: a party is named once in each part", ErrInvalid)
-				}
-				return fmt.Errorf("name party: %w", err)
+		if !visible {
+			return "", ErrNotFound
+		}
+		var pa Party
+		err := tx.QueryRow(ctx, `SELECT`+partyColumns+partyJoins+` WHERE pa.id = $1`, p.PartyID, false).Scan(
+			&pa.ID, &pa.Kind, &pa.Name, &pa.OrgNumber, &pa.Phone, &pa.Email, &pa.Address, &pa.CustomerID, &pa.MergedInto, &pa.Revision)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrNotFound
+		}
+		if err != nil {
+			return "", fmt.Errorf("read party: %w", err)
+		}
+		if pa.MergedInto != "" {
+			return "", errPartyMerged
+		}
+		parties[i] = DocumentParty{PartyID: p.PartyID, Role: p.Role, Name: pa.Name, OrgNumber: pa.OrgNumber, Address: pa.Address}
+	}
+	body := render(tpl, n.Data)
+	data, err := json.Marshal(n.Data)
+	if err != nil {
+		return "", err
+	}
+	hash := contentHash(n.Kind, n.Title, body, n.Data, parties)
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO document_records (shop_id, kind, subject_kind, subject_id, template_version_id, title, body, data,
+		                              content_sha256, supersedes_id, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULLIF($10, '')::uuid, $11) RETURNING id`,
+		scope.ShopID, n.Kind, n.SubjectKind, n.SubjectID, n.TemplateVersionID, n.Title, body, data, hash,
+		n.Supersedes, scope.UserID).Scan(&id); err != nil {
+		return "", docError(err)
+	}
+	for i, p := range parties {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO document_record_parties (shop_id, document_id, party_id, position, role, name, org_number, address)
+			VALUES ($1, $2, $3, $4, $5, $6, nullif($7, ''), nullif($8, ''))`,
+			scope.ShopID, id, p.PartyID, i+1, p.Role, p.Name, p.OrgNumber, p.Address); err != nil {
+			if isUniqueViolation(err, "document_record_parties_document_id_party_id_role_key") {
+				return "", fmt.Errorf("%w: a party is named once in each part", ErrInvalid)
 			}
+			return "", fmt.Errorf("name party: %w", err)
 		}
-		return nil
-	})
-	return id, err
+	}
+	return id, nil
 }
 
 // DocumentRecordByID reads a document for whoever may read its kind.

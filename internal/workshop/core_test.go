@@ -107,6 +107,9 @@ var core = map[string]string{
 	"StartShopExport": "privacy", "FinishShopExport": "privacy", "WriteShopExport": "privacy",
 	"ShopExports": "privacy", "ShopExportByID": "privacy",
 
+	// Parties as customers to invoice (#177, #199).
+	"CustomerForParty": "a party invoiced: who it is billed as",
+
 	// The shop itself.
 	"ShopDetailsFor": "the shop", "SaveDetails": "the shop",
 	"ModulesFor": "what the shop runs", "ModuleChanges": "what the shop runs", "SwitchModule": "what the shop runs",
@@ -123,4 +126,11 @@ var core = map[string]string{
 	"StockCheckSettings": "a car's history in stock", "PurchaseSplitOf": "a car's history in stock",
 	"CalculationByID": "a car's history in stock", "CalculationsForVehicle": "a car's history in stock",
 	"CostsOfUnit": "a car's history in stock", "InternalLabourRate": "a car's history in stock",
+	// Leads (#172): what the shop was asked, read whatever is switched on.
+	"LeadByID": "a car's leads", "Leads": "a car's leads", "LeadErasureMonths": "a car's leads",
+	"SellersOfCars": "a car's leads: who sells cars", "CarsInStock": "a car's history in stock",
+	// Test drives (#173): read whatever is switched on.
+	// Deals (#175): read whatever is switched on.
+	"DealByID": "a car's deals", "Deals": "a car's deals", "SaleTaxOfDeal": "a car's deals",
+	"TestDriveByID": "a car's test drives", "TestDrivesOfUnit": "a car's test drives", "TestDriveRules": "a car's test drives",
 }

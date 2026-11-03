@@ -1,0 +1,157 @@
+{{define "terms"}}{{$d := .Deals}}
+  <div class="pair">
+    <label><span>{{.T "The buyer is"}}</span>
+      <select name="buyer_kind">{{range $d.Kinds}}<option value="{{.}}"{{if eq . ($d.Field "buyer_kind")}} selected{{end}}>{{$.T ($d.Word .)}}</option>{{end}}</select></label>
+    <label><span>{{.T "Price of the car, VAT included, in kronor"}}</span>
+      <input name="price" inputmode="decimal" required value="{{$d.Field "price"}}"></label>
+  </div>
+  <label><span>{{.T "How the sale is taxed"}}</span>
+    <select name="tax"><option value="">{{.T "Not chosen yet"}}</option>
+      {{range $d.Treatments}}<option value="{{.}}"{{if eq . ($d.Field "tax")}} selected{{end}}>{{$.T ($d.Word .)}}</option>{{end}}</select></label>
+  <label><span>{{.T "Warranty"}}</span><input name="warranty" maxlength="1000" value="{{$d.Field "warranty"}}"></label>
+  <div class="pair">
+    <label><span>{{.T "Delivered on"}}</span><input type="date" name="delivery_on" value="{{$d.Field "delivery_on"}}"></label>
+    <label><span>{{.T "Where"}}</span><input name="delivery_place" maxlength="300" value="{{$d.Field "delivery_place"}}"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "Odometer, km"}}</span><input name="odometer" inputmode="numeric" value="{{$d.Field "odometer"}}"></label>
+    <label><span>{{.T "Payment"}}</span><input name="payment_terms" maxlength="500" value="{{$d.Field "payment_terms"}}"></label>
+  </div>
+  <fieldset><legend>{{.T "Sold with the car"}}</legend>
+  {{range $d.LineRows}}
+  <div class="pair">
+    <label><span>{{$.T "Description"}}</span><input name="line_desc" maxlength="300" value="{{.Desc}}"></label>
+    <label><span>{{$.T "Quantity"}}</span><input name="line_qty" inputmode="decimal" value="{{.Qty}}"></label>
+    <label><span>{{$.T "Price before VAT, in kronor"}}</span><input name="line_price" inputmode="decimal" value="{{.Price}}"></label>
+    <label><span>{{$.T "VAT, per cent"}}</span><input name="line_vat" inputmode="numeric" value="{{.VAT}}"></label>
+  </div>
+  {{end}}
+  </fieldset>
+  <label><span>{{.T "Note"}}</span><textarea name="note" maxlength="1000" rows="2">{{$d.Field "note"}}</textarea></label>
+{{end}}
+{{define "content"}}
+{{$d := .Deals}}{{$x := $d.Deal}}
+{{if not $x.ID}}
+<h1>{{.T "Deals"}}</h1>
+{{if .Error}}<p class="error" role="alert">{{.Sentence .Error}}</p>{{end}}
+<p>{{if $d.All}}<a href="/cars/deals">{{.T "Open deals only"}}</a>{{else}}<a href="/cars/deals?all=1">{{.T "Cancelled deals too"}}</a>{{end}}</p>
+{{if $d.Deals}}
+<ul class="lines">
+  {{range $d.Deals}}
+  <li><div class="row"><a href="/cars/deals/{{.ID}}">{{.Number}} &middot; {{.Car}}</a><span class="tag">{{$.T ($d.Word .State)}}</span></div>
+    <div class="waiting">{{range $i, $b := .Buyers}}{{if $i}}, {{end}}{{$b.Name}}{{end}} &middot; {{$.Money .TotalMinor}} &middot; {{.SalespersonName}}</div></li>
+  {{end}}
+</ul>
+{{else}}<p class="empty">{{.T "No deals."}}</p>{{end}}
+
+<h2>{{.T "New deal"}}</h2>
+<form method="post" action="/cars/deals">
+  <input type="hidden" name="key" value="{{$d.Key}}">
+  {{with $d.Lead.ID}}<input type="hidden" name="lead" value="{{.}}">{{end}}
+  {{if $d.Lead.PartyID}}<input type="hidden" name="buyer" value="{{$d.Lead.PartyID}}"><p class="waiting">{{.T "Buyer: %s" $d.Lead.Contact}}</p>
+  {{else}}
+  <label><span>{{.T "Buyer's name"}}</span><input name="name" maxlength="200" value="{{or (index $d.Form "name") $d.Lead.Name}}"></label>
+  <div class="pair">
+    <label><span>{{.T "Phone"}}</span><input name="phone" type="tel" maxlength="40" value="{{or (index $d.Form "phone") $d.Lead.Phone}}"></label>
+    <label><span>{{.T "Email"}}</span><input name="email" type="email" maxlength="200" value="{{or (index $d.Form "email") $d.Lead.Email}}"></label>
+  </div>
+  {{end}}
+  <label><span>{{.T "Car"}}</span>
+    <select name="unit" required>
+      {{range $d.Cars}}<option value="{{.UnitID}}"{{if or (eq .UnitID (index $d.Form "unit")) (eq .UnitID $d.Lead.StockUnitID)}} selected{{end}}>{{.Car}} &middot; {{$.T .StatusLabel}}</option>{{end}}
+    </select></label>
+  {{template "terms" .}}
+  <button type="submit">{{.T "Open the deal"}}</button>
+</form>
+{{else}}
+<h1>{{.T "Deal"}} {{$x.Number}}: {{$x.Car}}</h1>
+{{if .Error}}<p class="error" role="alert">{{.Sentence .Error}}</p>{{end}}
+<p class="waiting"><span class="tag">{{.T ($d.Word $x.State)}}</span> &middot; {{.T "Version %d" $x.Version}} &middot; {{$x.SalespersonName}}
+  {{with $x.LeadID}}&middot; <a href="/cars/leads/{{.}}">{{$.T "Lead"}}</a>{{end}}</p>
+<ul class="lines">
+  <li><div class="row"><span>{{.T "Buyers"}}</span><span>{{range $i, $b := $x.Buyers}}{{if $i}}, {{end}}{{$b.Name}}{{end}} ({{.T ($d.Word $x.Terms.BuyerKind)}})</span></div></li>
+  <li><div class="row"><span>{{.T "Price of the car"}}</span><span>{{.Money $x.Terms.PriceMinor}}</span></div></li>
+  {{range $x.Terms.Lines}}<li><div class="row"><span>{{.Description}}</span><span>{{$.Money .GrossMinor}}</span></div></li>{{end}}
+  <li><div class="row"><span>{{.T "To pay in all"}}</span><strong>{{.Money $x.TotalMinor}}</strong></div></li>
+  <li><div class="row"><span>{{.T "How the sale is taxed"}}</span><span>{{if $x.Terms.TaxTreatment}}{{.T ($d.Word $x.Terms.TaxTreatment)}}{{else}}{{.T "Not chosen yet"}}{{end}}</span></div>
+    {{if not $x.MarginSchemeEligible}}<div class="waiting">{{.T "Its purchase does not make this car eligible for the margin scheme."}}</div>{{end}}</li>
+</ul>
+
+{{with $x.Missing}}<h2>{{$.T "Before the contract is complete"}}</h2><ul>{{range .}}<li>{{$.T .}}</li>{{end}}</ul>{{end}}
+{{range $d.Warnings}}<p class="error" role="alert">{{$.T "The contract says \"%s\" to a consumer. A general \"as is\" clause does not exempt you from the Consumer Sales Act; state each known defect instead." .}}</p>{{end}}
+
+<h2>{{.T "Known defects"}}</h2>
+{{if $x.Defects}}
+<ul class="lines">
+  {{range $f := $x.Defects}}
+  <li><div>{{$f.Description}}</div>
+    {{range $x.Buyers}}{{$a := $f.AnswerOf .PartyID}}
+    <div class="row"><span>{{.Name}}</span>
+      <span>{{if $a}}{{if $a.Accepted}}{{$.T "Accepted"}}{{else}}{{$.T "Refused"}}{{end}} &middot; {{$.T ($d.Word $a.How)}}{{else}}{{$.T "Not answered"}}{{end}}</span></div>
+    {{if ne $x.State "cancelled"}}
+    <form method="post" action="/cars/deals/{{$x.ID}}/defects/{{$f.ID}}/answer" class="inline">
+      <input type="hidden" name="party" value="{{.PartyID}}">
+      <button type="submit" name="accepted" value="1" class="secondary">{{$.T "Accepted, here"}}</button>
+      <button type="submit" name="accepted" value="0" class="secondary">{{$.T "Refused"}}</button>
+    </form>
+    {{end}}{{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}<p class="empty">{{.T "No known defects stated."}}</p>{{end}}
+{{if ne $x.State "cancelled"}}
+<form method="post" action="/cars/deals/{{$x.ID}}/defects">
+  <label><span>{{.T "A known defect, as you tell the buyer"}}</span><textarea name="description" maxlength="1000" rows="2" required></textarea></label>
+  <button type="submit" class="secondary">{{.T "Add the defect"}}</button>
+</form>
+
+<h2>{{.T "Contract"}}</h2>
+{{with $x.ContractID}}<p><a href="/contracts/{{.}}">{{$.T "Read the contract"}}</a>
+  {{if ne $x.ContractBasis $x.Basis}} &middot; {{$.T "out of date: the terms or the known defects have changed since"}}{{end}}</p>
+  {{range $x.Buyers}}
+  <div class="row"><span>{{.Name}}</span><span>{{if $d.Signed .PartyID}}{{$.T "Signed"}}{{else}}
+    <form method="post" action="/cars/deals/{{$x.ID}}/signed" class="inline">
+      <input type="hidden" name="party" value="{{$d.SignatureParty .PartyID}}"><input type="hidden" name="hash" value="{{$d.Contract.Hash}}">
+      <select name="method"><option value="in_person_click">{{$.T "Signed here, in person"}}</option><option value="paper">{{$.T "Signed on paper"}}</option></select>
+      <button type="submit" class="secondary">{{$.T "Record the signature"}}</button>
+    </form>{{end}}</span></div>
+  {{end}}
+{{end}}
+{{if not $x.Completed}}
+<form method="post" action="/cars/deals/{{$x.ID}}/contract">
+  <input type="hidden" name="replacing" value="{{$x.ContractID}}">
+  {{if $d.Templates}}<label><span>{{.T "Template"}}</span><select name="template">{{range $d.Templates}}<option value="{{.VersionID}}">{{.Name}}</option>{{end}}</select></label>
+  {{else}}<input type="hidden" name="template" value=""><p class="waiting">{{.T "From the shipped contract, a draft that needs legal review."}}</p>{{end}}
+  <button type="submit" class="secondary">{{if $x.ContractID}}{{.T "Make it again from the terms as they stand"}}{{else}}{{.T "Make the contract"}}{{end}}</button>
+</form>
+{{end}}
+{{if not $x.Missing}}{{if not $x.Completed}}
+<form method="post" action="/cars/deals/{{$x.ID}}/complete"><button type="submit">{{.T "Complete the contract"}}</button></form>
+{{end}}{{end}}
+{{if $x.Completed}}<h2>{{.T "Invoice"}}</h2>
+{{if $x.InvoiceRef}}<p>{{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/invoices/{{$x.InvoiceID}}">{{.T "Invoiced as %s" $x.InvoiceRef}}</a>{{else}}{{.T "Invoiced as %s" $x.InvoiceRef}}{{end}}</p>
+{{else}}<form method="post" action="/cars/deals/{{$x.ID}}/invoice"><button type="submit">{{.T "Invoice the sale"}}</button></form>{{end}}
+{{end}}
+
+{{if $d.Unsaved}}<section class="callout"><h2>{{.T "What you typed, not saved"}}</h2>
+  <p class="waiting">{{.T "Somebody saved the terms while you were changing them. The form below holds theirs; carry over what you still want."}}</p>
+  <ul>{{range $d.UnsavedFields}}<li>{{$.T .Label}}: {{if .Choice}}{{$.T .Value}}{{else}}{{.Value}}{{end}}</li>{{end}}
+  {{range $d.UnsavedLines}}<li>{{.Desc}}: {{.Qty}} &times; {{.Price}} ({{.VAT}}%)</li>{{end}}</ul></section>{{end}}
+<details{{if $d.Unsaved}} open{{end}}><summary>{{.T "Change the terms"}}</summary>
+<form method="post" action="/cars/deals/{{$x.ID}}/terms">
+  <input type="hidden" name="version" value="{{$x.Version}}">
+  {{range $x.Buyers}}<input type="hidden" name="buyer" value="{{.PartyID}}">{{end}}
+  {{template "terms" .}}
+  <button type="submit" class="secondary">{{.T "Save as a new version"}}</button>
+</form>
+</details>
+<details><summary>{{.T "Cancel the deal"}}</summary>
+<form method="post" action="/cars/deals/{{$x.ID}}/cancel">
+  <label><span>{{.T "Why"}}</span><input name="reason" maxlength="300" required></label>
+  <button type="submit" class="secondary">{{.T "Cancel it"}}</button>
+</form>
+</details>
+{{end}}
+{{end}}
+<p><a href="/cars/deals">{{.T "All deals"}}</a></p>
+{{end}}

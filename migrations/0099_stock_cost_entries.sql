@@ -90,18 +90,20 @@ GRANT SELECT, INSERT ON stock_cost_settings TO freesms_app;
 -- when it was posted, and read whenever a cost is read, never stored:
 --
 --   * A cost is after the sale when the moment it is for (happened_at) is
---     later than the sale that stands (stock_units.sold_at). Work on a job
+--     later than the sale that stands (stock_unit_sales, 0095). Work on a job
 --     opened before the sale is before it however late its invoice is
 --     posted; a job opened after the sale is after it.
 --   * A cost dated rather than timed is for the end of its day, or the
---     moment it was recorded if that is earlier: one dated before the day
+--     moment it was recorded if that is earlier, or the start of its day
+--     if that is still to come (stock_cost_dated): one dated before the day
 --     of the sale is before it, one dated a later day is after it, and on
 --     the day of the sale itself, one entered before the sale was made is
 --     before it and one entered after is after it. A cost dated the day of
 --     the sale and entered on a later day is after it: what is not known
 --     to be before the sale is not counted in what the car cost to sell.
---   * A sale that falls through (sold back to for sale) clears sold_at:
---     it was never a sale, and every cost is before the next one.
+--   * A sale that falls through (sold back to for sale) no longer stands:
+--     it is kept, with when it fell through, but nothing is after it, and
+--     every cost is before the next one.
 --   * A reversal, and a supplier's invoice that replaces another, carry
 --     the moment of the entry they stand in for (the replacement because it
 --     is for the same job), so they are always on its side of the sale.
@@ -110,13 +112,19 @@ GRANT SELECT, INSERT ON stock_cost_settings TO freesms_app;
 -- undone -- or written off has no sale to be after. One rule, read by the
 -- application wherever a cost is read.
 CREATE FUNCTION stock_cost_post_sale(unit uuid, happened timestamptz) RETURNS boolean LANGUAGE sql STABLE AS $$
-    SELECT coalesce(happened > sold_at, false) FROM stock_units WHERE id = unit
+    SELECT coalesce(happened > (SELECT s.sold_at FROM stock_unit_sales s
+                                 WHERE s.stock_unit_id = unit AND s.fell_through_at IS NULL), false)
 $$;
 
 -- The moment a cost dated by hand is for: the end of its day where the
--- shop is, or now if that is earlier.
+-- shop is, or now if that is earlier -- unless its day has not begun yet,
+-- when it is the start of that day. A cost entered this morning for
+-- tomorrow is for tomorrow, and so after a sale made this afternoon, as
+-- its date says; taking now would put it before.
 CREATE FUNCTION stock_cost_dated(shop uuid, day date) RETURNS timestamptz LANGUAGE sql VOLATILE AS $$
-    SELECT least(clock_timestamp(), (day + 1)::timestamp AT TIME ZONE (SELECT timezone FROM shops WHERE id = shop))
+    SELECT CASE WHEN day::timestamp AT TIME ZONE tz > clock_timestamp() THEN day::timestamp AT TIME ZONE tz
+                ELSE least(clock_timestamp(), (day + 1)::timestamp AT TIME ZONE tz) END
+      FROM (SELECT timezone AS tz FROM shops WHERE id = shop) s
 $$;
 
 -- A supplier's invoice for work sent out from a job on a car in stock is
@@ -142,7 +150,13 @@ BEGIN
     -- it until the new one's amount is noted. Each entry is locked first
     -- the way ReverseStockCost locks it, so a reversal by hand at the same
     -- moment waits and finds it reversed, rather than both reversing it;
-    -- the INSERT below then reads what the wait let commit.
+    -- the INSERT below then reads what the wait let commit. The job comes
+    -- first, then the costs, the order ReverseStockCost takes them in:
+    -- the reversal's foreign key needs a share of the job, so a lock on
+    -- the cost taken before the job would wait on a page that holds the
+    -- job and waits on the cost.
+    PERFORM 1 FROM work_orders w JOIN outsourced_work o ON o.work_order_id = w.id
+      WHERE o.id = NEW.outsourced_id FOR SHARE OF w;
     PERFORM pg_advisory_xact_lock(hashtextextended('cost:' || e.id::text, 0))
        FROM stock_cost_entries e
        JOIN outsourced_events oe ON oe.id = e.outsourced_event_id

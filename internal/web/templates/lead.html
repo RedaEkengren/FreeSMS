@@ -1,0 +1,93 @@
+{{define "content"}}
+{{$d := .Leads}}{{$l := $d.Lead}}
+<h1>{{if $l.Erased}}{{.T "Details erased"}}{{else}}{{$l.Contact}}{{end}}</h1>
+<p class="waiting">
+  <span class="tag{{if $l.CarGone}} late{{end}}">{{.T ($d.Word $l.Status)}}</span>
+  {{with $l.LostReason}}&middot; {{$.T ($d.Word .)}}{{end}}{{with $l.LostNote}} &middot; {{.}}{{end}}
+  &middot; {{.T ($d.Word $l.Channel)}} &middot; {{.Date (.Local $l.CreatedAt) "2 Jan 2006 15:04"}}
+</p>
+{{if not $l.Erased}}
+<ul class="lines">
+  {{with $l.Phone}}<li><div class="row"><span>{{$.T "Phone"}}</span><a href="tel:{{.}}">{{.}}</a></div></li>{{end}}
+  {{with $l.Email}}<li><div class="row"><span>{{$.T "Email"}}</span><a href="mailto:{{.}}">{{.}}</a></div></li>{{end}}
+  <li><div class="row"><span>{{.T "Car"}}</span><span>{{if $l.Car}}{{$l.Car}}{{else}}{{.T "Any car"}}{{end}}</span></div>
+    {{with $l.Wishes}}<div class="waiting">{{.}}</div>{{end}}
+    {{if $l.CarGone}}<div class="waiting late">{{.T "The car is reserved or sold: offer another"}}</div>{{end}}</li>
+  <li><div class="row"><span>{{.T "Salesperson"}}</span><span>{{if $l.SalespersonName}}{{$l.SalespersonName}}{{else}}{{.T "Nobody has it"}}{{end}}</span></div></li>
+  {{with $l.NextStepOn}}<li><div class="row"><span>{{$.T "Next step"}}</span><span>{{$.Date . "2 Jan 2006"}}</span></div>
+    {{with $l.NextStep}}<div class="waiting">{{.}}</div>{{end}}</li>{{end}}
+</ul>
+{{end}}
+
+<h2>{{.T "Contacts"}}</h2>
+{{if $l.Contacts}}
+<ul class="lines">
+  {{range $l.Contacts}}
+  <li><div class="row"><span>{{$.T ($d.Word .How)}}</span><span class="waiting">{{.By}}, {{$.Date ($.Local .At) "2 Jan 15:04"}}</span></div>
+    {{with .Note}}<div>{{.}}</div>{{end}}</li>
+  {{end}}
+</ul>
+{{else}}
+<p class="empty">{{.T "Nobody has been in touch yet."}}</p>
+{{end}}
+
+{{if not $l.Erased}}
+<details open><summary>{{.T "Record a contact"}}</summary>
+<form method="post" action="/cars/leads/{{$l.ID}}/contacts">
+  <label><span>{{.T "How"}}</span>
+    <select name="how">{{range $d.Hows}}<option value="{{.}}">{{$.T ($d.Word .)}}</option>{{end}}</select></label>
+  <label><span>{{.T "What was said"}}</span><textarea name="note" maxlength="1000" rows="2"></textarea></label>
+  <button type="submit">{{.T "Record the contact"}}</button>
+</form>
+</details>
+
+{{if $l.Open}}
+<details><summary>{{.T "Next step"}}</summary>
+<form method="post" action="/cars/leads/{{$l.ID}}/next">
+  <div class="pair">
+    <label><span>{{.T "On"}}</span><input type="date" name="on" value="{{with $l.NextStepOn}}{{$.Date . "2006-01-02"}}{{else}}{{$d.Today}}{{end}}"></label>
+    <label><span>{{.T "What"}}</span><input name="what" maxlength="500" value="{{$l.NextStep}}"></label>
+  </div>
+  <button type="submit" class="secondary">{{.T "Set the next step"}}</button>
+</form>
+</details>
+{{end}}
+
+{{if ne $l.Status "won"}}
+<details><summary>{{.T "Where it stands"}}</summary>
+<form method="post" action="/cars/leads/{{$l.ID}}/status">
+  <label><span>{{.T "Now"}}</span>
+    <select name="status">{{range $d.Statuses}}<option value="{{.}}"{{if eq . $l.Status}} selected{{end}}>{{$.T ($d.Word .)}}</option>{{end}}</select></label>
+  <div class="pair">
+    <label><span>{{.T "Lost because"}}</span>
+      <select name="reason"><option value=""></option>{{range $d.LostReasons}}<option value="{{.}}">{{$.T ($d.Word .)}}</option>{{end}}</select></label>
+    <label><span>{{.T "Note"}}</span><input name="note" maxlength="500"></label>
+  </div>
+  <button type="submit" class="secondary">{{.T "Move the lead"}}</button>
+</form>
+</details>
+{{end}}
+
+{{if .Session.Scope.Role.RunsTheShop}}
+<form method="post" action="/cars/leads/{{$l.ID}}/assign">
+  <label><span>{{.T "Salesperson"}}</span>
+    <select name="salesperson"><option value="">{{.T "Nobody yet"}}</option>
+      {{range $d.Sellers}}<option value="{{.UserID}}"{{if eq .UserID $l.Salesperson}} selected{{end}}>{{.Name}}</option>{{end}}</select></label>
+  <button type="submit" class="secondary">{{.T "Give the lead to them"}}</button>
+</form>
+{{else if not $l.Salesperson}}
+<form method="post" action="/cars/leads/{{$l.ID}}/assign">
+  <input type="hidden" name="salesperson" value="{{.Session.Scope.UserID}}">
+  <button type="submit" class="secondary">{{.T "Take the lead"}}</button>
+</form>
+{{else if eq $l.Salesperson .Session.Scope.UserID}}
+<form method="post" action="/cars/leads/{{$l.ID}}/assign">
+  <input type="hidden" name="salesperson" value="">
+  <button type="submit" class="secondary">{{.T "Give it up"}}</button>
+</form>
+{{end}}
+{{end}}
+{{if and $l.Open (not $l.Erased)}}<p><a href="/cars/test-drives/new?lead={{$l.ID}}">{{.T "Book a test drive"}}</a>
+  {{if $l.DealID}}&middot; <a href="/cars/deals/{{$l.DealID}}">{{.T "The deal"}}</a>{{else if $l.DealElsewhere}}&middot; {{.T "A deal stands, with another salesperson"}}{{else}}&middot; <a href="/cars/deals?lead={{$l.ID}}">{{.T "Open a deal"}}</a>{{end}}</p>{{end}}
+<p><a href="/cars/leads">{{.T "All leads"}}</a></p>
+{{end}}

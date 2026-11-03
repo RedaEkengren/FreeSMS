@@ -251,35 +251,32 @@ func ReverseStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 	}
 	var out StockCost
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('cost:' || $1::text, 0))`, entryID); err != nil {
-			return err
-		}
-		c, err := stockCostTx(ctx, tx, entryID)
-		if err != nil {
-			return err
-		}
-		switch {
-		case c.Reversed:
-			return errCostReversed
-		case c.ReversesID != "":
-			return errCostReversal
-		}
-		// Taken back as the original was entered: from where it came, so
-		// a job's posting reversed may be posted again, and for the same
-		// moment, so on the same side of the sale.
-		var id string
+		// The one way a cost is reversed (stock_cost_reverse, 0202): the
+		// cost's job, then the cost, the order the supplier-invoice and
+		// job triggers take them in; taken back from where it came and
+		// for the same moment, so on the same side of the sale. Nothing
+		// reversed means it was already, or is itself a reversal, or is
+		// not there -- read after the locks, so a reversal by somebody
+		// else at the same moment is seen.
+		var id *string
 		if err := tx.QueryRow(ctx, `
-			INSERT INTO stock_cost_entries (shop_id, stock_unit_id, kind, net_minor, input_vat_minor, vat_rate_basis,
-			       supplier_party_id, external_ref, incurred_on, source, work_order_id, happened_at, currency,
-			       original_net_minor, rate_micro, rate_source, note, reverses_id, recorded_by)
-			SELECT shop_id, stock_unit_id, kind, -net_minor, -input_vat_minor, vat_rate_basis, supplier_party_id, external_ref,
-			       (clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops WHERE id = shop_id))::date,
-			       CASE WHEN source = 'outsourced' THEN 'manual' ELSE source END, work_order_id, happened_at, currency,
-			       -original_net_minor, rate_micro, rate_source, $2, id, NULLIF($3, '')::uuid
-			FROM stock_cost_entries WHERE id = $1 RETURNING id`, entryID, reason, scope.UserID).Scan(&id); err != nil {
+			SELECT stock_cost_reverse($1::uuid, (clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops))::date, $2,
+			                          NULLIF($3, '')::uuid)`, entryID, reason, scope.UserID).Scan(&id); err != nil {
 			return fmt.Errorf("reverse the cost: %w", err)
 		}
-		out, err = stockCostTx(ctx, tx, id)
+		if id == nil {
+			c, err := stockCostTx(ctx, tx, entryID)
+			switch {
+			case err != nil:
+				return err
+			case c.ReversesID != "":
+				return errCostReversal
+			default:
+				return errCostReversed
+			}
+		}
+		var err error
+		out, err = stockCostTx(ctx, tx, *id)
 		return err
 	})
 	return out, err
@@ -421,18 +418,30 @@ func PostJobCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		if err != nil {
 			return fmt.Errorf("read the job's car: %w", err)
 		}
-		// Done: invoiced, closed, or declined after work. An open job may
-		// yet take parts and hours, and a posting is what the job cost, not
-		// what it has cost so far; one that kept moving would change under
-		// the margin it is read into. Ready is not done: a ready job may be
-		// handed back for more work. The state is read FOR SHARE, so a job
-		// cannot move back while its cost is posted.
+		// Done: ready, invoiced, closed, or declined after work. An open job
+		// may yet take parts and hours, and a posting is what the job cost,
+		// not what it has cost so far; one that kept moving would change
+		// under the margin it is read into.
+		//
+		// Ready is enough. The car is the shop's own, so the job never needs
+		// a customer invoice -- one would bill the shop for work on its own
+		// car, at a number in the gap-free series, with output VAT on it.
+		// A ready job may still change: back on the lift, a part taken out
+		// or put back, its hours edited. Any of these takes the posting back
+		// by itself, in the database (stock_cost_job_changed, 0202), and the
+		// job posts again from what it then holds. This is the default pending
+		// the accountant's word on how a dealer's own workshop work on a
+		// stock car is booked (gate G2, #221).
+		//
+		// The state is read FOR SHARE, so the job cannot move while its
+		// cost is worked out; a change after it commits takes the posting
+		// back.
 		var state State
 		if err := tx.QueryRow(ctx, `SELECT state FROM work_orders WHERE id = $1 FOR SHARE`, jobID).Scan(&state); err != nil {
 			return fmt.Errorf("read the job: %w", err)
 		}
 		switch state {
-		case StateInvoiced, StateClosed, StateDeclined:
+		case StateReady, StateInvoiced, StateClosed, StateDeclined:
 		default:
 			return errJobOpen
 		}

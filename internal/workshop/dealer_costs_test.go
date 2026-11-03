@@ -3,8 +3,11 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/money"
@@ -130,19 +133,33 @@ func TestAJobOnAStockCarPostsItsCostOnce(t *testing.T) {
 	if err := workshop.MarkPerformed(ctx, pool, advisor(), job, 1, true); err != nil {
 		t.Fatal(err)
 	}
-	// Ready is not done: a ready job may go back on the lift for more.
+	// Ready, it posts: the shop's own car needs no customer invoice.
 	move(t, pool, job, workshop.StateReady)
-	if _, err := workshop.PostJobCost(ctx, pool, buyerScope(), job); !errors.Is(err, workshop.ErrInvalid) {
-		t.Errorf("a ready job's cost was posted: %v", err)
-	}
-	if _, err := workshop.Issue(ctx, pool, advisor(), job); err != nil {
-		t.Fatal(err)
-	}
 	posted, err := workshop.PostJobCost(ctx, pool, buyerScope(), job)
 	// 2,5 h at 400 kr and two kits at 1 500 kr: 4 000 kr.
 	if err != nil || posted.NetMinor != 400_000 || posted.Source != workshop.CostFromWorkOrder || posted.Kind != workshop.CostWorkshop ||
 		posted.StockUnitID != p.StockUnitID || posted.WorkOrderID != job {
 		t.Fatalf("the job's posting: %+v, %v", posted, err)
+	}
+	// Back on the lift for more, the posting is taken back by itself, with
+	// an event saying so, and the job cannot post until it is ready again.
+	move(t, pool, job, workshop.StateInProgress)
+	costs, err := workshop.CostsOfUnit(ctx, pool, buyerScope(), p.StockUnitID)
+	if err != nil || len(costs.Entries) != 2 || costs.TotalMinor() != 0 || !costs.Entries[0].Reversed {
+		t.Fatalf("after the job went back to work: %+v, %v", costs, err)
+	}
+	var events int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE event = 'stock_cost.reversed' AND subject_id = $1
+		AND detail->>'work_order_id' = $2`, p.StockUnitID, job).Scan(&events); err != nil || events != 1 {
+		t.Errorf("%d events for the posting taken back (%v)", events, err)
+	}
+	if _, err := workshop.PostJobCost(ctx, pool, buyerScope(), job); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a job back in progress posted its cost: %v", err)
+	}
+	move(t, pool, job, workshop.StateReady)
+	posted, err = workshop.PostJobCost(ctx, pool, buyerScope(), job)
+	if err != nil || posted.NetMinor != 400_000 {
+		t.Fatalf("posted again once ready: %+v, %v", posted, err)
 	}
 	again, err := workshop.PostJobCost(ctx, pool, buyerScope(), job)
 	if err != nil || again.ID != posted.ID {
@@ -258,6 +275,15 @@ func refTo(n int64) *int64 { return &n }
 // noted is reversed once: the hand waits for the invoice, finds the cost
 // already taken back, and is told so rather than failing.
 func TestACostReversedByHandWhileItsInvoiceIsCorrectedIsReversedOnce(t *testing.T) {
+	// The entry's id as the page sent it, and in capitals: both are the
+	// same cost, and so the same lock.
+	for name, spell := range map[string]func(string) string{"as stored": func(s string) string { return s },
+		"in capitals": strings.ToUpper} {
+		t.Run(name, func(t *testing.T) { reversedOnceWhileCorrected(t, spell) })
+	}
+}
+
+func reversedOnceWhileCorrected(t *testing.T, spell func(string) string) {
 	pool := setup(t)
 	ctx := context.Background()
 	buy(t, pool, workshop.StockFromPurchase)
@@ -281,7 +307,7 @@ func TestACostReversedByHandWhileItsInvoiceIsCorrectedIsReversedOnce(t *testing.
 	}
 	done := make(chan error, 1)
 	go func() {
-		_, err := workshop.ReverseStockCost(ctx, pool, buyerScope(), entry, "Fel bil")
+		_, err := workshop.ReverseStockCost(ctx, pool, buyerScope(), spell(entry), "Fel bil")
 		done <- err
 	}()
 	for deadline := time.Now().Add(10 * time.Second); ; {
@@ -359,4 +385,259 @@ func TestAfterTheSaleIsWhatTheCostIsFor(t *testing.T) {
 			t.Errorf("a %s cost is after a sale that fell through: %+v", c.Source, c)
 		}
 	}
+}
+
+// A supplier's cost reversed by hand while the corrected invoice is noted
+// through the workshop's own page: the hand reversal took its cost lock
+// and is waiting to write, and the invoice has locked the job and its
+// trigger wants the same cost. Both take the job before the cost, so one
+// waits for the other rather than each for the other; neither is
+// aborted as a deadlock, and the cost is reversed once.
+func TestACostReversedByHandWhileItsInvoiceIsNotedDoesNotDeadlock(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	job, line := turboJob(t, pool)
+	out := sendOut(t, pool, job, line, time.Now().AddDate(0, 0, 3))
+	record(t, pool, out, workshop.OutsourcedEventInput{Kind: "invoice", AmountMinor: pointerTo(int64(450_000)), InvoiceRef: "TV-1"})
+	var entry string
+	if err := pool.QueryRow(ctx, `SELECT id FROM stock_cost_entries WHERE source = 'outsourced'`).Scan(&entry); err != nil {
+		t.Fatal(err)
+	}
+	waiting := func(n int) {
+		t.Helper()
+		for deadline := time.Now().Add(10 * time.Second); ; {
+			var w int
+			if err := pool.QueryRow(ctx, `SELECT count(*) FROM pg_locks WHERE NOT granted`).Scan(&w); err != nil {
+				t.Fatal(err)
+			}
+			if w >= n {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("%d waiting, want %d", w, n)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	// Something else holds the stock unit for a moment -- a salesperson
+	// moving its deal -- so the hand reversal stops half way, holding what
+	// it took before it writes.
+	hold, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer hold.Rollback(ctx)
+	if _, err := hold.Exec(ctx, `SELECT 1 FROM stock_units WHERE id = $1 FOR UPDATE`, p.StockUnitID); err != nil {
+		t.Fatal(err)
+	}
+	reversed := make(chan error, 1)
+	go func() {
+		_, err := workshop.ReverseStockCost(ctx, pool, buyerScope(), entry, "Fel bil")
+		reversed <- err
+	}()
+	waiting(1)
+	noted := make(chan error, 1)
+	go func() {
+		noted <- workshop.RecordOutsourced(ctx, pool, advisor(), out,
+			workshop.OutsourcedEventInput{Kind: "invoice", AmountMinor: pointerTo(int64(420_000)), InvoiceRef: "TV-1b"})
+	}()
+	waiting(2)
+	if err := hold.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-reversed; err != nil {
+		t.Errorf("the reversal by hand: %v", err)
+	}
+	if err := <-noted; err != nil {
+		t.Errorf("the corrected invoice: %v", err)
+	}
+	var reversals int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM stock_cost_entries WHERE reverses_id = $1`, entry).Scan(&reversals); err != nil || reversals != 1 {
+		t.Errorf("reversed %d times (%v)", reversals, err)
+	}
+}
+
+// A cost dated a day still to come is for that day: entered this morning
+// for tomorrow, it is after a sale made this afternoon, as its date says,
+// not before it because it was typed in first.
+func TestACostDatedTomorrowIsAfterASaleMadeToday(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	tomorrow := cost(workshop.CostTransport, 40_000)
+	tomorrow.IncurredOn = time.Now().AddDate(0, 0, 1)
+	if _, err := workshop.RecordStockCost(ctx, pool, buyerScope(), p.StockUnitID, tomorrow); err != nil {
+		t.Fatal(err)
+	}
+	moveStock(t, pool, p.StockUnitID, workshop.StockForSale, workshop.StockReserved, workshop.StockSold)
+	costs, err := workshop.CostsOfUnit(ctx, pool, buyerScope(), p.StockUnitID)
+	if err != nil || costs.AfterSale != 40_000 || costs.BeforeSale != 0 {
+		t.Errorf("before the sale %d, after it %d (%v); want tomorrow's cost after today's sale", costs.BeforeSale, costs.AfterSale, err)
+	}
+}
+
+// jobTakenBackToWork is a job on the car in stock now (vehicleA) that
+// posted its cost when ready and then went back to work, which takes the
+// posting back.
+func jobTakenBackToWork(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	ctx := context.Background()
+	job := newJob(t, pool)
+	if err := workshop.AddLine(ctx, pool, advisor(), job, workshop.NewLine{Kind: "labour", Description: "Polering",
+		QuantityMilli: 1000, UnitPriceMinor: 95_000, VATRateBasis: 2500}); err != nil {
+		t.Fatal(err)
+	}
+	move(t, pool, job, workshop.StateEstimated, workshop.StateAwaitingApproval, workshop.StateApproved, workshop.StateInProgress)
+	if err := workshop.MarkPerformed(ctx, pool, advisor(), job, 1, true); err != nil {
+		t.Fatal(err)
+	}
+	move(t, pool, job, workshop.StateReady)
+	if _, err := workshop.PostJobCost(ctx, pool, buyerScope(), job); err != nil {
+		t.Fatal(err)
+	}
+	move(t, pool, job, workshop.StateInProgress)
+}
+
+// A sale is a row: sold, fallen through and sold again is two sales, the
+// first kept with the moment it fell through. Which side of a sale a cost
+// is on is read from the sale that stands, and nothing about an earlier
+// sale is written over.
+func TestASaleThatFellThroughIsKept(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	moveStock(t, pool, p.StockUnitID, workshop.StockForSale, workshop.StockSold)
+	between, err := workshop.RecordStockCost(ctx, pool, buyerScope(), p.StockUnitID, cost(workshop.CostTransport, 10_000))
+	if err != nil || !between.PostSale {
+		t.Fatalf("a cost after the first sale: %+v, %v", between, err)
+	}
+	moveStock(t, pool, p.StockUnitID, workshop.StockForSale, workshop.StockSold)
+	costs, err := workshop.CostsOfUnit(ctx, pool, buyerScope(), p.StockUnitID)
+	if err != nil || costs.BeforeSale != 10_000 || costs.AfterSale != 0 {
+		t.Errorf("after the second sale: before %d, after %d (%v); want the cost between the two sales before the one that stands",
+			costs.BeforeSale, costs.AfterSale, err)
+	}
+	moveStock(t, pool, p.StockUnitID, workshop.StockDelivered)
+	var sales, fell, standing int
+	if err := pool.QueryRow(ctx, `SELECT count(*), count(fell_through_at), count(*) FILTER (WHERE fell_through_at IS NULL)
+		FROM stock_unit_sales WHERE stock_unit_id = $1`, p.StockUnitID).Scan(&sales, &fell, &standing); err != nil {
+		t.Fatal(err)
+	}
+	if sales != 2 || fell != 1 || standing != 1 {
+		t.Errorf("%d sales, %d fell through, %d standing; want 2, 1 and 1", sales, fell, standing)
+	}
+	for _, stmt := range []string{`UPDATE stock_unit_sales SET sold_at = now()`, `DELETE FROM stock_unit_sales`,
+		`UPDATE stock_unit_sales SET fell_through_at = now() WHERE fell_through_at IS NOT NULL`} {
+		if err := asApp(ctx, pool, stmt); err == nil {
+			t.Errorf("%q as the application was let through", stmt)
+		}
+	}
+}
+
+// readyPostedStockJob is a job on the car in stock with one hour of
+// labour, ready, its cost posted at 400 kr the hour.
+func readyPostedStockJob(t *testing.T, pool *pgxpool.Pool) (job, unit string) {
+	t.Helper()
+	ctx := context.Background()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	if err := workshop.SetInternalLabourRate(ctx, pool, everything(owner()), 40_000); err != nil {
+		t.Fatal(err)
+	}
+	job = newJob(t, pool)
+	if err := workshop.AddLine(ctx, pool, advisor(), job, workshop.NewLine{Kind: "labour", Description: "Rekond",
+		QuantityMilli: 1000, UnitPriceMinor: 95_000, VATRateBasis: 2500}); err != nil {
+		t.Fatal(err)
+	}
+	move(t, pool, job, workshop.StateEstimated, workshop.StateAwaitingApproval, workshop.StateApproved, workshop.StateInProgress)
+	if err := workshop.MarkPerformed(ctx, pool, advisor(), job, 1, true); err != nil {
+		t.Fatal(err)
+	}
+	move(t, pool, job, workshop.StateReady)
+	if posted, err := workshop.PostJobCost(ctx, pool, buyerScope(), job); err != nil || posted.NetMinor != 40_000 {
+		t.Fatalf("the posting: %+v, %v", posted, err)
+	}
+	return job, p.StockUnitID
+}
+
+// standingJobCost is what the job's standing posting says, or -1 for none.
+func standingJobCost(t *testing.T, pool *pgxpool.Pool, unit string) int64 {
+	t.Helper()
+	costs, err := workshop.CostsOfUnit(context.Background(), pool, buyerScope(), unit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range costs.Entries {
+		if c.Source == workshop.CostFromWorkOrder && c.ReversesID == "" && !c.Reversed {
+			return c.NetMinor
+		}
+	}
+	return -1
+}
+
+// A posted job's cost is what the job cost: whatever changes its parts or
+// its hours afterwards, or sends it back to work by any path, takes the
+// posting back with an event, and it is posted again from what the job
+// now holds.
+func TestAPostedJobCostIsTakenBackWhenTheJobChanges(t *testing.T) {
+	ctx := context.Background()
+	for name, change := range map[string]func(t *testing.T, pool *pgxpool.Pool, job string){
+		"a task added": func(t *testing.T, pool *pgxpool.Pool, job string) {
+			task, err := workshop.AddTask(ctx, pool, advisor(), job, "Polera igen", 0, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := standingJobCost(t, pool, unitOf(t, pool, job)); got != -1 {
+				t.Errorf("the posting stands at %d with the job back at work", got)
+			}
+			if err := workshop.MoveTask(ctx, pool, technician(), task, workshop.TaskMove{To: workshop.TaskDone}); err != nil {
+				t.Fatal(err)
+			}
+			move(t, pool, job, workshop.StateReady)
+		},
+		"a part taken out": func(t *testing.T, pool *pgxpool.Pool, job string) {
+			stockShelf(t, pool, 4)
+			if err := workshop.TakeOut(ctx, pool, technician(), job, stockedPart, 1); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"the hours edited": func(t *testing.T, pool *pgxpool.Pool, job string) {
+			l := lineOf(t, pool, job, 1)
+			e := asEdit(l)
+			e.QuantityMilli, e.Reason = 2000, "Tog längre tid"
+			if _, err := workshop.EditLine(ctx, pool, advisor(), job, 1, l.Revision, e); err != nil {
+				t.Fatal(err)
+			}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			pool := setup(t)
+			addTechnician(t, pool)
+			job, unit := readyPostedStockJob(t, pool)
+			change(t, pool, job)
+			if got := standingJobCost(t, pool, unit); got != -1 {
+				t.Errorf("the posting still stands at %d after %s", got, name)
+			}
+			var events int
+			if err := pool.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE event = 'stock_cost.reversed' AND subject_id = $1`,
+				unit).Scan(&events); err != nil || events != 1 {
+				t.Errorf("%d events for the posting taken back (%v)", events, err)
+			}
+			again, err := workshop.PostJobCost(ctx, pool, buyerScope(), job)
+			if err != nil || again.NetMinor == 0 {
+				t.Errorf("posted again: %+v, %v", again, err)
+			}
+		})
+	}
+}
+
+// unitOf is the stock unit a job's car is in.
+func unitOf(t *testing.T, pool *pgxpool.Pool, job string) string {
+	t.Helper()
+	var unit string
+	if err := pool.QueryRow(context.Background(), `SELECT u.id FROM work_orders w JOIN stock_units u ON u.vehicle_id = w.vehicle_id
+		AND u.closed_at IS NULL WHERE w.id = $1`, job).Scan(&unit); err != nil {
+		t.Fatal(err)
+	}
+	return unit
 }
