@@ -47,7 +47,8 @@
          your own clock, and the shop's labour guide. Both say which now. */}}
     {{if and .Session.Scope.Role.WorksInTheWorkshop (.Runs "workshop")}}<a href="/time" class="nav">{{.T "My hours"}}</a>
     {{end}}<a href="/rota" class="nav">{{.T "Rota"}}</a>
-    {{if and .Session.Scope.Role.SeesCustomerPersonalData (.Runs "workshop")}}<a href="/labour" class="nav">{{.T "Labour times"}}</a>{{end}}{{if and .Session.Scope.Role.SeesPurchasePrice (.Runs "dealer")}}
+    {{if and .Session.Scope.Role.SeesCustomerPersonalData (.Runs "workshop")}}<a href="/labour" class="nav">{{.T "Labour times"}}</a>{{end}}{{if and (or .Session.Scope.Role.BuysVehicles .Session.Scope.Role.SellsVehicles) (.Runs "dealer")}}
+    <a href="/cars/stock" class="nav">{{.T "Cars in stock"}}</a>{{end}}{{if and .Session.Scope.Role.SeesPurchasePrice (.Runs "dealer")}}
     <a href="/cars/calculations/new" class="nav">{{.T "Before the bid"}}</a>{{end}}{{if and .Session.Scope.Role.SellsVehicles (.Runs "dealer")}}
     <a href="/cars/leads" class="nav">{{.T "Leads"}}</a>
     <a href="/cars/deals" class="nav">{{.T "Deals"}}</a>{{end}}

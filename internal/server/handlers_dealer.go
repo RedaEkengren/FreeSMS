@@ -15,6 +15,7 @@ import (
 // dealerData is what a car-sales page shows beyond the common page: one
 // field on pageData, so the pages of each module keep to their own.
 type dealerData struct {
+	Stock       workshop.StockList
 	Calculation workshop.Calculation
 	Result      workshop.CalculationResult
 	Vehicle     workshop.Vehicle
@@ -252,4 +253,15 @@ func (s *Server) handleAcceptCalculation(w http.ResponseWriter, r *http.Request)
 	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/cars/calculations/"+id, http.StatusSeeOther)
+}
+
+// handleCarStock is the stock list (#168): every car in stock, longest there
+// first, and for whoever may see it what each has cost.
+func (s *Server) handleCarStock(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	list, err := workshop.Stock(r.Context(), s.pool, session.Scope)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "carstock", pageData{Title: "Cars in stock", Session: session, Dealer: &dealerData{Stock: list}})
 }

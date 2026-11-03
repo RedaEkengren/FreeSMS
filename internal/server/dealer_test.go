@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -245,5 +246,35 @@ func TestAnEditWithAMistakeStaysAnEditOfTheCalculation(t *testing.T) {
 	if !strings.Contains(body, `name="calculation" value="`+c.CalculationID+`"`) || strings.Contains(body, `name="registration"`) ||
 		!strings.Contains(body, `value="abc"`) {
 		t.Errorf("the edit came back as a new calculation, or lost what was typed:\n%s", visibleText(body))
+	}
+}
+
+// The stock list (#168) shows the car to whoever buys or sells cars, and
+// what it was bought for only to whoever may see it: the salesperson's
+// response holds no purchase price, not just a page that hides one.
+func TestTheStockListShowsThePurchasePriceOnlyToTheBuyer(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	seller, err := workshop.CreateParty(ctx, pool, owner, workshop.NewParty{Kind: "private", Name: "Sam Säljare", Role: workshop.PartySeller})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordPurchase(ctx, pool, owner, workshop.NewPurchase{VehicleID: vehicleA, Reason: workshop.StockFromPurchase,
+		SellerPartyID: seller, PurchasedOn: time.Now(), PriceMinor: 8_543_210, SellerType: workshop.SellerPrivate}); err != nil {
+		t.Fatal(err)
+	}
+	price := "85,432.10"
+	buyer := strings.ReplaceAll(visibleText(get(t, signIn(t, ts, buyerEmail), ts.URL+"/cars/stock", http.StatusOK)), " ", " ")
+	if !strings.Contains(buyer, "0 days in stock") || !strings.Contains(buyer, price) || !strings.Contains(buyer, "Stock value") {
+		t.Errorf("the buyer's stock list:\n%s", buyer)
+	}
+	sales := get(t, signIn(t, ts, salesEmail), ts.URL+"/cars/stock", http.StatusOK)
+	if !strings.Contains(sales, "0 days in stock") || strings.Contains(sales, "85,432") || strings.Contains(sales, "Bought for") ||
+		strings.Contains(sales, "Stock value") {
+		t.Errorf("the salesperson's stock list:\n%s", visibleText(sales))
+	}
+	if status, _ := getBody(t, signIn(t, ts, techEmail), ts.URL+"/cars/stock"); status != http.StatusForbidden {
+		t.Errorf("a technician's stock list answered %d, want 403", status)
 	}
 }
