@@ -641,3 +641,57 @@ func firstDifference(want, got string) string {
 	}
 	return "(lengths differ)"
 }
+
+// A workshop that later switches on car sales and Rental reads the
+// documents it issued exactly as before (#142): the invoice and the credit
+// note as the customer reads them, their electronic invoices and the
+// accounting export. The menu around a page changes with the modules, so
+// the pages are compared within <main>.
+func TestWorkshopDocumentsAreUnchangedWhenMoreModulesAreSwitchedOn(t *testing.T) {
+	pool := testsupport.FreshPool(t)
+	ctx := context.Background()
+	if err := database.Migrate(ctx, pool, migrations.FS); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	seed, err := os.ReadFile("../../scripts/seed.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, string(seed)); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	world := goldenScenario(t, pool)
+	// Switched on as the owner does it, which records the workshop as it
+	// was first.
+	ownerScope := access.Scope{ShopID: seedShopID, UserID: seedOwner, Role: access.Of(access.RoleOwner), Modules: []access.Module{access.Workshop}}
+	for _, m := range []access.Module{access.Dealer, access.Rental} {
+		if _, err := workshop.SwitchModule(ctx, pool, ownerScope, m, true, "Selling and renting too", false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	main := func(s string) string {
+		if i, j := strings.Index(s, "<main"), strings.Index(s, "</main>"); i >= 0 && j > i {
+			return s[i:j]
+		}
+		return s
+	}
+	ts := goldenServer(t, pool)
+	client := goldenSignIn(t, ts, "anna@example.test")
+	compared := 0
+	for _, p := range world.pages() {
+		if p.as != "anna@example.test" || !strings.HasPrefix(p.path, "/invoices/") && p.path != "/accounting/export" {
+			continue
+		}
+		want, err := os.ReadFile(filepath.Join(goldenDir, p.file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := normaliseGolden(fetchGolden(t, ts, client, p)); main(got) != main(string(want)) {
+			t.Errorf("%s is not what it was with the workshop alone", p.file)
+		}
+		compared++
+	}
+	if compared != 5 {
+		t.Errorf("compared %d documents, want the invoice, the credit note, both e-invoices and the export", compared)
+	}
+}
