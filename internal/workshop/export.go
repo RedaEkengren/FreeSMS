@@ -80,7 +80,7 @@ var ExportTables = []string{
 	"rate_plans", "rate_plan_seasons", "rental_extras", "rental_bookings", "rental_booking_events", "rental_booking_lines",
 	"rental_drivers", "rental_licence_checks",
 	// Each end of a rental, and what a return found (#194).
-	"rental_handovers", "damage_cases",
+	"rental_handovers", "damage_cases", "damage_case_steps",
 	// A fleet vehicle's paperwork, and handover gaps let go (#202).
 	"fleet_rental_reports", "fleet_insurances", "rental_gap_overrides",
 	// How long the rental register is kept (#200).

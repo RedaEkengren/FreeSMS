@@ -92,6 +92,7 @@ var actionProviders = []ActionProvider{
 	{Module: access.Rental, Name: "rental", Items: rentalWaiting},
 	// The fleet's paperwork (#202), a provider of its own: today's page
 	// is the day's handovers, and this failing does not take them with it.
+	{Module: access.Rental, Name: "damage", Items: damageWaiting},
 	{Module: access.Rental, Name: "rental paperwork", Items: rentalPaperworkWaiting},
 }
 
@@ -158,6 +159,7 @@ var waitingSays = map[string]string{
 	"rental_insurance_ended": "Its insurance for rental use has ended: %s",
 	"rental_permit_ends":     "The rental permit ends soon",
 	"rental_gaps":            "Something is missing before this handover: %s",
+	"damage_to_assess":       "Damage found two days ago and not assessed: %s",
 }
 
 // Says is the item's catalogue key.

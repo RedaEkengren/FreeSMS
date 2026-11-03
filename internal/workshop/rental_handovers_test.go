@@ -19,6 +19,13 @@ import (
 // missing for the handover. 100 km a day are included, at 3 kr net over.
 func handoverReady(t *testing.T, pool *pgxpool.Pool) (rentable, string) {
 	t.Helper()
+	return handoverReadyWith(t, pool, "ABC 12D", "V1")
+}
+
+// handoverReadyWith is handoverReady with a registration and fleet number
+// of its own, for a test that has another unit already.
+func handoverReadyWith(t *testing.T, pool *pgxpool.Pool, registration, fleet string) (rentable, string) {
+	t.Helper()
 	ctx := context.Background()
 	tpl, err := workshop.SaveChecklistTemplate(ctx, pool, owner(), "", "Utlämning och återlämning",
 		[]string{"Lack och plåt", "Vänster dörr", "Fälgar"})
@@ -39,7 +46,7 @@ func handoverReady(t *testing.T, pool *pgxpool.Pool) (rentable, string) {
 		Reference: "TSV 2024-1234", DecidedOn: day("2024-01-15"), Responsible: "Anna Andersson"}); err != nil {
 		t.Fatal(err)
 	}
-	unit := addUnit(t, pool, workshop.NewRentalUnit{Registration: "ABC 12D", FleetNumber: "V1", Category: "Bil"})
+	unit := addUnit(t, pool, workshop.NewRentalUnit{Registration: registration, FleetNumber: fleet, Category: "Bil"})
 	membership, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), unit, time.Now().AddDate(-1, 0, 0), "bought", "")
 	if err != nil {
 		t.Fatal(err)
