@@ -303,6 +303,8 @@ func verifyShop(ctx context.Context, tx pgx.Tx, files Files, sr *ShopReport) err
 		  WHEN 'stock_unit'     THEN EXISTS (SELECT 1 FROM stock_units x WHERE x.id = e.subject_id)
 		  WHEN 'purchase'       THEN EXISTS (SELECT 1 FROM vehicle_purchases x WHERE x.id = e.subject_id)
 		  WHEN 'rental_booking' THEN EXISTS (SELECT 1 FROM rental_bookings x WHERE x.id = e.subject_id)
+		  WHEN 'test_drive'     THEN EXISTS (SELECT 1 FROM test_drives x WHERE x.id = e.subject_id)
+		  WHEN 'vehicle_sale'   THEN EXISTS (SELECT 1 FROM vehicle_sales x WHERE x.id = e.subject_id)
 		  ELSE false END`); err != nil {
 		return err
 	} else if n > 0 {

@@ -294,6 +294,10 @@ func TestEveryAuditSubjectKindIsOneVerifyCanFind(t *testing.T) {
 		             VALUES ('` + id + `05', '` + shopID + `', gen_random_uuid(), gen_random_uuid(), current_date, 0) RETURNING id`,
 		"rental_booking": `INSERT INTO rental_bookings (id, shop_id, block_id, number, unit_id, renter_party_id, starts_at, ends_at, profile_version_id)
 		             VALUES ('` + id + `06', '` + shopID + `', gen_random_uuid(), 1, gen_random_uuid(), gen_random_uuid(), now(), now() + interval '1 day', gen_random_uuid()) RETURNING id`,
+		"test_drive": `INSERT INTO test_drives (id, shop_id, stock_unit_id, driver_party_id, block_id, starts_at, ends_at)
+		             VALUES ('` + id + `07', '` + shopID + `', gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), now(), now() + interval '1 hour') RETURNING id`,
+		"vehicle_sale": `INSERT INTO vehicle_sales (id, shop_id, stock_unit_id, salesperson_id)
+		             VALUES ('` + id + `08', '` + shopID + `', gen_random_uuid(), '` + userID + `') RETURNING id`,
 	}
 	conn, err := pool.Acquire(ctx)
 	if err != nil {
