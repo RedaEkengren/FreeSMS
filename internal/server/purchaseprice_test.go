@@ -1,13 +1,16 @@
 package server
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/auth"
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 const (
@@ -16,9 +19,8 @@ const (
 )
 
 // What the business paid is never put in front of a salesperson (#145): not
-// on a page, a fragment, an export or a search, asked for directly. Today
-// the purchase prices FreeSMS holds are the workshop's parts costs; a
-// dealer's stock prices will be read the same way, under SeesPurchasePrice.
+// on a page, a fragment, an export or a search, asked for directly: a
+// workshop part's cost, and a stock car's purchase price and costs.
 // The owner is asked first, as the control: the figure is there to leak.
 func TestASalespersonIsHandedNoPurchasePriceByAnyRoute(t *testing.T) {
 	ts, pool := testServer(t)
@@ -40,7 +42,25 @@ func TestASalespersonIsHandedNoPurchasePriceByAnyRoute(t *testing.T) {
 		`INSERT INTO parts (id, shop_id, number, name, cost_minor, price_minor) VALUES
 		 ('` + partA + `','` + shopA + `','COST-1','Costly part', 471123, 900000)`,
 	})
-	cost := []string{"4 711,23", "4 711,23", "4 711,23", "4711,23", "4711.23", "471123"}
+	// And a car bought for 98 765,43 with a cost of 3 456,78 on it (#145,
+	// #168): the stock list and the car's page show both to the buyer.
+	ctx := context.Background()
+	carOwner := access.Scope{ShopID: shopA, UserID: "aaaaaaaa-0000-0000-0000-000000000011", Role: access.Of(access.RoleOwner), Modules: access.Modules}
+	if _, err := pool.Exec(ctx, `UPDATE vehicles SET vin = 'YV1SW61R021234567' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000005'`); err != nil {
+		t.Fatal(err)
+	}
+	bought, err := workshop.RecordPurchase(ctx, pool, carOwner, workshop.NewPurchase{VehicleID: "aaaaaaaa-0000-0000-0000-000000000005",
+		Reason: workshop.StockFromPurchase, NewSeller: &workshop.NewParty{Kind: "private", Name: "Sam Säljare"}, PurchasedOn: time.Now(),
+		PriceMinor: 9_876_543, SellerType: workshop.SellerPrivate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordStockCost(ctx, pool, carOwner, bought.StockUnitID, workshop.NewStockCost{Kind: workshop.CostTransport,
+		NetMinor: 345_678, VATRateBasis: 2500, IncurredOn: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	cost := []string{"4 711,23", "4 711,23", "4 711,23", "4711,23", "4711.23", "471123",
+		"98 765,43", "98 765,43", "98 765,43", "98765,43", "98,765.43", "98765.43", "9876543", "3 456,78", "3 456,78", "3 456,78", "3456,78", "3,456.78", "3456.78", "345678"}
 	leaks := func(body string) bool {
 		for _, c := range cost {
 			if strings.Contains(body, c) {
@@ -61,8 +81,11 @@ func TestASalespersonIsHandedNoPurchasePriceByAnyRoute(t *testing.T) {
 		return resp.StatusCode, string(b)
 	}
 
-	if _, body := get(signIn(t, ts, ownerEmail), "/stock/parts/"+partA); !leaks(body) {
-		t.Fatal("the owner's page for the part does not show its cost; the sweep below would prove nothing")
+	owner := signIn(t, ts, ownerEmail)
+	for _, page := range []string{"/stock/parts/" + partA, "/cars/stock", "/cars/stock/" + bought.StockUnitID} {
+		if _, body := get(owner, page); !leaks(body) {
+			t.Fatalf("the owner's %s does not show what was paid; the sweep below would prove nothing", page)
+		}
 	}
 
 	sales := signIn(t, ts, salesEmail)
@@ -79,6 +102,7 @@ func TestASalespersonIsHandedNoPurchasePriceByAnyRoute(t *testing.T) {
 			"/jobs/{id}":        "/jobs/aaaaaaaa-0000-0000-0000-00000000000f",
 			"/customers/{id}":   "/customers/aaaaaaaa-0000-0000-0000-000000000004",
 			"/vehicles/{id}":    "/vehicles/aaaaaaaa-0000-0000-0000-000000000005",
+			"/cars/stock/{id}":  "/cars/stock/" + bought.StockUnitID,
 		} {
 			path = strings.ReplaceAll(path, from, to)
 		}
@@ -88,7 +112,7 @@ func TestASalespersonIsHandedNoPurchasePriceByAnyRoute(t *testing.T) {
 		}
 		for _, q := range []string{"", "?q=COST-1", "?code=COST-1"} {
 			if _, body := get(sales, path+q); leaks(body) {
-				t.Errorf("GET %s%s handed a salesperson the part's cost", path, q)
+				t.Errorf("GET %s%s handed a salesperson what was paid", path, q)
 			}
 		}
 		swept++
