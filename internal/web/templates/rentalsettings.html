@@ -21,6 +21,26 @@
 </details>
 {{end}}
 
+<h2 id="charges">{{.T "How return charges are taxed"}}</h2>
+<p class="waiting">{{.T "Whether a charge is taxed or outside the scope of VAT is for your adviser to say. Until you mark a kind confirmed, its charges say so. A charge keeps the treatment it was confirmed with."}}</p>
+<ul class="lines">
+  {{range .Rental.ChargeClasses}}<li><div class="row"><span>{{$.T ($.Rental.ChargeName .Kind)}}</span>
+    <span>{{if eq .VATCategory "O"}}{{$.T "outside the scope of VAT"}}{{else}}{{$.T "VAT %d%%" ($.Rental.Percent .VATRateBp)}}{{end}}{{if not .Confirmed}} <span class="tag late">{{$.T "not confirmed"}}</span>{{end}}</span></div>
+  {{if $runs}}
+  <details><summary>{{$.T "Change"}}</summary>
+  <form method="post" action="/rental/charge-classes">
+    <input type="hidden" name="kind" value="{{.Kind}}">
+    <div class="pair">
+      <label><span>{{$.T "Category"}}</span><select name="category"><option value="S"{{if eq .VATCategory "S"}} selected{{end}}>{{$.T "taxed"}}</option><option value="O"{{if eq .VATCategory "O"}} selected{{end}}>{{$.T "outside the scope of VAT"}}</option></select></label>
+      <label><span>{{$.T "VAT rate, per cent"}}</span><input name="rate" inputmode="decimal" value="{{$.Rental.Percent .VATRateBp}}"></label>
+    </div>
+    <label class="check"><input type="checkbox" name="confirmed" value="1"{{if .Confirmed}} checked{{end}}> {{$.T "Confirmed by our adviser"}}</label>
+    <button type="submit" class="secondary">{{$.T "Save"}}</button>
+  </form>
+  </details>
+  {{end}}</li>{{end}}
+</ul>
+
 <h2>{{.T "Rental permit"}}</h2>
 <p class="waiting">{{.T "The rental permit (biluthyrningstillstånd) is your business's, granted by Transportstyrelsen. FreeSMS records it and refuses to hand over a unit whose profile needs one when none stands for the whole rental."}}</p>
 {{if .Rental.Permits}}

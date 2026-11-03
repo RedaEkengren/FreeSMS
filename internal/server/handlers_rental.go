@@ -58,6 +58,9 @@ type rentalData struct {
 	DamageCase workshop.DamageCaseDetail
 	// A booking's deposit (#196).
 	Deposit workshop.RentalDeposit
+	// A booking's return charges, and how each kind is taxed (#195).
+	Charges       []workshop.RentalCharge
+	ChargeClasses []workshop.ChargeClass
 	// A booking form's own key: sent twice, one booking.
 	Key string
 	Now time.Time
@@ -218,6 +221,7 @@ func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("POST /rental/profiles/{id}", s.requireSession(s.handleRentalProfileSave))
 	m.HandleFunc("POST /rental/register/retention", s.requireSession(s.handleRegisterRetention))
 	s.rentalHandoverRoutes(m)
+	s.chargeRoutes(m)
 }
 
 // handleRentalSettings shows the permit and the rule profiles: the rental
@@ -238,6 +242,9 @@ func (s *Server) handleRentalSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if d.Retention, err = workshop.RentalRegisterRetention(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
+	}
+	if d.ChargeClasses, err = workshop.ChargeClasses(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
 		return
 	}
 	s.render(w, r, http.StatusOK, "rentalsettings", pageData{Title: "Rental settings", Session: session, Rental: d,
@@ -644,6 +651,9 @@ func (s *Server) handleRentalBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if d.Deposit, err = workshop.RentalDepositOf(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
+		return
+	}
+	if d.Charges, err = workshop.RentalCharges(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
 		return
 	}
 	d.Key = newFormKey()

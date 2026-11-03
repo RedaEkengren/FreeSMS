@@ -265,7 +265,9 @@ var swept = map[string]string{
 	"POST /cars/stock/{id}/reservations/{res}/terms": "sweep",
 	"GET /rental/damage/{id}":                        "sweep", "POST /rental/damage/{id}/steps": "sweep",
 	"POST /rental/bookings/{id}/deposit/{what}": "sweep",
-	"POST /cars/trade-ins/{sale}/receive":       "sweep", "POST /cars/trade-ins/{sale}/credit": "sweep",
+	"POST /rental/charge-classes":               "sweep", "POST /rental/bookings/{id}/charges": "sweep",
+	"POST /rental/bookings/{id}/charges/{charge}/{what}": "sweep",
+	"POST /cars/trade-ins/{sale}/receive":                "sweep", "POST /cars/trade-ins/{sale}/credit": "sweep",
 	"POST /cars/stock/{id}/consignment/{agreement}/end": "sweep",
 	"POST /cars/stock/{id}/card/{what}":                 "sweep",
 	"POST /cars/stock/{id}/listing":                     "sweep", "POST /cars/stock/{id}/photos": "sweep", "GET /cars/stock/{id}/photos/{photo}": "sweep",
@@ -340,6 +342,7 @@ func fill(pattern string) (method, path string) {
 		"{filing}":                "bbbbbbbb-0000-0000-0000-0000000000d5",
 		"{photo}":                 "bbbbbbbb-0000-0000-0000-0000000000d6",
 		"{what}":                  "damage",
+		"{charge}":                "bbbbbbbb-0000-0000-0000-0000000000eb",
 		"/cars/trade-ins/{sale}":  "/cars/trade-ins/bbbbbbbb-0000-0000-0000-0000000000cd",
 		// Rental: ids that are nobody's.
 		"/rental/permits/{id}":     "/rental/permits/bbbbbbbb-0000-0000-0000-0000000000e1",

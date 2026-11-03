@@ -57,7 +57,20 @@
 <h3>{{$.T "The return suggests"}}</h3>
 <p class="waiting">{{$.T "Nothing here is charged until a person confirms it."}}</p>
 <ul class="lines">
-  {{range .Proposed}}<li><div class="row"><span>{{$.T ($.Rental.ChargeLabel .Kind) ($.Num .Quantity)}}</span>{{if .UnitPriceMinor}}<span>{{$.T "%s each, net" ($.Money .Price)}}</span>{{end}}</div></li>{{end}}
+  {{range .Proposed}}<li><div class="row"><span>{{$.T ($.Rental.ChargeLabel .Kind) ($.Num .Quantity)}}</span>{{if .UnitPriceMinor}}<span>{{$.T "%s each, net" ($.Money .Price)}}</span>{{end}}</div>
+  {{if eq $.Rental.Booking.State "returned"}}
+  <details><summary>{{$.T "Confirm it as a charge"}}</summary>
+  <form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/charges">
+    <input type="hidden" name="kind" value="{{.Kind}}"><input type="hidden" name="proposed" value="1"><input type="hidden" name="key" value="{{$.Rental.Key}}-{{.Kind}}">
+    <label><span>{{$.T "What it says"}}</span><input name="description" maxlength="200" value="{{$.T ($.Rental.ChargeName .Kind)}}" required></label>
+    <div class="pair">
+      <label><span>{{$.T "Quantity"}}</span><input name="quantity" inputmode="decimal" value="{{.Quantity}}" required></label>
+      <label><span>{{$.T "Price of one, net, in kronor"}}</span><input name="price" inputmode="decimal" value="{{if .UnitPriceMinor}}{{$.Rental.Kronor .Price}}{{end}}" required></label>
+    </div>
+    <button type="submit">{{$.T "Confirm the charge"}}</button>
+  </form>
+  </details>
+  {{end}}</li>{{end}}
 </ul>
 {{end}}
 {{if .Damage}}
@@ -72,6 +85,54 @@
 {{else if eq $.Rental.Booking.State "checked_out"}}
 <form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/check-in"><button type="submit">{{$.T "Check it in"}}</button></form>
 {{end}}
+{{end}}
+{{end}}
+
+<h2 id="charges">{{$.T "Charges"}}</h2>
+<p class="waiting">{{$.T "A charge is owed once a person confirms it, and invoiced once the customer has been told of it."}}</p>
+{{with $.Rental.Charges}}
+<ul class="lines">
+  {{range .}}<li>
+    <div class="row"><span>{{if not .Stands}}<s>{{end}}{{.Description}} &middot; {{$.Num ($.Rental.Count .QuantityMilli)}}{{if not .Stands}}</s>{{end}}</span><span>{{$.Money .Gross}}</span></div>
+    <div class="waiting">{{$.T ($.Rental.ChargeName .Kind)}} &middot; {{if eq .VATCategory "O"}}{{$.T "outside the scope of VAT"}}{{else}}{{$.T "VAT %d%%" ($.Rental.Percent .VATRateBp)}}{{end}}
+      {{if not .ClassConfirmed}} &middot; <span class="tag late">{{$.T "VAT treatment not confirmed"}}</span>{{end}}
+      {{if .InformedAt}} &middot; {{$.T "customer told %s" ($.Date ($.Local .InformedAt) "2 Jan 2006")}}{{end}}
+      {{with .Withdrawn}} &middot; {{$.T "withdrawn: %s" .}}{{end}}</div>
+    {{if .Stands}}
+    {{if not .InformedAt}}
+    <form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/charges/{{.ID}}/inform">
+      <label><span>{{$.T "Told how"}}</span><select name="channel">{{range $.Rental.ChargeChannels}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+      <button type="submit" class="secondary">{{$.T "The customer has been told"}}</button>
+    </form>
+    {{end}}
+    <details><summary>{{$.T "Withdraw it"}}</summary>
+    <form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/charges/{{.ID}}/withdraw">
+      <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="300" required></label>
+      <button type="submit" class="secondary">{{$.T "Withdraw the charge"}}</button>
+    </form>
+    </details>
+    {{end}}
+  </li>{{end}}
+</ul>
+{{end}}
+{{if or (eq $.Rental.Booking.State "returned") (eq $.Rental.Booking.State "cancelled") (eq $.Rental.Booking.State "no_show")}}
+<details><summary>{{$.T "Add a charge"}}</summary>
+<form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/charges">
+  <input type="hidden" name="key" value="{{$.Rental.Key}}-charge">
+  <label><span>{{$.T "Kind"}}</span><select name="kind">{{range $.Rental.ChargeKinds}}{{if ne . "damage"}}<option value="{{.}}">{{$.T ($.Rental.ChargeName .)}}</option>{{end}}{{end}}</select></label>
+  <label><span>{{$.T "What it says"}}</span><input name="description" maxlength="200" required></label>
+  <div class="pair">
+    <label><span>{{$.T "Quantity"}}</span><input name="quantity" inputmode="decimal" value="1" required></label>
+    <label><span>{{$.T "Price of one, net, in kronor"}}</span><input name="price" inputmode="decimal" required></label>
+  </div>
+  <button type="submit">{{$.T "Confirm the charge"}}</button>
+</form>
+</details>
+{{range $.Rental.Handovers.Damage}}
+<form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/charges">
+  <input type="hidden" name="kind" value="damage"><input type="hidden" name="damage_case" value="{{.ID}}"><input type="hidden" name="key" value="{{$.Rental.Key}}-{{.ID}}">
+  <button type="submit" class="secondary">{{$.T "Charge the damage as settled: %s" .Description}}</button>
+</form>
 {{end}}
 {{end}}
 

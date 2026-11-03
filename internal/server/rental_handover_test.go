@@ -121,6 +121,22 @@ func TestTheRentalDeskChecksAUnitOutAndIn(t *testing.T) {
 			t.Errorf("the booking page after check-in lacks %q", want)
 		}
 	}
+	// Returned, a charge is confirmed on the page and listed, its VAT
+	// treatment marked not confirmed until the shop says (#195).
+	if resp := postModuleForm(t, client, ts.URL, page+"/charges", url.Values{"kind": {"cleaning"}, "description": {"Städning av tältduk"},
+		"quantity": {"1"}, "price": {"400"}, "key": {"k1"}}); resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("confirming a charge: %d %s", resp.StatusCode, readBody(t, resp))
+	}
+	resp, _ = client.Get(ts.URL + page)
+	body = readBody(t, resp)
+	for _, want := range []string{"Städning av tältduk", "/charges/", "/inform"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the booking page with a charge lacks %q", want)
+		}
+	}
+	if !strings.Contains(body, "VAT treatment not confirmed") && !strings.Contains(body, "Momsbehandlingen inte bekräftad") {
+		t.Errorf("the charge's unconfirmed VAT treatment is not said")
+	}
 	tech := signIn(t, ts, techEmail)
 	if resp, _ := tech.Get(ts.URL + page); resp.StatusCode != http.StatusForbidden {
 		t.Errorf("a technician's view of the booking: %d", resp.StatusCode)
