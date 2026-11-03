@@ -290,3 +290,43 @@ func TestAReservationsDepositIsHeldAgainstIt(t *testing.T) {
 		t.Errorf("a deposit taken on an ended reservation: %v", err)
 	}
 }
+
+// Sold to its holder, a reserved car's invoice is issued with the deposit
+// already paid on it: the money moves from the deposit to the invoice, and
+// nothing is held any more (#174).
+func TestTheDepositIsAppliedToTheSaleInvoice(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := eligibleCar(t, pool)
+	kim := driver(t, pool)
+	r, err := workshop.Reserve(ctx, pool, sales(), workshop.NewReservation{StockUnitID: unit, PartyID: kim,
+		ExpiresAt: time.Now().Add(48 * time.Hour), Refundable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	five := int64(500_000)
+	if _, err := workshop.RecordReservationDeposit(ctx, pool, sales(), r.ID, "", workshop.NewPayment{AmountMinor: &five, Method: "swish",
+		PaidOn: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	d, err := dealTo(t, pool, unit, kim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inv, err := workshop.IssueDealInvoice(ctx, pool, sales(), d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var paid int64
+	if err := pool.QueryRow(ctx, `SELECT coalesce(sum(amount_minor), 0) FROM invoice_payments WHERE invoice_id = $1 AND method = 'deposit'`,
+		inv.ID).Scan(&paid); err != nil {
+		t.Fatal(err)
+	}
+	b, err := workshop.ReservationDeposit(ctx, pool, sales(), r.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if paid != five || b.Held() != 0 || b.Applied != five {
+		t.Errorf("the invoice was paid %d from the deposit, which holds %d (%+v)", paid, b.Held(), b)
+	}
+}

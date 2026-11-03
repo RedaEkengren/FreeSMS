@@ -549,3 +549,35 @@ func ReservationDeposit(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 	})
 	return out, err
 }
+
+// applyReservationDepositTx applies, to the invoice for the car's sale,
+// what is held of the deposit of the reservation the sale ended: a payment
+// already received, as much of it as the invoice owes (#174). Nothing when
+// the car was not reserved, or no deposit is held.
+func applyReservationDepositTx(ctx context.Context, tx pgx.Tx, scope access.Scope, unitID, invoiceID string) error {
+	var deposit string
+	err := tx.QueryRow(ctx, `
+		SELECT d.id FROM vehicle_reservations r
+		JOIN deposits d ON d.subject_kind = 'reservation' AND d.subject_id = r.root_id
+		WHERE r.stock_unit_id = $1 AND r.end_kind = 'sold'
+		ORDER BY r.ended_at DESC LIMIT 1`, unitID).Scan(&deposit)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read the reservation's deposit: %w", err)
+	}
+	d, err := depositTx(ctx, tx, deposit, true)
+	if err != nil {
+		return err
+	}
+	b, err := balanceTx(ctx, tx, invoiceID, true)
+	if err != nil {
+		return err
+	}
+	amount := min(d.Held(), b.OutstandingMinor())
+	if amount <= 0 {
+		return nil
+	}
+	return applyDepositTx(ctx, tx, scope, deposit, invoiceID, amount, "")
+}

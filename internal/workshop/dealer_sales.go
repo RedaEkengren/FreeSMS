@@ -1420,8 +1420,10 @@ func IssueDealInvoice(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			lines = append(lines, SourcedLine{Kind: "part", Description: l.Description, QuantityMilli: l.QuantityMilli,
 				UnitPriceMinor: l.UnitPriceMinor, VATRateBasis: l.VATRateBasis})
 		}
-		inv, err = issueSourcedTx(ctx, tx, scope, of, lines)
-		return err
+		if inv, err = issueSourcedTx(ctx, tx, scope, of, lines); err != nil {
+			return err
+		}
+		return applyReservationDepositTx(ctx, tx, scope, d.StockUnitID, inv.ID)
 	})
 	return inv, err
 }
