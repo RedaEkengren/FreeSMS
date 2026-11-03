@@ -128,6 +128,7 @@ var core = map[string]string{
 	"ReservationsOfUnit": "a car's history in stock", "ReservationDeposit": "money held stays readable, as deposits are",
 	"ReservationTermsOf": "a document given to a customer stays readable",
 	"ConsignmentsOfUnit": "a car's history in stock",
+	"DeliveryOfSale":     "the consumer law's clocks run for three years after delivery",
 	"StockChecks":        "a car's history in stock", "ChecksOutstanding": "a car's history in stock",
 	"StockCheckSettings": "a car's history in stock", "PurchaseSplitOf": "a car's history in stock",
 	"CalculationByID": "a car's history in stock", "CalculationsForVehicle": "a car's history in stock",

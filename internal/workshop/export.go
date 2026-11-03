@@ -63,6 +63,8 @@ var ExportTables = []string{
 	"vehicle_sale_trade_ins", "vehicle_sale_trade_in_receipts",
 	// Cars sold on a principal's behalf, every version of the agreement (#166).
 	"consignment_agreements",
+	// Sold cars handed over (#179).
+	"vehicle_sale_deliveries",
 	// Rental
 	"rental_permits", "rental_permit_revocations", "rental_profiles", "rental_units", "fleet_memberships",
 	"rate_plans", "rate_plan_seasons", "rental_extras", "rental_bookings", "rental_booking_events", "rental_booking_lines",

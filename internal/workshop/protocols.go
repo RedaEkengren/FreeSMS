@@ -176,6 +176,19 @@ func StartProtocol(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 				return ErrNotFound
 			}
 		}
+		// A delivery's protocol is of the car the sale sells.
+		if subj.Kind == SubjectDelivery {
+			var ok bool
+			if err := tx.QueryRow(ctx, `
+				SELECT EXISTS (SELECT 1 FROM vehicle_sales s JOIN stock_units u ON u.id = s.stock_unit_id
+				               WHERE s.id = $1 AND vehicle_now(u.vehicle_id) = vehicle_now($2))`,
+				subj.RefID, subj.VehicleID).Scan(&ok); err != nil {
+				return fmt.Errorf("read the sale: %w", err)
+			}
+			if !ok {
+				return ErrNotFound
+			}
+		}
 		if supersedes != "" {
 			var ok bool
 			if err := tx.QueryRow(ctx, `

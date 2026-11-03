@@ -78,6 +78,8 @@ var AuditedTransitions = []AuditTransition{
 	// A reservation ended without a sale, and what was decided about its
 	// deposit (#174).
 	{"reservation.ended", "stock_unit", "audit_events", true},
+	// A sold car handed over before every condition was met (#179).
+	{"vehicle_sale.delivered_early", "vehicle_sale", "audit_events", true},
 	// A test drive let start before its agreement was signed (#173).
 	{"test_drive.started_unsigned", "test_drive", "audit_events", true},
 	// Rental
@@ -212,7 +214,7 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 		if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
 			return nil, access.ErrForbidden
 		}
-	case "test_drive":
+	case "test_drive", "vehicle_sale":
 		if !scope.Role.SellsVehicles() {
 			return nil, access.ErrForbidden
 		}
