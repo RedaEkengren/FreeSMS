@@ -1,0 +1,24 @@
+{{define "content"}}
+{{$c := .Rental.DamageCase}}
+<h1>{{.T "Damage case"}}</h1>
+{{if .Error}}<p class="error" role="alert">{{.Sentence .Error}}</p>{{end}}
+<p>{{$c.Description}}</p>
+<p class="waiting">{{.T "Found %s" (.Date (.Local $c.ObservedAt) "2 Jan 2006")}}{{if $c.BookingID}} &middot; <a href="/rental/bookings/{{$c.BookingID}}">{{.T "The rental"}}</a>{{end}}</p>
+<p class="waiting">{{.T "A damage is not a debt: it is owed only once its amount is settled and the customer has been told."}}</p>
+{{with $c.Steps}}
+<ul class="lines">
+  {{range .}}<li><div class="row"><span>{{$.T .Step}}{{with .Liability}}: {{$.T .}}{{end}}{{with .AmountMinor}}: {{$.MoneyOrBlank .}}{{end}}{{with .Channel}}: {{$.T .}}{{end}}{{with .Response}}: {{$.T .}}{{end}}{{with .Outcome}}: {{$.T .}}{{end}}</span>
+    <span>{{$.Date ($.Local .At) "2 Jan 2006"}}</span></div><div class="waiting">{{.Reason}}{{if .By}} &middot; {{.By}}{{end}}</div></li>{{end}}
+</ul>
+{{end}}
+<form method="post" action="/rental/damage/{{$c.ID}}/steps">
+  <label><span>{{.T "Next step"}}</span><select name="step">{{range .Rental.DamageSteps}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+  <label><span>{{.T "Liable"}}</span><select name="liability"><option value=""></option>{{range .Rental.DamageLiabilities}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+  <label><span>{{.T "Amount, in kronor"}}</span><input name="amount" inputmode="decimal"></label>
+  <label><span>{{.T "Told how"}}</span><select name="channel"><option value=""></option>{{range .Rental.DamageChannels}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+  <label><span>{{.T "Their answer"}}</span><select name="response"><option value=""></option>{{range .Rental.DamageResponses}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+  <label><span>{{.T "Outcome"}}</span><select name="outcome"><option value=""></option>{{range .Rental.DamageOutcomes}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+  <label><span>{{.T "Why"}}</span><input name="reason" maxlength="500" required></label>
+  <button type="submit">{{.T "Record the step"}}</button>
+</form>
+{{end}}

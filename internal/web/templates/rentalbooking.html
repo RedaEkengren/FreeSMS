@@ -63,7 +63,7 @@
 {{if .Damage}}
 <h3>{{$.T "Damage on the unit"}}</h3>
 <ul class="lines">
-  {{range .Damage}}<li><div class="row"><span>{{.Description}}</span><span class="tag">{{$.T "observed"}}</span></div></li>{{end}}
+  {{range .Damage}}<li><div class="row"><a href="/rental/damage/{{.ID}}">{{.Description}}</a><span class="tag">{{$.T "observed"}}</span></div></li>{{end}}
 </ul>
 {{end}}
 {{if not .UnderWay}}
