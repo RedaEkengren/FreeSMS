@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
@@ -21,6 +22,18 @@ type dealerData struct {
 	Vehicle     workshop.Vehicle
 	// What was typed, given back when it was refused.
 	Form map[string]string
+	// The request's own key, so a form sent twice buys the car once.
+	Key string
+}
+
+// PurchaseReasons are the ways a car comes into stock by being bought.
+func (dealerData) PurchaseReasons() []string {
+	return []string{workshop.StockFromPurchase, workshop.StockFromTradeIn, workshop.StockFromRepurchase}
+}
+
+// ReasonLabel is a way into stock in words, a catalogue key.
+func (dealerData) ReasonLabel(reason string) string {
+	return workshop.StockUnit{Reason: reason}.ReasonLabel()
 }
 
 // SellerTypes are the kinds of seller a form offers.
@@ -264,4 +277,78 @@ func (s *Server) handleCarStock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.render(w, r, http.StatusOK, "carstock", pageData{Title: "Cars in stock", Session: session, Dealer: &dealerData{Stock: list}})
+}
+
+// handleBuyCarForm is the form a buyer records a car bought on: the car,
+// who sold it and what kind of seller they are, when, the odometer and
+// what was paid.
+func (s *Server) handleBuyCarForm(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	if !session.Scope.Role.BuysVehicles() {
+		s.renderError(w, r, http.StatusForbidden, "Not for your role", "Buying a car is the buyer's.")
+		return
+	}
+	s.render(w, r, http.StatusOK, "carbuy", pageData{Title: "Record a car bought", Session: session,
+		Dealer: &dealerData{Key: newFormKey(), Form: map[string]string{
+			"registration": r.URL.Query().Get("registration"), "reason": workshop.StockFromPurchase,
+			"seller_kind": "private", "purchased_on": time.Now().In(s.shopLocation(r)).Format(time.DateOnly)}}})
+}
+
+// handleBuyCar records the purchase and opens the car's cycle in stock, the
+// seller made with it when they are new.
+func (s *Server) handleBuyCar(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	form := map[string]string{}
+	for _, k := range []string{"registration", "vin", "make", "model", "reason", "seller_kind", "seller_name", "seller_phone",
+		"seller_email", "seller_org", "seller_type", "purchased_on", "odometer", "price", "note"} {
+		form[k] = strings.TrimSpace(r.FormValue(k))
+	}
+	key := r.FormValue("key")
+	refuse := func(msg string) {
+		s.render(w, r, http.StatusBadRequest, "carbuy", pageData{Title: "Record a car bought", Session: session,
+			Dealer: &dealerData{Form: form, Key: key}, Error: msg})
+	}
+	if !session.Scope.Role.BuysVehicles() {
+		s.renderError(w, r, http.StatusForbidden, "Not for your role", "Buying a car is the buyer's.")
+		return
+	}
+	price, err := parseMinorUnits(form["price"])
+	if err != nil || form["price"] == "" {
+		refuse("Say what was paid, as a number.")
+		return
+	}
+	day, err := time.ParseInLocation(time.DateOnly, form["purchased_on"], s.shopLocation(r))
+	if err != nil {
+		refuse("Say the day it was bought.")
+		return
+	}
+	n := workshop.NewPurchase{Reason: form["reason"], PurchasedOn: day, PriceMinor: price, SellerType: form["seller_type"],
+		Note: form["note"], Key: key,
+		NewSeller: &workshop.NewParty{Kind: form["seller_kind"], Name: form["seller_name"], Phone: form["seller_phone"],
+			Email: form["seller_email"], OrgNumber: form["seller_org"]}}
+	if v := form["odometer"]; v != "" {
+		km, err := strconv.ParseInt(strings.ReplaceAll(strings.ReplaceAll(v, " ", ""), "\u00a0", ""), 10, 64)
+		if err != nil {
+			refuse("The odometer is a whole number of kilometres.")
+			return
+		}
+		n.OdometerKm = &km
+	}
+	n.VehicleID, err = workshop.CarForPurchase(r.Context(), s.pool, session.Scope, workshop.CarToBuy{
+		Registration: form["registration"], VIN: form["vin"], Make: form["make"], Model: form["model"]})
+	if errors.Is(err, workshop.ErrInvalid) {
+		refuse(trimInvalid(err))
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	if _, err := workshop.RecordPurchase(r.Context(), s.pool, session.Scope, n); errors.Is(err, workshop.ErrInvalid) {
+		refuse(trimInvalid(err))
+		return
+	} else if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/cars/stock", http.StatusSeeOther)
 }

@@ -278,3 +278,39 @@ func TestTheStockListShowsThePurchasePriceOnlyToTheBuyer(t *testing.T) {
 		t.Errorf("a technician's stock list answered %d, want 403", status)
 	}
 }
+
+// A buyer records a car bought on the page: the car by its plate, the
+// seller typed with it, what was paid. It is in stock at once. Refused --
+// no seller named -- the form comes back as typed and nobody is kept. A
+// salesperson is not given the form.
+func TestABuyerRecordsACarBoughtOnThePage(t *testing.T) {
+	ts, pool := testServer(t)
+	dealerShop(t, pool)
+	buyer := signIn(t, ts, buyerEmail)
+	form := url.Values{"registration": {"KLM 456"}, "make": {"Volvo"}, "model": {"V70"}, "reason": {workshop.StockFromPurchase},
+		"seller_kind": {"private"}, "seller_name": {""}, "seller_phone": {"070-111 22 33"}, "seller_type": {workshop.SellerPrivate},
+		"purchased_on": {time.Now().Format(time.DateOnly)}, "odometer": {"154 000"}, "price": {"72 500"}, "key": {"buy-page-1"}}
+	refused := post(t, buyer, ts.URL+"/cars/stock", form)
+	if !strings.Contains(refused, "a party needs a name") || !strings.Contains(refused, "070-111 22 33") {
+		t.Errorf("a purchase with no seller named:\n%s", visibleText(refused))
+	}
+	var people int
+	if err := pool.QueryRow(context.Background(), `SELECT count(*) FROM people WHERE phone = '070-111 22 33'`).Scan(&people); err != nil {
+		t.Fatal(err)
+	}
+	if people != 0 {
+		t.Errorf("a refused purchase kept %d people", people)
+	}
+	form.Set("seller_name", "Sam Säljare")
+	if resp := postResponse(t, buyer, ts.URL+"/cars/stock", form); resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/cars/stock" {
+		t.Fatalf("recording the purchase answered %d to %q", resp.StatusCode, resp.Header.Get("Location"))
+	}
+	list := strings.ReplaceAll(visibleText(get(t, buyer, ts.URL+"/cars/stock", http.StatusOK)), " ", " ")
+	if !strings.Contains(list, "KLM 456") || !strings.Contains(list, "Volvo V70") || !strings.Contains(list, "72,500.00") ||
+		!strings.Contains(list, "154000 km") {
+		t.Errorf("the stock list after the purchase:\n%s", list)
+	}
+	if status, _ := getBody(t, signIn(t, ts, salesEmail), ts.URL+"/cars/stock/new"); status != http.StatusForbidden {
+		t.Errorf("a salesperson was given the purchase form: %d", status)
+	}
+}

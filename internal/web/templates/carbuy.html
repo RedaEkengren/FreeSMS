@@ -1,0 +1,41 @@
+{{define "content"}}
+{{$d := .Dealer}}
+<h1>{{.T "Record a car bought"}}</h1>
+{{if .Error}}<p class="error" role="alert">{{.Sentence .Error}}</p>{{end}}
+<form method="post" action="/cars/stock">
+  <input type="hidden" name="key" value="{{$d.Key}}">
+  <fieldset>
+    <legend>{{.T "The car"}}</legend>
+    <label><span>{{.T "Registration"}}</span><input name="registration" value="{{index $d.Form "registration"}}" autocapitalize="characters"></label>
+    <label><span>{{.T "Chassis number (VIN)"}}</span><input name="vin" value="{{index $d.Form "vin"}}" autocapitalize="characters"></label>
+    <label><span>{{.T "Make"}}</span><input name="make" value="{{index $d.Form "make"}}"></label>
+    <label><span>{{.T "Model"}}</span><input name="model" value="{{index $d.Form "model"}}"></label>
+    <label><span>{{.T "Odometer, km"}}</span><input name="odometer" value="{{index $d.Form "odometer"}}" inputmode="numeric"></label>
+    <label><span>{{.T "How it came in"}}</span>
+      <select name="reason">{{range $d.PurchaseReasons}}<option value="{{.}}"{{if eq . (index $d.Form "reason")}} selected{{end}}>{{$.T ($d.ReasonLabel .)}}</option>{{end}}</select></label>
+  </fieldset>
+  <fieldset>
+    <legend>{{.T "Who sold it"}}</legend>
+    <label><span>{{.T "A person or a company"}}</span>
+      <select name="seller_kind">
+        <option value="private"{{if eq (index $d.Form "seller_kind") "private"}} selected{{end}}>{{.T "A person"}}</option>
+        <option value="company"{{if eq (index $d.Form "seller_kind") "company"}} selected{{end}}>{{.T "A company"}}</option>
+      </select></label>
+    <label><span>{{.T "Name"}}</span><input name="seller_name" value="{{index $d.Form "seller_name"}}" required></label>
+    <label><span>{{.T "Organisation number"}}</span><input name="seller_org" value="{{index $d.Form "seller_org"}}"></label>
+    <label><span>{{.T "Phone"}}</span><input name="seller_phone" value="{{index $d.Form "seller_phone"}}" inputmode="tel"></label>
+    <label><span>{{.T "Email"}}</span><input name="seller_email" value="{{index $d.Form "seller_email"}}" inputmode="email"></label>
+    <label><span>{{.T "What kind of seller"}}</span>
+      <select name="seller_type" required><option value=""></option>{{range $d.SellerTypes}}<option value="{{.}}"{{if eq . (index $d.Form "seller_type")}} selected{{end}}>{{$.T ($d.SellerTypeLabel .)}}</option>{{end}}</select></label>
+    <p class="waiting">{{.T "Whether the car may later be sold under the margin scheme follows from this, and stays not eligible until the evidence is added."}}</p>
+  </fieldset>
+  <fieldset>
+    <legend>{{.T "The purchase"}}</legend>
+    <label><span>{{.T "Bought on"}}</span><input type="date" name="purchased_on" value="{{index $d.Form "purchased_on"}}" required></label>
+    <label><span>{{.T "Paid, in kronor"}}</span><input name="price" value="{{index $d.Form "price"}}" inputmode="decimal" required></label>
+    <p class="waiting">{{.T "Everything paid to the seller except interest, the seller's lender included."}}</p>
+    <label><span>{{.T "Note"}}</span><textarea name="note" maxlength="1000">{{index $d.Form "note"}}</textarea></label>
+  </fieldset>
+  <button type="submit">{{.T "Record the purchase"}}</button>
+</form>
+{{end}}
