@@ -3,6 +3,7 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -423,5 +424,42 @@ func TestAVehiclesProtocolsAreReadInRoundTripsThatDoNotGrowWithThem(t *testing.T
 	}
 	if four := read(); four != one {
 		t.Errorf("%d round trips for four protocols, %d for one; want the same", four, one)
+	}
+}
+
+// A purchase's protocol is of a purchase that exists and of the car it
+// bought (#147): the database refuses a purchase that is not there, and
+// StartProtocol refuses another vehicle than the one bought.
+func TestAPurchasesProtocolIsOfThatPurchaseAndItsCar(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	var car string
+	if err := pool.QueryRow(ctx, `SELECT vehicle_id FROM stock_units WHERE id = $1`, p.StockUnitID).Scan(&car); err != nil {
+		t.Fatal(err)
+	}
+	tpl, err := workshop.SaveChecklistTemplate(ctx, pool, owner(), "", "Inköp", []string{"Lack"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.SetTemplateSubjects(ctx, pool, everything(owner()), tpl, []string{workshop.SubjectPurchase}); err != nil {
+		t.Fatal(err)
+	}
+	var other string
+	if err := pool.QueryRow(ctx, `INSERT INTO vehicles (shop_id, label) VALUES ($1, 'en annan bil') RETURNING id`, shopID).Scan(&other); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.StartProtocol(ctx, pool, buyerScope(), workshop.ProtocolSubject{Kind: workshop.SubjectPurchase,
+		RefID: p.ID, VehicleID: other}, tpl, "", ""); !errors.Is(err, workshop.ErrNotFound) {
+		t.Errorf("a purchase's protocol of another car: %v, want not found", err)
+	}
+	if _, err := workshop.StartProtocol(ctx, pool, buyerScope(), workshop.ProtocolSubject{Kind: workshop.SubjectPurchase,
+		RefID: p.ID, VehicleID: car}, tpl, "", ""); err != nil {
+		t.Errorf("the car bought: %v", err)
+	}
+	_, err = pool.Exec(ctx, `INSERT INTO inspections (shop_id, subject, purchase_id, vehicle_id, template_name, performed_by)
+		VALUES ($1, 'purchase', gen_random_uuid(), $2, 'x', $3)`, shopID, car, userID)
+	if !strings.Contains(fmt.Sprint(err), "23503") {
+		t.Errorf("a protocol of a purchase that does not exist: %v, want a foreign key violation", err)
 	}
 }

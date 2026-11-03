@@ -162,6 +162,20 @@ func StartProtocol(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		if err != nil {
 			return fmt.Errorf("read template: %w", err)
 		}
+		// A purchase's protocol is of the car bought: its stock unit's
+		// vehicle, not whichever vehicle the request names.
+		if subj.Kind == SubjectPurchase {
+			var ok bool
+			if err := tx.QueryRow(ctx, `
+				SELECT EXISTS (SELECT 1 FROM vehicle_purchases p JOIN stock_units u ON u.id = p.stock_unit_id
+				               WHERE p.id = $1 AND vehicle_now(u.vehicle_id) = vehicle_now($2))`,
+				subj.RefID, subj.VehicleID).Scan(&ok); err != nil {
+				return fmt.Errorf("read the purchase: %w", err)
+			}
+			if !ok {
+				return ErrNotFound
+			}
+		}
 		if supersedes != "" {
 			var ok bool
 			if err := tx.QueryRow(ctx, `
