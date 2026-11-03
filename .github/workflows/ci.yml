@@ -39,6 +39,11 @@ jobs:
       # into silence rather than a failure. The name must match what the tests
       # read.
       test-db-env: FREESMS_TEST_DATABASE_URL
+      # internal/server alone took over ten minutes under -race once Dealer
+      # and Rental were merged (#139), and Go's default kills it there with a
+      # panic that reads like a broken test. Thirty leaves room while #139
+      # finds where the time goes; it is a ceiling, not a target.
+      test-timeout: 30m
 
   restore:
     # A backup nobody has restored is not a backup. This takes a real backup of
