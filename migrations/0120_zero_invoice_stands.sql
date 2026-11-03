@@ -2,7 +2,7 @@
 -- A function replaced with the same signature; the previous release never
 -- invoices a sale.
 --
--- The invoice that stands for a car sale (0209), read again: issued, and
+-- The invoice that stands for a car sale (0118), read again: issued, and
 -- not credited in full -- credited in full meaning it has a credit note
 -- and what it came to less what its credit notes took back is nothing or
 -- less. A 0 kr invoice, with no credit note, stands; the application

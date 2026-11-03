@@ -689,7 +689,7 @@ func TestOneRequestKeyForTwoCarsAtOnceIsOneDeal(t *testing.T) {
 }
 
 // Terms written before the eligibility they relied on was recorded on
-// them -- by the release before 0205 -- are read with the eligibility
+// them -- by the release before 0114 -- are read with the eligibility
 // that stands, not refused.
 func TestTermsWithoutTheirEligibilityAreReadWithTheStandingOne(t *testing.T) {
 	pool := setup(t)

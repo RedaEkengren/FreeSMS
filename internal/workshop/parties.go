@@ -653,7 +653,7 @@ func CustomerForParty(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 // made now from the party's own details, which move to it -- the person
 // (name, telephone, email), or the company's name and number, and the
 // address -- as the front desk keeps a customer's, the party then pointing
-// at it (parties_details_in_one_place, 0206). Invoices are addressed to
+// at it (parties_details_in_one_place, 0115). Invoices are addressed to
 // customers (plan v2: parties are linked 1:1 to customers), so a car's
 // buyer (#177) and a renter (#199, Rental invoicing) are invoiced through
 // this. Idempotent: the party is locked first, so two calls at once make
@@ -677,7 +677,7 @@ func customerForPartyTx(ctx context.Context, tx pgx.Tx, scope access.Scope, part
 		return *customer, nil
 	}
 	// This party becomes the customer: the trigger that gives every new
-	// customer a party of its own leaves it to this one (0206).
+	// customer a party of its own leaves it to this one (0115).
 	if _, err := tx.Exec(ctx, `SELECT set_config('app.party_becoming_customer', $1, true)`, id); err != nil {
 		return "", err
 	}

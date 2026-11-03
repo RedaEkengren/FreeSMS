@@ -759,7 +759,7 @@ var shippedTestDriveNames = map[string]string{"sv": "Provkörningsavtal (behöve
 func ShippedTestDriveTemplate(locale string) string { return shippedTestDriveTemplates[locale] }
 
 // ensureTestDriveTemplateTx is the shipped agreement template's newest version: the
-// one marked as shipped (0210), whatever it is called now, made the first
+// one marked as shipped (0119), whatever it is called now, made the first
 // time -- named in the shop's language -- when the shop has none of the
 // kind. A shop with only its own templates is
 // asked which to use, never handed one of them unasked.

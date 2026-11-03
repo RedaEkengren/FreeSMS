@@ -154,7 +154,7 @@ type Deal struct {
 	// The car may be sold under the margin scheme (vat_eligibility).
 	MarginSchemeEligible bool
 	// The eligibility assessment the margin scheme relied on, when the
-	// terms chose it (0205).
+	// terms chose it (0114).
 	EligibilityID string
 }
 
@@ -528,7 +528,7 @@ func ReviseDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sal
 		if d.State == DealCancelled {
 			return errDealState
 		}
-		// Invoiced, how the sale is taxed is frozen (0207): no new terms
+		// Invoiced, how the sale is taxed is frozen (0116): no new terms
 		// until the invoice is credited -- said before anything about the
 		// version, as carrying a change over would not help.
 		if d.InvoiceID != "" {
@@ -969,7 +969,7 @@ func dealTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id string) (Deal
 		id).Scan(&d.ContractedDocumentID); err != nil {
 		return Deal{}, err
 	}
-	// The invoice that stands for the sale (sale_invoice_standing, 0209).
+	// The invoice that stands for the sale (sale_invoice_standing, 0118).
 	if err := tx.QueryRow(ctx, `
 		SELECT coalesce(i.series || '-' || i.number, ''), coalesce(i.id::text, '')
 		FROM (SELECT sale_invoice_standing($1) AS id) st LEFT JOIN invoices i ON i.id = st.id`,
@@ -1109,7 +1109,7 @@ var disputeClauses = map[string]map[string]string{
 func ShippedSalesContract(locale string) string { return shippedSalesContracts[locale] }
 
 // ensureSalesContractTemplateTx is the shipped contract template's newest version: the
-// one marked as shipped (0210), whatever it is called now, made the first
+// one marked as shipped (0119), whatever it is called now, made the first
 // time -- named in the shop's language -- when the shop has none of the
 // kind. A shop with only its own templates is
 // asked which to use, never handed one of them unasked.
@@ -1337,7 +1337,7 @@ var errDealNotComplete = fmt.Errorf("%w: the contract is not complete; a deal is
 //
 // How it is posted is not decided: the accounting export refuses a period
 // with a car sale (ErrCarSalePostings). Once invoiced, the terms -- and so
-// how the sale is taxed -- are frozen until the invoice is credited (0207).
+// how the sale is taxed -- are frozen until the invoice is credited (0116).
 // For whoever sells cars, on a deal they may see.
 func IssueDealInvoice(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, saleID string) (Invoice, error) {
 	if !scope.Role.SellsVehicles() {
@@ -1416,7 +1416,7 @@ func IssueDealInvoice(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 // saleTaxTx is how the deal's car is taxed as its terms stand, one car
 // alone (money.MarginScheme): read by SaleTaxOfDeal and by the invoice.
 // Terms written before the eligibility relied on was recorded on them
-// (0205, 0208) are read with the one that stands.
+// (0114, 0117) are read with the one that stands.
 func saleTaxTx(ctx context.Context, tx pgx.Tx, d Deal) (SaleTax, error) {
 	out := SaleTax{Treatment: d.Terms.TaxTreatment, EligibilityID: d.EligibilityID}
 	switch d.Terms.TaxTreatment {

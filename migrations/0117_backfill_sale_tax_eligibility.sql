@@ -1,7 +1,7 @@
 -- rollback: safe
--- Fills a column 0205 added; the previous release reads terms as before.
+-- Fills a column 0114 added; the previous release reads terms as before.
 --
--- Terms that chose the margin scheme before 0205 recorded which eligibility
+-- Terms that chose the margin scheme before 0114 recorded which eligibility
 -- they relied on have none (#176). They get the assessment that stood when
 -- they were written: the newest recorded by then. SaleTaxOfDeal also reads
 -- the standing one for any still without, as written by the release before

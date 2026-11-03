@@ -251,7 +251,7 @@ func ReverseStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 	}
 	var out StockCost
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		// The one way a cost is reversed (stock_cost_reverse, 0202): the
+		// The one way a cost is reversed (stock_cost_reverse, 0111): the
 		// cost's job, then the cost, the order the supplier-invoice and
 		// job triggers take them in; taken back from where it came and
 		// for the same moment, so on the same side of the sale. Nothing
@@ -428,7 +428,7 @@ func PostJobCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, jo
 		// car, at a number in the gap-free series, with output VAT on it.
 		// A ready job may still change: back on the lift, a part taken out
 		// or put back, its hours edited. Any of these takes the posting back
-		// by itself, in the database (stock_cost_job_changed, 0202), and the
+		// by itself, in the database (stock_cost_job_changed, 0111), and the
 		// job posts again from what it then holds. This is the default pending
 		// the accountant's word on how a dealer's own workshop work on a
 		// stock car is booked (gate G2, #221).
