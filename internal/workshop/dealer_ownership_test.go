@@ -74,15 +74,18 @@ func TestOnlyAConfirmedFilingChangesTheOwnerAndOnlyOnce(t *testing.T) {
 func TestAPurchaseIsFiledAndAnUnconfirmedSaleIsNotForgotten(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
-	p := buy(t, pool, workshop.StockFromPurchase)
-	if f, err := workshop.FilingOf(ctx, pool, buyerScope(), "purchase", p.ID); err != nil || f.Status != "prepared" || f.FromPartyID == "" {
+	unit := eligibleCar(t, pool)
+	var purchase string
+	if err := pool.QueryRow(ctx, `SELECT id FROM vehicle_purchases WHERE stock_unit_id = $1`, unit).Scan(&purchase); err != nil {
+		t.Fatal(err)
+	}
+	if f, err := workshop.FilingOf(ctx, pool, buyerScope(), "purchase", purchase); err != nil || f.Status != "prepared" || f.FromPartyID == "" {
 		t.Errorf("the purchase's filing: %+v, %v", f, err)
 	}
-	if _, err := workshop.FilingOf(ctx, pool, sales(), "purchase", p.ID); err == nil {
+	if _, err := workshop.FilingOf(ctx, pool, sales(), "purchase", purchase); err == nil {
 		t.Error("a salesperson read a purchase's filing")
 	}
-	moveStock(t, pool, p.StockUnitID, workshop.StockForSale)
-	d := deliveredOn(t, pool, p.StockUnitID, time.Now().AddDate(0, 0, -3))
+	d := deliveredOn(t, pool, unit, time.Now().AddDate(0, 0, -3))
 	items, err := workshop.WaitingFor(ctx, pool, sales())
 	if err != nil {
 		t.Fatal(err)
