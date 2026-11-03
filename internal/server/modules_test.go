@@ -309,3 +309,55 @@ func TestAReadBegunBeforeASwitchDoesNotRefillTheCache(t *testing.T) {
 		t.Errorf("after the switch: %v, %v; want the workshop off", on, err)
 	}
 }
+
+// Car sales and Rental, switched on and off again on the shop page, answer
+// every one of their routes exactly as a path that does not exist, as the
+// workshop's do (#143): signed in as the owner or a technician, or not at
+// all, whatever the method.
+func TestSwitchedOffCarSalesAndRentalAreNotThere(t *testing.T) {
+	ts, _ := testServer(t)
+	owner := signIn(t, ts, ownerEmail)
+	tech := signIn(t, ts, techEmail)
+	missing := func(client *http.Client, method, path string) (int, string) {
+		req, _ := http.NewRequest(method, ts.URL+path, strings.NewReader(""))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", ts.URL)
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("%s %s: %v", method, path, err)
+		}
+		return resp.StatusCode, readBody(t, resp)
+	}
+	_, nothing := missing(owner, http.MethodGet, "/there-is-no-such-page")
+	for _, m := range []string{"dealer", "rental"} {
+		for _, step := range []url.Values{
+			{"module": {m}, "on": {"yes"}, "reason": {"Testing"}},
+			{"module": {m}, "on": {"no"}, "confirm": {"yes"}, "reason": {"Testing"}},
+		} {
+			resp := postModuleForm(t, owner, ts.URL, "/shop/modules", step)
+			readBody(t, resp)
+			if resp.StatusCode != http.StatusSeeOther {
+				t.Fatalf("switching %s %s answered %d", m, step.Get("on"), resp.StatusCode)
+			}
+		}
+	}
+
+	anonymous := noRedirects()
+	checked := map[access.Module]int{}
+	for _, r := range routeTable(t) {
+		if r.Module != access.Dealer && r.Module != access.Rental {
+			continue
+		}
+		method, path := fill(r.Pattern)
+		for who, client := range map[string]*http.Client{"owner": owner, "technician": tech, "nobody": anonymous} {
+			if status, body := missing(client, method, path); status != http.StatusNotFound || body != nothing {
+				t.Errorf("%s %s as %s, %s off: %d %q; want the answer a path that does not exist gets",
+					method, path, who, r.Module, status, body)
+			}
+		}
+		checked[r.Module]++
+	}
+	if checked[access.Dealer] < 30 || checked[access.Rental] < 30 {
+		t.Errorf("routes checked: %v", checked)
+	}
+}
