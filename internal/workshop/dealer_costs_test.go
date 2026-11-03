@@ -312,7 +312,7 @@ func reversedOnceWhileCorrected(t *testing.T, spell func(string) string) {
 	}()
 	for deadline := time.Now().Add(10 * time.Second); ; {
 		var waiting int
-		if err := pool.QueryRow(ctx, `SELECT count(*) FROM pg_locks WHERE NOT granted`).Scan(&waiting); err != nil {
+		if err := pool.QueryRow(ctx, waitingForALock).Scan(&waiting); err != nil {
 			t.Fatal(err)
 		}
 		if waiting > 0 {
@@ -408,7 +408,7 @@ func TestACostReversedByHandWhileItsInvoiceIsNotedDoesNotDeadlock(t *testing.T) 
 		t.Helper()
 		for deadline := time.Now().Add(10 * time.Second); ; {
 			var w int
-			if err := pool.QueryRow(ctx, `SELECT count(*) FROM pg_locks WHERE NOT granted`).Scan(&w); err != nil {
+			if err := pool.QueryRow(ctx, waitingForALock).Scan(&w); err != nil {
 				t.Fatal(err)
 			}
 			if w >= n {
@@ -641,3 +641,9 @@ func unitOf(t *testing.T, pool *pgxpool.Pool, job string) string {
 	}
 	return unit
 }
+
+// waitingForALock counts the connections to this test's own database that
+// wait on a lock. pg_locks is the whole server's: with packages tested in
+// parallel, another test's waits counted here let a step go before the one
+// it waits for was queued, and the order the test sets up was luck.
+const waitingForALock = `SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`
