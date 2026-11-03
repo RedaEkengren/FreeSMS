@@ -475,6 +475,15 @@ func ApplyDeposit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d
 	}
 	key = strings.TrimSpace(key)
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		return applyDepositTx(ctx, tx, scope, depositID, invoiceID, amountMinor, key)
+	})
+}
+
+// applyDepositTx is ApplyDeposit in the caller's transaction, its checks of
+// the role and the identifiers made: for an invoice that applies the
+// deposit it was paid against as it is issued (#174).
+func applyDepositTx(ctx context.Context, tx pgx.Tx, scope access.Scope, depositID, invoiceID string, amountMinor int64, key string) error {
+	{
 		d, err := depositTx(ctx, tx, depositID, true)
 		if err != nil {
 			return err
@@ -523,7 +532,7 @@ func ApplyDeposit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d
 			return fmt.Errorf("record the application: %w", err)
 		}
 		return closeIfFinishedTx(ctx, tx, b.WorkOrderID)
-	})
+	}
 }
 
 // replayedApplicationTx reports whether key already applied amountMinor of

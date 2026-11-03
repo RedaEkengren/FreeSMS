@@ -102,9 +102,13 @@ type NewPurchase struct {
 	VehicleID     string
 	Reason        string // purchase, trade_in or repurchase
 	SellerPartyID string
-	PurchasedOn   time.Time
-	OdometerKm    *int64
-	PriceMinor    int64
+	// A seller not yet known, made a party in the purchase's own
+	// transaction, so a purchase refused leaves no person behind it. Used
+	// instead of SellerPartyID.
+	NewSeller   *NewParty
+	PurchasedOn time.Time
+	OdometerKm  *int64
+	PriceMinor  int64
 	// Another currency: its code, the amount paid in it in minor units,
 	// kronor for one unit in millionths, and where the rate came from.
 	Currency      string
@@ -207,7 +211,19 @@ func RecordPurchase(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 	default:
 		return Purchase{}, errPurchaseReason
 	}
-	if !looksLikeUUID(n.SellerPartyID) || !looksLikeUUID(n.VehicleID) {
+	var sellerNote string
+	if n.NewSeller != nil {
+		seller := *n.NewSeller
+		seller.Role = PartySeller
+		var err error
+		if seller, sellerNote, err = checkNewParty(seller); err != nil {
+			return Purchase{}, err
+		}
+		n.NewSeller, n.SellerPartyID = &seller, ""
+	} else if !looksLikeUUID(n.SellerPartyID) {
+		return Purchase{}, ErrNotFound
+	}
+	if !looksLikeUUID(n.VehicleID) {
 		return Purchase{}, ErrNotFound
 	}
 	if n.PurchasedOn.IsZero() || n.PurchasedOn.After(time.Now().Add(24*time.Hour)) {
@@ -233,25 +249,33 @@ func RecordPurchase(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 	n.Key = strings.TrimSpace(n.Key)
 	var out Purchase
 	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		if err := partySeenTx(ctx, tx, scope, n.SellerPartyID); err != nil {
-			return err
+		if n.NewSeller == nil {
+			if err := partySeenTx(ctx, tx, scope, n.SellerPartyID); err != nil {
+				return err
+			}
 		}
 		unit, err := openStockUnitTx(ctx, tx, scope, n.VehicleID, n.Reason, n.Key)
 		if err != nil {
 			return err
 		}
-		// The same request again: the unit it opened has its purchase.
+		// The same request again: the unit it opened has its purchase. A
+		// seller made with it is not made twice.
 		var existing string
 		err = tx.QueryRow(ctx, `SELECT id FROM vehicle_purchases WHERE stock_unit_id = $1`, unit.ID).Scan(&existing)
 		if err == nil {
 			out, err = purchaseTx(ctx, tx, `p.id = $1`, existing)
-			if err == nil && (out.SellerPartyID != n.SellerPartyID || out.TaxPurchasePriceMinor != price) {
+			if err == nil && ((n.NewSeller == nil && out.SellerPartyID != n.SellerPartyID) || out.TaxPurchasePriceMinor != price) {
 				return errPurchaseKey
 			}
 			return err
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("read purchase: %w", err)
+		}
+		if n.NewSeller != nil {
+			if n.SellerPartyID, err = createPartyTx(ctx, tx, scope, *n.NewSeller, sellerNote); err != nil {
+				return err
+			}
 		}
 		if err := evidenceTx(ctx, tx, n.EvidenceDocumentIDs); err != nil {
 			return err

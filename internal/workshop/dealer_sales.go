@@ -681,6 +681,15 @@ func CompleteDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, s
 		// Sold already, or delivered since -- a deal revised after the
 		// car left, completed again -- the car stays where it is.
 		if status != StockSold && status != StockDelivered {
+			// A car reserved is sold to its holder, which ends the
+			// reservation as sold; to anyone else it is refused (#174).
+			buyers := make([]string, len(d.Buyers))
+			for i, b := range d.Buyers {
+				buyers[i] = b.PartyID
+			}
+			if err := endReservationOnSaleTx(ctx, tx, scope, d.StockUnitID, buyers); err != nil {
+				return err
+			}
 			if err := moveStockUnitTx(ctx, tx, scope, d.StockUnitID, StockSold, ""); err != nil {
 				return err
 			}
@@ -1411,8 +1420,10 @@ func IssueDealInvoice(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			lines = append(lines, SourcedLine{Kind: "part", Description: l.Description, QuantityMilli: l.QuantityMilli,
 				UnitPriceMinor: l.UnitPriceMinor, VATRateBasis: l.VATRateBasis})
 		}
-		inv, err = issueSourcedTx(ctx, tx, scope, of, lines)
-		return err
+		if inv, err = issueSourcedTx(ctx, tx, scope, of, lines); err != nil {
+			return err
+		}
+		return applyReservationDepositTx(ctx, tx, scope, d.StockUnitID, inv.ID)
 	})
 	return inv, err
 }

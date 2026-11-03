@@ -97,6 +97,19 @@ var (
 	ErrStockNoReason = fmt.Errorf("%w: say why the cycle ends without a sale, in 300 characters or fewer", ErrInvalid)
 )
 
+// StockMovesFor is where roles may move a unit from where it is now, for a
+// page to offer only the moves it may make. It decides nothing: MoveStockUnit
+// checks again.
+func StockMovesFor(roles access.Roles, from StockStatus) []StockStatus {
+	var out []StockStatus
+	for _, to := range stockMoves[from] {
+		if mayMoveStockRoles(roles, from, to) {
+			out = append(out, to)
+		}
+	}
+	return out
+}
+
 // mayMoveStock checks roles, and the Dealer module, for moving a unit to
 // status: the buyer, who prepares the car and decides it is ready, may
 // offer it for sale, take it back into preparation, and end a cycle
@@ -104,6 +117,14 @@ var (
 // and lets a reservation or a sale fall through. Whoever runs the shop does
 // both.
 func mayMoveStock(roles access.Roles, scope access.Scope, from, to StockStatus) error {
+	if !mayMoveStockRoles(roles, from, to) {
+		return access.ErrForbidden
+	}
+	return scope.Require(access.Dealer)
+}
+
+// mayMoveStockRoles is mayMoveStock's question of the roles alone.
+func mayMoveStockRoles(roles access.Roles, from, to StockStatus) bool {
 	var may bool
 	switch to {
 	case StockInPreparation, StockClosed, StockWrittenOff:
@@ -115,10 +136,7 @@ func mayMoveStock(roles access.Roles, scope access.Scope, from, to StockStatus) 
 	case StockReserved, StockSold, StockDelivered:
 		may = roles.SellsVehicles()
 	}
-	if !may {
-		return access.ErrForbidden
-	}
-	return scope.Require(access.Dealer)
+	return may
 }
 
 // StockUnit is one cycle, as it is read.
@@ -313,6 +331,19 @@ func moveStockUnitTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id stri
 		}
 		if !slices.Contains(stockMoves[from], to) {
 			return errStockMove
+		}
+		// A reserved car with its reservation standing moves on only by
+		// ending the reservation -- which decides its deposit -- or by
+		// selling it to the holder, which ends it first (#174).
+		if from == StockReserved {
+			var standing bool
+			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM vehicle_reservations WHERE stock_unit_id = $1 AND ended_at IS NULL)`,
+				id).Scan(&standing); err != nil {
+				return fmt.Errorf("read the reservation: %w", err)
+			}
+			if standing {
+				return errReservationStanding
+			}
 		}
 		if to.Ended() {
 			if err := retireResourceTx(ctx, tx, scope, resource); err != nil {

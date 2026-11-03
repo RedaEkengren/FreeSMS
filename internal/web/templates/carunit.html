@@ -1,0 +1,157 @@
+{{define "content"}}
+{{$d := .CarUnit}}{{$u := $d.Unit}}
+<h1>{{with $d.Vehicle}}{{if .Registration}}{{.Registration}}{{else if .VIN}}{{.VIN}}{{else}}{{$.T "No registration"}}{{end}}{{end}}</h1>
+{{if .Error}}<p class="error" role="alert">{{.Sentence .Error}}</p>{{end}}
+<p class="waiting">
+  {{with $d.Vehicle}}{{if .Make}}{{.Make}} {{.Model}} &middot; {{end}}{{end}}
+  <span class="tag">{{.T $u.Status.Label}}</span> &middot; {{.T $u.ReasonLabel}} &middot; {{.T "In stock since %s" (.Date (.Local $u.OpenedAt) "2 Jan 2006")}}
+  &middot; <a href="/vehicles/{{$u.VehicleID}}">{{.T "The vehicle"}}</a>
+</p>
+
+{{if $d.Moves}}
+<section>
+  <h2>{{.T "Move it on"}}</h2>
+  {{range $d.Moves}}
+  <form method="post" action="/cars/stock/{{$u.ID}}/move">
+    <input type="hidden" name="to" value="{{.}}">
+    {{if .Ended}}<label><span>{{$.T "Why it ends without a sale"}}</span><input name="reason" value="{{index $d.Form "reason"}}" maxlength="300" required></label>{{end}}
+    <button type="submit" class="secondary">{{$.T .Label}}</button>
+  </form>
+  {{end}}
+</section>
+{{end}}
+
+{{if $d.ShowReservations}}
+<section>
+  <h2>{{.T "Reservation"}}</h2>
+  {{with $d.Standing}}
+    <p>{{$.T "Reserved for %s until %s" .HolderName ($.Date ($.Local .ExpiresAt) "Mon 2 Jan 15:04")}}
+      {{if $d.Lapsed}}<span class="tag late">{{$.T "Run out: end it and decide on the deposit"}}</span>{{end}}</p>
+    <p class="waiting">{{if .Refundable}}{{$.T "The deposit is refundable"}}{{else}}{{$.T "The deposit is not refundable"}}{{end}}{{if .Conditions}} &middot; {{.Conditions}}{{end}}
+      &middot; {{$.T "Deposit held %s" ($.Money $d.Deposit.Held)}}</p>
+    <form method="post" action="/cars/stock/{{$u.ID}}/reservations/{{.ID}}/terms">
+      {{if $d.TermsID}}<a href="/contracts/{{$d.TermsID}}">{{$.T "The terms given to the customer"}}</a>{{end}}
+      <button type="submit" class="secondary">{{if $d.TermsID}}{{$.T "Make the terms again"}}{{else}}{{$.T "Make the terms for the customer"}}{{end}}</button>
+    </form>
+    <form method="post" action="/cars/stock/{{$u.ID}}/reservations/{{.ID}}/deposit">
+      <input type="hidden" name="key" value="{{$d.Key}}">
+      <label><span>{{$.T "Deposit received, in kronor"}}</span><input name="amount" value="{{index $d.Form "amount"}}" inputmode="decimal" required></label>
+      <label><span>{{$.T "How"}}</span><select name="method">{{range $d.Methods}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+      <label><span>{{$.T "Received on"}}</span><input type="date" name="paid_on" value="{{$d.Today}}" required></label>
+      <label><span>{{$.T "Reference"}}</span><input name="reference" value="{{index $d.Form "reference"}}" maxlength="100"></label>
+      <button type="submit" class="secondary">{{$.T "Record the deposit"}}</button>
+    </form>
+    <form method="post" action="/cars/stock/{{$u.ID}}/reservations/{{.ID}}/extend">
+      <label><span>{{$.T "Extend until"}}</span><input type="datetime-local" name="until" value="{{$d.Soon}}" required></label>
+      <button type="submit" class="secondary">{{$.T "Extend"}}</button>
+    </form>
+    <form method="post" action="/cars/stock/{{$u.ID}}/reservations/{{.ID}}/end">
+      <input type="hidden" name="how" value="{{if $d.Lapsed}}lapsed{{else}}cancelled{{end}}">
+      <label><span>{{$.T "The deposit"}}</span><select name="deposit" required>
+        <option value=""></option><option value="refund">{{$.T "Refund it"}}</option><option value="retain">{{$.T "Keep it"}}</option><option value="none">{{$.T "There was none"}}</option></select></label>
+      <label><span>{{$.T "Why it ends"}}</span><input name="end_reason" value="{{index $d.Form "end_reason"}}" maxlength="300" required></label>
+      <button type="submit" class="secondary">{{if $d.Lapsed}}{{$.T "End the reservation"}}{{else}}{{$.T "Cancel the reservation"}}{{end}}</button>
+    </form>
+    <p class="waiting">{{$.T "A deposit refunded is recorded in the payment journal as money given back; keeping one is decided here and needs the shop's terms to allow it."}}</p>
+  {{else}}
+    {{if eq (print $u.Status) "for_sale"}}
+    <form method="post" action="/cars/stock/{{$u.ID}}/reserve">
+      <input type="hidden" name="key" value="{{$d.Key}}">
+      <label><span>{{$.T "A person or a company"}}</span><select name="holder_kind"><option value="private">{{$.T "A person"}}</option><option value="company">{{$.T "A company"}}</option></select></label>
+      <label><span>{{$.T "Name"}}</span><input name="holder_name" value="{{index $d.Form "holder_name"}}" required></label>
+      <label><span>{{$.T "Phone"}}</span><input name="holder_phone" value="{{index $d.Form "holder_phone"}}" inputmode="tel"></label>
+      <label><span>{{$.T "Email"}}</span><input name="holder_email" value="{{index $d.Form "holder_email"}}" inputmode="email"></label>
+      <label><span>{{$.T "Reserved until"}}</span><input type="datetime-local" name="until" value="{{with index $d.Form "until"}}{{.}}{{else}}{{$d.Soon}}{{end}}" required></label>
+      <label class="check"><input type="checkbox" name="refundable" value="yes" checked> <span>{{$.T "The deposit is refundable"}}</span></label>
+      <label><span>{{$.T "Conditions"}}</span><textarea name="conditions" maxlength="1000">{{index $d.Form "conditions"}}</textarea></label>
+      <button type="submit">{{$.T "Reserve the car"}}</button>
+    </form>
+    {{end}}
+  {{end}}
+  {{if $d.Reservations}}
+  <ul class="lines">
+    {{range $d.Reservations}}{{if not .Standing}}
+    <li><div class="waiting">{{.HolderName}} &middot; {{$.Date ($.Local .CreatedAt) "2 Jan 2006"}}&ndash;{{$.Date ($.Local .ExpiresAt) "2 Jan 2006"}} &middot; {{$.T .EndKind}}{{if .EndReason}} &middot; {{.EndReason}}{{end}}</div></li>
+    {{end}}{{end}}
+  </ul>
+  {{end}}
+</section>
+{{end}}
+
+{{with $d.Purchase}}
+<section>
+  <h2>{{$.T "The purchase"}}</h2>
+  <p>{{$.T "Bought for %s on %s" ($.Money .TaxPurchasePriceMinor) ($.Date .PurchasedOn "2 Jan 2006")}}</p>
+  <p class="waiting">{{$.T ($d.SellerTypeLabel .Eligibility.SellerType)}} &middot;
+    {{if .Eligibility.Eligible}}{{$.T "May be sold under the margin scheme"}}{{else}}{{$.T "Not eligible for the margin scheme"}}{{end}}</p>
+</section>
+{{end}}
+
+{{if $d.ShowChecks}}
+<section>
+  <h2>{{.T "Checks before money leaves"}}</h2>
+  {{if $d.Outstanding}}
+    <p class="waiting">{{.T "Still to pass:"}} {{range $i, $k := $d.Outstanding}}{{if $i}}, {{end}}{{$.T ($d.CheckKindLabel $k)}}{{end}}
+      {{if $d.Overridden}}&middot; <span class="tag late">{{.T "Let through by the owner"}}</span>{{end}}</p>
+  {{else}}
+    <p class="waiting">{{.T "Every check required has passed."}}</p>
+  {{end}}
+  {{if $d.Checks}}
+  <ul class="lines">
+    {{range $d.Checks}}
+    <li><div class="row"><span>{{$.T .KindLabel}}</span><span class="tag{{if eq .Result "fail"}} late{{end}}">{{$.T .Result}}</span></div>
+      <div class="waiting">{{.CheckedBy}}, {{$.Date ($.Local .CheckedAt) "2 Jan 2006 15:04"}}{{if .Note}} &middot; {{.Note}}{{end}}</div></li>
+    {{end}}
+  </ul>
+  {{end}}
+  {{if not $u.Status.Ended}}
+  <form method="post" action="/cars/stock/{{$u.ID}}/checks">
+    <label><span>{{.T "Check"}}</span><select name="kind">{{range $d.CheckKinds}}<option value="{{.}}">{{$.T ($d.CheckKindLabel .)}}</option>{{end}}</select></label>
+    <label><span>{{.T "Result"}}</span><select name="result">
+      <option value="pass">{{.T "pass"}}</option><option value="fail">{{.T "fail"}}</option><option value="unknown">{{.T "unknown"}}</option></select></label>
+    <label><span>{{.T "Note"}}</span><input name="check_note" value="{{index $d.Form "check_note"}}" maxlength="500"></label>
+    <button type="submit">{{.T "Record the check"}}</button>
+  </form>
+  {{if and $d.Outstanding (not $d.Overridden) .Session.Scope.Role.RunsTheShop}}
+  <form method="post" action="/cars/stock/{{$u.ID}}/checks/override">
+    <label><span>{{.T "Why money may leave anyway"}}</span><input name="override_reason" value="{{index $d.Form "override_reason"}}" maxlength="300" required></label>
+    <button type="submit" class="secondary">{{.T "Let it through"}}</button>
+  </form>
+  {{end}}
+  {{end}}
+</section>
+{{end}}
+
+{{with $d.Costs}}
+<section>
+  <h2>{{$.T "Costs"}}</h2>
+  <p class="waiting">{{$.T "Before the sale %s, after it %s" ($.Money .BeforeSale) ($.Money .AfterSale)}}</p>
+  {{if .Entries}}
+  <ul class="lines">
+    {{range .Entries}}
+    <li><div class="row"><span>{{$.T .KindLabel}}{{if .ExternalRef}} &middot; {{.ExternalRef}}{{end}}</span><strong>{{$.Money .NetMinor}}</strong></div>
+      <div class="waiting">{{$.Date .IncurredOn "2 Jan 2006"}}{{if .Note}} &middot; {{.Note}}{{end}}{{if .Reversed}} &middot; <span class="tag">{{$.T "Reversed"}}</span>{{end}}</div>
+      {{if and (not .Reversed) (not .ReversesID) (not $u.Status.Ended)}}
+      <form method="post" action="/cars/stock/{{$u.ID}}/costs/{{.ID}}/reverse">
+        <label><span>{{$.T "Why it is reversed"}}</span><input name="reverse_reason" maxlength="300" required></label>
+        <button type="submit" class="secondary">{{$.T "Reverse"}}</button>
+      </form>
+      {{end}}
+    </li>
+    {{end}}
+  </ul>
+  {{end}}
+  {{if not $u.Status.Ended}}
+  <form method="post" action="/cars/stock/{{$u.ID}}/costs">
+    <label><span>{{$.T "Kind"}}</span><select name="cost_kind">{{range $d.CostKinds}}<option value="{{.}}"{{if eq . (index $d.Form "cost_kind")}} selected{{end}}>{{$.T ($d.CostKindLabel .)}}</option>{{end}}</select></label>
+    <label><span>{{$.T "Before VAT, in kronor"}}</span><input name="net" value="{{index $d.Form "net"}}" inputmode="decimal" required></label>
+    <label><span>{{$.T "VAT rate, per cent"}}</span><input name="rate" value="{{with index $d.Form "rate"}}{{.}}{{else}}25{{end}}" inputmode="numeric" required></label>
+    <label><span>{{$.T "Spent on"}}</span><input type="date" name="incurred_on" value="{{with index $d.Form "incurred_on"}}{{.}}{{else}}{{$d.Today}}{{end}}" required></label>
+    <label><span>{{$.T "The supplier's reference"}}</span><input name="ref" value="{{index $d.Form "ref"}}" maxlength="100"></label>
+    <label><span>{{$.T "Note"}}</span><input name="cost_note" value="{{index $d.Form "cost_note"}}" maxlength="500"></label>
+    <button type="submit">{{$.T "Record the cost"}}</button>
+  </form>
+  {{end}}
+</section>
+{{end}}
+{{end}}

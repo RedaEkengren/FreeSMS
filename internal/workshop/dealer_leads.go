@@ -878,6 +878,8 @@ func dealerWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 			                OR n.next_step_on <= (clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops))::date)))
 			UNION ALL
 			`+testDrivesOverdue+`
+			UNION ALL
+			`+reservationsWaiting+`
 			ORDER BY 5, 6`, scope.UserID)
 		if err != nil {
 			return fmt.Errorf("read the leads waiting: %w", err)
@@ -889,7 +891,7 @@ func dealerWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 			if err := rows.Scan(&it.Kind, &it.SubjectKind, &it.SubjectID, &it.Text, &it.Due, &at); err != nil {
 				return err
 			}
-			if it.SubjectKind == "test_drive" {
+			if it.SubjectKind == "test_drive" || it.Kind == "reservation_lapsed" {
 				it.Urgency = UrgencyNow
 			} else if it.Text == "" && it.Kind != "lead_car_gone" {
 				// What they want is theirs to say, and not a car's name.

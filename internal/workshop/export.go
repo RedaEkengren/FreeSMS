@@ -57,6 +57,8 @@ var ExportTables = []string{
 	// Deals, their terms, defects and what each buyer answered (#175).
 	"vehicle_sales", "vehicle_sale_terms", "vehicle_sale_buyers", "vehicle_sale_lines", "vehicle_sale_defects",
 	"vehicle_sale_defect_answers", "vehicle_sale_events",
+	// Cars reserved for a customer, and how each reservation ended (#174).
+	"vehicle_reservations",
 	// Rental
 	"rental_permits", "rental_permit_revocations", "rental_profiles", "rental_units", "fleet_memberships",
 	"rate_plans", "rate_plan_seasons", "rental_extras", "rental_bookings", "rental_booking_events", "rental_booking_lines",

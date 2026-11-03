@@ -1,0 +1,34 @@
+{{define "content"}}
+{{$d := .Dealer.Stock}}
+<h1>{{.T "Cars in stock"}}</h1>
+{{if .Error}}<p class="error" role="alert">{{.Sentence .Error}}</p>{{end}}
+{{if .Session.Scope.Role.BuysVehicles}}<p><a href="/cars/stock/new" class="button">{{.T "Record a car bought"}}</a></p>{{end}}
+
+{{if $d.TotalValueMinor}}
+<p class="waiting">{{$.T "Stock value %s" ($.MoneyOrBlank $d.TotalValueMinor)}}{{if $d.MissingValue}} &middot; {{$.N "%d car has no purchase price yet" $d.MissingValue}}{{end}}</p>
+{{end}}
+
+{{if $d.Rows}}
+<ul class="lines">
+  {{range $d.Rows}}
+  <li>
+    <div class="row"><a href="/cars/stock/{{.UnitID}}">{{if .Registration}}{{.Registration}}{{else if .VIN}}{{.VIN}}{{else}}{{$.T "No registration"}}{{end}}</a>
+      <span class="tag{{if eq .Ageing "90+"}} late{{end}}">{{$.T .StatusLabel}}</span></div>
+    <div class="waiting">
+      {{if .Make}}{{.Make}} {{.Model}}{{if .ModelYear}} {{.ModelYear}}{{end}} &middot; {{end}}{{if .OdometerKm}}{{$.T "%s km" ($.Num .Km)}} &middot; {{end}}
+      {{$.N "%d day in stock" .DaysInStock}}{{with .DaysForSale}} &middot; {{$.N "%d day for sale" .}}{{end}}
+      {{if .Consigned}}&middot; <span class="tag">{{$.T "On consignment"}}</span>{{end}}
+    </div>
+    {{with .Figures}}
+    <div class="waiting">
+      {{if .PurchaseMinor}}{{$.T "Bought for %s" ($.MoneyOrBlank .PurchaseMinor)}}{{else}}{{$.T "Purchase price missing"}}{{end}}
+      &middot; {{$.T "Costs so far %s" ($.Money .CostsMinor)}}
+    </div>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p class="empty">{{.T "No cars in stock."}}</p>
+{{end}}
+{{end}}

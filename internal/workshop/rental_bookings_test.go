@@ -981,3 +981,29 @@ func TestAnExtensionIsNotChargedTheMinimumAgain(t *testing.T) {
 		t.Errorf("four days at 400 kr come to %d öre of rent, want %d (%+v)", rent, 4*40000, b.Lines)
 	}
 }
+
+// A person with a rental booked or out is not erased: the contract is
+// still running, with a car on the road in their name (#148). Once it is
+// cancelled, they are.
+func TestAPersonWhoRentsIsNotErasedUntilTheRentalEnds(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	id, err := v.book(pool, in2031(10, 9), in2031(12, 9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var person string
+	if err := pool.QueryRow(ctx, `SELECT person_id FROM parties WHERE id = $1`, v.renter).Scan(&person); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ErasePerson(ctx, pool, everything(owner()), &recordingRemover{}, person, "Begäran"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Fatalf("erased with a rental booked: %v", err)
+	}
+	if err := workshop.CancelRentalBooking(ctx, pool, rentalDesk(), id, "Kunden ångrade sig", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ErasePerson(ctx, pool, everything(owner()), &recordingRemover{}, person, "Begäran"); err != nil {
+		t.Errorf("not erased after the rental was cancelled: %v", err)
+	}
+}

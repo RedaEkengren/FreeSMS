@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -145,12 +146,16 @@ func TestNoCarSalesRouteServesAnotherShopsRow(t *testing.T) {
 	ts, pool := testServer(t)
 	dealerShop(t, pool)
 	const calcB, leadB = "bbbbbbbb-0000-0000-0000-0000000000ca", "bbbbbbbb-0000-0000-0000-0000000000cb"
+	const unitB = "bbbbbbbb-0000-0000-0000-0000000000cf"
 	seedShop(t, pool, shopB, []string{
 		`INSERT INTO purchase_calculations (id, shop_id, calculation_id, version, vehicle_id, note)
 		 VALUES ('` + calcB + `','` + shopB + `','` + calcB + `',1,'` + vehicleB + `','` + secretB + `')`,
 		`INSERT INTO leads (id, shop_id, contact_name, contact_email, wishes, channel)
 		 VALUES ('` + leadB + `','` + shopB + `','` + secretB + `','b@example.test','` + secretB + `','phone')`,
 		`INSERT INTO lead_events (shop_id, lead_id, kind, status) VALUES ('` + shopB + `','` + leadB + `','status','new')`,
+		`INSERT INTO resources (id, shop_id, kind, vehicle_id) VALUES ('bbbbbbbb-0000-0000-0000-0000000000d1','` + shopB + `','vehicle','` + vehicleB + `')`,
+		`INSERT INTO stock_units (id, shop_id, vehicle_id, resource_id, reason)
+		 VALUES ('` + unitB + `','` + shopB + `','` + vehicleB + `','bbbbbbbb-0000-0000-0000-0000000000d1','defleet')`,
 	})
 	for _, email := range []string{ownerEmail, buyerEmail, salesEmail, techEmail} {
 		c := signIn(t, ts, email)
@@ -162,6 +167,10 @@ func TestNoCarSalesRouteServesAnotherShopsRow(t *testing.T) {
 			{http.MethodPost, "/cars/leads/" + leadB + "/status"},
 			{http.MethodPost, "/cars/leads/" + leadB + "/assign"},
 			{http.MethodPost, "/cars/leads/" + leadB + "/next"},
+			{http.MethodGet, "/cars/stock/" + unitB},
+			{http.MethodPost, "/cars/stock/" + unitB + "/move"},
+			{http.MethodPost, "/cars/stock/" + unitB + "/checks"},
+			{http.MethodPost, "/cars/stock/" + unitB + "/costs"},
 		} {
 			var status int
 			var body string
@@ -245,5 +254,173 @@ func TestAnEditWithAMistakeStaysAnEditOfTheCalculation(t *testing.T) {
 	if !strings.Contains(body, `name="calculation" value="`+c.CalculationID+`"`) || strings.Contains(body, `name="registration"`) ||
 		!strings.Contains(body, `value="abc"`) {
 		t.Errorf("the edit came back as a new calculation, or lost what was typed:\n%s", visibleText(body))
+	}
+}
+
+// The stock list (#168) shows the car to whoever buys or sells cars, and
+// what it was bought for only to whoever may see it: the salesperson's
+// response holds no purchase price, not just a page that hides one.
+func TestTheStockListShowsThePurchasePriceOnlyToTheBuyer(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	seller, err := workshop.CreateParty(ctx, pool, owner, workshop.NewParty{Kind: "private", Name: "Sam Säljare", Role: workshop.PartySeller})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordPurchase(ctx, pool, owner, workshop.NewPurchase{VehicleID: vehicleA, Reason: workshop.StockFromPurchase,
+		SellerPartyID: seller, PurchasedOn: time.Now(), PriceMinor: 8_543_210, SellerType: workshop.SellerPrivate}); err != nil {
+		t.Fatal(err)
+	}
+	price := "85,432.10"
+	buyer := strings.ReplaceAll(visibleText(get(t, signIn(t, ts, buyerEmail), ts.URL+"/cars/stock", http.StatusOK)), " ", " ")
+	if !strings.Contains(buyer, "0 days in stock") || !strings.Contains(buyer, price) || !strings.Contains(buyer, "Stock value") {
+		t.Errorf("the buyer's stock list:\n%s", buyer)
+	}
+	sales := get(t, signIn(t, ts, salesEmail), ts.URL+"/cars/stock", http.StatusOK)
+	if !strings.Contains(sales, "0 days in stock") || strings.Contains(sales, "85,432") || strings.Contains(sales, "Bought for") ||
+		strings.Contains(sales, "Stock value") {
+		t.Errorf("the salesperson's stock list:\n%s", visibleText(sales))
+	}
+	if status, _ := getBody(t, signIn(t, ts, techEmail), ts.URL+"/cars/stock"); status != http.StatusForbidden {
+		t.Errorf("a technician's stock list answered %d, want 403", status)
+	}
+}
+
+// A buyer records a car bought on the page: the car by its plate, the
+// seller typed with it, what was paid. It is in stock at once. Refused --
+// no seller named -- the form comes back as typed and nobody is kept. A
+// salesperson is not given the form.
+func TestABuyerRecordsACarBoughtOnThePage(t *testing.T) {
+	ts, pool := testServer(t)
+	dealerShop(t, pool)
+	buyer := signIn(t, ts, buyerEmail)
+	form := url.Values{"registration": {"KLM 456"}, "make": {"Volvo"}, "model": {"V70"}, "reason": {workshop.StockFromPurchase},
+		"seller_kind": {"private"}, "seller_name": {""}, "seller_phone": {"070-111 22 33"}, "seller_type": {workshop.SellerPrivate},
+		"purchased_on": {time.Now().Format(time.DateOnly)}, "odometer": {"154 000"}, "price": {"72 500"}, "key": {"buy-page-1"}}
+	refused := post(t, buyer, ts.URL+"/cars/stock", form)
+	if !strings.Contains(refused, "a party needs a name") || !strings.Contains(refused, "070-111 22 33") {
+		t.Errorf("a purchase with no seller named:\n%s", visibleText(refused))
+	}
+	var people int
+	if err := pool.QueryRow(context.Background(), `SELECT count(*) FROM people WHERE phone = '070-111 22 33'`).Scan(&people); err != nil {
+		t.Fatal(err)
+	}
+	if people != 0 {
+		t.Errorf("a refused purchase kept %d people", people)
+	}
+	form.Set("seller_name", "Sam Säljare")
+	if resp := postResponse(t, buyer, ts.URL+"/cars/stock", form); resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/cars/stock" {
+		t.Fatalf("recording the purchase answered %d to %q", resp.StatusCode, resp.Header.Get("Location"))
+	}
+	list := strings.ReplaceAll(visibleText(get(t, buyer, ts.URL+"/cars/stock", http.StatusOK)), " ", " ")
+	if !strings.Contains(list, "KLM 456") || !strings.Contains(list, "Volvo V70") || !strings.Contains(list, "72,500.00") ||
+		!strings.Contains(list, "154000 km") {
+		t.Errorf("the stock list after the purchase:\n%s", list)
+	}
+	if status, _ := getBody(t, signIn(t, ts, salesEmail), ts.URL+"/cars/stock/new"); status != http.StatusForbidden {
+		t.Errorf("a salesperson was given the purchase form: %d", status)
+	}
+}
+
+// One car in stock, worked on its page: the buyer sees what it was bought
+// for, records a check and a cost and offers it for sale; the salesperson
+// sees the same car with no figure and may reserve it, not take it back
+// into preparation.
+func TestACarInStockIsWorkedOnItsPage(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	p, err := workshop.RecordPurchase(ctx, pool, owner, workshop.NewPurchase{VehicleID: vehicleA, Reason: workshop.StockFromPurchase,
+		NewSeller: &workshop.NewParty{Kind: "private", Name: "Sam Säljare"}, PurchasedOn: time.Now(), PriceMinor: 8_543_210,
+		SellerType: workshop.SellerPrivate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := ts.URL + "/cars/stock/" + p.StockUnitID
+	buyer := signIn(t, ts, buyerEmail)
+	text := strings.ReplaceAll(visibleText(get(t, buyer, page, http.StatusOK)), "\u00a0", " ")
+	for _, want := range []string{"85,432.10", "Checks before money leaves", "Costs", "For sale"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("the buyer's page does not show %q:\n%s", want, text)
+		}
+	}
+	if status := postStatus(t, buyer, page+"/checks", url.Values{"kind": {workshop.CheckDrivingBan}, "result": {"pass"}}); status != http.StatusSeeOther {
+		t.Errorf("recording a check answered %d", status)
+	}
+	if status := postStatus(t, buyer, page+"/costs", url.Values{"cost_kind": {workshop.CostTransport}, "net": {"1 234,50"}, "rate": {"25"},
+		"incurred_on": {time.Now().Format(time.DateOnly)}}); status != http.StatusSeeOther {
+		t.Errorf("recording a cost answered %d", status)
+	}
+	if status := postStatus(t, buyer, page+"/move", url.Values{"to": {string(workshop.StockForSale)}}); status != http.StatusSeeOther {
+		t.Errorf("offering it for sale answered %d", status)
+	}
+	text = strings.ReplaceAll(visibleText(get(t, buyer, page, http.StatusOK)), "\u00a0", " ")
+	if !strings.Contains(text, "1,234.50") || !strings.Contains(text, "No driving ban") {
+		t.Errorf("the buyer's page after the check and the cost:\n%s", text)
+	}
+	sales := get(t, signIn(t, ts, salesEmail), page, http.StatusOK)
+	if strings.Contains(sales, "85,432") || strings.Contains(sales, "1,234") || strings.Contains(sales, "Checks before money leaves") ||
+		!strings.Contains(sales, `value="reserved"`) || strings.Contains(sales, `value="in_preparation"`) {
+		t.Errorf("the salesperson's page:\n%s", visibleText(sales))
+	}
+}
+
+// A salesperson reserves a car on its page for a customer typed there,
+// takes a deposit, extends the reservation and cancels it with the deposit
+// to be refunded; the car is for sale again (#174).
+func TestASalespersonReservesACarOnItsPage(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	p, err := workshop.RecordPurchase(ctx, pool, owner, workshop.NewPurchase{VehicleID: vehicleA, Reason: workshop.StockFromPurchase,
+		NewSeller: &workshop.NewParty{Kind: "private", Name: "Sam Säljare"}, PurchasedOn: time.Now(), PriceMinor: 8_500_000,
+		SellerType: workshop.SellerPrivate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.MoveStockUnit(ctx, pool, owner, p.StockUnitID, workshop.StockForSale, ""); err != nil {
+		t.Fatal(err)
+	}
+	page := ts.URL + "/cars/stock/" + p.StockUnitID
+	seller := signIn(t, ts, salesEmail)
+	until := time.Now().Add(72 * time.Hour).Format("2006-01-02T15:04")
+	if status := postStatus(t, seller, page+"/reserve", url.Values{"holder_kind": {"private"}, "holder_name": {"Kim Köpare"},
+		"holder_phone": {"070-765 43 21"}, "until": {until}, "refundable": {"yes"}, "key": {"res-page-1"}}); status != http.StatusSeeOther {
+		t.Fatalf("reserving answered %d", status)
+	}
+	rs, err := workshop.ReservationsOfUnit(ctx, pool, owner, p.StockUnitID)
+	if err != nil || len(rs) != 1 {
+		t.Fatalf("the reservations: %+v, %v", rs, err)
+	}
+	res := page + "/reservations/" + rs[0].ID
+	if status := postStatus(t, seller, res+"/deposit", url.Values{"amount": {"5 000"}, "method": {"swish"},
+		"paid_on": {time.Now().Format(time.DateOnly)}, "key": {"dep-page-1"}}); status != http.StatusSeeOther {
+		t.Errorf("recording the deposit answered %d", status)
+	}
+	text := strings.ReplaceAll(visibleText(get(t, seller, page, http.StatusOK)), " ", " ")
+	if !strings.Contains(text, "Reserved for Kim Köpare") || !strings.Contains(text, "Deposit held SEK 5,000.00") {
+		t.Errorf("the reserved car's page:\n%s", text)
+	}
+	if resp := postResponse(t, seller, res+"/terms", url.Values{}); resp.StatusCode != http.StatusSeeOther ||
+		!strings.HasPrefix(resp.Header.Get("Location"), "/contracts/") {
+		t.Errorf("making the terms answered %d to %q", resp.StatusCode, resp.Header.Get("Location"))
+	} else if doc := visibleText(get(t, seller, ts.URL+resp.Header.Get("Location"), http.StatusOK)); !strings.Contains(doc, "Kim Köpare") {
+		t.Errorf("the terms:\n%s", doc)
+	}
+	if status := postStatus(t, seller, res+"/extend", url.Values{"until": {time.Now().Add(120 * time.Hour).Format("2006-01-02T15:04")}}); status != http.StatusSeeOther {
+		t.Errorf("extending answered %d", status)
+	}
+	rs, _ = workshop.ReservationsOfUnit(ctx, pool, owner, p.StockUnitID)
+	if status := postStatus(t, seller, page+"/reservations/"+rs[0].ID+"/end", url.Values{"how": {"cancelled"}, "deposit": {"refund"},
+		"end_reason": {"Banken sa nej"}}); status != http.StatusSeeOther {
+		t.Errorf("cancelling answered %d", status)
+	}
+	text = visibleText(get(t, seller, page, http.StatusOK))
+	if !strings.Contains(text, "Reserve the car") || !strings.Contains(text, "Banken sa nej") {
+		t.Errorf("the car's page after the reservation was cancelled:\n%s", text)
+	}
+	if strings.Contains(get(t, signIn(t, ts, buyerEmail), page, http.StatusOK), "Reserve the car") {
+		t.Error("the buyer was offered to reserve the car")
 	}
 }

@@ -58,6 +58,8 @@ type PersonExport struct {
 	// Cars they asked about (#172) and drove (#173).
 	Leads      []ExportedLead      `json:"leads,omitempty"`
 	TestDrives []ExportedTestDrive `json:"test_drives,omitempty"`
+	// Cars reserved for them (#174).
+	Reservations []ExportedReservation `json:"reservations,omitempty"`
 
 	// Written out rather than left for somebody to infer.
 	Notes []string `json:"notes"`
@@ -83,6 +85,19 @@ type ExportedLead struct {
 	Email    string    `json:"email,omitempty"`
 	Status   string    `json:"status"`
 	Contacts []string  `json:"contacts,omitempty"`
+}
+
+// ExportedReservation is a car reserved for the person, as it was agreed
+// and how it ended.
+type ExportedReservation struct {
+	Car             string     `json:"car"`
+	Made            time.Time  `json:"made"`
+	Until           time.Time  `json:"until"`
+	Refundable      bool       `json:"deposit_refundable"`
+	Conditions      string     `json:"conditions,omitempty"`
+	Ended           *time.Time `json:"ended,omitempty"`
+	How             string     `json:"how_it_ended,omitempty"`
+	DepositDecision string     `json:"deposit_decision,omitempty"`
 }
 
 type ExportedTestDrive struct {
@@ -312,6 +327,9 @@ func ExportPerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 		roles.Close()
 
 		// The cars they asked about and drove.
+		if err := exportReservationsTx(ctx, tx, personID, &e); err != nil {
+			return err
+		}
 		if err := exportLeadsAndDrivesTx(ctx, tx, personID, &e); err != nil {
 			return err
 		}
@@ -397,6 +415,9 @@ func MarshalExport(e PersonExport) ([]byte, error) {
 	return json.MarshalIndent(e, "", "  ")
 }
 
+// errEraseRenting is an erasure asked for while the person rents.
+var errEraseRenting = fmt.Errorf("%w: this person has a rental that is booked or out; end or cancel it first", ErrInvalid)
+
 // ErasePerson clears somebody's identifying details while keeping what the law
 // requires.
 //
@@ -439,6 +460,27 @@ func ErasePerson(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fi
 		}
 		if err != nil && err != pgx.ErrNoRows {
 			return fmt.Errorf("check for an account: %w", err)
+		}
+
+		// A rental booked or out is a contract still running, with a car on
+		// the road in their name: it ends, or is cancelled, before they are
+		// erased (#148). Its record afterwards is kept like any other.
+		var renting bool
+		if err := tx.QueryRow(ctx, `
+			WITH theirs AS (
+			  SELECT pa.id FROM parties pa LEFT JOIN customers c ON c.id = pa.customer_id
+			   WHERE pa.person_id = $1 OR c.person_id = $1)
+			SELECT EXISTS (
+			  SELECT 1 FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id
+			   WHERE `+rentalState+` IN ('held', 'confirmed', 'checked_out')
+			     AND (b.renter_party_id IN (SELECT id FROM theirs)
+			          OR EXISTS (SELECT 1 FROM rental_drivers d
+			                      WHERE d.booking_id = b.id AND d.removed_at IS NULL AND d.party_id IN (SELECT id FROM theirs))))`,
+			personID).Scan(&renting); err != nil {
+			return fmt.Errorf("check for a rental: %w", err)
+		}
+		if renting {
+			return errEraseRenting
 		}
 
 		// Their leads and test drives (#172, #173), found by their party and

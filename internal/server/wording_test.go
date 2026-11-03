@@ -221,3 +221,50 @@ func TestStartingAnInspectionOrClockingOutOfNoJobIsNotFound(t *testing.T) {
 		}
 	}
 }
+
+// A confirmed overpayment replayed by the offline queue -- the same request
+// with the same key -- is recorded once (#141): the confirmation is part of
+// the request, not a licence to record it again.
+func TestAConfirmedOverpaymentReplayedIsRecordedOnce(t *testing.T) {
+	ts, pool := testServer(t)
+	ctx := context.Background()
+	var invoice string
+	if err := database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `
+			INSERT INTO invoices (shop_id, series, number, work_order_id, customer_name, net_minor, vat_minor, gross_minor, seller_name, seller_payment_terms_days)
+			VALUES ($1, 'A', 80, $2, 'Test Kund', 100000, 25000, 125000, 'Shop A', 30) RETURNING id::text`, shopA, jobA).Scan(&invoice)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	desk := signIn(t, ts, advisorEmail)
+	form := url.Values{"amount": {"12500"}, "paid_on": {time.Now().Format("2006-01-02")}, "method": {"bank"},
+		"confirm_over": {"1"}, "over_reason": {"Betalade fel belopp"}}.Encode()
+	for i := 0; i < 2; i++ {
+		req, err := http.NewRequest(http.MethodPost, ts.URL+"/invoices/"+invoice+"/payments", strings.NewReader(form))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", "http://"+req.URL.Host)
+		req.Header.Set(IdempotencyHeader, "offline-0123456789abcdef")
+		client := *desk
+		client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusSeeOther {
+			t.Errorf("attempt %d answered %d, want 303", i+1, resp.StatusCode)
+		}
+	}
+	var n int
+	if err := database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT count(*) FROM invoice_payments WHERE invoice_id = $1`, invoice).Scan(&n)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("the replayed overpayment was recorded %d times", n)
+	}
+}

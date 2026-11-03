@@ -136,12 +136,14 @@ var waitingSays = map[string]string{
 	"outbox_given_up":    "%d call to another service was given up",
 	"outbox_manual":      "%d call to another service is a task to do by hand",
 	// Dealer
-	"lead_follow_up":      "A lead's next step is due: %s",
-	"lead_follow_up_any":  "A lead's next step is due",
-	"lead_car_gone":       "The car a lead asked about is reserved or sold: %s",
-	"lead_unassigned":     "A new lead nobody has: %s",
-	"lead_unassigned_any": "A new lead nobody has",
-	"test_drive_overdue":  "A test drive is not back: %s",
+	"lead_follow_up":       "A lead's next step is due: %s",
+	"lead_follow_up_any":   "A lead's next step is due",
+	"lead_car_gone":        "The car a lead asked about is reserved or sold: %s",
+	"lead_unassigned":      "A new lead nobody has: %s",
+	"lead_unassigned_any":  "A new lead nobody has",
+	"test_drive_overdue":   "A test drive is not back: %s",
+	"reservation_expiring": "A reservation runs out within a day: %s",
+	"reservation_lapsed":   "A reservation has run out: end it and decide on the deposit: %s",
 	// Rental
 	"rental_handover": "To hand over today: %s",
 	"rental_return":   "Due back today: %s",
@@ -187,6 +189,8 @@ func (w ActionItem) Link() string {
 		return "/cars/leads/" + w.SubjectID
 	case w.SubjectKind == "test_drive":
 		return "/cars/test-drives/" + w.SubjectID
+	case w.SubjectKind == "stock_unit":
+		return "/cars/stock/" + w.SubjectID
 	case w.SubjectKind == "rental_booking":
 		return "/rental/bookings/" + w.SubjectID
 	case w.SubjectKind == "rental_unit":

@@ -462,3 +462,42 @@ func reported(t *testing.T, pool *pgxpool.Pool, v rentable) {
 	}
 	inRentalUse(t, pool, u.Memberships[0].ID)
 }
+
+// A licence check served its rental alone, so cancelling the rental ends
+// the check's purpose and removes what it holds now, not at its expiry
+// (#153). That the check was made stays.
+func TestCancellingARentalEndsItsLicenceChecksPurpose(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	id, err := v.book(pool, in2031(10, 9), in2031(12, 9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver, err := workshop.AddRentalDriver(ctx, pool, rentalDesk(), id, v.renter, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), driver, workshop.LicenceShown{Shown: true, Categories: []string{"B"},
+		ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}); err != nil {
+		t.Fatal(err)
+	}
+	held := func() (open, kept int) {
+		t.Helper()
+		if err := pool.QueryRow(ctx, `
+			SELECT count(*) FILTER (WHERE r.ended_at IS NULL AND r.value_removed_at IS NULL), count(*)
+			FROM identity_records r JOIN rental_licence_checks c ON c.identity_record_id = r.id WHERE c.booking_id = $1`, id).Scan(&open, &kept); err != nil {
+			t.Fatal(err)
+		}
+		return open, kept
+	}
+	if open, kept := held(); open != 1 || kept != 1 {
+		t.Fatalf("before cancelling: %d open of %d", open, kept)
+	}
+	if err := workshop.CancelRentalBooking(ctx, pool, rentalDesk(), id, "Kunden ångrade sig", false); err != nil {
+		t.Fatal(err)
+	}
+	if open, kept := held(); open != 0 || kept != 1 {
+		t.Errorf("after cancelling: %d still open, %d kept; want none open and the check kept", open, kept)
+	}
+}
