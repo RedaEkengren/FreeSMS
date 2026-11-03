@@ -179,14 +179,7 @@ func CreateParty(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n 
 	if err := mayRecordPartyRole(scope.Role, scope, n.Role); err != nil {
 		return "", err
 	}
-	n.Name = strings.TrimSpace(n.Name)
-	switch {
-	case n.Kind != "private" && n.Kind != "company":
-		return "", fmt.Errorf("%w: a party is either a person or a company", ErrInvalid)
-	case n.Name == "" || utf8.RuneCountInString(n.Name) > 200:
-		return "", fmt.Errorf("%w: a party needs a name, in 200 characters or fewer", ErrInvalid)
-	}
-	note, err := checkNote(n.Note)
+	n, note, err := checkNewParty(n)
 	if err != nil {
 		return "", err
 	}
@@ -197,6 +190,21 @@ func CreateParty(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n 
 		return err
 	})
 	return id, err
+}
+
+// checkNewParty checks what a new party is made from, as CreateParty and
+// an operation that makes one along the way (RecordPurchase) both must:
+// the name trimmed, and the note.
+func checkNewParty(n NewParty) (NewParty, string, error) {
+	n.Name = strings.TrimSpace(n.Name)
+	switch {
+	case n.Kind != "private" && n.Kind != "company":
+		return n, "", fmt.Errorf("%w: a party is either a person or a company", ErrInvalid)
+	case n.Name == "" || utf8.RuneCountInString(n.Name) > 200:
+		return n, "", fmt.Errorf("%w: a party needs a name, in 200 characters or fewer", ErrInvalid)
+	}
+	note, err := checkNote(n.Note)
+	return n, note, err
 }
 
 // createPartyTx makes a party CreateParty has checked, in the caller's

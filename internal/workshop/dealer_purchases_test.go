@@ -320,3 +320,40 @@ func TestAPurchaseReplayedFindsItselfAndABuyBackIsAssessedAgain(t *testing.T) {
 		t.Errorf("%d cycles, want 2", len(units))
 	}
 }
+
+// A seller typed with the purchase is made in the purchase's transaction:
+// recorded, the car is bought from them; refused -- the car is already in
+// stock -- nobody is left behind with no purchase to be kept for. Replayed
+// with the same key, the seller is not made twice.
+func TestASellerTypedWithThePurchaseIsMadeOnlyWithIt(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	people := func() (n int) {
+		t.Helper()
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM people WHERE display_name = 'Sam Säljare'`).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	n := workshop.NewPurchase{VehicleID: vehicleA, Reason: workshop.StockFromPurchase, PurchasedOn: time.Now(),
+		PriceMinor: 8_500_000, SellerType: workshop.SellerPrivate, Key: "buy-1",
+		NewSeller: &workshop.NewParty{Kind: "private", Name: "Sam Säljare", Phone: "070-111 22 33"}}
+	p, err := workshop.RecordPurchase(ctx, pool, buyerScope(), n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.SellerPartyID == "" || people() != 1 {
+		t.Errorf("bought from a seller typed with it: %+v, %d people", p, people())
+	}
+	again, err := workshop.RecordPurchase(ctx, pool, buyerScope(), n)
+	if err != nil || again.ID != p.ID || people() != 1 {
+		t.Errorf("the same request again: %+v, %v, %d people", again, err, people())
+	}
+	n.Key = "buy-2"
+	if _, err := workshop.RecordPurchase(ctx, pool, buyerScope(), n); !errors.Is(err, workshop.ErrInvalid) {
+		t.Fatalf("the car bought again while in stock: %v", err)
+	}
+	if people() != 1 {
+		t.Errorf("a refused purchase left its seller behind: %d people", people())
+	}
+}
