@@ -657,6 +657,20 @@ func CancelRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 		if noShow {
 			kind = "no_show"
 		}
+		// The licence checks made for this rental served it alone (a check
+		// is never carried to another booking): their purpose ends with it,
+		// and what they hold goes now rather than at expiry (#153). That a
+		// check was made stays, as EndIdentityPurpose leaves it.
+		if _, err := tx.Exec(ctx, `
+			UPDATE identity_records
+			   SET ended_at = clock_timestamp(), ended_by = NULLIF($2, '')::uuid, end_reason = $3,
+			       key_id = NULL, sealed = NULL, verification_ref = NULL,
+			       value_removed_at = coalesce(value_removed_at, clock_timestamp())
+			 WHERE ended_at IS NULL
+			   AND id IN (SELECT identity_record_id FROM rental_licence_checks WHERE booking_id = $1)`,
+			id, scope.UserID, "rental "+kind); err != nil {
+			return fmt.Errorf("end the licence checks' purpose: %w", err)
+		}
 		_, err = rentalEventTx(ctx, tx, scope, id, kind, reason, nil)
 		return err
 	})
