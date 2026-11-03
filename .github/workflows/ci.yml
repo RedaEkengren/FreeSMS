@@ -57,8 +57,11 @@ jobs:
     # years of invoices.
     runs-on: ubuntu-latest
     # Three image builds for the rollback test on top of the restore, and two
-    # more for each M6 migration marked safe.
-    timeout-minutes: 45
+    # more for each M6 migration marked safe -- so it grows with every
+    # migration. 45 minutes ran out at 0137 (2026-11-03), cancelling the
+    # browser tests after everything before them had passed; 75 leaves room
+    # while #142's question of building fewer images stays open.
+    timeout-minutes: 75
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
