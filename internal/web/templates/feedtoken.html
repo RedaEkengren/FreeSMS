@@ -1,0 +1,6 @@
+{{define "content"}}
+<h1>{{.T "The stock feed's token"}}</h1>
+<p>{{.T "Give this to whoever builds your website. It is shown this once: it is kept only in a form that cannot be read back. A new one stops this one working."}}</p>
+<p><code>{{index .Dealer.Form "token"}}</code></p>
+<p><a href="/cars/stock">{{.T "Back to the cars in stock"}}</a></p>
+{{end}}

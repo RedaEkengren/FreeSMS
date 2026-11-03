@@ -21,6 +21,34 @@
 </section>
 {{end}}
 
+{{if $d.ShowListing}}
+<section>
+  <h2>{{.T "Offered as"}}</h2>
+  {{with $d.Photos}}<div class="photos">{{range .}}<figure><img src="/cars/stock/{{$u.ID}}/photos/{{.ID}}" alt="" loading="lazy" width="160">
+    <figcaption>{{if eq .Position 1}}<span class="tag">{{$.T "Cover"}}</span>{{else}}<form method="post" action="/cars/stock/{{$u.ID}}/photos/{{.ID}}/cover"><button type="submit" class="secondary">{{$.T "Make it the cover"}}</button></form>{{end}}
+    <form method="post" action="/cars/stock/{{$u.ID}}/photos/{{.ID}}/remove"><button type="submit" class="secondary">{{$.T "Remove"}}</button></form></figcaption></figure>{{end}}</div>{{end}}
+  {{if not $u.Status.Ended}}
+  <form method="post" action="/cars/stock/{{$u.ID}}/photos" enctype="multipart/form-data" data-online-only>
+    <label><span>{{.T "Add a photograph"}}</span><input type="file" name="photo" accept="image/*" capture="environment" required></label>
+    <button type="submit" class="secondary">{{.T "Upload"}}</button>
+  </form>
+  {{$l := $d.Listing}}
+  <form method="post" action="/cars/stock/{{$u.ID}}/listing">
+    <label><span>{{.T "Price, VAT included, in kronor"}}</span><input name="asking_price" inputmode="decimal" value="{{with index $d.Form "asking_price"}}{{.}}{{else}}{{$d.AskingPrice}}{{end}}"></label>
+    <label><span>{{.T "Variant"}}</span><input name="variant" maxlength="100" value="{{$l.Variant}}"></label>
+    <label><span>{{.T "Fuel"}}</span><input name="fuel" maxlength="40" value="{{$l.Fuel}}"></label>
+    <label><span>{{.T "Gearbox"}}</span><input name="gearbox" maxlength="40" value="{{$l.Gearbox}}"></label>
+    <label><span>{{.T "Colour"}}</span><input name="colour" maxlength="60" value="{{$l.Colour}}"></label>
+    <label class="check"><input type="checkbox" name="vat_deductible" value="yes"{{if $l.VATDeductible}} checked{{end}}> <span>{{.T "A business buyer may deduct the VAT"}}</span></label>
+    <label><span>{{.T "Equipment, one per line"}}</span><textarea name="equipment" rows="4">{{range $l.Equipment}}{{.}}
+{{end}}</textarea></label>
+    <label><span>{{.T "Description"}}</span><textarea name="description" maxlength="4000" rows="4">{{$l.Description}}</textarea></label>
+    <button type="submit">{{.T "Save how it is offered"}}</button>
+  </form>
+  {{end}}
+</section>
+{{end}}
+
 {{with $d.Consignments}}{{$c := index . 0}}
 <section>
   <h2>{{$.T "On consignment for %s" $c.PrincipalName}}</h2>

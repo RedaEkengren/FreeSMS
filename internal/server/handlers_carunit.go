@@ -35,6 +35,11 @@ type carUnitData struct {
 	Reservations     []workshop.Reservation
 	Standing         *workshop.Reservation
 	Deposit          workshop.DepositBalance
+	// How it is offered and its photographs (#167), for whoever buys or
+	// sells cars.
+	ShowListing bool
+	Listing     workshop.Listing
+	Photos      []workshop.StockPhoto
 	// The purchase's change of ownership, for whoever buys cars (#180).
 	Filing *workshop.OwnershipFiling
 	// A consigned car's agreement, every version, newest first.
@@ -42,6 +47,14 @@ type carUnitData struct {
 	// The reservation's terms in force, a document, or "".
 	TermsID string
 	Key     string
+}
+
+// AskingPrice is the listing's price as the form holds it, or "".
+func (d carUnitData) AskingPrice() string {
+	if d.Listing.AskingPriceMinor == nil {
+		return ""
+	}
+	return plainAmount(*d.Listing.AskingPriceMinor)
 }
 
 // Methods are the ways money arrives, for the deposit form.
@@ -114,6 +127,13 @@ func (s *Server) carUnitPage(w http.ResponseWriter, r *http.Request, status int,
 		if d.Outstanding, d.Overridden, err = workshop.ChecksOutstanding(r.Context(), s.pool, scope, unit.ID); err != nil {
 			s.log.Error("read outstanding checks", "error", err)
 		}
+	}
+	d.ShowListing = true
+	if d.Listing, err = workshop.ListingOf(r.Context(), s.pool, scope, unit.ID); err != nil {
+		s.log.Error("read the listing", "error", err)
+	}
+	if d.Photos, err = workshop.StockPhotos(r.Context(), s.pool, scope, unit.ID); err != nil {
+		s.log.Error("read the photos", "error", err)
 	}
 	if !unit.Owned() {
 		if d.Consignments, err = workshop.ConsignmentsOfUnit(r.Context(), s.pool, scope, unit.ID); err != nil {

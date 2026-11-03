@@ -53,4 +53,17 @@
 {{else}}
 <p class="empty">{{.T "No cars in stock."}}</p>
 {{end}}
+{{if .Session.Scope.Role.RunsTheShop}}
+<section>
+  <h2>{{.T "Your website's feed"}}</h2>
+  <p class="waiting">{{.T "Your website can read the cars for sale from /feed/v1/stock.json: price, description, equipment and photographs, and never what a car cost."}}</p>
+  <form method="post" action="/cars/feed">
+    <label class="check"><input type="checkbox" name="published" value="yes"> <span>{{.T "Publish it"}}</span></label>
+    <label class="check"><input type="checkbox" name="open" value="yes"> <span>{{.T "Open to anyone, without a token"}}</span></label>
+    <label class="check"><input type="checkbox" name="include_reserved" value="yes"> <span>{{.T "Show reserved cars, marked as reserved"}}</span></label>
+    <label class="check"><input type="checkbox" name="new_token" value="yes"> <span>{{.T "Make a new token (the old one stops working)"}}</span></label>
+    <button type="submit" class="secondary">{{.T "Save the feed"}}</button>
+  </form>
+</section>
+{{end}}
 {{end}}
