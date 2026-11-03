@@ -129,6 +129,7 @@ var core = map[string]string{
 	"ReservationTermsOf": "a document given to a customer stays readable",
 	"ConsignmentsOfUnit": "a car's history in stock",
 	"DeliveryOfSale":     "the consumer law's clocks run for three years after delivery",
+	"FilingOf":           "an ownership filing is kept with the sale or purchase it is for",
 	"ComplaintByID":      "the dealer answers for three years whatever it runs", "ComplaintsOfSale": "the dealer answers for three years whatever it runs",
 	"StockChecks": "a car's history in stock", "ChecksOutstanding": "a car's history in stock",
 	"StockCheckSettings": "a car's history in stock", "PurchaseSplitOf": "a car's history in stock",

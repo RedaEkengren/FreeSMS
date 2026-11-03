@@ -308,6 +308,11 @@ func RecordPurchase(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 			currency, n.OriginalMinor, n.RateMicro, n.RateSource, n.Note, scope.UserID).Scan(&id); err != nil {
 			return fmt.Errorf("record the purchase: %w", err)
 		}
+		// Its ownership is to be filed: prepared now, so nothing is
+		// forgotten (#180).
+		if _, err := prepareFilingTx(ctx, tx, scope, "purchase", id, n.VehicleID, n.SellerPartyID, "", n.PurchasedOn); err != nil {
+			return err
+		}
 		// The seller is a seller from now, if not one already.
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO party_roles (shop_id, party_id, role, started_by)

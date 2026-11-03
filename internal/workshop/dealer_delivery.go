@@ -178,6 +178,18 @@ func DeliverCar(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sal
 				return err
 			}
 		}
+		// Its ownership passes to the buyer: from the shop, or from the
+		// principal of a car sold on their behalf (#180, #166).
+		var vehicle, principal string
+		if err := tx.QueryRow(ctx, `
+			SELECT u.vehicle_id, coalesce((SELECT a.principal_party_id::text FROM consignment_agreements a
+			                               WHERE a.stock_unit_id = u.id ORDER BY a.version DESC LIMIT 1), '')
+			FROM stock_units u WHERE u.id = $1`, d.StockUnitID).Scan(&vehicle, &principal); err != nil {
+			return fmt.Errorf("read the car: %w", err)
+		}
+		if _, err := prepareFilingTx(ctx, tx, scope, "sale", saleID, vehicle, principal, d.Buyers[0].PartyID, n.At); err != nil {
+			return err
+		}
 		if err := moveStockUnitTx(ctx, tx, scope, d.StockUnitID, StockDelivered, ""); err != nil {
 			return err
 		}

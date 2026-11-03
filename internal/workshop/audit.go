@@ -78,6 +78,8 @@ var AuditedTransitions = []AuditTransition{
 	// A reservation ended without a sale, and what was decided about its
 	// deposit (#174).
 	{"reservation.ended", "stock_unit", "audit_events", true},
+	// A change of ownership confirmed by Transportstyrelsen (#180).
+	{"ownership.confirmed", "ownership_filing", "audit_events", true},
 	// A sold car handed over before every condition was met (#179).
 	{"vehicle_sale.delivered_early", "vehicle_sale", "audit_events", true},
 	// A test drive let start before its agreement was signed (#173).
@@ -211,6 +213,10 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 		}
 	case "document", "deposit", "payout":
 	case "stock_unit":
+		if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+			return nil, access.ErrForbidden
+		}
+	case "ownership_filing":
 		if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
 			return nil, access.ErrForbidden
 		}
