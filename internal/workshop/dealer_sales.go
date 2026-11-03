@@ -214,11 +214,13 @@ func (d Deal) Missing() []string {
 }
 
 var (
-	errDealBuyers         = fmt.Errorf("%w: a deal has one to four buyers, each named once", ErrInvalid)
-	errDealKind           = fmt.Errorf("%w: say whether the buyer is a consumer or a business", ErrInvalid)
-	errDealPrice          = fmt.Errorf("%w: a price is from nothing up to a billion kronor", ErrInvalid)
-	errDealTax            = fmt.Errorf("%w: that is not a way a sale is taxed", ErrInvalid)
-	errDealScheme         = fmt.Errorf("%w: this car may not be sold under the margin scheme: its purchase does not make it eligible", ErrInvalid)
+	errDealBuyers = fmt.Errorf("%w: a deal has one to four buyers, each named once", ErrInvalid)
+	errDealKind   = fmt.Errorf("%w: say whether the buyer is a consumer or a business", ErrInvalid)
+	errDealPrice  = fmt.Errorf("%w: a price is from nothing up to a billion kronor", ErrInvalid)
+	errDealTax    = fmt.Errorf("%w: that is not a way a sale is taxed", ErrInvalid)
+	errDealScheme = fmt.Errorf("%w: this car may not be sold under the margin scheme: its purchase does not make it eligible", ErrInvalid)
+	// The purchase was assessed again after the terms chose the scheme.
+	errDealSchemeLost     = fmt.Errorf("%w: the car's purchase was assessed again and no longer allows the margin scheme; choose how the sale is taxed and make the contract again", ErrInvalid)
 	errDealText           = fmt.Errorf("%w: a warranty and a note are at most 1000 characters, a place 300 and payment terms 500", ErrInvalid)
 	errDealOdometer       = fmt.Errorf("%w: an odometer reading is a whole number of kilometres, under ten million", ErrInvalid)
 	errDealLine           = fmt.Errorf("%w: an extra has a description, a quantity, a price and a VAT rate", ErrInvalid)
@@ -1381,6 +1383,12 @@ func IssueDealInvoice(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 		var lines []SourcedLine
 		switch d.Terms.TaxTreatment {
 		case TaxMarginScheme:
+			// The terms chose the scheme on the assessment that stood then;
+			// one made since that refuses it wins, before anything is issued
+			// (CorrectVATEligibility is refused once it is).
+			if !d.MarginSchemeEligible {
+				return errDealSchemeLost
+			}
 			tax, err := saleTaxTx(ctx, tx, d)
 			if err != nil {
 				return err
