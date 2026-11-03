@@ -128,3 +128,49 @@ func TestTheDealerAndRentalRoleMatrix(t *testing.T) {
 		}
 	}
 }
+
+// A lead recorded and a rental booked tell every open home page and queue
+// that something changed ('actions', #157, #158), as the workshop's and
+// Core's changes do: another screen hears it without a reload.
+func TestCarSalesAndRentalTellTheQueueTheyChanged(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Release()
+	if _, err := conn.Exec(ctx, `LISTEN freesms_changes`); err != nil {
+		t.Fatal(err)
+	}
+	heard := func() bool {
+		t.Helper()
+		got := false
+		for {
+			wait, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+			n, err := conn.Conn().WaitForNotification(wait)
+			cancel()
+			if err != nil {
+				return got
+			}
+			got = got || n.Payload == shopID+" actions"
+		}
+	}
+	anna := salesperson(t, pool, "Anna Säljare", "anna.s@example.test")
+	van := rentableVanWith(t, pool, "VAN 01")
+	heard()
+	n := walkIn("Kim Köpare", "070-123 45 67")
+	n.Wishes, n.Key = "En kombi", "live-1"
+	if _, err := workshop.CreateLead(ctx, pool, anna, n); err != nil {
+		t.Fatal(err)
+	}
+	if !heard() {
+		t.Error("a lead recorded, and the queue heard nothing")
+	}
+	if _, err := van.book(pool, in2031(10, 9), in2031(12, 9)); err != nil {
+		t.Fatal(err)
+	}
+	if !heard() {
+		t.Error("a rental booked, and the queue heard nothing")
+	}
+}
