@@ -11,10 +11,13 @@
 {{if $d.Moves}}
 <section>
   <h2>{{.T "Move it on"}}</h2>
+  {{range $d.Moves}}
   <form method="post" action="/cars/stock/{{$u.ID}}/move">
-    <label><span>{{.T "Why, when it ends without a sale"}}</span><input name="reason" value="{{index $d.Form "reason"}}" maxlength="300"></label>
-    {{range $d.Moves}}<button type="submit" name="to" value="{{.}}" class="secondary">{{$.T .Label}}</button> {{end}}
+    <input type="hidden" name="to" value="{{.}}">
+    {{if .Ended}}<label><span>{{$.T "Why it ends without a sale"}}</span><input name="reason" value="{{index $d.Form "reason"}}" maxlength="300" required></label>{{end}}
+    <button type="submit" class="secondary">{{$.T .Label}}</button>
   </form>
+  {{end}}
 </section>
 {{end}}
 
