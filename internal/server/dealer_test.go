@@ -146,12 +146,16 @@ func TestNoCarSalesRouteServesAnotherShopsRow(t *testing.T) {
 	ts, pool := testServer(t)
 	dealerShop(t, pool)
 	const calcB, leadB = "bbbbbbbb-0000-0000-0000-0000000000ca", "bbbbbbbb-0000-0000-0000-0000000000cb"
+	const unitB = "bbbbbbbb-0000-0000-0000-0000000000cf"
 	seedShop(t, pool, shopB, []string{
 		`INSERT INTO purchase_calculations (id, shop_id, calculation_id, version, vehicle_id, note)
 		 VALUES ('` + calcB + `','` + shopB + `','` + calcB + `',1,'` + vehicleB + `','` + secretB + `')`,
 		`INSERT INTO leads (id, shop_id, contact_name, contact_email, wishes, channel)
 		 VALUES ('` + leadB + `','` + shopB + `','` + secretB + `','b@example.test','` + secretB + `','phone')`,
 		`INSERT INTO lead_events (shop_id, lead_id, kind, status) VALUES ('` + shopB + `','` + leadB + `','status','new')`,
+		`INSERT INTO resources (id, shop_id, kind, vehicle_id) VALUES ('bbbbbbbb-0000-0000-0000-0000000000d1','` + shopB + `','vehicle','` + vehicleB + `')`,
+		`INSERT INTO stock_units (id, shop_id, vehicle_id, resource_id, reason)
+		 VALUES ('` + unitB + `','` + shopB + `','` + vehicleB + `','bbbbbbbb-0000-0000-0000-0000000000d1','defleet')`,
 	})
 	for _, email := range []string{ownerEmail, buyerEmail, salesEmail, techEmail} {
 		c := signIn(t, ts, email)
@@ -163,6 +167,10 @@ func TestNoCarSalesRouteServesAnotherShopsRow(t *testing.T) {
 			{http.MethodPost, "/cars/leads/" + leadB + "/status"},
 			{http.MethodPost, "/cars/leads/" + leadB + "/assign"},
 			{http.MethodPost, "/cars/leads/" + leadB + "/next"},
+			{http.MethodGet, "/cars/stock/" + unitB},
+			{http.MethodPost, "/cars/stock/" + unitB + "/move"},
+			{http.MethodPost, "/cars/stock/" + unitB + "/checks"},
+			{http.MethodPost, "/cars/stock/" + unitB + "/costs"},
 		} {
 			var status int
 			var body string
@@ -312,5 +320,48 @@ func TestABuyerRecordsACarBoughtOnThePage(t *testing.T) {
 	}
 	if status, _ := getBody(t, signIn(t, ts, salesEmail), ts.URL+"/cars/stock/new"); status != http.StatusForbidden {
 		t.Errorf("a salesperson was given the purchase form: %d", status)
+	}
+}
+
+// One car in stock, worked on its page: the buyer sees what it was bought
+// for, records a check and a cost and offers it for sale; the salesperson
+// sees the same car with no figure and may reserve it, not take it back
+// into preparation.
+func TestACarInStockIsWorkedOnItsPage(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	p, err := workshop.RecordPurchase(ctx, pool, owner, workshop.NewPurchase{VehicleID: vehicleA, Reason: workshop.StockFromPurchase,
+		NewSeller: &workshop.NewParty{Kind: "private", Name: "Sam Säljare"}, PurchasedOn: time.Now(), PriceMinor: 8_543_210,
+		SellerType: workshop.SellerPrivate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := ts.URL + "/cars/stock/" + p.StockUnitID
+	buyer := signIn(t, ts, buyerEmail)
+	text := strings.ReplaceAll(visibleText(get(t, buyer, page, http.StatusOK)), "\u00a0", " ")
+	for _, want := range []string{"85,432.10", "Checks before money leaves", "Costs", "For sale"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("the buyer's page does not show %q:\n%s", want, text)
+		}
+	}
+	if status := postStatus(t, buyer, page+"/checks", url.Values{"kind": {workshop.CheckDrivingBan}, "result": {"pass"}}); status != http.StatusSeeOther {
+		t.Errorf("recording a check answered %d", status)
+	}
+	if status := postStatus(t, buyer, page+"/costs", url.Values{"cost_kind": {workshop.CostTransport}, "net": {"1 234,50"}, "rate": {"25"},
+		"incurred_on": {time.Now().Format(time.DateOnly)}}); status != http.StatusSeeOther {
+		t.Errorf("recording a cost answered %d", status)
+	}
+	if status := postStatus(t, buyer, page+"/move", url.Values{"to": {string(workshop.StockForSale)}}); status != http.StatusSeeOther {
+		t.Errorf("offering it for sale answered %d", status)
+	}
+	text = strings.ReplaceAll(visibleText(get(t, buyer, page, http.StatusOK)), "\u00a0", " ")
+	if !strings.Contains(text, "1,234.50") || !strings.Contains(text, "No driving ban") {
+		t.Errorf("the buyer's page after the check and the cost:\n%s", text)
+	}
+	sales := get(t, signIn(t, ts, salesEmail), page, http.StatusOK)
+	if strings.Contains(sales, "85,432") || strings.Contains(sales, "1,234") || strings.Contains(sales, "Checks before money leaves") ||
+		!strings.Contains(sales, `value="reserved"`) || strings.Contains(sales, `value="in_preparation"`) {
+		t.Errorf("the salesperson's page:\n%s", visibleText(sales))
 	}
 }

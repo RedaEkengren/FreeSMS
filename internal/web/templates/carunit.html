@@ -1,0 +1,97 @@
+{{define "content"}}
+{{$d := .CarUnit}}{{$u := $d.Unit}}
+<h1>{{with $d.Vehicle}}{{if .Registration}}{{.Registration}}{{else if .VIN}}{{.VIN}}{{else}}{{$.T "No registration"}}{{end}}{{end}}</h1>
+{{if .Error}}<p class="error" role="alert">{{.Sentence .Error}}</p>{{end}}
+<p class="waiting">
+  {{with $d.Vehicle}}{{if .Make}}{{.Make}} {{.Model}} &middot; {{end}}{{end}}
+  <span class="tag">{{.T $u.Status.Label}}</span> &middot; {{.T $u.ReasonLabel}} &middot; {{.T "In stock since %s" (.Date (.Local $u.OpenedAt) "2 Jan 2006")}}
+  &middot; <a href="/vehicles/{{$u.VehicleID}}">{{.T "The vehicle"}}</a>
+</p>
+
+{{if $d.Moves}}
+<section>
+  <h2>{{.T "Move it on"}}</h2>
+  <form method="post" action="/cars/stock/{{$u.ID}}/move">
+    <label><span>{{.T "Why, when it ends without a sale"}}</span><input name="reason" value="{{index $d.Form "reason"}}" maxlength="300"></label>
+    {{range $d.Moves}}<button type="submit" name="to" value="{{.}}" class="secondary">{{$.T .Label}}</button> {{end}}
+  </form>
+</section>
+{{end}}
+
+{{with $d.Purchase}}
+<section>
+  <h2>{{$.T "The purchase"}}</h2>
+  <p>{{$.T "Bought for %s on %s" ($.Money .TaxPurchasePriceMinor) ($.Date .PurchasedOn "2 Jan 2006")}}</p>
+  <p class="waiting">{{$.T ($d.SellerTypeLabel .Eligibility.SellerType)}} &middot;
+    {{if .Eligibility.Eligible}}{{$.T "May be sold under the margin scheme"}}{{else}}{{$.T "Not eligible for the margin scheme"}}{{end}}</p>
+</section>
+{{end}}
+
+{{if $d.ShowChecks}}
+<section>
+  <h2>{{.T "Checks before money leaves"}}</h2>
+  {{if $d.Outstanding}}
+    <p class="waiting">{{.T "Still to pass:"}} {{range $i, $k := $d.Outstanding}}{{if $i}}, {{end}}{{$.T ($d.CheckKindLabel $k)}}{{end}}
+      {{if $d.Overridden}}&middot; <span class="tag late">{{.T "Let through by the owner"}}</span>{{end}}</p>
+  {{else}}
+    <p class="waiting">{{.T "Every check required has passed."}}</p>
+  {{end}}
+  {{if $d.Checks}}
+  <ul class="lines">
+    {{range $d.Checks}}
+    <li><div class="row"><span>{{$.T .KindLabel}}</span><span class="tag{{if eq .Result "fail"}} late{{end}}">{{$.T .Result}}</span></div>
+      <div class="waiting">{{.CheckedBy}}, {{$.Date ($.Local .CheckedAt) "2 Jan 2006 15:04"}}{{if .Note}} &middot; {{.Note}}{{end}}</div></li>
+    {{end}}
+  </ul>
+  {{end}}
+  {{if not $u.Status.Ended}}
+  <form method="post" action="/cars/stock/{{$u.ID}}/checks">
+    <label><span>{{.T "Check"}}</span><select name="kind">{{range $d.CheckKinds}}<option value="{{.}}">{{$.T ($d.CheckKindLabel .)}}</option>{{end}}</select></label>
+    <label><span>{{.T "Result"}}</span><select name="result">
+      <option value="pass">{{.T "pass"}}</option><option value="fail">{{.T "fail"}}</option><option value="unknown">{{.T "unknown"}}</option></select></label>
+    <label><span>{{.T "Note"}}</span><input name="check_note" value="{{index $d.Form "check_note"}}" maxlength="500"></label>
+    <button type="submit">{{.T "Record the check"}}</button>
+  </form>
+  {{if and $d.Outstanding (not $d.Overridden) .Session.Scope.Role.RunsTheShop}}
+  <form method="post" action="/cars/stock/{{$u.ID}}/checks/override">
+    <label><span>{{.T "Why money may leave anyway"}}</span><input name="override_reason" value="{{index $d.Form "override_reason"}}" maxlength="300" required></label>
+    <button type="submit" class="secondary">{{.T "Let it through"}}</button>
+  </form>
+  {{end}}
+  {{end}}
+</section>
+{{end}}
+
+{{with $d.Costs}}
+<section>
+  <h2>{{$.T "Costs"}}</h2>
+  <p class="waiting">{{$.T "Before the sale %s, after it %s" ($.Money .BeforeSale) ($.Money .AfterSale)}}</p>
+  {{if .Entries}}
+  <ul class="lines">
+    {{range .Entries}}
+    <li><div class="row"><span>{{$.T .KindLabel}}{{if .ExternalRef}} &middot; {{.ExternalRef}}{{end}}</span><strong>{{$.Money .NetMinor}}</strong></div>
+      <div class="waiting">{{$.Date .IncurredOn "2 Jan 2006"}}{{if .Note}} &middot; {{.Note}}{{end}}{{if .Reversed}} &middot; <span class="tag">{{$.T "Reversed"}}</span>{{end}}</div>
+      {{if and (not .Reversed) (not .ReversesID) (not $u.Status.Ended)}}
+      <form method="post" action="/cars/stock/{{$u.ID}}/costs/{{.ID}}/reverse">
+        <label><span>{{$.T "Why it is reversed"}}</span><input name="reverse_reason" maxlength="300" required></label>
+        <button type="submit" class="secondary">{{$.T "Reverse"}}</button>
+      </form>
+      {{end}}
+    </li>
+    {{end}}
+  </ul>
+  {{end}}
+  {{if not $u.Status.Ended}}
+  <form method="post" action="/cars/stock/{{$u.ID}}/costs">
+    <label><span>{{$.T "Kind"}}</span><select name="cost_kind">{{range $d.CostKinds}}<option value="{{.}}"{{if eq . (index $d.Form "cost_kind")}} selected{{end}}>{{$.T ($d.CostKindLabel .)}}</option>{{end}}</select></label>
+    <label><span>{{$.T "Before VAT, in kronor"}}</span><input name="net" value="{{index $d.Form "net"}}" inputmode="decimal" required></label>
+    <label><span>{{$.T "VAT rate, per cent"}}</span><input name="rate" value="{{with index $d.Form "rate"}}{{.}}{{else}}25{{end}}" inputmode="numeric" required></label>
+    <label><span>{{$.T "Spent on"}}</span><input type="date" name="incurred_on" value="{{with index $d.Form "incurred_on"}}{{.}}{{else}}{{$d.Today}}{{end}}" required></label>
+    <label><span>{{$.T "The supplier's reference"}}</span><input name="ref" value="{{index $d.Form "ref"}}" maxlength="100"></label>
+    <label><span>{{$.T "Note"}}</span><input name="cost_note" value="{{index $d.Form "cost_note"}}" maxlength="500"></label>
+    <button type="submit">{{$.T "Record the cost"}}</button>
+  </form>
+  {{end}}
+</section>
+{{end}}
+{{end}}

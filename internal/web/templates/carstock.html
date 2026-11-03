@@ -12,7 +12,7 @@
 <ul class="lines">
   {{range $d.Rows}}
   <li>
-    <div class="row"><a href="/vehicles/{{.VehicleID}}">{{if .Registration}}{{.Registration}}{{else if .VIN}}{{.VIN}}{{else}}{{$.T "No registration"}}{{end}}</a>
+    <div class="row"><a href="/cars/stock/{{.UnitID}}">{{if .Registration}}{{.Registration}}{{else if .VIN}}{{.VIN}}{{else}}{{$.T "No registration"}}{{end}}</a>
       <span class="tag{{if eq .Ageing "90+"}} late{{end}}">{{$.T .StatusLabel}}</span></div>
     <div class="waiting">
       {{if .Make}}{{.Make}} {{.Model}}{{if .ModelYear}} {{.ModelYear}}{{end}} &middot; {{end}}{{if .OdometerKm}}{{$.T "%s km" ($.Num .Km)}} &middot; {{end}}
