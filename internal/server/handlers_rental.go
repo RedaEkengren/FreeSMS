@@ -56,6 +56,8 @@ type rentalData struct {
 	Retention     *workshop.RegisterRetention
 	// A damage case and its steps (#197).
 	DamageCase workshop.DamageCaseDetail
+	// A booking's deposit (#196).
+	Deposit workshop.RentalDeposit
 	// A booking form's own key: sent twice, one booking.
 	Key string
 	Now time.Time
@@ -189,6 +191,7 @@ func (rentalData) HasCategory(p workshop.RentalProfile, c string) bool {
 func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("GET /rental/damage/{id}", s.requireSession(s.handleRentalDamage))
 	m.HandleFunc("POST /rental/damage/{id}/steps", s.requireSession(s.handleRentalDamageStep))
+	m.HandleFunc("POST /rental/bookings/{id}/deposit/{what}", s.requireSession(s.handleRentalDeposit))
 	m.HandleFunc("GET /rental", s.requireSession(s.handleRentalUnits))
 	m.HandleFunc("GET /rental/prices", s.requireSession(s.handleRentalPrices))
 	m.HandleFunc("POST /rental/bookings", s.requireSession(s.handleRentalBook))
@@ -640,7 +643,11 @@ func (s *Server) handleRentalBooking(w http.ResponseWriter, r *http.Request) {
 	if d.Overrides, err = workshop.RentalGapOverrides(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
 		return
 	}
-	s.render(w, r, http.StatusOK, "rentalbooking", pageData{Title: "Rental booking", Session: session, Rental: d,
+	if d.Deposit, err = workshop.RentalDepositOf(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
+		return
+	}
+	d.Key = newFormKey()
+	s.render(w, r, http.StatusOK, "rentalbooking", pageData{Title: "Rental booking", Session: session, Rental: d, Methods: workshop.PaymentMethods,
 		Today: time.Now().In(s.shopLocation(r)).Format("2006-01-02")})
 }
 

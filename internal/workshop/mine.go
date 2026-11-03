@@ -160,6 +160,8 @@ var waitingSays = map[string]string{
 	"rental_permit_ends":     "The rental permit ends soon",
 	"rental_gaps":            "Something is missing before this handover: %s",
 	"damage_to_assess":       "Damage found two days ago and not assessed: %s",
+	"deposit_to_return":      "A rental is over and its deposit is still held: %s",
+	"deposit_hold_open":      "A rental is over and the hold on the card is not released: %s",
 }
 
 // Says is the item's catalogue key.

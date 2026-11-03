@@ -221,6 +221,7 @@
     "referred_arn": {"other": "referred to the National Board for Consumer Disputes"},
     "price_reduction": {"other": "price reduction"},
     "in_person": {"other": "in person"},
+    "card_hold": {"other": "card hold"},
     "new_confirmed": {"other": "confirmed new"},
     "pre_existing": {"other": "there before"},
     "liability_assessed": {"other": "liability assessed"},

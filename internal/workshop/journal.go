@@ -118,15 +118,16 @@ var (
 )
 
 var (
-	errPurpose          = fmt.Errorf("%w: that is not what it can be for", ErrInvalid)
-	errExternalTwice    = fmt.Errorf("%w: that payment has already been recorded", ErrInvalid)
-	errKeyOtherPayment  = fmt.Errorf("%w: that request was already used to record another payment", ErrInvalid)
-	errRefundTooMuch    = fmt.Errorf("%w: that is more than is left of the payment to give back", ErrInvalid)
-	errNotAPayment      = fmt.Errorf("%w: only money received is refunded", ErrInvalid)
-	errReversedRefund   = fmt.Errorf("%w: that payment has been reversed, so there is nothing of it to give back", ErrInvalid)
-	errRefundsStand     = fmt.Errorf("%w: that payment has refunds; reverse them first, then the payment", ErrInvalid)
-	errDepositShort     = fmt.Errorf("%w: that is more than the deposit still holds", ErrInvalid)
-	errGivenBackTooMuch = fmt.Errorf("%w: that is more than the customer paid beyond the invoice; if the invoice was wrong, credit it first", ErrInvalid)
+	errPurpose                 = fmt.Errorf("%w: that is not what it can be for", ErrInvalid)
+	errExternalTwice           = fmt.Errorf("%w: that payment has already been recorded", ErrInvalid)
+	errKeyOtherPayment         = fmt.Errorf("%w: that request was already used to record another payment", ErrInvalid)
+	errRefundTooMuch           = fmt.Errorf("%w: that is more than is left of the payment to give back", ErrInvalid)
+	errNotAPayment             = fmt.Errorf("%w: only money received is refunded", ErrInvalid)
+	errReversedRefund          = fmt.Errorf("%w: that payment has been reversed, so there is nothing of it to give back", ErrInvalid)
+	errRefundsStand            = fmt.Errorf("%w: that payment has refunds; reverse them first, then the payment", ErrInvalid)
+	errDepositShort            = fmt.Errorf("%w: that is more than the deposit still holds", ErrInvalid)
+	errRentalDepositNeedsClaim = fmt.Errorf("%w: a rental's deposit is applied from the damage case it settles", ErrInvalid)
+	errGivenBackTooMuch        = fmt.Errorf("%w: that is more than the customer paid beyond the invoice; if the invoice was wrong, credit it first", ErrInvalid)
 	// ErrReversalNoReason is reversing a payment without saying why.
 	ErrReversalNoReason = fmt.Errorf("%w: say why the payment is reversed, in 300 characters or fewer", ErrInvalid)
 	// ErrRefundNoReason is refunding a payment without saying why.
@@ -475,15 +476,30 @@ func ApplyDeposit(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, d
 	}
 	key = strings.TrimSpace(key)
 	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		return applyDepositTx(ctx, tx, scope, depositID, invoiceID, amountMinor, key)
+		// A rental's deposit settles only a claim that is settled, told
+		// and past its objection (#196): from its damage case, never here.
+		var purpose string
+		if err := tx.QueryRow(ctx, `SELECT purpose FROM deposits WHERE id = $1`, depositID).Scan(&purpose); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrNotFound
+			}
+			return fmt.Errorf("read deposit: %w", err)
+		}
+		if purpose == "rental" {
+			return errRentalDepositNeedsClaim
+		}
+		_, err := applyDepositTx(ctx, tx, scope, depositID, invoiceID, amountMinor, key)
+		return err
 	})
 }
 
 // applyDepositTx is ApplyDeposit in the caller's transaction, its checks of
 // the role and the identifiers made: for an invoice that applies the
-// deposit it was paid against as it is issued (#174).
-func applyDepositTx(ctx context.Context, tx pgx.Tx, scope access.Scope, depositID, invoiceID string, amountMinor int64, key string) error {
-	{
+// deposit it was paid against as it is issued (#174). Returns the row out
+// of the deposit, or nothing when the same request was made before.
+func applyDepositTx(ctx context.Context, tx pgx.Tx, scope access.Scope, depositID, invoiceID string, amountMinor int64, key string) (string, error) {
+	var applied string
+	err := func() error {
 		d, err := depositTx(ctx, tx, depositID, true)
 		if err != nil {
 			return err
@@ -531,8 +547,10 @@ func applyDepositTx(ctx context.Context, tx pgx.Tx, scope access.Scope, depositI
 			scope.ShopID, out.ID, in.ID); err != nil {
 			return fmt.Errorf("record the application: %w", err)
 		}
+		applied = out.ID
 		return closeIfFinishedTx(ctx, tx, b.WorkOrderID)
-	}
+	}()
+	return applied, err
 }
 
 // replayedApplicationTx reports whether key already applied amountMinor of

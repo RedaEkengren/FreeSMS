@@ -98,7 +98,7 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 
 	// A deposit received, applied and partly given back; a seller paid
 	// out; a payment matched to the bank's statement and the match undone.
-	dep, err := workshop.CreateDeposit(ctx, pool, everything, workshop.NewHolding{PartyID: partyOf(t, pool, fixtureCustomer), Purpose: "rental"})
+	dep, err := workshop.CreateDeposit(ctx, pool, everything, workshop.NewHolding{PartyID: partyOf(t, pool, fixtureCustomer), Purpose: "other"})
 	if err != nil {
 		t.Fatal(err)
 	}

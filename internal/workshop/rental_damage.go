@@ -30,9 +30,11 @@ type DamageStep struct {
 	Channel     string
 	Response    string
 	Outcome     string
-	Reason      string
-	At          time.Time
-	By          string
+	// By when the customer may object, said when they are told (#196).
+	RespondBy *time.Time
+	Reason    string
+	At        time.Time
+	By        string
 }
 
 // DamageCaseDetail is a case with its steps and where it stands.
@@ -96,6 +98,35 @@ func (c DamageCaseDetail) Disputed() bool {
 	return disputed
 }
 
+// RespondBy is by when the customer, told last, may object; nil when
+// that was not said or the case was reopened since.
+func (c DamageCaseDetail) RespondBy() *time.Time {
+	var out *time.Time
+	for _, s := range c.Steps {
+		switch s.Step {
+		case "customer_informed":
+			out = s.RespondBy
+		case "reopened":
+			out = nil
+		}
+	}
+	return out
+}
+
+// Accepted reports whether the customer's latest answer accepts it.
+func (c DamageCaseDetail) Accepted() bool {
+	accepted := false
+	for _, s := range c.Steps {
+		switch s.Step {
+		case "customer_response":
+			accepted = s.Response == "accepted"
+		case "reopened":
+			accepted = false
+		}
+	}
+	return accepted
+}
+
 // Chargeable reports whether the case may become money owed: its amount
 // settled and the customer told of it.
 func (c DamageCaseDetail) Chargeable() bool {
@@ -129,7 +160,8 @@ func TakeDamageStep(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		s.Channel != "" && !slices.Contains(DamageChannels, s.Channel),
 		s.Response != "" && !slices.Contains(DamageResponses, s.Response),
 		s.Outcome != "" && !slices.Contains(DamageOutcomes, s.Outcome),
-		s.AmountMinor != nil && (*s.AmountMinor < 0 || *s.AmountMinor > 10_000_000_000):
+		s.AmountMinor != nil && (*s.AmountMinor < 0 || *s.AmountMinor > 10_000_000_000),
+		s.RespondBy != nil && s.Step != "customer_informed":
 		return errDamageStep
 	}
 	for step, given := range need {
@@ -162,9 +194,9 @@ func TakeDamageStep(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 			}
 		}
 		_, err = tx.Exec(ctx, `
-			INSERT INTO damage_case_steps (shop_id, case_id, step, liability, amount_minor, channel, response, outcome, reason, by_user)
-			VALUES ($1, $2, $3, nullif($4, ''), $5, nullif($6, ''), nullif($7, ''), nullif($8, ''), $9, NULLIF($10, '')::uuid)`,
-			scope.ShopID, caseID, s.Step, s.Liability, s.AmountMinor, s.Channel, s.Response, s.Outcome, s.Reason, scope.UserID)
+			INSERT INTO damage_case_steps (shop_id, case_id, step, liability, amount_minor, channel, response, outcome, reason, by_user, respond_by)
+			VALUES ($1, $2, $3, nullif($4, ''), $5, nullif($6, ''), nullif($7, ''), nullif($8, ''), $9, NULLIF($10, '')::uuid, $11::date)`,
+			scope.ShopID, caseID, s.Step, s.Liability, s.AmountMinor, s.Channel, s.Response, s.Outcome, s.Reason, scope.UserID, s.RespondBy)
 		return err
 	})
 }
@@ -188,7 +220,7 @@ func damageCaseTx(ctx context.Context, tx pgx.Tx, id string, lock bool) (DamageC
 	}
 	rows, err := tx.Query(ctx, `
 		SELECT s.step, coalesce(s.liability, ''), s.amount_minor, coalesce(s.channel, ''), coalesce(s.response, ''), coalesce(s.outcome, ''),
-		       s.reason, s.at, coalesce(p.display_name, '')
+		       s.reason, s.at, coalesce(p.display_name, ''), s.respond_by
 		FROM damage_case_steps s LEFT JOIN users u ON u.id = s.by_user LEFT JOIN people p ON p.id = u.person_id
 		WHERE s.case_id = $1 ORDER BY s.seq`, id)
 	if err != nil {
@@ -197,7 +229,7 @@ func damageCaseTx(ctx context.Context, tx pgx.Tx, id string, lock bool) (DamageC
 	defer rows.Close()
 	for rows.Next() {
 		var s DamageStep
-		if err := rows.Scan(&s.Step, &s.Liability, &s.AmountMinor, &s.Channel, &s.Response, &s.Outcome, &s.Reason, &s.At, &s.By); err != nil {
+		if err := rows.Scan(&s.Step, &s.Liability, &s.AmountMinor, &s.Channel, &s.Response, &s.Outcome, &s.Reason, &s.At, &s.By, &s.RespondBy); err != nil {
 			return c, err
 		}
 		c.Steps = append(c.Steps, s)
@@ -224,7 +256,9 @@ func DamageCaseByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 }
 
 // damageWaiting is the queue's damage cases with nothing assessed two days
-// after they were observed, for the rental desk.
+// after they were observed, and rentals over whose deposit is still held
+// or whose card hold is not let go (#196) -- with no damage case of theirs
+// open -- for the rental desk. One statement.
 func damageWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ActionItem, error) {
 	if !scope.Role.HandsOverRentals() {
 		return nil, nil
@@ -232,18 +266,33 @@ func damageWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 	var out []ActionItem
 	err := inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
-			SELECT c.booking_id::text, c.description, c.observed_at + interval '2 days'
+			SELECT 'damage_to_assess', c.booking_id::text, c.description, c.observed_at + interval '2 days'
 			FROM damage_cases c
 			WHERE c.booking_id IS NOT NULL AND c.observed_at < clock_timestamp() - interval '2 days'
 			  AND NOT EXISTS (SELECT 1 FROM damage_case_steps s WHERE s.case_id = c.id)
-			ORDER BY c.observed_at`)
+			UNION ALL
+			SELECT CASE WHEN x.held <> 0 THEN 'deposit_to_return' ELSE 'deposit_hold_open' END, b.id::text, 'R-' || b.number, b.ends_at
+			FROM rental_deposits rd
+			JOIN rental_bookings b ON b.id = rd.booking_id
+			JOIN resource_blocks k ON k.id = b.block_id
+			CROSS JOIN LATERAL (SELECT
+				(SELECT coalesce(sum(p.amount_minor + p.rounding_minor), 0) FROM invoice_payments p WHERE p.deposit_id = rd.deposit_id) AS held,
+				coalesce((SELECT e.kind = 'held' FROM rental_deposit_events e
+				           WHERE e.rental_deposit_id = rd.id AND e.kind IN ('held', 'hold_released') ORDER BY e.seq DESC LIMIT 1), false) AS hold) x
+			WHERE `+rentalState+` IN ('returned', 'cancelled', 'no_show', 'hold_expired')
+			  AND (x.held <> 0 OR x.hold)
+			  AND NOT EXISTS (SELECT 1 FROM damage_cases c WHERE c.booking_id = b.id
+			                  AND NOT EXISTS (SELECT 1 FROM damage_case_steps s WHERE s.case_id = c.id AND s.step = 'outcome'
+			                                  AND s.seq > coalesce((SELECT max(r.seq) FROM damage_case_steps r WHERE r.case_id = c.id AND r.step = 'reopened'), 0))
+			                  AND NOT EXISTS (SELECT 1 FROM damage_case_steps s WHERE s.case_id = c.id AND s.step = 'pre_existing'))
+			ORDER BY 4`)
 		if err != nil {
-			return fmt.Errorf("read damage to assess: %w", err)
+			return fmt.Errorf("read damage and deposits waiting: %w", err)
 		}
 		defer rows.Close()
 		for rows.Next() {
-			it := ActionItem{Kind: "damage_to_assess", Module: access.Rental, SubjectKind: "rental_booking", Urgency: UrgencySoon}
-			if err := rows.Scan(&it.SubjectID, &it.Text, &it.Due); err != nil {
+			it := ActionItem{Module: access.Rental, SubjectKind: "rental_booking", Urgency: UrgencySoon}
+			if err := rows.Scan(&it.Kind, &it.SubjectID, &it.Text, &it.Due); err != nil {
 				return err
 			}
 			out = append(out, it)

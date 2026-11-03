@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
@@ -48,6 +49,14 @@ func (s *Server) handleRentalDamageStep(w http.ResponseWriter, r *http.Request) 
 		step.AmountMinor = &n
 	case "customer_informed":
 		step.Channel = r.FormValue("channel")
+		if v := strings.TrimSpace(r.FormValue("respond_by")); v != "" {
+			day, err := time.ParseInLocation("2006-01-02", v, s.shopLocation(r))
+			if err != nil {
+				s.rentalDamagePage(w, r, http.StatusBadRequest, "Use the picker.")
+				return
+			}
+			step.RespondBy = &day
+		}
 	case "customer_response":
 		step.Response = r.FormValue("response")
 	case "outcome":
