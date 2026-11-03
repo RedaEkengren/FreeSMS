@@ -50,7 +50,12 @@ func TestASalespersonRecordsALeadOnThePage(t *testing.T) {
 	if page := get(t, signIn(t, ts, techEmail), ts.URL+"/cars/leads", http.StatusForbidden); strings.Contains(page, "Kim Köpare") {
 		t.Error("a technician was shown a lead")
 	}
-	if _, err := workshop.SwitchModule(ctx, pool, owner, access.Dealer, false, "Slutar sälja bilar", false); err != nil {
+	// The lead is open business: switching off asks first (#143), and the
+	// owner, meaning it, switches off with it open.
+	if _, err := workshop.SwitchModule(ctx, pool, owner, access.Dealer, false, "Slutar sälja bilar", false); err == nil {
+		t.Error("car sales switched off with a lead open, unasked")
+	}
+	if _, err := workshop.SwitchModule(ctx, pool, owner, access.Dealer, false, "Slutar sälja bilar", true); err != nil {
 		t.Fatal(err)
 	}
 	get(t, signIn(t, ts, salesEmail), ts.URL+"/cars/leads", http.StatusNotFound)

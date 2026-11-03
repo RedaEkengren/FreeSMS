@@ -62,7 +62,8 @@ type OpenBusiness struct {
 // OpenItem is one thing still open.
 type OpenItem struct {
 	// "job", "booking" or "clock": somebody clocked on to a job. What is
-	// the person's name for a clock.
+	// the person's name for a clock. Car sales: "deal", "reserved" (a car
+	// held for a buyer), "lead" and "test_drive".
 	Kind string
 	// What a person recognises it by: a job number and plate, a booking's
 	// time and what it is for.
@@ -287,11 +288,14 @@ func SwitchModule(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, m
 // openBusinessTx lists what is open in a module. The workshop's: every job
 // not yet invoiced, closed, declined or cancelled, and every booking still to
 // come, and every clock still running, which switching off stops. Car sales
-// and rental have none until they exist.
+// and rental list theirs (dealerOpenBusinessTx, rentalOpenBusinessTx).
 func openBusinessTx(ctx context.Context, tx pgx.Tx, m access.Module) (*OpenBusiness, error) {
 	open := &OpenBusiness{Module: m}
 	if m == access.Rental {
 		return rentalOpenBusinessTx(ctx, tx, open)
+	}
+	if m == access.Dealer {
+		return dealerOpenBusinessTx(ctx, tx, open)
 	}
 	if m != access.Workshop {
 		return open, nil
@@ -384,4 +388,54 @@ func ShopModules(ctx context.Context, pool *pgxpool.Pool, shopID string) ([]acce
 		out = append(out, access.Module(n))
 	}
 	return out, err
+}
+
+// dealerOpenBusinessTx lists what is open in car sales (#143): a deal not
+// cancelled and not yet invoiced, a car reserved for a buyer, a lead
+// neither won nor lost, and a test drive booked or out and not back.
+// Switching off with any of it would leave a buyer, a deposit or a car on
+// the road with nobody able to see it.
+func dealerOpenBusinessTx(ctx context.Context, tx pgx.Tx, open *OpenBusiness) (*OpenBusiness, error) {
+	rows, err := tx.Query(ctx, `
+		WITH car AS (
+		  SELECT u.id, u.status, u.closed_at, coalesce(r.registration, '') AS registration
+		    FROM stock_units u
+		    LEFT JOIN vehicle_registrations r ON r.vehicle_id = u.vehicle_id AND r.valid_to IS NULL)
+		SELECT 'deal', s.number::int, c.registration, NULL::timestamptz, s.id::text
+		  FROM vehicle_sales s JOIN car c ON c.id = s.stock_unit_id
+		 WHERE NOT EXISTS (SELECT 1 FROM vehicle_sale_events e WHERE e.sale_id = s.id AND e.kind = 'cancelled')
+		   AND sale_invoice_standing(s.id) IS NULL
+		UNION ALL
+		SELECT 'reserved', 0, c.registration, NULL, c.id::text
+		  FROM car c WHERE c.status = 'reserved' AND c.closed_at IS NULL
+		UNION ALL
+		SELECT 'lead', 0, coalesce(c.registration, ''), NULL, l.id::text
+		  FROM leads l LEFT JOIN car c ON c.id = l.stock_unit_id
+		 WHERE l.erased_at IS NULL
+		   AND coalesce((SELECT e.status FROM lead_events e WHERE e.lead_id = l.id AND e.kind = 'status'
+		                 ORDER BY e.seq DESC LIMIT 1), 'new') NOT IN ('won', 'lost')
+		UNION ALL
+		SELECT 'test_drive', 0, c.registration, d.starts_at, d.id::text
+		  FROM test_drives d JOIN car c ON c.id = d.stock_unit_id
+		 WHERE NOT EXISTS (SELECT 1 FROM test_drive_events e WHERE e.test_drive_id = d.id AND e.kind IN ('returned', 'cancelled'))
+		   AND (d.ends_at > now() OR EXISTS (SELECT 1 FROM test_drive_events e WHERE e.test_drive_id = d.id AND e.kind = 'started'))
+		 ORDER BY 1, 2, 4`)
+	if err != nil {
+		return nil, fmt.Errorf("read open car sales: %w", err)
+	}
+	defer rows.Close()
+	links := map[string]string{"deal": "/cars/deals/", "reserved": "/cars/deals", "lead": "/cars/leads/", "test_drive": "/cars/test-drives/"}
+	for rows.Next() {
+		var it OpenItem
+		var id string
+		if err := rows.Scan(&it.Kind, &it.Number, &it.Registration, &it.At, &id); err != nil {
+			return nil, err
+		}
+		it.Link = links[it.Kind]
+		if it.Kind != "reserved" {
+			it.Link += id
+		}
+		open.Items = append(open.Items, it)
+	}
+	return open, rows.Err()
 }

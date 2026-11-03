@@ -110,7 +110,7 @@
 <div class="error" role="alert">
   <p>{{$.T "Still open in %s:" ($.T .Module.Label)}}</p>
   <ul>
-    {{range .Items}}<li><a href="{{.Link}}">{{if eq .Kind "job"}}{{$.T "Job #%d" .Number}}{{else if eq .Kind "clock"}}{{$.T "Clocked on to job #%d" .Number}}{{else}}{{$.T "Booking %s" ($.Date ($.Local .At) "Mon 2 Jan 15:04")}}{{end}}</a> {{$.Dot .Registration .What}}</li>{{end}}
+    {{range .Items}}<li><a href="{{.Link}}">{{if eq .Kind "job"}}{{$.T "Job #%d" .Number}}{{else if eq .Kind "clock"}}{{$.T "Clocked on to job #%d" .Number}}{{else if eq .Kind "deal"}}{{$.T "Deal #%d" .Number}}{{else if eq .Kind "reserved"}}{{$.T "Reserved car"}}{{else if eq .Kind "lead"}}{{$.T "Open lead"}}{{else if eq .Kind "test_drive"}}{{$.T "Test drive %s" ($.Date ($.Local .At) "Mon 2 Jan 15:04")}}{{else}}{{$.T "Booking %s" ($.Date ($.Local .At) "Mon 2 Jan 15:04")}}{{end}}</a> {{$.Dot .Registration .What}}</li>{{end}}
   </ul>
   <p>{{$.T "Switched off, these stay as they are, and nobody can carry on with them until it is switched on again."}}</p>
 </div>

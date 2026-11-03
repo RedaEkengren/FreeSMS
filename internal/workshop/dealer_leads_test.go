@@ -396,3 +396,59 @@ func TestACarKnownByItsChassisNumberIsNamedByIt(t *testing.T) {
 		}
 	}
 }
+
+// Switching car sales off with business open is refused until the owner
+// says they mean it, having been shown what (#143): a lead neither won nor
+// lost, a car reserved for a buyer and a deal not yet invoiced. An
+// invoiced deal is not open.
+func TestCarSalesAreNotSwitchedOffUnderOpenBusinessUnasked(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	anna := salesperson(t, pool, "Anna Säljare", "anna.s@example.test")
+	// Car sales are not yet offered at setup (Available), so the shop
+	// runs them as a row, the way a later release will switch them on.
+	if _, err := pool.Exec(ctx, `INSERT INTO shop_module_changes (shop_id, module, enabled, reason) VALUES ($1, 'dealer', true, 'test')`, shopID); err != nil {
+		t.Fatal(err)
+	}
+	unit := eligibleCar(t, pool)
+	n := walkIn("Kim Köpare", "070-123 45 67")
+	n.StockUnitID, n.Key = unit, "form-1"
+	lead, err := workshop.CreateLead(ctx, pool, anna, n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	openNow := func() map[string]string {
+		t.Helper()
+		_, err := workshop.SwitchModule(ctx, pool, owner(), access.Dealer, false, "Slutar sälja bilar", false)
+		open, ok := workshop.AsOpenBusiness(err)
+		if !ok {
+			t.Fatalf("switched off with business open: %v", err)
+		}
+		kinds := map[string]string{}
+		for _, it := range open.Items {
+			kinds[it.Kind] = it.Link
+		}
+		return kinds
+	}
+	moveStock(t, pool, unit, workshop.StockReserved)
+	if k := openNow(); k["lead"] != "/cars/leads/"+lead.ID || k["reserved"] == "" {
+		t.Errorf("a lead and a reserved car: %v", k)
+	}
+	moveStock(t, pool, unit, workshop.StockForSale)
+	deal := completedDealOn(t, pool, unit, workshop.TaxMarginScheme)
+	if k := openNow(); k["deal"] != "/cars/deals/"+deal.ID {
+		t.Errorf("a contracted deal: %v", k)
+	}
+	if _, err := workshop.IssueDealInvoice(ctx, pool, sales(), deal.ID); err != nil {
+		t.Fatal(err)
+	}
+	// Invoiced, the deal is done and no longer open. The lead was never
+	// the deal's, so it is still open until somebody closes it; meaning it,
+	// the owner switches car sales off with it open.
+	if k := openNow(); k["deal"] != "" || k["lead"] == "" {
+		t.Errorf("after the invoice: %v, want the lead alone", k)
+	}
+	if changed, err := workshop.SwitchModule(ctx, pool, owner(), access.Dealer, false, "Slutar sälja bilar", true); err != nil || !changed {
+		t.Errorf("switched off, meaning it: %v, %v", changed, err)
+	}
+}
