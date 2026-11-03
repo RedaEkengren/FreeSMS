@@ -8432,6 +8432,7 @@
     "that phone number has too few or too many digits": {"other": "telefonnumret har för få eller för många siffror"},
     "that request was already used for another enquiry": {"other": "den begäran har redan använts för en annan förfrågan"},
     "Lead": {"other": "Lead"},
+    "this person has a rental that is booked or out; end or cancel it first": {"other": "personen har en hyra som är bokad eller ute; avsluta eller avboka den först"},
     "Deal #%d": {"other": "Affär #%d"},
     "Reserved car": {"other": "Reserverad bil"},
     "Open lead": {"other": "Öppet lead"},
