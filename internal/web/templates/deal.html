@@ -147,6 +147,21 @@
 {{if $x.Completed}}<h2>{{.T "Invoice"}}</h2>
 {{if $x.InvoiceRef}}<p>{{if .Session.Scope.Role.SeesCustomerPersonalData}}<a href="/invoices/{{$x.InvoiceID}}">{{.T "Invoiced as %s" $x.InvoiceRef}}</a>{{else}}{{.T "Invoiced as %s" $x.InvoiceRef}}{{end}}</p>
 {{else}}<form method="post" action="/cars/deals/{{$x.ID}}/invoice"><button type="submit">{{.T "Invoice the sale"}}</button></form>{{end}}
+<h2>{{.T "Delivery"}}</h2>
+{{with $d.Delivery}}
+  <p>{{$.T "Handed over %s" ($.Date ($.Local .DeliveredAt) "2 Jan 2006 15:04")}}{{if .AtHome}} &middot; {{$.T "at the buyer's address"}}{{end}}{{with .OdometerKm}} &middot; {{$.T "%s km" ($.Num $d.DeliveryKm)}}{{end}}</p>
+  {{if .Consumer}}<p class="waiting">{{$.T "A defect is presumed to have been there at delivery until %s; the dealer answers for defects until %s." ($.Date .PresumptionEnds "2 Jan 2006") ($.Date .LiabilityEnds "2 Jan 2006")}}</p>{{end}}
+  {{if .OverrideReason}}<p class="waiting">{{$.T "Let go before every condition was met: %s" .OverrideReason}}</p>{{end}}
+{{else}}
+  {{with $d.Missing}}<ul class="error">{{range .}}<li>{{$.T .}}</li>{{end}}</ul>{{end}}
+  <form method="post" action="/cars/deals/{{$x.ID}}/deliver">
+    <label><span>{{.T "Handed over"}}</span><input type="datetime-local" name="at" value="{{$d.Now}}" required></label>
+    <label><span>{{.T "Odometer, km"}}</span><input name="odometer" inputmode="numeric"></label>
+    <label class="check"><input type="checkbox" name="at_home" value="yes"> <span>{{.T "At the buyer's address"}}</span></label>
+    {{if .Session.Scope.Role.RunsTheShop}}<label><span>{{.T "If it goes before every condition is met, why"}}</span><input name="override" maxlength="300"></label>{{end}}
+    <button type="submit">{{.T "Record the delivery"}}</button>
+  </form>
+{{end}}
 {{end}}
 
 {{if $d.Unsaved}}<section class="callout"><h2>{{.T "What you typed, not saved"}}</h2>

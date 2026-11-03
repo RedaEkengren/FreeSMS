@@ -279,7 +279,7 @@ var swept = map[string]string{
 	"GET /cars/deals/{id}": "sweep", "POST /cars/deals/{id}/terms": "sweep", "POST /cars/deals/{id}/defects": "sweep",
 	"POST /cars/deals/{id}/defects/{defect}/answer": "sweep", "POST /cars/deals/{id}/contract": "sweep",
 	"POST /cars/deals/{id}/signed": "sweep", "POST /cars/deals/{id}/complete": "sweep", "POST /cars/deals/{id}/cancel": "sweep",
-	"POST /cars/deals/{id}/invoice": "sweep",
+	"POST /cars/deals/{id}/invoice": "sweep", "POST /cars/deals/{id}/deliver": "sweep",
 }
 
 // fill substitutes shop B's identifiers into a pattern.
