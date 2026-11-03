@@ -90,6 +90,9 @@ var actionProviders = []ActionProvider{
 	{Module: access.Dealer, Name: "dealer", Items: dealerWaiting},
 	// Rental
 	{Module: access.Rental, Name: "rental", Items: rentalWaiting},
+	// The fleet's paperwork (#202), a provider of its own: today's page
+	// is the day's handovers, and this failing does not take them with it.
+	{Module: access.Rental, Name: "rental paperwork", Items: rentalPaperworkWaiting},
 }
 
 // IncompleteError is WaitingFor's when a provider failed: the items of the
@@ -144,6 +147,13 @@ var waitingSays = map[string]string{
 	"rental_return":   "Due back today: %s",
 	"rental_overdue":  "Out past its return: %s",
 	"rental_at_risk":  "May not be back in time for this rental: %s",
+	// Rental: the fleet's paperwork (#202).
+	"rental_report_in":       "Report into rental use in the vehicle register: %s",
+	"rental_report_out":      "Out of the fleet, and still reported into rental use: %s",
+	"rental_insurance_ends":  "Its insurance for rental use ends soon: %s",
+	"rental_insurance_ended": "Its insurance for rental use has ended: %s",
+	"rental_permit_ends":     "The rental permit ends soon",
+	"rental_gaps":            "Something is missing before this handover: %s",
 }
 
 // Says is the item's catalogue key.
@@ -179,6 +189,10 @@ func (w ActionItem) Link() string {
 		return "/cars/test-drives/" + w.SubjectID
 	case w.SubjectKind == "rental_booking":
 		return "/rental/bookings/" + w.SubjectID
+	case w.SubjectKind == "rental_unit":
+		return "/rental/units/" + w.SubjectID
+	case w.SubjectKind == "rental_settings":
+		return "/rental/settings"
 	}
 	return "/jobs/" + w.SubjectID
 }

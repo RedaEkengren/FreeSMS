@@ -61,6 +61,12 @@ var ExportTables = []string{
 	"rental_permits", "rental_permit_revocations", "rental_profiles", "rental_units", "fleet_memberships",
 	"rate_plans", "rate_plan_seasons", "rental_extras", "rental_bookings", "rental_booking_events", "rental_booking_lines",
 	"rental_drivers", "rental_licence_checks",
+	// Each end of a rental, and what a return found (#194).
+	"rental_handovers", "damage_cases",
+	// A fleet vehicle's paperwork, and handover gaps let go (#202).
+	"fleet_rental_reports", "fleet_insurances", "rental_gap_overrides",
+	// How long the rental register is kept (#200).
+	"rental_register_retention",
 }
 
 // exportQueries are tables exported with chosen columns, because one of
@@ -101,7 +107,7 @@ var exportQueries = map[string]string{
 	"rental_profile_versions": `SELECT id, shop_id, profile_id, version, permit_required, registration_required,
 		licence_check_required, licence_categories, reporting_required, check_out_template_id, check_in_template_id,
 		extract(epoch FROM cleaning_buffer)::bigint AS cleaning_buffer_seconds, mileage_allowance, default_deposit_minor,
-		minimum_age, sublet_banned, unconfirmed, created_at, created_by FROM rental_profile_versions`,
+		minimum_age, sublet_banned, unconfirmed, created_at, created_by, insurance_required FROM rental_profile_versions`,
 }
 
 // exportExcluded are the tables that do not go, and why.
@@ -337,6 +343,9 @@ func writeTable(ctx context.Context, tx pgx.Tx, z *zip.Writer, table string) (in
 			return n, err
 		}
 		for i, v := range values {
+			// As stored: this is data for software and a restore, and a
+			// value is not rewritten for a spreadsheet (SpreadsheetCell is
+			// for the files people open, as the rental register's).
 			record[i] = exportValue(v, fields[i].DataTypeOID)
 		}
 		if err := cw.Write(record); err != nil {

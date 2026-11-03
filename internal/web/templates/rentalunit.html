@@ -37,6 +37,42 @@
 {{else}}
 <p>{{$.T "Never in the fleet yet."}}</p>
 {{end}}
+{{with $.Rental.FleetUse}}{{if .MembershipID}}
+<h2>{{$.T "Rental use and insurance"}}</h2>
+<p>{{if .Reported}}<span class="tag pass">{{$.T "reported into rental use"}}</span>{{else}}<span class="tag late">{{$.T "not reported into rental use"}}</span>{{end}}</p>
+<ul class="lines">
+  {{range .Reports}}<li><div class="row"><span>{{if eq .Direction "in"}}{{$.T "Reported into rental use"}}{{else}}{{$.T "Reported out of rental use"}}{{end}} &middot; {{$.Date .ReportedOn "2 Jan 2006"}}{{with .Reference}} &middot; {{.}}{{end}}</span><span>{{.RecordedBy}}</span></div></li>{{end}}
+  {{range .Insurances}}<li><div class="row"><span>{{.Insurer}} &middot; {{.PolicyRef}} &middot; {{$.Date .ValidFrom "2 Jan 2006"}} &ndash; {{if .ValidTo}}{{$.Date .ValidTo "2 Jan 2006"}}{{else}}{{$.T "until further notice"}}{{end}}</span>
+    <span class="tag{{if ne .CoversRental "yes"}} late{{end}}">{{if eq .CoversRental "yes"}}{{$.T "covers rental"}}{{else if eq .CoversRental "no"}}{{$.T "does not cover rental"}}{{else}}{{$.T "rental cover not known"}}{{end}}</span></div></li>{{end}}
+</ul>
+<p class="waiting">{{$.T $.Rental.RegisterSays}} <a href="{{$.Rental.RegisterLink}}" rel="noopener" target="_blank">Transportstyrelsen</a></p>
+<details><summary>{{$.T "Record a report"}}</summary>
+<form method="post" action="/rental/memberships/{{.MembershipID}}/report">
+  <input type="hidden" name="unit" value="{{$.Rental.Unit.ID}}">
+  <div class="pair">
+    <label><span>{{$.T "Into or out of rental use"}}</span><select name="direction"><option value="in">{{$.T "Into rental use"}}</option><option value="out">{{$.T "Out of rental use"}}</option></select></label>
+    <label><span>{{$.T "Reported on"}}</span><input type="date" name="on" required></label>
+  </div>
+  <label><span>{{$.T "Reference"}}</span><input name="reference" maxlength="200"></label>
+  <button type="submit" class="secondary">{{$.T "Record the report"}}</button>
+</form>
+</details>
+<details><summary>{{$.T "Record an insurance"}}</summary>
+<form method="post" action="/rental/memberships/{{.MembershipID}}/insurance">
+  <input type="hidden" name="unit" value="{{$.Rental.Unit.ID}}">
+  <div class="pair">
+    <label><span>{{$.T "Insurer"}}</span><input name="insurer" maxlength="120" required></label>
+    <label><span>{{$.T "Policy number"}}</span><input name="policy_ref" maxlength="100" required></label>
+  </div>
+  <div class="pair">
+    <label><span>{{$.T "Valid from"}}</span><input type="date" name="valid_from" required></label>
+    <label><span>{{$.T "Valid until, if it ends"}}</span><input type="date" name="valid_to"></label>
+  </div>
+  <label><span>{{$.T "Covers rental use"}}</span><select name="covers"><option value="yes">{{$.T "Yes"}}</option><option value="no">{{$.T "No"}}</option><option value="unknown">{{$.T "Not known"}}</option></select></label>
+  <button type="submit" class="secondary">{{$.T "Record the insurance"}}</button>
+</form>
+</details>
+{{end}}{{end}}
 {{if not .InFleet}}
 <form method="post" action="/rental/units/{{.ID}}/fleet">
   <div class="pair">

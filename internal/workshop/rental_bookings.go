@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -321,6 +322,21 @@ func lockUnitResourceTx(ctx context.Context, tx pgx.Tx, resource string) error {
 	return nil
 }
 
+// lockResourceOfTx finds a resource by what is on it and locks it, in one
+// statement: of selects the resource's id from $1 -- a block, a booking, a
+// fleet period. The resource first is the order every write to it takes.
+func lockResourceOfTx(ctx context.Context, tx pgx.Tx, of string, arg any) (string, error) {
+	var id string
+	err := tx.QueryRow(ctx, `SELECT id FROM resources WHERE id = (`+of+`) FOR UPDATE`, arg).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("lock the resource: %w", err)
+	}
+	return id, nil
+}
+
 // inFleetTx refuses a period the unit is not in the fleet for, all of it.
 func inFleetTx(ctx context.Context, tx pgx.Tx, unitID string, from, to time.Time) error {
 	var in bool
@@ -549,6 +565,9 @@ type lockedRental struct {
 	starts, ends                     time.Time
 	buffer                           time.Duration
 	blockStatus                      string
+	// Where its block starts now: before the booked start once the unit
+	// went out early.
+	blockFrom time.Time
 }
 
 func lockRentalTx(ctx context.Context, tx pgx.Tx, id string) (lockedRental, error) {
@@ -557,21 +576,13 @@ func lockRentalTx(ctx context.Context, tx pgx.Tx, id string) (lockedRental, erro
 	// rental write takes, so two never wait on each other.
 	// Found and locked in one statement; the booking's block, and so its
 	// unit, never changes.
-	var one int
+	if _, err := lockResourceOfTx(ctx, tx, `SELECT k.resource_id FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id WHERE b.id = $1`, id); err != nil {
+		return b, err
+	}
 	err := tx.QueryRow(ctx, `
-		SELECT 1 FROM resources
-		WHERE id = (SELECT k.resource_id FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id WHERE b.id = $1)
-		FOR UPDATE`, id).Scan(&one)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return b, ErrNotFound
-	}
-	if err != nil {
-		return b, fmt.Errorf("lock the unit: %w", err)
-	}
-	err = tx.QueryRow(ctx, `
-		SELECT b.unit_id, k.resource_id, b.block_id, `+rentalState+`, b.starts_at, b.ends_at, k.buffer_after, k.status
+		SELECT b.unit_id, k.resource_id, b.block_id, `+rentalState+`, b.starts_at, b.ends_at, k.buffer_after, k.status, lower(k.period)
 		FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id
-		WHERE b.id = $1 FOR UPDATE OF b, k`, id).Scan(&b.unit, &b.resource, &b.block, &b.state, &b.starts, &b.ends, &b.buffer, &b.blockStatus)
+		WHERE b.id = $1 FOR UPDATE OF b, k`, id).Scan(&b.unit, &b.resource, &b.block, &b.state, &b.starts, &b.ends, &b.buffer, &b.blockStatus, &b.blockFrom)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return b, ErrNotFound
 	}
@@ -740,7 +751,7 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 			return errExtendLater
 		}
 		if b.state == RentalCheckedOut {
-			if err := licencesLastTx(ctx, tx, id, to); err != nil {
+			if err := lastsTheExtensionTx(ctx, tx, id, b.starts, to); err != nil {
 				return err
 			}
 		}
@@ -757,7 +768,12 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 		if err != nil {
 			return err
 		}
-		if err := reblockTx(ctx, tx, b, b.starts, to); err != nil {
+		// Out since before the booked start, the block keeps starting then.
+		from := b.starts
+		if b.blockFrom.Before(from) {
+			from = b.blockFrom
+		}
+		if err := reblockTx(ctx, tx, b, from, to); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE rental_bookings SET ends_at = $2 WHERE id = $1`, id, to); err != nil {
@@ -784,6 +800,10 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 			}
 			lines = append(lines, extras...)
 			switch {
+			case plan == "":
+				// Not known what plan it was agreed under: the plan
+				// pricing the unit today was never agreed, and does not
+				// change the kilometres that were.
 			case quote.IncludedKm == nil:
 				// The added days include unlimited kilometres. The
 				// odometer is read when the unit goes out and comes back,
@@ -854,7 +874,7 @@ func (b lockedRental) open() bool {
 
 const rentalBookingColumns = `
 	b.id, b.number, b.unit_id, u.fleet_number || coalesce(' · ' || reg.registration, ' · ' || r.name, ''), u.resource_id,
-	b.renter_party_id, coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, ''),
+	b.renter_party_id, ` + partyNameSQL + `,
 	b.starts_at, b.ends_at, ` + rentalState + `, CASE WHEN k.status = 'held' THEN k.expires_at END, b.block_id,
 	v.profile_id, coalesce(b.plan_id::text, ''), b.included_km, b.extra_km_minor,
 	EXISTS (SELECT 1 FROM rental_bookings o JOIN resource_blocks ok ON ok.id = o.block_id
@@ -1011,7 +1031,7 @@ func Renters(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Ren
 	var out []Renter
 	err := inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
-			SELECT pa.id, coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, ''),
+			SELECT pa.id, `+partyNameSQL+`,
 			       coalesce(cp.phone, pp.phone, '')
 			FROM parties pa
 			LEFT JOIN customers c ON c.id = pa.customer_id
@@ -1036,33 +1056,24 @@ func Renters(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]Ren
 	return out, err
 }
 
-// licencesLastTx refuses an extension of a rental already out past the end
-// of a driver's licence, when its profile needs a licence check: the unit
-// is with them, and a check at the counter is the only way to know.
-func licencesLastTx(ctx context.Context, tx pgx.Tx, bookingID string, to time.Time) error {
-	var needed bool
-	if err := tx.QueryRow(ctx, `SELECT v.licence_check_required FROM rental_bookings b JOIN rental_profile_versions v ON v.id = b.profile_version_id
-		WHERE b.id = $1`, bookingID).Scan(&needed); err != nil {
-		return fmt.Errorf("read profile: %w", err)
-	}
-	if !needed {
-		return nil
-	}
-	loc, err := shopLocationTx(ctx, tx)
+// lastsTheExtensionTx refuses to extend a rental that is out past a
+// driver's licence or the insurance its profile requires: the counter's
+// question (bookingGapsCTEs) asked once, for the longer period.
+func lastsTheExtensionTx(ctx context.Context, tx pgx.Tx, bookingID string, starts, to time.Time) error {
+	gaps, err := bookingGapsTx(ctx, tx, []string{bookingID}, []time.Time{starts}, []time.Time{to})
 	if err != nil {
 		return err
 	}
-	drivers, err := rentalDriversTx(ctx, tx, bookingID)
-	if err != nil {
-		return err
+	// Only these two are the extension's to ask -- the rest were settled
+	// at the handover -- and a licence first, as it always was.
+	has := func(code string) bool {
+		return slices.ContainsFunc(gaps[bookingID], func(g HandoverGap) bool { return g.Code == code })
 	}
-	for _, d := range drivers {
-		if d.Removed {
-			continue
-		}
-		if d.Check == nil || !d.Check.Passed || d.Check.ValidUntil == nil || !licenceLasts(*d.Check.ValidUntil, to, loc) {
-			return errExtendLicence
-		}
+	switch {
+	case has(GapLicence):
+		return errExtendLicence
+	case has(GapInsurance):
+		return errExtendInsurance
 	}
 	return nil
 }

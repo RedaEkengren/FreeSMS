@@ -373,10 +373,12 @@ func BookResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, b
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("read what is booked: %w", err)
 		}
-		// In a savepoint: the same request, replayed while the first is
-		// still in flight, waits here on the first's row, and is then
-		// refused -- by the key, or by the overlap with itself. Either way
-		// the first has committed by then, and its block is the answer.
+		// In a savepoint, for the one replay the read above cannot see: the
+		// same key in flight on another resource, which this resource's
+		// lock does not queue. (A replay on this resource waited on that
+		// lock and found its block above.) The key's unique index refuses
+		// it once the other commits, and the block found by the key is the
+		// answer.
 		sp, err := tx.Begin(ctx)
 		if err != nil {
 			return err
@@ -412,9 +414,8 @@ func BookResource(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, b
 // then the block, the order every write to a resource takes. A block's
 // resource never changes, so reading which one unlocked is safe.
 func blockKindTx(ctx context.Context, tx pgx.Tx, id string) (kind, status string, expired bool, err error) {
-	if _, err = tx.Exec(ctx, `
-		SELECT 1 FROM resources WHERE id = (SELECT resource_id FROM resource_blocks WHERE id = $1) FOR UPDATE`, id); err != nil {
-		return "", "", false, fmt.Errorf("lock the resource: %w", err)
+	if _, err = lockResourceOfTx(ctx, tx, `SELECT resource_id FROM resource_blocks WHERE id = $1`, id); err != nil {
+		return "", "", false, err
 	}
 	err = tx.QueryRow(ctx, `
 		SELECT kind, status, status = 'held' AND expires_at <= clock_timestamp()

@@ -407,7 +407,7 @@ func ProtocolsForVehicle(ctx context.Context, pool *pgxpool.Pool, scope access.S
 
 func readProtocols(ctx context.Context, tx pgx.Tx, where string, arg any) ([]Protocol, error) {
 	rows, err := tx.Query(ctx, `
-		SELECT i.id::text, i.subject, i.vehicle_id::text, coalesce(r.registration, ''), i.template_name,
+		SELECT i.id::text, i.subject, coalesce(i.vehicle_id::text, ''), coalesce(r.registration, ''), i.template_name,
 		       coalesce(p.display_name, ''), i.started_at, i.completed_at, i.abandoned_at,
 		       coalesce(i.supersedes_id::text, '')
 		FROM inspections i

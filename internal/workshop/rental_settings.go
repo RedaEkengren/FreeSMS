@@ -47,15 +47,6 @@ type RentalPermit struct {
 	RecordedBy  string
 }
 
-// ValidOn reports whether the permit stands on day, a date in the shop's
-// zone: decided by then, not expired, not revoked.
-func (p RentalPermit) ValidOn(day time.Time) bool {
-	d := dateOnly(day)
-	return !d.Before(dateOnly(p.DecidedOn)) &&
-		(p.ExpiresOn == nil || !d.After(dateOnly(*p.ExpiresOn))) &&
-		(p.RevokedOn == nil || d.Before(dateOnly(*p.RevokedOn)))
-}
-
 func dateOnly(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }
@@ -193,18 +184,6 @@ func rentalPermitsTx(ctx context.Context, tx pgx.Tx) ([]RentalPermit, error) {
 	return out, rows.Err()
 }
 
-// permitCovers reports whether the permits between them stand on every day
-// from first to last, in the shop's zone: a renewal that starts the day
-// after the old one ends covers the change.
-func permitCovers(permits []RentalPermit, first, last time.Time) bool {
-	for d := dateOnly(first); !d.After(dateOnly(last)); d = d.AddDate(0, 0, 1) {
-		if !slices.ContainsFunc(permits, func(p RentalPermit) bool { return p.ValidOn(d) }) {
-			return false
-		}
-	}
-	return true
-}
-
 // The shipped profiles' bases.
 const (
 	ProfileCar       = "car"
@@ -227,6 +206,7 @@ const (
 	RuleLicenceCheck = "licence_check_required"
 	RuleCategories   = "licence_categories"
 	RuleReporting    = "reporting_required"
+	RuleInsurance    = "insurance_required"
 )
 
 // RentalRules are one version of a profile's rules.
@@ -237,6 +217,8 @@ type RentalRules struct {
 	LicenceCheckRequired bool
 	LicenceCategories    []string
 	ReportingRequired    bool
+	// Insured for rental use on every day of the rental (#202).
+	InsuranceRequired bool
 	// How the shop works.
 	CheckOutTemplateID  string
 	CheckInTemplateID   string
@@ -256,15 +238,15 @@ func shippedRules(base string) (RentalRules, []string) {
 	switch base {
 	case ProfileCar:
 		return RentalRules{PermitRequired: true, RegistrationRequired: true, LicenceCheckRequired: true,
-			LicenceCategories: []string{"B"}, ReportingRequired: true, CleaningBuffer: time.Hour,
+			LicenceCategories: []string{"B"}, ReportingRequired: true, InsuranceRequired: true, CleaningBuffer: time.Hour,
 			MileageAllowance: true, MinimumAge: 18, SubletBanned: true}, []string{RuleReporting}
 	case ProfileTrailer:
 		return RentalRules{RegistrationRequired: true, LicenceCheckRequired: true, LicenceCategories: []string{"B", "BE"},
-				CleaningBuffer: 30 * time.Minute, MinimumAge: 18, SubletBanned: true},
-			[]string{RulePermit, RuleLicenceCheck, RuleCategories, RuleReporting}
+				InsuranceRequired: true, CleaningBuffer: 30 * time.Minute, MinimumAge: 18, SubletBanned: true},
+			[]string{RulePermit, RuleLicenceCheck, RuleCategories, RuleReporting, RuleInsurance}
 	case ProfileMachine:
-		return RentalRules{CleaningBuffer: time.Hour, MinimumAge: 18, SubletBanned: true},
-			[]string{RulePermit, RuleRegistration, RuleLicenceCheck, RuleReporting}
+		return RentalRules{InsuranceRequired: true, CleaningBuffer: time.Hour, MinimumAge: 18, SubletBanned: true},
+			[]string{RulePermit, RuleRegistration, RuleLicenceCheck, RuleReporting, RuleInsurance}
 	}
 	return RentalRules{SubletBanned: true}, nil
 }
@@ -273,6 +255,8 @@ func shippedRules(base string) (RentalRules, []string) {
 // presented as the law, as a catalogue key; "" for none.
 func UnconfirmedReason(base, rule string) string {
 	switch {
+	case rule == RuleInsurance:
+		return "Whether a trailer or a machine must be insured for rental use, beyond its ordinary insurance, is not confirmed. It is required by default."
 	case rule == RuleReporting:
 		return "Whether the rental marking in the vehicle register is needed before the first rental, and for which kinds of vehicle, is not confirmed."
 	case base == ProfileTrailer && rule == RulePermit:
@@ -348,12 +332,13 @@ func insertRulesTx(ctx context.Context, tx pgx.Tx, shopID, userID, profileID str
 	err := tx.QueryRow(ctx, `
 		INSERT INTO rental_profile_versions (shop_id, profile_id, version, permit_required, registration_required,
 			licence_check_required, licence_categories, reporting_required, check_out_template_id, check_in_template_id,
-			cleaning_buffer, mileage_allowance, default_deposit_minor, minimum_age, sublet_banned, unconfirmed, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, '')::uuid, NULLIF($10, '')::uuid, $11, $12, $13, $14, $15, $16, NULLIF($17, '')::uuid)
+			cleaning_buffer, mileage_allowance, default_deposit_minor, minimum_age, sublet_banned, unconfirmed, created_by,
+			insurance_required)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, '')::uuid, NULLIF($10, '')::uuid, $11, $12, $13, $14, $15, $16, NULLIF($17, '')::uuid, $18)
 		RETURNING id`,
 		shopID, profileID, version, r.PermitRequired, r.RegistrationRequired, r.LicenceCheckRequired, cats,
 		r.ReportingRequired, r.CheckOutTemplateID, r.CheckInTemplateID, r.CleaningBuffer, r.MileageAllowance,
-		r.DefaultDepositMinor, age, r.SubletBanned, unconfirmed, userID).Scan(&id)
+		r.DefaultDepositMinor, age, r.SubletBanned, unconfirmed, userID, r.InsuranceRequired).Scan(&id)
 	if err != nil {
 		return "", fmt.Errorf("record the profile's rules: %w", err)
 	}
@@ -364,7 +349,7 @@ const profileColumns = `
 	p.id, p.base, p.name, p.created_by IS NULL, v.id, v.version, v.permit_required, v.registration_required, v.licence_check_required,
 	v.licence_categories, v.reporting_required, coalesce(v.check_out_template_id::text, ''),
 	coalesce(v.check_in_template_id::text, ''), v.cleaning_buffer, v.mileage_allowance, v.default_deposit_minor,
-	coalesce(v.minimum_age, 0), v.sublet_banned, v.unconfirmed, v.created_at, coalesce(pe.display_name, '')`
+	coalesce(v.minimum_age, 0), v.sublet_banned, v.unconfirmed, v.created_at, coalesce(pe.display_name, ''), v.insurance_required`
 
 func scanProfile(row pgx.Row) (RentalProfile, error) {
 	var p RentalProfile
@@ -372,7 +357,7 @@ func scanProfile(row pgx.Row) (RentalProfile, error) {
 	err := row.Scan(&p.ID, &p.Base, &p.Name, &p.Shipped, &p.VersionID, &p.Version, &r.PermitRequired, &r.RegistrationRequired,
 		&r.LicenceCheckRequired, &r.LicenceCategories, &r.ReportingRequired, &r.CheckOutTemplateID, &r.CheckInTemplateID,
 		&r.CleaningBuffer, &r.MileageAllowance, &r.DefaultDepositMinor, &r.MinimumAge, &r.SubletBanned,
-		&p.Unconfirmed, &p.ChangedAt, &p.ChangedBy)
+		&p.Unconfirmed, &p.ChangedAt, &p.ChangedBy, &r.InsuranceRequired)
 	return p, err
 }
 
@@ -531,6 +516,7 @@ func stillUnconfirmed(old RentalProfile, r RentalRules) []string {
 		RuleLicenceCheck: old.Rules.LicenceCheckRequired == r.LicenceCheckRequired,
 		RuleCategories:   slices.Equal(old.Rules.LicenceCategories, r.LicenceCategories),
 		RuleReporting:    old.Rules.ReportingRequired == r.ReportingRequired,
+		RuleInsurance:    old.Rules.InsuranceRequired == r.InsuranceRequired,
 	}
 	var out []string
 	for _, u := range old.Unconfirmed {
@@ -592,6 +578,7 @@ func sameRules(a, b RentalRules) bool {
 	return slices.Equal(a.LicenceCategories, b.LicenceCategories) &&
 		a.PermitRequired == b.PermitRequired && a.RegistrationRequired == b.RegistrationRequired &&
 		a.LicenceCheckRequired == b.LicenceCheckRequired && a.ReportingRequired == b.ReportingRequired &&
+		a.InsuranceRequired == b.InsuranceRequired &&
 		a.CheckOutTemplateID == b.CheckOutTemplateID && a.CheckInTemplateID == b.CheckInTemplateID &&
 		a.CleaningBuffer == b.CleaningBuffer && a.MileageAllowance == b.MileageAllowance &&
 		a.DefaultDepositMinor == b.DefaultDepositMinor && a.MinimumAge == b.MinimumAge && a.SubletBanned == b.SubletBanned
@@ -675,29 +662,27 @@ const (
 // add what they own -- a unit, its drivers -- by asking it too; nothing
 // else asks whether a unit is a car.
 func rentalHandoverGapsTx(ctx context.Context, tx pgx.Tx, profile RentalProfile, from, to time.Time) ([]HandoverGap, error) {
-	var gaps []HandoverGap
-	if profile.Rules.PermitRequired {
-		permits, err := rentalPermitsTx(ctx, tx)
-		if err != nil {
-			return nil, err
-		}
-		loc, err := shopLocationTx(ctx, tx)
-		if err != nil {
-			return nil, err
-		}
-		last := to
-		if last.IsZero() {
-			// Open-ended: it has to stand for as long as can be said.
-			last = from.AddDate(1, 0, 0)
-		} else {
-			last = last.Add(-time.Nanosecond)
-		}
-		if !permitCovers(permits, from.In(loc), last.In(loc)) {
-			gaps = append(gaps, HandoverGap{Code: GapPermit,
-				Sentence: "There is no rental permit that stands for the whole rental."})
-		}
+	if !profile.Rules.PermitRequired {
+		return nil, nil
 	}
-	return gaps, nil
+	if to.IsZero() {
+		// Open-ended: it has to stand for as long as can be said, a year,
+		// that day included -- the period's last day is the day before
+		// its end, so the end is a moment into the day after.
+		to = from.AddDate(1, 0, 0).Add(time.Microsecond)
+	}
+	var missing bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (
+		    SELECT 1 FROM shops z,
+		         generate_series(`+firstDay("$1::timestamptz", "z.timezone")+`, `+lastDay("$2::timestamptz", "z.timezone")+`, interval '1 day') d
+		    WHERE NOT `+permitStandsOn("d::date")+`)`, from, to).Scan(&missing); err != nil {
+		return nil, fmt.Errorf("read the permits: %w", err)
+	}
+	if missing {
+		return []HandoverGap{gapSentences[GapPermit]}, nil
+	}
+	return nil, nil
 }
 
 // RentalHandoverGaps answers what a profile version requires before

@@ -228,3 +228,22 @@ func TestRentalSettingsAreNeverWrittenOver(t *testing.T) {
 		}
 	}
 }
+
+// Open-ended from local midnight, a rental must be covered for a whole
+// year, the last day included: a permit ending the day before that is
+// not enough (review r8, #4).
+func TestAnOpenEndedRentalIsCoveredForAWholeYear(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	car := profileFor(t, pool, workshop.ProfileCar)
+	from := wallAt("2031-06-01 00:00")
+	ends := day("2032-05-31")
+	if _, err := workshop.RecordRentalPermit(ctx, pool, rentalOwner(), workshop.NewRentalPermit{
+		Reference: "TSV 1", DecidedOn: day("2030-01-01"), ExpiresOn: &ends, Responsible: "Anna"}); err != nil {
+		t.Fatal(err)
+	}
+	gaps, err := workshop.RentalHandoverGaps(ctx, pool, rentalDesk(), car.VersionID, from, time.Time{})
+	if err != nil || len(gaps) != 1 || gaps[0].Code != workshop.GapPermit {
+		t.Errorf("open-ended from 1 June 2031, a permit to 31 May 2032: %+v, %v; want the permit missing for 1 June 2032", gaps, err)
+	}
+}

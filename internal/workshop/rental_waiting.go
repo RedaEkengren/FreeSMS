@@ -25,9 +25,9 @@ const rentalToday = `
 // The rental desk's kinds of thing to do, as SQL conditions on a booking b
 // with its block k and the shop's today t (rentalToday).
 const (
-	rentalHandoverToday = `` + rentalState + ` = 'confirmed' AND b.starts_at < t.tomorrow`
-	rentalReturnToday   = `` + rentalState + ` = 'checked_out' AND b.ends_at >= clock_timestamp() AND b.ends_at < t.tomorrow`
-	rentalOverdue       = `` + rentalState + ` = 'checked_out' AND b.ends_at < clock_timestamp()`
+	rentalHandoverToday = rentalState + ` = 'confirmed' AND b.starts_at < t.tomorrow`
+	rentalReturnToday   = rentalState + ` = 'checked_out' AND b.ends_at >= clock_timestamp() AND b.ends_at < t.tomorrow`
+	rentalOverdue       = rentalState + ` = 'checked_out' AND b.ends_at < clock_timestamp()`
 )
 
 // rentalWaiting is the rental desk's part of the action queue.

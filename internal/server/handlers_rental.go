@@ -18,7 +18,7 @@ import (
 // does not exist; the operations check the role and the module again.
 
 // rentalPages are the templates Rental adds.
-var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "rentalprices", "rentalbooking"}
+var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "rentalprices", "rentalbooking", "rentalhandover", "rentalregister"}
 
 // rentalData is what Rental's pages are given.
 type rentalData struct {
@@ -39,6 +39,20 @@ type rentalData struct {
 	Gaps       []workshop.HandoverGap
 	Agreements []workshop.DocumentRecord
 	Templates  []workshop.DocumentTemplate
+	// A booking's handovers, and the protocol on the handover page.
+	Handovers workshop.RentalHandoverView
+	Protocol  workshop.Protocol
+	// The unit's newest period in the fleet: reported, insured (#202).
+	FleetUse workshop.FleetUse
+	// Handover gaps let go on the booking.
+	Overrides []workshop.GapOverride
+	// The rental register (#200): what was read, what was asked, and how
+	// long it is kept.
+	Register      []workshop.RegisterEntry
+	Who           *workshop.RegisterEntry
+	RegisterAsked bool
+	RegisterForm  registerForm
+	Retention     *workshop.RegisterRetention
 	// A booking form's own key: sent twice, one booking.
 	Key string
 	Now time.Time
@@ -187,11 +201,15 @@ func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("GET /rental/units/{id}", s.requireSession(s.handleRentalUnit))
 	m.HandleFunc("POST /rental/units/{id}/fleet", s.requireSession(s.handleFleetJoin))
 	m.HandleFunc("POST /rental/memberships/{id}/end", s.requireSession(s.handleFleetLeave))
+	m.HandleFunc("POST /rental/memberships/{id}/report", s.requireSession(s.handleFleetReport))
+	m.HandleFunc("POST /rental/memberships/{id}/insurance", s.requireSession(s.handleFleetInsurance))
 	m.HandleFunc("GET /rental/settings", s.requireSession(s.handleRentalSettings))
 	m.HandleFunc("POST /rental/permits", s.requireSession(s.handleRentalPermit))
 	m.HandleFunc("POST /rental/permits/{id}/revoke", s.requireSession(s.handleRentalPermitRevoke))
 	m.HandleFunc("POST /rental/profiles", s.requireSession(s.handleRentalProfileAdd))
 	m.HandleFunc("POST /rental/profiles/{id}", s.requireSession(s.handleRentalProfileSave))
+	m.HandleFunc("POST /rental/register/retention", s.requireSession(s.handleRegisterRetention))
+	s.rentalHandoverRoutes(m)
 }
 
 // handleRentalSettings shows the permit and the rule profiles: the rental
@@ -210,6 +228,9 @@ func (s *Server) handleRentalSettings(w http.ResponseWriter, r *http.Request) {
 		if d.Checklists, err = workshop.ChecklistTemplates(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
 			return
 		}
+	}
+	if d.Retention, err = workshop.RentalRegisterRetention(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
 	}
 	s.render(w, r, http.StatusOK, "rentalsettings", pageData{Title: "Rental settings", Session: session, Rental: d,
 		Today: time.Now().In(s.shopLocation(r)).Format("2006-01-02")})
@@ -295,7 +316,7 @@ func (s *Server) handleRentalProfileSave(w http.ResponseWriter, r *http.Request)
 	_, err := workshop.SaveRentalProfile(r.Context(), s.pool, session.Scope, r.PathValue("id"), workshop.RentalRules{
 		PermitRequired: on("permit_required"), RegistrationRequired: on("registration_required"),
 		LicenceCheckRequired: on("licence_check_required"), LicenceCategories: r.Form["licence_categories"],
-		ReportingRequired: on("reporting_required"), CheckOutTemplateID: r.FormValue("check_out_template"),
+		ReportingRequired: on("reporting_required"), InsuranceRequired: on("insurance_required"), CheckOutTemplateID: r.FormValue("check_out_template"),
 		CheckInTemplateID: r.FormValue("check_in_template"), CleaningBuffer: time.Duration(minutes) * time.Minute,
 		MileageAllowance: on("mileage_allowance"), DefaultDepositMinor: deposit, MinimumAge: age,
 		SubletBanned: on("sublet_banned")})
@@ -358,6 +379,11 @@ func (s *Server) renderRentalUnit(w http.ResponseWriter, r *http.Request, id str
 	}
 	if d.Bookings, err = workshop.RentalBookings(r.Context(), s.pool, session.Scope, time.Now(), time.Now().AddDate(1, 0, 0)); s.handoverError(w, r, err) {
 		return
+	}
+	if len(u.Memberships) > 0 {
+		if d.FleetUse, err = workshop.FleetUseOf(r.Context(), s.pool, session.Scope, u.Memberships[0].ID); s.handoverError(w, r, err) {
+			return
+		}
 	}
 	s.render(w, r, status, "rentalunit", pageData{Title: "Rental unit", Session: session,
 		Rental: d, Today: time.Now().In(s.shopLocation(r)).Format(wallClockLayout)})
@@ -603,6 +629,12 @@ func (s *Server) handleRentalBooking(w http.ResponseWriter, r *http.Request) {
 	if d.Agreements, err = workshop.RentalAgreements(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
 		return
 	}
+	if d.Handovers, err = workshop.RentalHandovers(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
+		return
+	}
+	if d.Overrides, err = workshop.RentalGapOverrides(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
+		return
+	}
 	s.render(w, r, http.StatusOK, "rentalbooking", pageData{Title: "Rental booking", Session: session, Rental: d,
 		Today: time.Now().In(s.shopLocation(r)).Format("2006-01-02")})
 }
@@ -612,6 +644,14 @@ func (s *Server) handleRentalBookingAction(w http.ResponseWriter, r *http.Reques
 	id, loc := r.PathValue("id"), s.shopLocation(r)
 	var err error
 	switch r.PathValue("action") {
+	case "check-out":
+		s.handleRentalHandoverStart(w, r, workshop.HandoverOut)
+		return
+	case "check-in":
+		s.handleRentalHandoverStart(w, r, workshop.HandoverIn)
+		return
+	case "let-go":
+		err = workshop.OverrideHandoverGap(r.Context(), s.pool, session.Scope, id, r.FormValue("code"), r.FormValue("reason"))
 	case "confirm":
 		err = workshop.ConfirmRentalBooking(r.Context(), s.pool, session.Scope, id)
 	case "cancel", "no-show":

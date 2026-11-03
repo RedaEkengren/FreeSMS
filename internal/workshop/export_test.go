@@ -115,6 +115,15 @@ func TestTheWholeShopLeavesReadableWithoutFreeSMS(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
 	job, invoiceID := invoicedJob(t, pool)
+	// Values as typed, a phone number and a note starting as a formula
+	// would: the export is data for software, and carries them unchanged
+	// (review r8, #1).
+	if _, err := pool.Exec(ctx, `UPDATE work_orders SET complaint = '- see note' WHERE id = $1`, job); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE people SET phone = '+46 70 123 45 67' WHERE id = '22222222-2222-2222-2222-222222222222'`); err != nil {
+		t.Fatal(err)
+	}
 
 	// A photograph on an inspection item.
 	var photoKey = "abcdef0123456789abcdef0123456789"
@@ -160,6 +169,12 @@ func TestTheWholeShopLeavesReadableWithoutFreeSMS(t *testing.T) {
 	}
 	if !strings.Contains(string(files["erasures.csv"]), "Begärde radering") {
 		t.Error("the erasure is not recorded in the export")
+	}
+	if jobs := csvRows(t, files["work_orders.csv"]); len(jobs) == 0 || jobs[0]["complaint"] != "- see note" {
+		t.Errorf("a complaint starting with a minus did not leave as typed: %v", jobs)
+	}
+	if !strings.Contains(string(files["people.csv"]), ",+46 70 123 45 67,") {
+		t.Error("a phone number starting with a plus did not leave as typed")
 	}
 }
 

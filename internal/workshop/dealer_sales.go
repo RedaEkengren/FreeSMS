@@ -1306,12 +1306,8 @@ func SaleTaxOfDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	return out, err
 }
 
-// partyNameSQL names a party pa -- a company by its name, a person by
-// theirs -- over partyNameJoins.
-const partyNameSQL = `coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, '')`
-
 // partyNameJoins reaches a sale buyer b's party and its customer and
-// people, for partyNameSQL.
+// people, for partyNameSQL (parties.go).
 const partyNameJoins = `JOIN parties pa ON pa.id = b.party_id LEFT JOIN customers c ON c.id = pa.customer_id
 	LEFT JOIN people cp ON cp.id = c.person_id LEFT JOIN people pp ON pp.id = pa.person_id`
 

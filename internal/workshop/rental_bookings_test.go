@@ -4,14 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/database"
+	"github.com/RedaEkengren/FreeSMS/internal/testsupport"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
+	"github.com/RedaEkengren/FreeSMS/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -362,6 +367,10 @@ func rentalAudited(t *testing.T, pool *pgxpool.Pool, made func(event, kind, id s
 		t.Fatal(err)
 	}
 	made("rental.price_overridden", "rental_booking", id)
+	if _, err := workshop.RentalRegister(context.Background(), pool, rentalOwner(), workshop.RegisterFilter{From: in2031(1, 0), To: in2031(30, 0)}, "Tillsyn"); err != nil {
+		t.Fatal(err)
+	}
+	made("rental_register.read", "shop", shopID)
 }
 
 // After every migration, audit_events takes a subject Core had and
@@ -422,7 +431,9 @@ func TestTheRentalDesksDayIsInTheQueueAndOnTheHomePage(t *testing.T) {
 	kinds := map[string]string{}
 	for _, it := range items {
 		kinds[it.Kind] = it.SubjectID
-		if it.Link() != "/rental/bookings/"+it.SubjectID || it.Says() == "" {
+		// A unit's paperwork goes to the unit (#202); a booking to itself.
+		if (it.SubjectKind == "rental_booking" && it.Link() != "/rental/bookings/"+it.SubjectID) ||
+			(it.SubjectKind == "rental_unit" && it.Link() != "/rental/units/"+it.SubjectID) || it.Says() == "" {
 			t.Errorf("an item that leads nowhere or says nothing: %+v", it)
 		}
 	}
@@ -819,5 +830,109 @@ func TestALimitedBookingExtendedIntoUnlimitedKilometresBecomesUnlimited(t *testi
 	}
 	if b, _ := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id); b.IncludedKm != nil {
 		t.Errorf("extended into unlimited kilometres, still limited to %d km", *b.IncludedKm)
+	}
+}
+
+// An extension adds kilometres by the plan the booking was agreed under,
+// and by no other. A booking that does not say which plan it was agreed
+// under -- plan_id is nullable, and none is written so now -- keeps its
+// agreed limit when extended: the plan pricing the unit today may say
+// unlimited, and was never agreed (review of the Rental merge, #7).
+func TestAnExtensionDoesNotTakeItsKilometresFromAPlanNeverAgreed(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := addUnit(t, pool, workshop.NewRentalUnit{Registration: "ABC 12D", FleetNumber: "V1", Category: "Bil"})
+	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), unit, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
+		t.Fatal(err)
+	}
+	plan, _ := workshop.CreateRatePlan(ctx, pool, rentalOwner(), workshop.NewRatePlan{Name: "Bil", Category: "Bil", VATRateBp: 2500, SeasonRule: "at_start"})
+	km := 100
+	if _, err := workshop.AddRateSeason(ctx, pool, rentalOwner(), plan, workshop.RateSeason{ValidFrom: day("2020-01-01"), Day: kr(40000),
+		IncludedKmPerDay: &km, ExtraKmMinor: kr(300)}); err != nil {
+		t.Fatal(err)
+	}
+	renter, _ := workshop.CreateParty(ctx, pool, rentalDesk(), workshop.NewParty{Kind: "private", Name: "R", Role: workshop.PartyRenter})
+	id, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: unit, RenterID: renter, From: in2031(10, 9), To: in2031(11, 9)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id); b.PlanID != plan {
+		t.Fatalf("the booking froze plan %q, want %q", b.PlanID, plan)
+	}
+	// The plan forgotten, and the category priced since by a plan with
+	// no limit.
+	if _, err := pool.Exec(ctx, `UPDATE rental_bookings SET plan_id = NULL WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ArchiveRatePlan(ctx, pool, rentalOwner(), plan); err != nil {
+		t.Fatal(err)
+	}
+	dayPlan(t, pool, "Bil", 40000, "at_start")
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, in2031(13, 9), ""); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id); b.IncludedKm == nil || *b.IncludedKm != 100 {
+		t.Errorf("extended with no plan agreed, the limit is now %v; want the 100 km agreed", b.IncludedKm)
+	}
+}
+
+// A booking written without its plan gets it back from the rent lines it
+// was agreed with, when they name one; one they do not name stays
+// without (review of the Rental merge, #7).
+func TestABookingWithoutItsPlanGetsItFromItsLines(t *testing.T) {
+	pool := testsupport.FreshPool(t)
+	ctx := context.Background()
+	names, err := fs.Glob(migrations.FS, "*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	backfill := ""
+	for _, n := range names {
+		if strings.HasSuffix(n, "_booking_plan_backfill.sql") {
+			backfill = n
+		}
+	}
+	before := fstest.MapFS{}
+	for _, n := range names {
+		if n < backfill {
+			body, _ := fs.ReadFile(migrations.FS, n)
+			before[n] = &fstest.MapFile{Data: body}
+		}
+	}
+	if backfill == "" || database.Migrate(ctx, pool, before) != nil {
+		t.Fatalf("migrate to before %q", backfill)
+	}
+	const known, unknown, plan, event = "aaaaaaaa-0000-0000-0000-000000000001", "aaaaaaaa-0000-0000-0000-000000000002",
+		"aaaaaaaa-0000-0000-0000-000000000003", "aaaaaaaa-0000-0000-0000-000000000004"
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Release()
+	for _, s := range []string{
+		`SET session_replication_role = replica`,
+		`INSERT INTO rate_plans (id, shop_id, name, category, vat_rate_bp, season_rule) VALUES ('` + plan + `', '` + shopID + `', 'Bil', 'Bil', 2500, 'at_start')`,
+		`INSERT INTO rental_bookings (id, shop_id, block_id, number, unit_id, renter_party_id, starts_at, ends_at, profile_version_id)
+		 VALUES ('` + known + `', '` + shopID + `', gen_random_uuid(), 1, gen_random_uuid(), gen_random_uuid(), now(), now() + interval '1 day', gen_random_uuid()),
+		        ('` + unknown + `', '` + shopID + `', gen_random_uuid(), 2, gen_random_uuid(), gen_random_uuid(), now(), now() + interval '1 day', gen_random_uuid())`,
+		`INSERT INTO rental_booking_lines (shop_id, booking_id, position, event_id, kind, unit, description, quantity_milli, unit_price_minor, vat_rate_bp, vat_category, unconfirmed, plan_id)
+		 VALUES ('` + shopID + `', '` + known + `', 1, '` + event + `', 'rent', 'day', 'Dag', 1000, 40000, 2500, 'S', false, '` + plan + `'),
+		        ('` + shopID + `', '` + unknown + `', 1, '` + event + `', 'extra', 'day', 'Stol', 1000, 5000, 2500, 'S', false, NULL)`,
+		`RESET session_replication_role`,
+	} {
+		if _, err := conn.Exec(ctx, s); err != nil {
+			t.Fatalf("%s: %v", s, err)
+		}
+	}
+	if err := database.Migrate(ctx, pool, migrations.FS); err != nil {
+		t.Fatal(err)
+	}
+	var got, none *string
+	if err := conn.QueryRow(ctx, `SELECT (SELECT plan_id::text FROM rental_bookings WHERE id = $1), (SELECT plan_id::text FROM rental_bookings WHERE id = $2)`,
+		known, unknown).Scan(&got, &none); err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || *got != plan || none != nil {
+		t.Errorf("the plans after: %v and %v; want %s and none", got, none, plan)
 	}
 }

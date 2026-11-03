@@ -375,9 +375,16 @@ func RentalDrivers(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 }
 
 func rentalDriversTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]RentalDriver, error) {
+	all, err := rentalDriversOfTx(ctx, tx, []string{bookingID})
+	return all[bookingID], err
+}
+
+// rentalDriversOfTx is the drivers of several bookings in one query, by
+// booking.
+func rentalDriversOfTx(ctx context.Context, tx pgx.Tx, bookingIDs []string) (map[string][]RentalDriver, error) {
 	rows, err := tx.Query(ctx, `
-		SELECT d.id, d.party_id,
-		       coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, ''),
+		SELECT d.booking_id::text, d.id, d.party_id,
+		       `+partyNameSQL+`,
 		       d.main, d.added_at, d.removed_at IS NOT NULL,
 		       k.passed, coalesce(k.failure, ''), k.checked_at, coalesce(kp.display_name, ''), k.valid_until
 		FROM rental_drivers d
@@ -387,25 +394,26 @@ func rentalDriversTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]Rental
 		LEFT JOIN people pp ON pp.id = pa.person_id
 		LEFT JOIN LATERAL (SELECT * FROM rental_licence_checks k WHERE k.driver_id = d.id ORDER BY k.checked_at DESC LIMIT 1) k ON true
 		LEFT JOIN users ku ON ku.id = k.checked_by LEFT JOIN people kp ON kp.id = ku.person_id
-		WHERE d.booking_id = $1
-		ORDER BY d.removed_at IS NOT NULL, NOT d.main, d.added_at`, bookingID)
+		WHERE d.booking_id = ANY($1::uuid[])
+		ORDER BY d.booking_id, d.removed_at IS NOT NULL, NOT d.main, d.added_at`, bookingIDs)
 	if err != nil {
 		return nil, fmt.Errorf("read drivers: %w", err)
 	}
 	defer rows.Close()
-	var out []RentalDriver
+	out := map[string][]RentalDriver{}
 	for rows.Next() {
+		var of string
 		var d RentalDriver
 		var passed *bool
 		var failure, by string
 		var at, until *time.Time
-		if err := rows.Scan(&d.ID, &d.PartyID, &d.Name, &d.Main, &d.AddedAt, &d.Removed, &passed, &failure, &at, &by, &until); err != nil {
+		if err := rows.Scan(&of, &d.ID, &d.PartyID, &d.Name, &d.Main, &d.AddedAt, &d.Removed, &passed, &failure, &at, &by, &until); err != nil {
 			return nil, err
 		}
 		if passed != nil {
 			d.Check = &LicenceCheckResult{Passed: *passed, Failure: failure, CheckedAt: *at, CheckedBy: by, ValidUntil: until}
 		}
-		out = append(out, d)
+		out[of] = append(out[of], d)
 	}
 	return out, rows.Err()
 }
@@ -438,11 +446,11 @@ type LicenceShown struct {
 // written: six digits or more with only separators or spaces between them,
 // digits of any script counted; a word of letters and three digits or more;
 // or a date, in figures or with the month's name, Swedish or English. A
-// clock time after "kl" and a range such as "3-4" are not dates. A free
+// clock time after "kl", a range such as "3-4", a fraction such as "3/4"
+// and a month with its year such as "12/2031" are not dates. A free
 // note can never be made fully safe; this refuses what a desk would
 // plausibly type.
 func holdsIdentifier(note string) bool {
-	run := 0
 	for _, word := range strings.Fields(note) {
 		digits, letters := 0, 0
 		for _, r := range word {
@@ -455,16 +463,6 @@ func holdsIdentifier(note string) bool {
 		}
 		if letters > 0 && digits >= 3 {
 			return true
-		}
-	}
-	for _, r := range note {
-		switch {
-		case unicode.IsDigit(r):
-			if run++; run >= 6 {
-				return true
-			}
-		case unicode.IsLetter(r):
-			run = 0
 		}
 	}
 	// Digits of any script read as the ASCII digit of the same value, so
@@ -480,20 +478,55 @@ func holdsIdentifier(note string) bool {
 	if aDayAndMonthName.MatchString(s) || aMonthNameAndDay.MatchString(s) {
 		return true
 	}
+	// A month with its year and a fraction are not dates, and are not
+	// counted towards a run of digits either: 12/2031 is six figures.
+	masked := []byte(s)
 	for _, m := range aDate.FindAllStringSubmatchIndex(s, -1) {
-		if m[8] >= 0 {
-			return true // a day, a month and a year
+		if m[1] < len(s) && s[m[1]] >= '0' && s[m[1]] <= '9' {
+			continue // ends inside a longer number: not two whole figures
 		}
 		first, _ := strconv.Atoi(s[m[2]:m[3]])
 		second, _ := strconv.Atoi(s[m[6]:m[7]])
+		firstYear, secondYear := m[3]-m[2] == 4, m[7]-m[6] == 4
+		sep := s[m[4]:m[5]]
+		if m[8] >= 0 {
+			// Three figures: a date with its year, if two of them are a day
+			// and a month -- 1985-01-01, 01.01.85, 1/12/1990.
+			third, _ := strconv.Atoi(strings.TrimLeft(s[m[8]:m[9]], " ./-"))
+			if firstYear && dayAndMonth(third, second) || !firstYear && (dayAndMonth(first, second) || dayAndMonth(second, first)) {
+				return true
+			}
+			continue
+		}
+		monthYear := first >= 1 && first <= 12 && (secondYear || m[7]-m[6] == 2 && second > 12) ||
+			firstYear && second >= 1 && second <= 12
+		fraction := sep == "/" && first >= 1 && first < second && (second == 2 || second == 3 || second == 4 || second == 8)
 		switch {
-		case s[m[4]:m[5]] == "-":
+		case monthYear || fraction:
+			// 12/2031, 12/31, 2019-04: a month and a year, which is not a
+			// date of birth -- the year's shape is read before a day's.
+			// tank 3/4: a fraction.
+			for i := m[2]; i < m[1]; i++ {
+				masked[i] = 'x'
+			}
+		case sep == "-":
 			// 3-4: a range. A date without its year is written with a dot
 			// or a slash.
-		case aClock.MatchString(s[:m[0]]):
+		case aClock.MatchString(s[:m[2]]):
 			// kl 14.30
 		case dayAndMonth(first, second) || dayAndMonth(second, first):
 			return true
+		}
+	}
+	run := 0
+	for _, r := range string(masked) {
+		switch {
+		case unicode.IsDigit(r):
+			if run++; run >= 6 {
+				return true
+			}
+		case unicode.IsLetter(r):
+			run = 0
 		}
 	}
 	return false
@@ -511,10 +544,14 @@ func digitValue(r rune) rune {
 
 func dayAndMonth(day, month int) bool { return day >= 1 && day <= 31 && month >= 1 && month <= 12 }
 
-// aDate is a day and a month, with or without the year, as people write
-// them in figures: 1/1/85, 01.01.1985, 1985-01-01, 12.3. The groups are
-// the first number, the separator, the second number and the year.
-var aDate = regexp.MustCompile(`(\d{1,4})\s*([./-])\s*(\d{1,2})(\s*[./-]\s*\d{1,4})?`)
+// aDate is two or three figures joined as a date is written: 1/1/85,
+// 01.01.1985, 1985-01-01, 12.3 -- and as a month and a year or a fraction
+// are, which holdsIdentifier tells apart. The groups are the first number,
+// the separator, the second number and the third. Whole numbers only, so
+// 12/2031 is not read as 12/20: a match starts after anything but a digit
+// -- a letter too, so "född1/1" is read -- and one that ends inside a
+// longer number is passed over.
+var aDate = regexp.MustCompile(`(?:^|\D)(\d{1,4})\s*([./-])\s*(\d{1,4})(\s*[./-]\s*\d{1,4})?`)
 
 // aClock is what a clock time is written after: kl 14.30, klockan 9.05.
 var aClock = regexp.MustCompile(`(?i)\b(?:kl\.?|klockan)\s*$`)
@@ -523,12 +560,12 @@ var aClock = regexp.MustCompile(`(?i)\b(?:kl\.?|klockan)\s*$`)
 const monthNames = `(?:jan(?:uari|uary)?|feb(?:ruari|ruary)?|mar(?:s|ch)?|apr(?:il)?|maj|may|jun[ie]?|jul[iy]?|aug(?:usti|ust)?|` +
 	`sep(?:t(?:ember)?)?|okt(?:ober)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)`
 
-// aDayAndMonthName is 12 mars, 1:a januari, 12th of March, 3 dec.
-var aDayAndMonthName = regexp.MustCompile(`(?i)\b(?:[1-9]|[12][0-9]|3[01])(?::?[ae]|st|nd|rd|th)?\.?\s*(?:of\s+)?` + monthNames + `\b`)
+// aDayAndMonthName is 12 mars, 05 mars, 1:a januari, 12th of March, 3 dec.
+var aDayAndMonthName = regexp.MustCompile(`(?i)\b(?:0?[1-9]|[12][0-9]|3[01])(?::?[ae]|st|nd|rd|th)?\.?\s*(?:of\s+)?` + monthNames + `\b`)
 
 // aMonthNameAndDay is March 12, sept 9 -- and not mars 2031, a month and a
 // year, which is not a date of birth.
-var aMonthNameAndDay = regexp.MustCompile(`(?i)\b` + monthNames + `\.?\s*(?:[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?\b`)
+var aMonthNameAndDay = regexp.MustCompile(`(?i)\b` + monthNames + `\.?\s*(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?\b`)
 
 // Why a licence check did not pass, as catalogue keys.
 const (
@@ -692,58 +729,6 @@ const (
 	GapLicence  = "licence"
 )
 
-// rentalBookingGapsTx is what a booking still lacks before its unit may be
-// handed over: its profile's requirements (rentalHandoverGapsTx) for its
-// own period, and a passing licence check this rental for every driver
-// listed, when the profile needs one. Check-out (#194) refuses while any is
-// missing; none of these can be overridden.
-func rentalBookingGapsTx(ctx context.Context, tx pgx.Tx, bookingID string) ([]HandoverGap, error) {
-	var version string
-	var starts, ends time.Time
-	if err := tx.QueryRow(ctx, `SELECT profile_version_id, starts_at, ends_at FROM rental_bookings WHERE id = $1`, bookingID).Scan(&version, &starts, &ends); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("read booking: %w", err)
-	}
-	p, err := profileVersionTx(ctx, tx, version)
-	if err != nil {
-		return nil, err
-	}
-	gaps, err := rentalHandoverGapsTx(ctx, tx, p, starts, ends)
-	if err != nil {
-		return nil, err
-	}
-	if !p.Rules.LicenceCheckRequired {
-		return gaps, nil
-	}
-	drivers, err := rentalDriversTx(ctx, tx, bookingID)
-	if err != nil {
-		return nil, err
-	}
-	loc, err := shopLocationTx(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-	listed := 0
-	for _, d := range drivers {
-		if d.Removed {
-			continue
-		}
-		listed++
-		// Asked again against the rental as it is now: extended since the
-		// check, the licence may not last it.
-		if d.Check == nil || !d.Check.Passed || d.Check.ValidUntil == nil || !licenceLasts(*d.Check.ValidUntil, ends, loc) {
-			gaps = append(gaps, HandoverGap{Code: GapLicence, Who: d.Name,
-				Sentence: "%s has not shown a valid licence for this rental."})
-		}
-	}
-	if listed == 0 {
-		gaps = append(gaps, HandoverGap{Code: GapNoDriver, Sentence: "No driver is named for the rental."})
-	}
-	return gaps, nil
-}
-
 // RentalBookingGaps is what a booking still lacks before handover, all at
 // once.
 func RentalBookingGaps(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, bookingID string) ([]HandoverGap, error) {
@@ -817,16 +802,15 @@ func ProduceRentalAgreement(ctx context.Context, pool *pgxpool.Pool, scope acces
 		if err != nil {
 			return err
 		}
-		permits, err := rentalPermitsTx(ctx, tx)
-		if err != nil {
-			return err
-		}
+		// The permit standing on the day the rental starts, by the one
+		// test of a permit (permitValidOn).
 		permit := "-"
-		for _, p := range permits {
-			if p.ValidOn(b.starts.In(loc)) {
-				permit = p.Reference
-				break
-			}
+		if err := tx.QueryRow(ctx, `
+			SELECT coalesce((SELECT p.reference FROM rental_permits p LEFT JOIN rental_permit_revocations x ON x.permit_id = p.id
+			                 WHERE `+permitValidOn(firstDay("$1::timestamptz", "s.timezone"))+`
+			                 ORDER BY p.decided_on DESC, p.recorded_at DESC LIMIT 1), '-')
+			FROM shops s`, b.starts).Scan(&permit); err != nil {
+			return fmt.Errorf("read the permit: %w", err)
 		}
 		lines, err := rentalLinesTx(ctx, tx, bookingID)
 		if err != nil {
@@ -858,7 +842,7 @@ func ProduceRentalAgreement(ctx context.Context, pool *pgxpool.Pool, scope acces
 			extra = money.Format(*extraKm + money.VAT(*extraKm, vat))
 		}
 		var renterName string
-		_ = tx.QueryRow(ctx, `SELECT coalesce(CASE WHEN pa.kind = 'company' THEN coalesce(c.company_name, pa.company_name) END, cp.display_name, pp.display_name, '')`+
+		_ = tx.QueryRow(ctx, `SELECT `+partyNameSQL+
 			` FROM parties pa LEFT JOIN customers c ON c.id = pa.customer_id LEFT JOIN people cp ON cp.id = c.person_id LEFT JOIN people pp ON pp.id = pa.person_id WHERE pa.id = $1`,
 			renter).Scan(&renterName)
 		n.Title = fmt.Sprintf("R-%d %s", number, unit)
