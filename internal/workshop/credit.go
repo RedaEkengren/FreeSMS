@@ -175,6 +175,7 @@ func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRe
 		creditedQty, creditedNet int64
 		creditedVAT              int64
 		unitCode                 string
+		category                 string
 		marginScheme             bool
 	}
 	rows, err := tx.Query(ctx, `
@@ -182,7 +183,7 @@ func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRe
 		       coalesce((SELECT -sum((c.quantity * 1000)::bigint) FROM invoice_lines c WHERE c.credits_line_id = l.id), 0),
 		       coalesce((SELECT -sum(c.net_minor) FROM invoice_lines c WHERE c.credits_line_id = l.id), 0),
 		       coalesce((SELECT -sum(c.vat_minor) FROM invoice_lines c WHERE c.credits_line_id = l.id), 0),
-		       coalesce(l.unit_code, ''), l.margin_scheme
+		       coalesce(l.unit_code, ''), coalesce(l.vat_category, ''), l.margin_scheme
 		FROM invoice_lines l WHERE l.invoice_id = $1 ORDER BY l.position`, invoiceID)
 	if err != nil {
 		return p, fmt.Errorf("read invoice lines: %w", err)
@@ -191,7 +192,7 @@ func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRe
 	byPos := map[int]*orig{}
 	for rows.Next() {
 		var o orig
-		if err := rows.Scan(&o.id, &o.position, &o.kind, &o.description, &o.qty, &o.unit, &o.rate, &o.net, &o.vat, &o.creditedQty, &o.creditedNet, &o.creditedVAT, &o.unitCode, &o.marginScheme); err != nil {
+		if err := rows.Scan(&o.id, &o.position, &o.kind, &o.description, &o.qty, &o.unit, &o.rate, &o.net, &o.vat, &o.creditedQty, &o.creditedNet, &o.creditedVAT, &o.unitCode, &o.category, &o.marginScheme); err != nil {
 			rows.Close()
 			return p, fmt.Errorf("scan invoice line: %w", err)
 		}
@@ -250,6 +251,9 @@ func planCreditTx(ctx context.Context, tx pgx.Tx, invoiceID string, req CreditRe
 		p.lines = append(p.lines, invoiceLine{
 			Kind: o.kind, Description: o.description, QuantityMilli: -qty, UnitPriceMinor: o.unit, VATRateBasis: o.rate,
 			NetMinor: -net, VATMinor: -vat, CreditsLineID: o.id, UnitCode: o.unitCode, MarginScheme: o.marginScheme,
+			// The category the line was sold under: an outside-scope line is
+			// credited as one (#195), which its rate alone does not say.
+			VATCategory: o.category,
 		})
 	}
 	// A car under the margin scheme is reduced by crediting its line, which

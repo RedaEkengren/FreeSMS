@@ -65,6 +65,12 @@ var salesAccounts = map[string]string{
 // exported wrong.
 var ErrCarSalePostings = errors.New("workshop: a car sale in this period cannot be exported yet: how it is posted waits on the accountant")
 
+// ErrRentalPostings is a period holding a rental's invoice (#199): how rent
+// and return charges -- some outside the scope of VAT -- are posted waits
+// on the accountant (#207, gate G2), so it is not exported rather than
+// exported wrong.
+var ErrRentalPostings = errors.New("workshop: a rental invoice in this period cannot be exported yet: how it is posted waits on the accountant")
+
 // ErrUnsupportedVATRate is returned when an invoice carries a rate this
 // export has no account for.
 var ErrUnsupportedVATRate = errors.New("workshop: an invoice in this period has a VAT rate with no account")
@@ -253,6 +259,10 @@ func ExportAccounting(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			if kind == "vehicle" {
 				nrows.Close()
 				return ErrCarSalePostings
+			}
+			if kind == LineRent || kind == LineRentalCharge {
+				nrows.Close()
+				return ErrRentalPostings
 			}
 			if !ok {
 				nrows.Close()

@@ -39,6 +39,31 @@ func depositOn(t *testing.T, pool *pgxpool.Pool, c string, amount int64) (string
 	return dc.BookingID, in
 }
 
+// rentalInvoice invoices what of the booking is not invoiced yet.
+func rentalInvoice(t *testing.T, pool *pgxpool.Pool, booking string) string {
+	t.Helper()
+	inv, err := workshop.IssueRentalInvoice(context.Background(), pool, rentalDesk(), booking, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return inv.ID
+}
+
+// claimInvoice charges the damage case as settled, tells the customer and
+// invoices it.
+func claimInvoice(t *testing.T, pool *pgxpool.Pool, booking, c string) string {
+	t.Helper()
+	ctx := context.Background()
+	charge, err := workshop.ConfirmCharge(ctx, pool, rentalDesk(), booking, workshop.NewCharge{Kind: workshop.ChargeDamage, DamageCaseID: c})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.InformCharge(ctx, pool, rentalDesk(), charge, "email"); err != nil {
+		t.Fatal(err)
+	}
+	return rentalInvoice(t, pool, booking)
+}
+
 // steps takes the damage case's steps as the rental desk.
 func steps(t *testing.T, pool *pgxpool.Pool, c string, ss ...workshop.DamageStep) {
 	t.Helper()
@@ -61,17 +86,13 @@ func TestARentalDepositSettlesOnlyAnAcceptedClaimAndTheRestGoesBack(t *testing.T
 	ctx := context.Background()
 	c := newDamageOn(t, pool, "GHI 56J", "V3")
 	booking, in := depositOn(t, pool, c, 500_000)
-	_, invoice := issued(t, pool)
-	inv := invoice.ID
-	before, err := workshop.BalanceFor(ctx, pool, advisor(), inv)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rent := rentalInvoice(t, pool, booking)
+	inv := rent
 	apply := func(amount int64) error {
 		return workshop.ApplyRentalDeposit(ctx, pool, rentalDesk(), booking, c, inv, amount, "")
 	}
 	d, _ := workshop.RentalDepositOf(ctx, pool, rentalDesk(), booking)
-	if err := workshop.ApplyDeposit(ctx, pool, advisor(), d.DepositID, inv, 1000, ""); !errors.Is(err, workshop.ErrInvalid) {
+	if err := workshop.ApplyDeposit(ctx, pool, advisor(), d.DepositID, rent, 1000, ""); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("a rental's deposit applied past its damage case: %v", err)
 	}
 	if err := apply(1000); !errors.Is(err, workshop.ErrInvalid) {
@@ -87,6 +108,15 @@ func TestARentalDepositSettlesOnlyAnAcceptedClaimAndTheRestGoesBack(t *testing.T
 		t.Errorf("applied while the customer may still object: %v", err)
 	}
 	steps(t, pool, c, workshop.DamageStep{Step: "customer_response", Response: "accepted"})
+	_, job := issued(t, pool)
+	if err := workshop.ApplyRentalDeposit(ctx, pool, rentalDesk(), booking, c, job.ID, 1000, ""); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a rental's deposit applied to a workshop invoice: %v", err)
+	}
+	inv = claimInvoice(t, pool, booking, c)
+	before, err := workshop.BalanceFor(ctx, pool, advisor(), inv)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := apply(amount + 1); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("more applied than the case settled: %v", err)
 	}
@@ -134,13 +164,12 @@ func TestADepositWaitsForTheTimeToObjectOrTheOwnersWord(t *testing.T) {
 			workshop.DamageStep{Step: "amount_settled", AmountMinor: &amount},
 			workshop.DamageStep{Step: "customer_informed", Channel: "letter", RespondBy: &past})
 	}
-	_, invoice := issued(t, pool)
-	inv := invoice.ID
 	b1, _ := depositOn(t, pool, quiet, 100_000)
-	if err := workshop.ApplyRentalDeposit(ctx, pool, rentalDesk(), b1, quiet, inv, amount, ""); err != nil {
+	if err := workshop.ApplyRentalDeposit(ctx, pool, rentalDesk(), b1, quiet, claimInvoice(t, pool, b1, quiet), amount, ""); err != nil {
 		t.Errorf("past the day to object: %v", err)
 	}
 	b2, _ := depositOn(t, pool, disputed, 100_000)
+	inv := rentalInvoice(t, pool, b2)
 	if err := workshop.ApplyRentalDeposit(ctx, pool, rentalDesk(), b2, quiet, inv, 1000, ""); !errors.Is(err, workshop.ErrNotFound) {
 		t.Errorf("another booking's damage case settled from this deposit: %v", err)
 	}
@@ -152,7 +181,7 @@ func TestADepositWaitsForTheTimeToObjectOrTheOwnersWord(t *testing.T) {
 		Reason: "Bilderna visar ny repa"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := workshop.ApplyRentalDeposit(ctx, pool, rentalDesk(), b2, disputed, inv, amount, ""); err != nil {
+	if err := workshop.ApplyRentalDeposit(ctx, pool, rentalDesk(), b2, disputed, claimInvoice(t, pool, b2, disputed), amount, ""); err != nil {
 		t.Errorf("on the owner's word: %v", err)
 	}
 }

@@ -447,6 +447,9 @@ type invoiceLine struct {
 	UnitCode string
 	// A car sold under the margin scheme (#177).
 	MarginScheme bool
+	// UNCL5305, where the source says it: O for a rental's charge outside
+	// the scope of VAT (#195). Empty, it is read off the rate (vatCategory).
+	VATCategory string
 }
 
 func chargeableLines(ctx context.Context, tx pgx.Tx, workOrderID string) ([]invoiceLine, error) {
@@ -510,7 +513,7 @@ func writeInvoiceLines(ctx context.Context, tx pgx.Tx, shopID, invoiceID string,
 	for _, l := range lines {
 		if _, err := tx.Exec(ctx, insert, shopID, invoiceID, l.Position, l.Kind, l.Description,
 			l.QuantityMilli, l.UnitPriceMinor, l.VATRateBasis, l.NetMinor, l.VATMinor, l.CreditsLineID,
-			l.UnitCode, vatCategory(l.VATRateBasis), l.MarginScheme); err != nil {
+			l.UnitCode, lineCategory(l), l.MarginScheme); err != nil {
 			return fmt.Errorf("write invoice line %d: %w", l.Position, err)
 		}
 	}
@@ -617,6 +620,12 @@ func unitCode(kind, partUnit string) string {
 		return "KGM"
 	case "hour":
 		return "HUR"
+	case "day":
+		return "DAY"
+	case "week":
+		return "WEE"
+	case "month":
+		return "MON"
 	}
 	return "C62"
 }
@@ -630,6 +639,15 @@ func vatCategory(rateBasis int) string {
 		return "S"
 	}
 	return ""
+}
+
+// lineCategory is the category a line is written with: its own, else
+// the one its rate says.
+func lineCategory(l invoiceLine) string {
+	if l.VATCategory != "" {
+		return l.VATCategory
+	}
+	return vatCategory(l.VATRateBasis)
 }
 
 // readSeller assembles the address into the shape it is printed in, because

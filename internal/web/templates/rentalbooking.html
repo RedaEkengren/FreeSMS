@@ -136,6 +136,21 @@
 {{end}}
 {{end}}
 
+<h2 id="invoices">{{$.T "Invoices"}}</h2>
+{{with $.Rental.Invoices}}
+<ul class="lines">
+  {{range .}}<li><div class="row"><span>{{if $.Session.Scope.Role.SeesCustomerPersonalData}}<a href="/invoices/{{.ID}}">{{.Reference}}</a>{{else}}{{.Reference}}{{end}}
+    {{if .CreditNote}} &middot; {{$.T "credit note"}}{{else if .Credited}} &middot; {{$.T "credited"}}{{end}}</span><span>{{$.Money .GrossMinor}}</span></div></li>{{end}}
+</ul>
+{{end}}
+{{if or (eq $.Rental.Booking.State "returned") (eq $.Rental.Booking.State "cancelled") (eq $.Rental.Booking.State "no_show")}}
+<form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/invoice">
+  <label><span>{{$.T "To"}}</span><select name="payer"><option value="">{{$.Rental.Booking.RenterName}}</option>{{range $.Rental.Renters}}{{if ne .ID $.Rental.Booking.RenterID}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}</select></label>
+  <button type="submit">{{$.T "Invoice what is not invoiced yet"}}</button>
+</form>
+<p class="waiting">{{$.T "The rent as it was booked, and the charges the customer has been told of. Nothing is priced again."}}</p>
+{{end}}
+
 <h2 id="deposit">{{$.T "Deposit"}}</h2>
 <p class="waiting">{{$.T "A deposit is the customer's money until a settled claim is set against it. FreeSMS records it; it is not a cash register, and a recorded payment is not a cash-register receipt."}}</p>
 {{with $.Rental.Deposit}}
@@ -167,6 +182,17 @@
   </details>
   {{end}}</li>{{end}}
 </ul>
+{{end}}
+{{if and .OwedBack $.Rental.Invoices $.Rental.Handovers.Damage}}
+<details><summary>{{$.T "Set part of it against a settled claim"}}</summary>
+<form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/deposit-apply">
+  <input type="hidden" name="key" value="{{$.Rental.Key}}-apply">
+  <label><span>{{$.T "Damage case"}}</span><select name="damage_case">{{range $.Rental.Handovers.Damage}}<option value="{{.ID}}">{{.Description}}</option>{{end}}</select></label>
+  <label><span>{{$.T "Invoice"}}</span><select name="invoice">{{range $.Rental.Invoices}}{{if not (or .CreditNote .Credited)}}<option value="{{.ID}}">{{.Reference}}</option>{{end}}{{end}}</select></label>
+  <label><span>{{$.T "Amount, in kronor"}}</span><input name="amount" inputmode="decimal" required></label>
+  <button type="submit">{{$.T "Set it against the claim"}}</button>
+</form>
+</details>
 {{end}}
 <details><summary>{{$.T "Record money received"}}</summary>
 <form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/deposit/receive">

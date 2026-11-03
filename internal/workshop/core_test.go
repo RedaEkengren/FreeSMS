@@ -134,6 +134,7 @@ var core = map[string]string{
 	"DamageCaseByID":           "a damage case stays readable whatever the shop runs",
 	"ChargeClasses":            "how charges were taxed stays readable whatever the shop runs",
 	"RentalCharges":            "a rental's charges stay readable whatever the shop runs",
+	"RentalInvoices":           "a rental's invoices stay readable whatever the shop runs",
 	"InformCharge":             "a customer is told of what they owe after the module is switched off",
 	"WithdrawCharge":           "a charge is withdrawn after the module is switched off",
 	"RentalDepositOf":          "a rental's deposit is the customer's money, readable whatever the shop runs",

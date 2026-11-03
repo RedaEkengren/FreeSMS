@@ -59,7 +59,9 @@ type rentalData struct {
 	// A booking's deposit (#196).
 	Deposit workshop.RentalDeposit
 	// A booking's return charges, and how each kind is taxed (#195).
-	Charges       []workshop.RentalCharge
+	Charges []workshop.RentalCharge
+	// A booking's invoices and credit notes (#199).
+	Invoices      []workshop.RentalInvoice
 	ChargeClasses []workshop.ChargeClass
 	// A booking form's own key: sent twice, one booking.
 	Key string
@@ -634,9 +636,6 @@ func (s *Server) handleRentalBooking(w http.ResponseWriter, r *http.Request) {
 		if d.Gaps, err = workshop.RentalBookingGaps(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
 			return
 		}
-		if d.Renters, err = workshop.Renters(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
-			return
-		}
 		if d.Templates, err = workshop.RentalAgreementTemplates(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
 			return
 		}
@@ -654,6 +653,13 @@ func (s *Server) handleRentalBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if d.Charges, err = workshop.RentalCharges(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
+		return
+	}
+	// Whom a driver or an invoice can be: the renters there are.
+	if d.Renters, err = workshop.Renters(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
+	}
+	if d.Invoices, err = workshop.RentalInvoices(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
 		return
 	}
 	d.Key = newFormKey()

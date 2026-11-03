@@ -346,7 +346,7 @@ func lastOutcome(c DamageCaseDetail) string {
 }
 
 // ApplyRentalDeposit takes amountMinor of the rental's deposit for a damage
-// case of the same booking, onto the invoice that charges it: no money
+// case of the same booking, onto an invoice of the rental (#199): no money
 // moves, two rows in the journal (ApplyDeposit). Refused unless the case's
 // amount is settled and the customer told, and they accepted or let the
 // time to object pass -- a disputed case only once whoever runs the shop
@@ -378,6 +378,9 @@ func ApplyRentalDeposit(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		}
 		if !strings.EqualFold(c.BookingID, bookingID) {
 			return ErrNotFound
+		}
+		if err := rentalInvoiceOfTx(ctx, tx, bookingID, invoiceID); err != nil {
+			return err
 		}
 		left, err := claimOpenTx(ctx, tx, c, time.Now())
 		if err != nil {

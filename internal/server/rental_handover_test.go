@@ -137,6 +137,28 @@ func TestTheRentalDeskChecksAUnitOutAndIn(t *testing.T) {
 	if !strings.Contains(body, "VAT treatment not confirmed") && !strings.Contains(body, "Momsbehandlingen inte bekräftad") {
 		t.Errorf("the charge's unconfirmed VAT treatment is not said")
 	}
+	// Told of the charge, the rental is invoiced from the page (#199).
+	charges, err := workshop.RentalCharges(ctx, pool, desk, booking)
+	if err != nil || len(charges) != 1 {
+		t.Fatalf("the charges: %+v, %v", charges, err)
+	}
+	if resp := postModuleForm(t, client, ts.URL, page+"/invoice", url.Values{}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("invoiced before the customer was told of the charge: %d", resp.StatusCode)
+	}
+	if resp := postModuleForm(t, client, ts.URL, page+"/charges/"+charges[0].ID+"/inform", url.Values{"channel": {"email"}}); resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("telling the customer: %d %s", resp.StatusCode, readBody(t, resp))
+	}
+	if resp := postModuleForm(t, client, ts.URL, page+"/invoice", url.Values{}); resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("invoicing the rental: %d %s", resp.StatusCode, readBody(t, resp))
+	}
+	invoices, err := workshop.RentalInvoices(ctx, pool, desk, booking)
+	if err != nil || len(invoices) != 1 {
+		t.Fatalf("the rental's invoices: %+v, %v", invoices, err)
+	}
+	resp, _ = client.Get(ts.URL + page)
+	if body := readBody(t, resp); !strings.Contains(body, invoices[0].Reference) {
+		t.Errorf("the booking page does not list its invoice %s", invoices[0].Reference)
+	}
 	tech := signIn(t, ts, techEmail)
 	if resp, _ := tech.Get(ts.URL + page); resp.StatusCode != http.StatusForbidden {
 		t.Errorf("a technician's view of the booking: %d", resp.StatusCode)
