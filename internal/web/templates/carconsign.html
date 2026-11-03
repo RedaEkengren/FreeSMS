@@ -1,0 +1,45 @@
+{{define "content"}}
+{{$d := .Dealer}}
+<h1>{{.T "Take a car in on consignment"}}</h1>
+{{if .Error}}<p class="error" role="alert">{{.Sentence .Error}}</p>{{end}}
+<form method="post" action="/cars/consign">
+  <input type="hidden" name="key" value="{{$d.Key}}">
+  <fieldset>
+    <legend>{{.T "The car"}}</legend>
+    <label><span>{{.T "Registration"}}</span><input name="registration" value="{{index $d.Form "registration"}}" autocapitalize="characters"></label>
+    <label><span>{{.T "Chassis number (VIN)"}}</span><input name="vin" value="{{index $d.Form "vin"}}" autocapitalize="characters"></label>
+    <label><span>{{.T "Make"}}</span><input name="make" value="{{index $d.Form "make"}}"></label>
+    <label><span>{{.T "Model"}}</span><input name="model_name" value="{{index $d.Form "model_name"}}"></label>
+  </fieldset>
+  <fieldset>
+    <legend>{{.T "Whose car it is"}}</legend>
+    <label><span>{{.T "A person or a company"}}</span><select name="principal_kind">
+      <option value="private"{{if eq (index $d.Form "principal_kind") "private"}} selected{{end}}>{{.T "A person"}}</option>
+      <option value="company"{{if eq (index $d.Form "principal_kind") "company"}} selected{{end}}>{{.T "A company"}}</option></select></label>
+    <label><span>{{.T "Name"}}</span><input name="principal_name" value="{{index $d.Form "principal_name"}}" required></label>
+    <label><span>{{.T "Phone"}}</span><input name="principal_phone" value="{{index $d.Form "principal_phone"}}" inputmode="tel"></label>
+    <label><span>{{.T "Email"}}</span><input name="principal_email" value="{{index $d.Form "principal_email"}}" inputmode="email"></label>
+    <label><span>{{.T "What kind of seller"}}</span><select name="seller_type" required><option value=""></option>
+      {{range $d.SellerTypes}}<option value="{{.}}"{{if eq . (index $d.Form "seller_type")}} selected{{end}}>{{$.T ($d.SellerTypeLabel .)}}</option>{{end}}</select></label>
+  </fieldset>
+  <fieldset>
+    <legend>{{.T "The agreement"}}</legend>
+    <label><span>{{.T "In whose name it is sold"}}</span><select name="model">
+      <option value="own_name"{{if eq (index $d.Form "model") "own_name"}} selected{{end}}>{{.T "In our own name, on the principal's behalf"}}</option>
+      <option value="principal_name"{{if eq (index $d.Form "model") "principal_name"}} selected{{end}}>{{.T "In the principal's name"}}</option></select></label>
+    <p class="waiting">{{.T "Which one decides the VAT and who answers to the buyer. Fill in a minimum price or a net payout, and the commission as an amount or a share."}}</p>
+    <label><span>{{.T "Lowest price, in kronor"}}</span><input name="minimum" value="{{index $d.Form "minimum"}}" inputmode="decimal"></label>
+    <label><span>{{.T "Or the net paid to the principal, in kronor"}}</span><input name="net" value="{{index $d.Form "net"}}" inputmode="decimal"></label>
+    <label><span>{{.T "Commission, in kronor"}}</span><input name="commission" value="{{index $d.Form "commission"}}" inputmode="decimal"></label>
+    <label><span>{{.T "Or the commission's share, per cent"}}</span><input name="commission_share" value="{{index $d.Form "commission_share"}}" inputmode="decimal"></label>
+    <label><span>{{.T "Costs the principal bears"}}</span><input name="costs" value="{{index $d.Form "costs"}}" maxlength="500"></label>
+    <label><span>{{.T "Who insures the car meanwhile"}}</span><select name="insured_by">
+      <option value="principal"{{if eq (index $d.Form "insured_by") "principal"}} selected{{end}}>{{.T "The principal"}}</option>
+      <option value="dealer"{{if eq (index $d.Form "insured_by") "dealer"}} selected{{end}}>{{.T "We do"}}</option></select></label>
+    <label><span>{{.T "From"}}</span><input type="date" name="starts_on" value="{{index $d.Form "starts_on"}}" required></label>
+    <label><span>{{.T "Until"}}</span><input type="date" name="ends_on" value="{{index $d.Form "ends_on"}}" required></label>
+    <label><span>{{.T "Terms"}}</span><textarea name="terms" maxlength="2000">{{index $d.Form "terms"}}</textarea></label>
+  </fieldset>
+  <button type="submit">{{.T "Take the car in"}}</button>
+</form>
+{{end}}

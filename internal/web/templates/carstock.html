@@ -2,7 +2,8 @@
 {{$d := .Dealer.Stock}}
 <h1>{{.T "Cars in stock"}}</h1>
 {{if .Error}}<p class="error" role="alert">{{.Sentence .Error}}</p>{{end}}
-{{if .Session.Scope.Role.BuysVehicles}}<p><a href="/cars/stock/new" class="button">{{.T "Record a car bought"}}</a></p>{{end}}
+{{if .Session.Scope.Role.BuysVehicles}}<p><a href="/cars/stock/new" class="button">{{.T "Record a car bought"}}</a>
+  <a href="/cars/consign" class="button secondary">{{.T "Take a car in on consignment"}}</a></p>{{end}}
 
 {{if $d.TotalValueMinor}}
 <p class="waiting">{{$.T "Stock value %s" ($.MoneyOrBlank $d.TotalValueMinor)}}{{if $d.MissingValue}} &middot; {{$.N "%d car has no purchase price yet" $d.MissingValue}}{{end}}</p>
