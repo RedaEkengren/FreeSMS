@@ -45,8 +45,9 @@ func inWorkshop(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, fn 
 // before it is offered; it is not offered at setup, or switched on, until
 // there is a page behind it. A shop that chose one and found nothing would
 // be told a thing that is not so. Rental is offered from its settings
-// (#189) on.
-var Available = []access.Module{access.Workshop, access.Rental}
+// (#189) on, car sales from the stock list, the purchase and the car's
+// own page (#168, #161, #167) on, with leads, test drives and deals.
+var Available = []access.Module{access.Workshop, access.Dealer, access.Rental}
 
 // available reports whether this release offers m.
 func available(m access.Module) bool { return slices.Contains(Available, m) }

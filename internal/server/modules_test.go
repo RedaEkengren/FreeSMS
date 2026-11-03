@@ -235,10 +235,10 @@ func TestSetupAsksWhatTheShopRuns(t *testing.T) {
 	if body := readBody(t, resp); resp.StatusCode != http.StatusBadRequest || !strings.Contains(body, "choose at least one") {
 		t.Errorf("setup with nothing ticked: %d", resp.StatusCode)
 	}
-	form.Set("module", "dealer")
+	form.Set("module", "fleet")
 	resp = postModuleForm(t, client, ts.URL, "/setup", form)
 	if readBody(t, resp); resp.StatusCode != http.StatusBadRequest {
-		t.Errorf("setup with a module this release does not have: %d, want 400", resp.StatusCode)
+		t.Errorf("setup with a module there is not: %d, want 400", resp.StatusCode)
 	}
 	form.Set("module", "workshop")
 	resp = postModuleForm(t, client, ts.URL, "/setup", form)

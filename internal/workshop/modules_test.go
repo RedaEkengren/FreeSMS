@@ -134,10 +134,8 @@ func TestSwitchingAModuleIsTheOwnersAndIsKept(t *testing.T) {
 			t.Errorf("%s reading the modules: %v, want ErrForbidden", who.Role, err)
 		}
 	}
-	for _, m := range []access.Module{access.Dealer, "bakery"} {
-		if _, err := workshop.SwitchModule(ctx, pool, owner(), m, true, "", false); !errors.Is(err, workshop.ErrInvalid) {
-			t.Errorf("switching on %q: %v; this release has nothing behind it", m, err)
-		}
+	if _, err := workshop.SwitchModule(ctx, pool, owner(), "bakery", true, "", false); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("switching on a module there is not: %v", err)
 	}
 	// Switching on what is on records nothing.
 	if _, err := workshop.SwitchModule(ctx, pool, owner(), access.Workshop, true, "", false); err != nil {
@@ -158,10 +156,10 @@ func TestSwitchingAModuleIsTheOwnersAndIsKept(t *testing.T) {
 	}
 	states, err := workshop.ModulesFor(ctx, pool, owner())
 	// Every module the release offers is listed, on or not: Rental since
-	// its settings (#189).
-	if err != nil || len(states) != 2 || states[0].Module != access.Workshop || states[0].On ||
-		states[1].Module != access.Rental || states[1].On {
-		t.Errorf("modules = %+v, %v; want the workshop and Rental, both off", states, err)
+	// its settings (#189), car sales since their stock pages (#168).
+	if err != nil || len(states) != 3 || states[0].Module != access.Workshop || states[0].On ||
+		states[1].Module != access.Dealer || states[1].On || states[2].Module != access.Rental || states[2].On {
+		t.Errorf("modules = %+v, %v; want the workshop, car sales and Rental, all off", states, err)
 	}
 }
 
