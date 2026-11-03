@@ -55,9 +55,13 @@ func (r Reservation) Lapsed(now time.Time) bool { return r.Standing() && !r.Expi
 type NewReservation struct {
 	StockUnitID string
 	PartyID     string
-	ExpiresAt   time.Time
-	Refundable  bool
-	Conditions  string
+	// A holder not yet known, made a party in the reservation's own
+	// transaction, so a refused reservation leaves nobody behind. Used
+	// instead of PartyID.
+	NewHolder  *NewParty
+	ExpiresAt  time.Time
+	Refundable bool
+	Conditions string
 	// The request's own key: replayed, it finds the reservation it made.
 	Key string
 }
@@ -117,7 +121,19 @@ func Reserve(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n NewR
 	if err := scope.Require(access.Dealer); err != nil {
 		return Reservation{}, err
 	}
-	if !looksLikeUUID(n.StockUnitID) || !looksLikeUUID(n.PartyID) {
+	var holderNote string
+	if n.NewHolder != nil {
+		holder := *n.NewHolder
+		holder.Role = PartyBuyer
+		var err error
+		if holder, holderNote, err = checkNewParty(holder); err != nil {
+			return Reservation{}, err
+		}
+		n.NewHolder, n.PartyID = &holder, ""
+	} else if !looksLikeUUID(n.PartyID) {
+		return Reservation{}, ErrNotFound
+	}
+	if !looksLikeUUID(n.StockUnitID) {
 		return Reservation{}, ErrNotFound
 	}
 	conditions, err := checkReservationTerms(n.ExpiresAt, n.Conditions)
@@ -141,8 +157,10 @@ func Reserve(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n NewR
 				return fmt.Errorf("read the request: %w", err)
 			}
 		}
-		if err := partySeenTx(ctx, tx, scope, n.PartyID); err != nil {
-			return err
+		if n.NewHolder == nil {
+			if err := partySeenTx(ctx, tx, scope, n.PartyID); err != nil {
+				return err
+			}
 		}
 		var status StockStatus
 		err := tx.QueryRow(ctx, `SELECT status FROM stock_units WHERE id = $1 FOR UPDATE`, n.StockUnitID).Scan(&status)
@@ -157,6 +175,11 @@ func Reserve(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, n NewR
 				return errReservationTaken
 			}
 			return errReservationCar
+		}
+		if n.NewHolder != nil {
+			if n.PartyID, err = createPartyTx(ctx, tx, scope, *n.NewHolder, holderNote); err != nil {
+				return err
+			}
 		}
 		id, err := insertReservationTx(ctx, tx, scope, n.StockUnitID, n.PartyID, n.ExpiresAt, n.Refundable, conditions, "", "", n.Key)
 		if err != nil {

@@ -365,3 +365,56 @@ func TestACarInStockIsWorkedOnItsPage(t *testing.T) {
 		t.Errorf("the salesperson's page:\n%s", visibleText(sales))
 	}
 }
+
+// A salesperson reserves a car on its page for a customer typed there,
+// takes a deposit, extends the reservation and cancels it with the deposit
+// to be refunded; the car is for sale again (#174).
+func TestASalespersonReservesACarOnItsPage(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	p, err := workshop.RecordPurchase(ctx, pool, owner, workshop.NewPurchase{VehicleID: vehicleA, Reason: workshop.StockFromPurchase,
+		NewSeller: &workshop.NewParty{Kind: "private", Name: "Sam Säljare"}, PurchasedOn: time.Now(), PriceMinor: 8_500_000,
+		SellerType: workshop.SellerPrivate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.MoveStockUnit(ctx, pool, owner, p.StockUnitID, workshop.StockForSale, ""); err != nil {
+		t.Fatal(err)
+	}
+	page := ts.URL + "/cars/stock/" + p.StockUnitID
+	seller := signIn(t, ts, salesEmail)
+	until := time.Now().Add(72 * time.Hour).Format("2006-01-02T15:04")
+	if status := postStatus(t, seller, page+"/reserve", url.Values{"holder_kind": {"private"}, "holder_name": {"Kim Köpare"},
+		"holder_phone": {"070-765 43 21"}, "until": {until}, "refundable": {"yes"}, "key": {"res-page-1"}}); status != http.StatusSeeOther {
+		t.Fatalf("reserving answered %d", status)
+	}
+	rs, err := workshop.ReservationsOfUnit(ctx, pool, owner, p.StockUnitID)
+	if err != nil || len(rs) != 1 {
+		t.Fatalf("the reservations: %+v, %v", rs, err)
+	}
+	res := page + "/reservations/" + rs[0].ID
+	if status := postStatus(t, seller, res+"/deposit", url.Values{"amount": {"5 000"}, "method": {"swish"},
+		"paid_on": {time.Now().Format(time.DateOnly)}, "key": {"dep-page-1"}}); status != http.StatusSeeOther {
+		t.Errorf("recording the deposit answered %d", status)
+	}
+	text := strings.ReplaceAll(visibleText(get(t, seller, page, http.StatusOK)), " ", " ")
+	if !strings.Contains(text, "Reserved for Kim Köpare") || !strings.Contains(text, "Deposit held SEK 5,000.00") {
+		t.Errorf("the reserved car's page:\n%s", text)
+	}
+	if status := postStatus(t, seller, res+"/extend", url.Values{"until": {time.Now().Add(120 * time.Hour).Format("2006-01-02T15:04")}}); status != http.StatusSeeOther {
+		t.Errorf("extending answered %d", status)
+	}
+	rs, _ = workshop.ReservationsOfUnit(ctx, pool, owner, p.StockUnitID)
+	if status := postStatus(t, seller, page+"/reservations/"+rs[0].ID+"/end", url.Values{"how": {"cancelled"}, "deposit": {"refund"},
+		"end_reason": {"Banken sa nej"}}); status != http.StatusSeeOther {
+		t.Errorf("cancelling answered %d", status)
+	}
+	text = visibleText(get(t, seller, page, http.StatusOK))
+	if !strings.Contains(text, "Reserve the car") || !strings.Contains(text, "Banken sa nej") {
+		t.Errorf("the car's page after the reservation was cancelled:\n%s", text)
+	}
+	if strings.Contains(get(t, signIn(t, ts, buyerEmail), page, http.StatusOK), "Reserve the car") {
+		t.Error("the buyer was offered to reserve the car")
+	}
+}

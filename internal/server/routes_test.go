@@ -260,7 +260,9 @@ var swept = map[string]string{
 	"GET /cars/stock/{id}": "sweep", "POST /cars/stock/{id}/move": "sweep", "POST /cars/stock/{id}/checks": "sweep",
 	"POST /cars/stock/{id}/checks/override": "sweep", "POST /cars/stock/{id}/costs": "sweep",
 	"POST /cars/stock/{id}/costs/{cost}/reverse": "sweep",
-	"GET /cars/calculations/new":                 "", "POST /cars/calculations": "",
+	"POST /cars/stock/{id}/reserve":              "sweep", "POST /cars/stock/{id}/reservations/{res}/extend": "sweep",
+	"POST /cars/stock/{id}/reservations/{res}/deposit": "sweep", "POST /cars/stock/{id}/reservations/{res}/end": "sweep",
+	"GET /cars/calculations/new": "", "POST /cars/calculations": "",
 	"GET /cars/calculations/{id}": "sweep", "POST /cars/calculations/{id}/accept": "sweep",
 	"GET /cars/leads": "", "POST /cars/leads": "", "POST /cars/leads/settings": "", "POST /cars/leads/reassign": "",
 	"GET /cars/leads/{id}": "sweep", "POST /cars/leads/{id}/contacts": "sweep", "POST /cars/leads/{id}/status": "sweep",
@@ -322,6 +324,7 @@ func fill(pattern string) (method, path string) {
 		"{defect}":                "bbbbbbbb-0000-0000-0000-0000000000ce",
 		"/cars/stock/{id}":        "/cars/stock/bbbbbbbb-0000-0000-0000-0000000000cf",
 		"{cost}":                  "bbbbbbbb-0000-0000-0000-0000000000d0",
+		"{res}":                   "bbbbbbbb-0000-0000-0000-0000000000d2",
 		// Rental: ids that are nobody's.
 		"/rental/permits/{id}":     "/rental/permits/bbbbbbbb-0000-0000-0000-0000000000e1",
 		"/rental/profiles/{id}":    "/rental/profiles/bbbbbbbb-0000-0000-0000-0000000000e2",

@@ -29,7 +29,23 @@ type carUnitData struct {
 	Overridden  bool
 	ShowChecks  bool
 	Form        map[string]string
+	// For whoever sells cars: the car's reservations, newest first, the
+	// one standing if any, and what is held as its deposit.
+	ShowReservations bool
+	Reservations     []workshop.Reservation
+	Standing         *workshop.Reservation
+	Deposit          workshop.DepositBalance
+	Key              string
 }
+
+// Methods are the ways money arrives, for the deposit form.
+func (carUnitData) Methods() []string { return workshop.PaymentMethods }
+
+// Lapsed reports whether the standing reservation has run out.
+func (d carUnitData) Lapsed() bool { return d.Standing != nil && d.Standing.Lapsed(time.Now()) }
+
+// Soon is a moment two days ahead, as a datetime field holds it.
+func (d carUnitData) Soon() string { return time.Now().Add(48 * time.Hour).Format("2006-01-02T15:04") }
 
 // CheckKinds are the kinds of check a form offers.
 func (carUnitData) CheckKinds() []string { return workshop.CheckKinds }
@@ -84,6 +100,20 @@ func (s *Server) carUnitPage(w http.ResponseWriter, r *http.Request, status int,
 		}
 		if d.Outstanding, d.Overridden, err = workshop.ChecksOutstanding(r.Context(), s.pool, scope, unit.ID); err != nil {
 			s.log.Error("read outstanding checks", "error", err)
+		}
+	}
+	if scope.Role.SellsVehicles() {
+		d.ShowReservations, d.Key = true, newFormKey()
+		if d.Reservations, err = workshop.ReservationsOfUnit(r.Context(), s.pool, scope, unit.ID); err != nil {
+			s.log.Error("read reservations", "error", err)
+		}
+		for i := range d.Reservations {
+			if d.Reservations[i].Standing() {
+				d.Standing = &d.Reservations[i]
+				if d.Deposit, err = workshop.ReservationDeposit(r.Context(), s.pool, scope, d.Standing.ID); err != nil {
+					s.log.Error("read the deposit", "error", err)
+				}
+			}
 		}
 	}
 	s.render(w, r, status, "carunit", pageData{Title: "Car in stock", Session: session, CarUnit: d, Error: msg})
@@ -176,6 +206,75 @@ func (s *Server) handleCarUnitReverseCost(w http.ResponseWriter, r *http.Request
 	s.carUnitDone(w, r)
 }
 
+// handleReserveCar reserves the car for a customer typed on the form.
+func (s *Server) handleReserveCar(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	form := map[string]string{}
+	for _, k := range []string{"holder_kind", "holder_name", "holder_phone", "holder_email", "until", "conditions"} {
+		form[k] = strings.TrimSpace(r.FormValue(k))
+	}
+	until, err := time.ParseInLocation("2006-01-02T15:04", form["until"], s.shopLocation(r))
+	if err != nil {
+		s.carUnitPage(w, r, http.StatusBadRequest, form, "Say until when it is reserved.")
+		return
+	}
+	_, err = workshop.Reserve(r.Context(), s.pool, session.Scope, workshop.NewReservation{StockUnitID: r.PathValue("id"),
+		NewHolder: &workshop.NewParty{Kind: form["holder_kind"], Name: form["holder_name"], Phone: form["holder_phone"], Email: form["holder_email"]},
+		ExpiresAt: until, Refundable: r.FormValue("refundable") != "", Conditions: form["conditions"], Key: r.FormValue("key")})
+	if s.carUnitRefused(w, r, err, form) {
+		return
+	}
+	s.carUnitDone(w, r)
+}
+
+// handleExtendReservation extends the standing reservation.
+func (s *Server) handleExtendReservation(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	until, err := time.ParseInLocation("2006-01-02T15:04", strings.TrimSpace(r.FormValue("until")), s.shopLocation(r))
+	if err != nil {
+		s.carUnitPage(w, r, http.StatusBadRequest, nil, "Say until when it is reserved.")
+		return
+	}
+	_, err = workshop.ExtendReservation(r.Context(), s.pool, session.Scope, r.PathValue("res"), until, "")
+	if s.carUnitRefused(w, r, err, nil) {
+		return
+	}
+	s.carUnitDone(w, r)
+}
+
+// handleReservationDeposit records a deposit received for the reservation.
+func (s *Server) handleReservationDeposit(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	form := map[string]string{"amount": r.FormValue("amount"), "reference": r.FormValue("reference")}
+	amount, err := parseMinorUnits(strings.TrimSpace(form["amount"]))
+	if err != nil || strings.TrimSpace(form["amount"]) == "" {
+		s.carUnitPage(w, r, http.StatusBadRequest, form, "Say how much was received, as a number.")
+		return
+	}
+	day, err := time.ParseInLocation(time.DateOnly, r.FormValue("paid_on"), s.shopLocation(r))
+	if err != nil {
+		s.carUnitPage(w, r, http.StatusBadRequest, form, "Say the day it was received.")
+		return
+	}
+	_, err = workshop.RecordReservationDeposit(r.Context(), s.pool, session.Scope, r.PathValue("res"), "", workshop.NewPayment{
+		AmountMinor: &amount, Method: r.FormValue("method"), PaidOn: day, Reference: form["reference"], Key: r.FormValue("key")})
+	if s.carUnitRefused(w, r, err, form) {
+		return
+	}
+	s.carUnitDone(w, r)
+}
+
+// handleEndReservation ends the standing reservation without a sale.
+func (s *Server) handleEndReservation(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	err := workshop.EndReservation(r.Context(), s.pool, session.Scope, r.PathValue("res"), r.FormValue("how"), r.FormValue("deposit"),
+		r.FormValue("end_reason"))
+	if s.carUnitRefused(w, r, err, map[string]string{"end_reason": r.FormValue("end_reason")}) {
+		return
+	}
+	s.carUnitDone(w, r)
+}
+
 // carUnitRoutes registers the pages of one car in stock.
 func (s *Server) carUnitRoutes(m routeMux) {
 	m.HandleFunc("GET /cars/stock/{id}", s.requireSession(s.handleCarUnit))
@@ -184,4 +283,8 @@ func (s *Server) carUnitRoutes(m routeMux) {
 	m.HandleFunc("POST /cars/stock/{id}/checks/override", s.requireSession(s.handleCarUnitOverride))
 	m.HandleFunc("POST /cars/stock/{id}/costs", s.requireSession(s.handleCarUnitCost))
 	m.HandleFunc("POST /cars/stock/{id}/costs/{cost}/reverse", s.requireSession(s.handleCarUnitReverseCost))
+	m.HandleFunc("POST /cars/stock/{id}/reserve", s.requireSession(s.handleReserveCar))
+	m.HandleFunc("POST /cars/stock/{id}/reservations/{res}/extend", s.requireSession(s.handleExtendReservation))
+	m.HandleFunc("POST /cars/stock/{id}/reservations/{res}/deposit", s.requireSession(s.handleReservationDeposit))
+	m.HandleFunc("POST /cars/stock/{id}/reservations/{res}/end", s.requireSession(s.handleEndReservation))
 }
