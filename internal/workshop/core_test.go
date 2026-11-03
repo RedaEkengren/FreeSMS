@@ -131,6 +131,7 @@ var core = map[string]string{
 	"DeliveryOfSale":     "the consumer law's clocks run for three years after delivery",
 	"ListingOf":          "a car's history in stock", "StockPhotos": "a car's history in stock",
 	"CardOf":         "a car's history in stock",
+	"DamageCaseByID": "a damage case stays readable whatever the shop runs",
 	"FeedSettingsOf": "how the shop publishes, readable whatever it runs",
 	"FilingOf":       "an ownership filing is kept with the sale or purchase it is for",
 	"ComplaintByID":  "the dealer answers for three years whatever it runs", "ComplaintsOfSale": "the dealer answers for three years whatever it runs",

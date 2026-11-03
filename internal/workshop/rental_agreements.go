@@ -439,6 +439,10 @@ type LicenceShown struct {
 	ValidUntil time.Time
 	Method     string
 	Note       string
+	// Whoever checked it saw that the driver is at least the profile's
+	// minimum age. No date of birth is kept: only that it was seen, as a
+	// test drive's age check (#173).
+	AgeOK bool
 }
 
 // holdsIdentifier reports whether a note looks as if it holds a licence
@@ -572,6 +576,7 @@ const (
 	licenceNotShown = "No licence was shown."
 	licenceCategory = "The licence does not hold a category this unit needs."
 	licenceExpires  = "The licence is not valid for the whole rental."
+	licenceTooYoung = "The driver was not seen to be the minimum age this unit is rented from."
 )
 
 // RecordLicenceCheck records a driver's licence check for this rental: the
@@ -628,11 +633,12 @@ func RecordLicenceCheck(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		var party string
 		var accepted []string
 		var needed, removed bool
+		var minimumAge int
 		if err := tx.QueryRow(ctx, `
-			SELECT d.party_id, d.removed_at IS NOT NULL, v.licence_check_required, v.licence_categories
+			SELECT d.party_id, d.removed_at IS NOT NULL, v.licence_check_required, v.licence_categories, coalesce(v.minimum_age, 0)
 			FROM rental_drivers d JOIN rental_bookings b ON b.id = d.booking_id
 			JOIN rental_profile_versions v ON v.id = b.profile_version_id
-			WHERE d.id = $1`, driverID).Scan(&party, &removed, &needed, &accepted); err != nil {
+			WHERE d.id = $1`, driverID).Scan(&party, &removed, &needed, &accepted, &minimumAge); err != nil {
 			return fmt.Errorf("read driver: %w", err)
 		}
 		switch {
@@ -655,10 +661,15 @@ func RecordLicenceCheck(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 			failure = licenceCategory
 		case !licenceLasts(l.ValidUntil, b.ends, loc):
 			failure = licenceExpires
+		case minimumAge > 0 && !l.AgeOK:
+			failure = licenceTooYoung
 		}
 		ref := "not shown; " + l.Method
 		if l.Shown {
 			ref = fmt.Sprintf("shown; categories %s; valid until %s; %s", strings.Join(cats, ","), l.ValidUntil.Format("2006-01-02"), l.Method)
+			if l.AgeOK {
+				ref += "; age seen"
+			}
 		}
 		if l.Note != "" {
 			ref += "; " + l.Note

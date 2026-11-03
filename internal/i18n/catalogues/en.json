@@ -221,6 +221,18 @@
     "referred_arn": {"other": "referred to the National Board for Consumer Disputes"},
     "price_reduction": {"other": "price reduction"},
     "in_person": {"other": "in person"},
+    "new_confirmed": {"other": "confirmed new"},
+    "pre_existing": {"other": "there before"},
+    "liability_assessed": {"other": "liability assessed"},
+    "amount_settled": {"other": "amount settled"},
+    "customer_informed": {"other": "customer told"},
+    "customer_response": {"other": "customer's answer"},
+    "third_party": {"other": "a third party"},
+    "no_answer": {"other": "no answer"},
+    "set_against_deposit": {"other": "set against the deposit"},
+    "written_off": {"other": "written off"},
+    "insurance_claim": {"other": "insurance claim"},
+    "closed_not_renter": {"other": "closed, not the renter's"},
     "%d car": {"one": "%d car", "other": "%d cars"},
     "%d car has no purchase price, and is left out of the totals": {"one": "%d car has no purchase price, and is left out of the totals", "other": "%d cars have no purchase price, and are left out of the totals"}
   }

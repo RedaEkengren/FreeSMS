@@ -61,8 +61,11 @@ var queryBudgets = map[string]int{
 	// fleet's paperwork (#202) -- reports, insurances, the permit ending
 	// and what every booking ahead lacks, in one statement
 	// (seedRentalsAhead books five, so a loop over them would show).
+	// 28 to 29: rental damage cases nobody has assessed (#197), one
+	// statement, a provider of its own so a failure there does not take
+	// the day's handovers with it.
 	"desk GET /":      17,
-	"owner GET /":     28,
+	"owner GET /":     29,
 	"desk GET /board": 21,
 	// 35: the quote the customer was shown and what they answered to it
 	// (two statements), which the counter reads on every live refresh.

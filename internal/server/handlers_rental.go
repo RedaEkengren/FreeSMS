@@ -18,7 +18,8 @@ import (
 // does not exist; the operations check the role and the module again.
 
 // rentalPages are the templates Rental adds.
-var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "rentalprices", "rentalbooking", "rentalhandover", "rentalregister"}
+var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "rentalprices", "rentalbooking", "rentalhandover", "rentalregister",
+	"rentaldamage"}
 
 // rentalData is what Rental's pages are given.
 type rentalData struct {
@@ -53,6 +54,8 @@ type rentalData struct {
 	RegisterAsked bool
 	RegisterForm  registerForm
 	Retention     *workshop.RegisterRetention
+	// A damage case and its steps (#197).
+	DamageCase workshop.DamageCaseDetail
 	// A booking form's own key: sent twice, one booking.
 	Key string
 	Now time.Time
@@ -184,6 +187,8 @@ func (rentalData) HasCategory(p workshop.RentalProfile, c string) bool {
 }
 
 func (s *Server) rentalRoutes(m routeMux) {
+	m.HandleFunc("GET /rental/damage/{id}", s.requireSession(s.handleRentalDamage))
+	m.HandleFunc("POST /rental/damage/{id}/steps", s.requireSession(s.handleRentalDamageStep))
 	m.HandleFunc("GET /rental", s.requireSession(s.handleRentalUnits))
 	m.HandleFunc("GET /rental/prices", s.requireSession(s.handleRentalPrices))
 	m.HandleFunc("POST /rental/bookings", s.requireSession(s.handleRentalBook))
@@ -713,7 +718,7 @@ func (s *Server) handleLicenceCheck(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusBadRequest, "Not accepted", "")
 		return
 	}
-	l := workshop.LicenceShown{Shown: r.FormValue("shown") != "", Categories: r.Form["categories"],
+	l := workshop.LicenceShown{Shown: r.FormValue("shown") != "", AgeOK: r.FormValue("age_ok") != "", Categories: r.Form["categories"],
 		Method: r.FormValue("method"), Note: r.FormValue("note")}
 	if until, ok := s.formDate(r, "valid_until"); !ok {
 		s.renderError(w, r, http.StatusBadRequest, "That date did not parse", "Use the picker.")

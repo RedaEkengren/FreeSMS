@@ -240,6 +240,25 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 	}
 	// Rental
 	rentalAudited(t, pool, func(event, kind, id string) { made[event] = subject{kind, id} })
+	// A disputed damage set against the deposit on the owner's word (#197).
+	{
+		c := newDamageOn(t, pool, "DMG 197", "V197")
+		amount := int64(100_000)
+		for _, s := range []workshop.DamageStep{
+			{Step: "amount_settled", AmountMinor: &amount, Reason: "Självrisken"},
+			{Step: "customer_informed", Channel: "sms", Reason: "Skickat"},
+			{Step: "customer_response", Response: "disputed", Reason: "Bestrids"},
+		} {
+			if err := workshop.TakeDamageStep(ctx, pool, rentalDesk(), c, s); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := workshop.TakeDamageStep(ctx, pool, rentalOwner(), c, workshop.DamageStep{Step: "outcome", Outcome: "set_against_deposit",
+			Reason: "Bilderna"}); err != nil {
+			t.Fatal(err)
+		}
+		made["damage.set_against_disputed"] = subject{"damage_case", c}
+	}
 
 	for _, tr := range workshop.AuditedTransitions {
 		s, ok := made[tr.Event]

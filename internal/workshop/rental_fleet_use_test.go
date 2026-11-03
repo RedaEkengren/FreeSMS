@@ -205,7 +205,7 @@ func TestOnlyABookingAheadThatLacksSomethingIsListed(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, _ := workshop.AddRentalDriver(ctx, pool, rentalDesk(), soon, v.renter, true)
-	if _, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), d, workshop.LicenceShown{Shown: true, Categories: []string{"B"},
+	if _, err := workshop.RecordLicenceCheck(ctx, pool, rentalDesk(), d, workshop.LicenceShown{Shown: true, AgeOK: true, Categories: []string{"B"},
 		ValidUntil: day("2035-01-01"), Method: workshop.LicenceCardInspected}); err != nil {
 		t.Fatal(err)
 	}
