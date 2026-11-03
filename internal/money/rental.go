@@ -232,10 +232,13 @@ func priceWall(from, to time.Time, t RateTerms, weekend bool) ([]RentalLine, err
 	if to.After(from.AddDate(5, 0, 0)) {
 		return nil, ErrTooLong
 	}
-	if min := from.Add(t.Minimum); to.Before(min) {
-		to = min
-	}
+	// The grace is time past the end that is not charged (rule 4), and the
+	// minimum is the least that is (rule 3): grace first, then the floor,
+	// or the grace would be taken off the minimum too.
 	need := to.Add(-t.Grace)
+	if min := from.Add(t.Minimum); need.Before(min) {
+		need = min
+	}
 	if !need.After(from) {
 		need = from.Add(time.Nanosecond)
 	}
@@ -326,4 +329,40 @@ func inOneWeekend(from, to time.Time) bool {
 	}
 	monday := time.Date(friday.Year(), friday.Month(), friday.Day()+3, 12, 0, 0, 0, time.UTC)
 	return !to.After(monday)
+}
+
+// PriceExtension bills what extending a rental that started at start, and
+// was booked to end, on to to adds. The minimum is the rental's, not the
+// extension's (rule 3): time it already paid for past end is not charged
+// again, and the extension carries no minimum of its own. An extension
+// ending within the grace of what was paid for adds nothing (rule 4). The
+// minimum and grace are those of the season the rental started in, as for
+// the rental itself.
+func PriceExtension(start, end, to time.Time, loc *time.Location, seasons []Season, split bool) ([]RentalLine, error) {
+	if !to.After(end) || end.Before(start) {
+		return nil, errors.New("money: an extension ends after the rental it extends")
+	}
+	first := -1
+	for i, s := range seasons {
+		if !s.Starts.After(start) {
+			first = i
+		}
+	}
+	if first < 0 {
+		return nil, ErrNoPriceFor
+	}
+	terms := seasons[first].Terms
+	from := end
+	if paid := start.Add(terms.Minimum); paid.After(from) {
+		from = paid
+	}
+	if !to.Add(-terms.Grace).After(from) {
+		return nil, nil
+	}
+	free := make([]Season, len(seasons))
+	copy(free, seasons)
+	for i := range free {
+		free[i].Terms.Minimum = 0
+	}
+	return PriceRentalSeasons(from, to, loc, free, split)
 }

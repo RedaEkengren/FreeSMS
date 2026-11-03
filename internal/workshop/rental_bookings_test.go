@@ -936,3 +936,48 @@ func TestABookingWithoutItsPlanGetsItFromItsLines(t *testing.T) {
 		t.Errorf("the plans after: %v and %v; want %s and none", got, none, plan)
 	}
 }
+
+// A rental of three days under a plan with a three-day minimum, extended by
+// one day, is four days' rent. The minimum is the rental's (rule 3), not
+// each extension's: priced apart, the extension was charged as three days.
+func TestAnExtensionIsNotChargedTheMinimumAgain(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := addUnit(t, pool, workshop.NewRentalUnit{Registration: "ABC 12D", FleetNumber: "V1", Category: "Bil"})
+	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), unit, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := workshop.CreateRatePlan(ctx, pool, rentalOwner(), workshop.NewRatePlan{Name: "Bil", Category: "Bil", VATRateBp: 2500, SeasonRule: "at_start"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.AddRateSeason(ctx, pool, rentalOwner(), plan, workshop.RateSeason{ValidFrom: day("2020-01-01"), Day: kr(40000),
+		Minimum: 3 * 24 * time.Hour}); err != nil {
+		t.Fatal(err)
+	}
+	renter, err := workshop.CreateParty(ctx, pool, rentalDesk(), workshop.NewParty{Kind: "private", Name: "R", Role: workshop.PartyRenter})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: unit, RenterID: renter,
+		From: in2031(10, 9), To: in2031(13, 9)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ExtendRentalBooking(ctx, pool, rentalDesk(), id, in2031(14, 9), "En dag till"); err != nil {
+		t.Fatal(err)
+	}
+	b, err := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rent int64
+	for _, l := range b.Lines {
+		if l.Kind == "rent" {
+			rent += l.Net()
+		}
+	}
+	if rent != 4*40000 {
+		t.Errorf("four days at 400 kr come to %d öre of rent, want %d (%+v)", rent, 4*40000, b.Lines)
+	}
+}

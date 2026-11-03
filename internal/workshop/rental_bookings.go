@@ -764,7 +764,7 @@ func ExtendRentalBooking(ctx context.Context, pool *pgxpool.Pool, scope access.S
 			FROM rental_bookings WHERE id = $1`, id).Scan(&plan, &next); err != nil {
 			return fmt.Errorf("read booking: %w", err)
 		}
-		quote, err := quoteTx(ctx, tx, QuoteRequest{UnitID: b.unit, PlanID: plan, From: b.ends, To: to})
+		quote, err := quoteTx(ctx, tx, QuoteRequest{UnitID: b.unit, PlanID: plan, From: b.ends, To: to, RentalStart: b.starts})
 		if err != nil {
 			return err
 		}

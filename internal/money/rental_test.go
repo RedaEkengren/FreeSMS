@@ -190,3 +190,61 @@ func TestSplitMonthsAreCountedFromTheStart(t *testing.T) {
 		t.Errorf("two months and five days from 31 January: %+v (%d), %v", lines, total(lines), err)
 	}
 }
+
+// A one-hour rental under a plan with a three-hour minimum and an hour's
+// grace is charged as the minimum: three hours. The grace is time past the
+// end of what is paid for (rule 4), not time taken off the minimum (rule 3).
+func TestTheGraceDoesNotCutTheMinimum(t *testing.T) {
+	hour := int64(10000)
+	terms := RateTerms{Prices: RatePrices{Hour: &hour}, Minimum: 3 * time.Hour, Grace: time.Hour}
+	from := time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC)
+	lines, err := PriceRental(from, from.Add(time.Hour), time.UTC, terms)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var n int64
+	for _, l := range lines {
+		n += l.Net()
+	}
+	if n != 3*hour {
+		t.Fatalf("a one-hour rental with a three-hour minimum is charged %d, want %d (lines %+v)", n, 3*hour, lines)
+	}
+}
+
+// An extension is priced on the rental it extends: the minimum the rental
+// already paid for is not charged again, nothing is added within the grace,
+// and past both only the time added is charged.
+func TestAnExtensionIsPricedOnTheWholeRental(t *testing.T) {
+	day := int64(40000)
+	seasons := []Season{{Starts: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+		Terms: RateTerms{Prices: RatePrices{Day: &day}, Minimum: 72 * time.Hour, Grace: time.Hour}}}
+	start := time.Date(2026, 6, 1, 9, 0, 0, 0, time.UTC)
+	sum := func(end, to time.Time) int64 {
+		t.Helper()
+		lines, err := PriceExtension(start, end, to, time.UTC, seasons, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var n int64
+		for _, l := range lines {
+			n += l.Net()
+		}
+		return n
+	}
+	d := func(n int) time.Time { return start.Add(time.Duration(n) * 24 * time.Hour) }
+	for _, c := range []struct {
+		name    string
+		end, to time.Time
+		want    int64
+	}{
+		{"three days booked, one added", d(3), d(4), day},
+		{"one day booked and three paid, to two", d(1), d(2), 0},
+		{"one day booked and three paid, to four", d(1), d(4), day},
+		{"within the grace", d(3), d(3).Add(30 * time.Minute), 0},
+		{"just past the grace", d(3), d(3).Add(61 * time.Minute), day},
+	} {
+		if got := sum(c.end, c.to); got != c.want {
+			t.Errorf("%s: %d, want %d", c.name, got, c.want)
+		}
+	}
+}

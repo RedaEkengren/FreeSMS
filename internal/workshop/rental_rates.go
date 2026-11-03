@@ -430,6 +430,10 @@ type QuoteRequest struct {
 	From   time.Time
 	To     time.Time
 	Extras []ExtraChoice
+	// RentalStart, when set, makes From..To an extension of a rental that
+	// started then and was booked to From: priced by money.PriceExtension,
+	// under the seasons in force from RentalStart.
+	RentalStart time.Time
 }
 
 // QuoteRental prices a rental under today's plans. Nothing is kept.
@@ -494,17 +498,21 @@ func quoteTx(ctx context.Context, tx pgx.Tx, q QuoteRequest) (RentalQuote, error
 	plan := plans[0]
 	// Seasons oldest first, each from its first day's midnight in the
 	// shop's zone; the one the rental starts in decides the allowance.
+	anchor := q.From
+	if !q.RentalStart.IsZero() {
+		anchor = q.RentalStart
+	}
 	var seasons []money.Season
 	var seasonIDs []string
 	var starting *RateSeason
 	for i := len(plan.Seasons) - 1; i >= 0; i-- {
 		s := plan.Seasons[i]
 		begins := time.Date(s.ValidFrom.Year(), s.ValidFrom.Month(), s.ValidFrom.Day(), 0, 0, 0, 0, loc)
-		if !begins.After(q.From) {
+		if !begins.After(anchor) {
 			starting = &plan.Seasons[i]
 			seasons, seasonIDs = seasons[:0], seasonIDs[:0]
 		}
-		if s.ValidUntil != nil && !time.Date(s.ValidUntil.Year(), s.ValidUntil.Month(), s.ValidUntil.Day(), 0, 0, 0, 0, loc).After(q.From) {
+		if s.ValidUntil != nil && !time.Date(s.ValidUntil.Year(), s.ValidUntil.Month(), s.ValidUntil.Day(), 0, 0, 0, 0, loc).After(anchor) {
 			starting, seasons, seasonIDs = nil, seasons[:0], seasonIDs[:0]
 			continue
 		}
@@ -514,7 +522,28 @@ func quoteTx(ctx context.Context, tx pgx.Tx, q QuoteRequest) (RentalQuote, error
 	if starting == nil {
 		return out, errNoSeason
 	}
-	lines, err := money.PriceRentalSeasons(q.From, q.To, loc, seasons, plan.SeasonRule == "split")
+	// An extension's allowance is the season's it starts in: the added
+	// days' kilometres and their price per kilometre.
+	if !q.RentalStart.IsZero() {
+		for i := len(plan.Seasons) - 1; i >= 0; i-- {
+			s := plan.Seasons[i]
+			if !time.Date(s.ValidFrom.Year(), s.ValidFrom.Month(), s.ValidFrom.Day(), 0, 0, 0, 0, loc).After(q.From) {
+				starting = &plan.Seasons[i]
+			}
+			if s.ValidUntil != nil && !time.Date(s.ValidUntil.Year(), s.ValidUntil.Month(), s.ValidUntil.Day(), 0, 0, 0, 0, loc).After(q.From) {
+				starting = nil
+			}
+		}
+		if starting == nil {
+			return out, errNoSeason
+		}
+	}
+	var lines []money.RentalLine
+	if q.RentalStart.IsZero() {
+		lines, err = money.PriceRentalSeasons(q.From, q.To, loc, seasons, plan.SeasonRule == "split")
+	} else {
+		lines, err = money.PriceExtension(q.RentalStart, q.From, q.To, loc, seasons, plan.SeasonRule == "split")
+	}
 	if errors.Is(err, money.ErrTooLong) {
 		return out, errRentalTooLong
 	}
