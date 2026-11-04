@@ -169,3 +169,47 @@ func TestACancelledRentalIsInvoicedItsFeeAlone(t *testing.T) {
 		t.Errorf("the cancellation invoice: %d to %q; want 250 kr to Åkeri AB", inv.GrossMinor, inv.CustomerName)
 	}
 }
+
+// A rental paid at the counter as it is invoiced is a cash invoice (#156):
+// the invoice and its payment in one transaction, the document saying it
+// was paid and how. A payment that does not add up takes no number and
+// leaves the rental to invoice.
+func TestARentalPaidAtTheReturnIsACashInvoice(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	dc, err := workshop.DamageCaseByID(ctx, pool, rentalDesk(), newDamageOn(t, pool, "GHI 56J", "V3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	booking := dc.BookingID
+	b, err := workshop.RentalBookingByID(ctx, pool, rentalDesk(), booking)
+	if err != nil {
+		t.Fatal(err)
+	}
+	short := workshop.CashSale{Payments: []workshop.CashPayment{{Method: "card", AmountMinor: b.Totals.GrossMinor - 100}}}
+	if _, err := workshop.IssueRentalInvoiceAndPay(ctx, pool, rentalDesk(), booking, "", short); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("paid short: %v", err)
+	}
+	if invs, err := workshop.RentalInvoices(ctx, pool, rentalDesk(), booking); err != nil || len(invs) != 0 {
+		t.Errorf("a payment that did not add up left %d invoices, %v", len(invs), err)
+	}
+	if _, err := workshop.IssueRentalInvoiceAndPay(ctx, pool, technician(), booking, "", short); err == nil {
+		t.Error("a technician invoiced a rental")
+	}
+	sale := workshop.CashSale{Payments: []workshop.CashPayment{{Method: "card", AmountMinor: b.Totals.GrossMinor, Reference: "T-77"}}}
+	inv, err := workshop.IssueRentalInvoiceAndPay(ctx, pool, rentalDesk(), booking, "", sale)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := workshop.DocumentByID(ctx, pool, everything(advisor()), inv.ID)
+	switch {
+	case err != nil:
+		t.Fatal(err)
+	case doc.Source != workshop.SourceRental || doc.PaidOnIssue == nil || len(doc.PaidOnIssue.With) != 1 ||
+		doc.PaidOnIssue.With[0].Method != "card" || doc.PaidOnIssue.With[0].AmountMinor != b.Totals.GrossMinor:
+		t.Errorf("the cash invoice: source %q, paid %+v", doc.Source, doc.PaidOnIssue)
+	}
+	if _, err := workshop.IssueRentalInvoiceAndPay(ctx, pool, rentalDesk(), booking, "", sale); !errors.Is(err, workshop.ErrNothingToInvoice) {
+		t.Errorf("invoiced and paid twice: %v", err)
+	}
+}

@@ -138,9 +138,10 @@ not exist.
   form then offers no lookup at all. With one (#155), every lookup is a row in
   `vehicle_lookups` -- who, which registration, why, which provider, what it
   said, never an owner -- kept a year, read again for a day, and never
-  written over what a person typed. Only intake has a page; a purchase and a
-  rental unit have the operation (`LookUpVehicle`, `QueueVehicleLookups`)
-  waiting for theirs. It has not been run against a real provider.
+  written over what a person typed. Intake, a car being bought and a vehicle
+  being added to the rental fleet each look up through the same fragment;
+  a list (`QueueVehicleLookups`) goes through the outbox at the provider's
+  pace. It has not been run against a real provider.
 
 - **Invoices issued before 0021 have no seller on them.** The seller is
   snapshotted onto the document now, the way the buyer always was, and the

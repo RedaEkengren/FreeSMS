@@ -207,6 +207,7 @@ func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("POST /rental/damage/{id}/steps", s.requireSession(s.handleRentalDamageStep))
 	m.HandleFunc("POST /rental/bookings/{id}/deposit/{what}", s.requireSession(s.handleRentalDeposit))
 	m.HandleFunc("GET /rental", s.requireSession(s.handleRentalUnits))
+	m.HandleFunc("GET /rental/units/lookup", s.requireSession(s.handleRentalUnitLookup))
 	m.HandleFunc("GET /rental/prices", s.requireSession(s.handleRentalPrices))
 	m.HandleFunc("POST /rental/bookings", s.requireSession(s.handleRentalBook))
 	m.HandleFunc("GET /rental/bookings/{id}", s.requireSession(s.handleRentalBooking))
@@ -373,7 +374,7 @@ func (s *Server) handleRentalUnits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d.Now = now
-	s.render(w, r, http.StatusOK, "rentalunits", pageData{Title: "Rental", Session: session, Rental: d})
+	s.render(w, r, http.StatusOK, "rentalunits", pageData{Title: "Rental", Session: session, Rental: d, CanLookUp: s.canLookUp()})
 }
 
 func (s *Server) handleRentalUnitAdd(w http.ResponseWriter, r *http.Request) {
@@ -672,9 +673,17 @@ func (s *Server) handleRentalBooking(w http.ResponseWriter, r *http.Request) {
 	if d.Invoices, err = workshop.RentalInvoices(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
 		return
 	}
+	// The ways it can be paid at the counter as it is invoiced (#156),
+	// once it is over and can be.
+	var flows []workshop.CounterFlow
+	if st := d.Booking.State; st == workshop.RentalReturned || st == workshop.RentalCancelled || st == workshop.RentalNoShow {
+		if flows, err = workshop.CounterPaymentFlows(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+			return
+		}
+	}
 	d.Key = newFormKey()
 	s.render(w, r, http.StatusOK, "rentalbooking", pageData{Title: "Rental booking", Session: session, Rental: d, Methods: workshop.PaymentMethods,
-		Today: time.Now().In(s.shopLocation(r)).Format("2006-01-02")})
+		CounterFlows: flows, Today: time.Now().In(s.shopLocation(r)).Format("2006-01-02")})
 }
 
 func (s *Server) handleRentalBookingAction(w http.ResponseWriter, r *http.Request) {

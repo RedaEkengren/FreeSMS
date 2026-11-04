@@ -83,6 +83,25 @@ func (s *Server) handleVehicle(w http.ResponseWriter, r *http.Request) {
 // hand, and a car that cannot be taken in because a third party is down is the
 // worst outcome available.
 func (s *Server) handleVehicleLookup(w http.ResponseWriter, r *http.Request) {
+	s.vehicleLookupFragment(w, r, workshop.LookupIntake, "newjob", "lookup", "/jobs/new/lookup", "lookup")
+}
+
+// handlePurchaseLookup is the same for a car being bought (#155): the
+// buyer sees its inspection, tax, driving ban and recorded mileage before
+// paying, where the provider gives them.
+func (s *Server) handlePurchaseLookup(w http.ResponseWriter, r *http.Request) {
+	s.vehicleLookupFragment(w, r, workshop.LookupPurchase, "carbuy", "carlookup", "/cars/stock/new/lookup", "carlookup")
+}
+
+// handleRentalUnitLookup is the same for a vehicle being added to the
+// rental fleet: what the registration is, to check before it is added.
+func (s *Server) handleRentalUnitLookup(w http.ResponseWriter, r *http.Request) {
+	s.vehicleLookupFragment(w, r, workshop.LookupRentalUnit, "rentalunits", "unitlookup", "/rental/units/lookup", "unitlookup")
+}
+
+// vehicleLookupFragment looks a registration up for purpose and renders
+// block of page with what it found, for htmx to swap into target.
+func (s *Server) vehicleLookupFragment(w http.ResponseWriter, r *http.Request, purpose, page, block, url, target string) {
 	session := sessionFrom(r.Context())
 	q := r.URL.Query()
 	registration := strings.TrimSpace(q.Get("registration"))
@@ -97,9 +116,10 @@ func (s *Server) handleVehicleLookup(w http.ResponseWriter, r *http.Request) {
 		typed.VIN = vehicledata.Of(vin)
 	}
 
-	data := pageData{Session: session, Lookup: typed, CanLookUp: s.canLookUp(), LookupRegistration: registration}
+	data := pageData{Session: session, Lookup: typed, CanLookUp: s.canLookUp(), LookupRegistration: registration,
+		LookupURL: url, LookupTarget: target}
 	found, err := workshop.LookUpVehicle(r.Context(), s.pool, session.Scope, s.vehicleLookup, s.lookupProvider,
-		registration, workshop.LookupIntake, typed.VIN.Value, q.Get("refresh") != "")
+		registration, purpose, typed.VIN.Value, q.Get("refresh") != "")
 	switch {
 	case errors.Is(err, vehicledata.ErrNotConfigured):
 		// Not an error the person needs to see. The shop has not set this up.
@@ -119,7 +139,7 @@ func (s *Server) handleVehicleLookup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.renderPartial(w, r, "newjob", "lookup", data)
+	s.renderPartial(w, r, page, block, data)
 }
 
 // fillEmpty is what was typed, with what a lookup found where nothing was.

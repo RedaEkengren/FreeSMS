@@ -49,6 +49,11 @@
     <label><span>{{.T "Registration, for a vehicle"}}</span><input name="registration" maxlength="20" autocapitalize="characters"></label>
     <label><span>{{.T "Or a name, for something unregistered"}}</span><input name="name" maxlength="120"></label>
   </div>
+  {{if .CanLookUp}}
+  <button type="button" class="secondary" hx-get="/rental/units/lookup" hx-include="[name='registration']"
+          hx-target="#unitlookup" hx-swap="innerHTML">{{.T "Look the registration up"}}</button>
+  <div id="unitlookup"></div>
+  {{end}}
   <div class="pair">
     <label><span>{{.T "Fleet number"}}</span><input name="fleet_number" maxlength="40" required></label>
     <label><span>{{.T "Category"}}</span><input name="category" maxlength="60" required placeholder="{{.T "Small van"}}"></label>
@@ -57,4 +62,10 @@
   <button type="submit">{{.T "Add the unit"}}</button>
 </form>
 </details>
+{{end}}
+
+{{/* What the registration is, to check before the unit is added (#155). */}}
+{{define "unitlookup"}}
+{{template "lookupfacts" .}}
+{{if or .Lookup.Make .Lookup.Model}}<p>{{.Lookup.Make}} {{.Lookup.Model}}{{if .Lookup.ModelYear}} &middot; {{.Lookup.ModelYear}}{{end}}</p>{{end}}
 {{end}}

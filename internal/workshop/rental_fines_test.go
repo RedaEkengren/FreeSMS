@@ -184,3 +184,80 @@ func TestAFineIsPassedOnlyToARentalThatHadTheCar(t *testing.T) {
 		t.Errorf("a charge paid is still on the queue")
 	}
 }
+
+// rentalTransitionsAudited makes each of Rental's transitions that the
+// trail reads from its own table (#151): a car out and back, a deposit
+// asked for and a hold taken and let go, a charge confirmed, told and
+// withdrawn, and fines passed on, kept and paid.
+func rentalTransitionsAudited(t *testing.T, pool *pgxpool.Pool, made func(event, kind, id string)) {
+	t.Helper()
+	ctx := context.Background()
+	dc, err := workshop.DamageCaseByID(ctx, pool, rentalDesk(), newDamageOn(t, pool, "AUD 151", "V151"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	booking := dc.BookingID
+	made("rental.handed_out", "rental_booking", booking)
+	made("rental.returned", "rental_booking", booking)
+
+	if err := workshop.RequireRentalDeposit(ctx, pool, rentalDesk(), booking, "", 300_000, "card_hold"); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.HoldRentalDeposit(ctx, pool, rentalDesk(), booking, 300_000, "T-151", time.Now().AddDate(0, 0, 7)); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ReleaseRentalDepositHold(ctx, pool, rentalDesk(), booking, "Tillbaka utan anmärkning"); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range []string{"rental_deposit.required", "rental_deposit.held", "rental_deposit.hold_released"} {
+		made(e, "rental_booking", booking)
+	}
+
+	charge, err := workshop.ConfirmCharge(ctx, pool, rentalDesk(), booking, workshop.NewCharge{Kind: workshop.ChargeCleaning,
+		Description: "Städning", QuantityMilli: 1000, UnitPriceMinor: 40_000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.InformCharge(ctx, pool, rentalDesk(), charge, "sms"); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.WithdrawCharge(ctx, pool, rentalDesk(), charge, "Kunden hade städat"); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range []string{"rental_charge.confirmed", "rental_charge.informed", "rental_charge.withdrawn"} {
+		made(e, "rental_booking", booking)
+	}
+
+	// The rental had the car from three hours ago to one; the plate was
+	// its long before.
+	now := time.Now()
+	for _, q := range []struct {
+		sql  string
+		args []any
+	}{
+		{`UPDATE rental_handovers SET at = $2 WHERE booking_id = $1 AND kind = 'check_out'`, []any{booking, now.Add(-3 * time.Hour)}},
+		{`UPDATE rental_handovers SET at = $2 WHERE booking_id = $1 AND kind = 'check_in'`, []any{booking, now.Add(-time.Hour)}},
+		{`UPDATE vehicle_registrations SET valid_from = '2020-01-01' WHERE normalised = $1`, []any{workshop.NormaliseRegistration("AUD 151")}},
+	} {
+		if _, err := pool.Exec(ctx, q.sql, q.args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := workshop.RecordFines(ctx, pool, rentalDesk(), "typed", []workshop.NewFine{
+		fineAt("AUD 151", "AUD-1", now.Add(-2*time.Hour)), fineAt("AUD 151", "AUD-2", now.Add(-2*time.Hour))}); err != nil {
+		t.Fatal(err)
+	}
+	passed, kept := fineNamed(t, pool, "AUD-1"), fineNamed(t, pool, "AUD-2")
+	if _, err := workshop.PassFineToRenter(ctx, pool, rentalDesk(), passed.ID, booking); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.KeepFine(ctx, pool, rentalDesk(), kept.ID, "Vår egen körning"); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.FinePaid(ctx, pool, rentalDesk(), passed.ID); err != nil {
+		t.Fatal(err)
+	}
+	made("fine.passed_to_renter", "vehicle_fine", passed.ID)
+	made("fine.kept", "vehicle_fine", kept.ID)
+	made("fine.paid", "vehicle_fine", passed.ID)
+}

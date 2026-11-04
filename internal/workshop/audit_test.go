@@ -240,6 +240,7 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 	}
 	// Rental
 	rentalAudited(t, pool, func(event, kind, id string) { made[event] = subject{kind, id} })
+	rentalTransitionsAudited(t, pool, func(event, kind, id string) { made[event] = subject{kind, id} })
 	// A disputed damage set against the deposit on the owner's word (#197).
 	{
 		c := newDamageOn(t, pool, "DMG 197", "V197")

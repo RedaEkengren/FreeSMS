@@ -7,9 +7,11 @@
   <fieldset>
     <legend>{{.T "The car"}}</legend>
     <label><span>{{.T "Registration"}}</span><input name="registration" value="{{index $d.Form "registration"}}" autocapitalize="characters"></label>
-    <label><span>{{.T "Chassis number (VIN)"}}</span><input name="vin" value="{{index $d.Form "vin"}}" autocapitalize="characters"></label>
-    <label><span>{{.T "Make"}}</span><input name="make" value="{{index $d.Form "make"}}"></label>
-    <label><span>{{.T "Model"}}</span><input name="model" value="{{index $d.Form "model"}}"></label>
+    {{if .CanLookUp}}
+    <button type="button" class="secondary" hx-get="/cars/stock/new/lookup" hx-include="[name='registration'],#carlookup input"
+            hx-target="#carlookup" hx-swap="innerHTML">{{.T "Look the registration up"}}</button>
+    {{end}}
+    <div id="carlookup">{{template "carlookup" .}}</div>
     <label><span>{{.T "Odometer, km"}}</span><input name="odometer" value="{{index $d.Form "odometer"}}" inputmode="numeric"></label>
     <label><span>{{.T "How it came in"}}</span>
       <select name="reason">{{range $d.PurchaseReasons}}<option value="{{.}}"{{if eq . (index $d.Form "reason")}} selected{{end}}>{{$.T ($d.ReasonLabel .)}}</option>{{end}}</select></label>
@@ -38,4 +40,13 @@
   </fieldset>
   <button type="submit">{{.T "Record the purchase"}}</button>
 </form>
+{{end}}
+
+{{/* The car as typed, and what a lookup found (#155): it fills in only
+     what is empty, and a VIN unlike the one typed is a conflict. */}}
+{{define "carlookup"}}
+{{template "lookupfacts" .}}
+<label><span>{{.T "Chassis number (VIN)"}}</span><input name="vin" value="{{.Lookup.VIN.Value}}" autocapitalize="characters"></label>
+<label><span>{{.T "Make"}}</span><input name="make" value="{{.Lookup.Make}}"></label>
+<label><span>{{.T "Model"}}</span><input name="model" value="{{.Lookup.Model}}"></label>
 {{end}}

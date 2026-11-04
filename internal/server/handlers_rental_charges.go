@@ -105,7 +105,19 @@ func (rentalData) Kronor(minor int64) string {
 // (#199).
 func (s *Server) handleRentalInvoice(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
-	_, err := workshop.IssueRentalInvoice(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("payer"))
+	var err error
+	if method := r.FormValue("paid_now"); method != "" {
+		// Paid at the counter as it is invoiced: a cash invoice (#156),
+		// both or neither. A flow chosen says the way of paying.
+		var flow string
+		if fid, ok := strings.CutPrefix(method, "flow:"); ok {
+			flow, method = fid, ""
+		}
+		_, err = workshop.IssueRentalInvoiceAndPay(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("payer"),
+			workshop.CashSale{FlowID: flow, Payments: []workshop.CashPayment{{Method: method, Reference: r.FormValue("paid_reference")}}})
+	} else {
+		_, err = workshop.IssueRentalInvoice(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("payer"))
+	}
 	if errors.Is(err, workshop.ErrNothingToInvoice) {
 		s.renderError(w, r, http.StatusBadRequest, "Nothing to invoice", "Everything on this rental is invoiced already.")
 		return

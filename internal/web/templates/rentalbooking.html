@@ -146,6 +146,14 @@
 {{if or (eq $.Rental.Booking.State "returned") (eq $.Rental.Booking.State "cancelled") (eq $.Rental.Booking.State "no_show")}}
 <form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/invoice">
   <label><span>{{$.T "To"}}</span><select name="payer"><option value="">{{$.Rental.Booking.RenterName}}</option>{{range $.Rental.Renters}}{{if ne .ID $.Rental.Booking.RenterID}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}</select></label>
+  <details>
+    <summary>{{$.T "Paid now, at the counter"}}</summary>
+    <div class="pair">
+      <label><span>{{$.T "How"}}</span><select name="paid_now"><option value="">{{$.T "Not paid now"}}</option>{{range $.CounterFlows}}<option value="flow:{{.ID}}">{{.Name}} ({{$.T .Method}})</option>{{end}}{{range $.CashMethods}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+      <label><span>{{$.T "Reference"}}</span><input name="paid_reference" maxlength="100"></label>
+    </div>
+    <p class="waiting">{{$.T "Issued and paid in one step: the invoice says it was paid. A recorded payment is not a cash-register receipt, and FreeSMS is not a cash register."}}</p>
+  </details>
   <button type="submit">{{$.T "Invoice what is not invoiced yet"}}</button>
 </form>
 <p class="waiting">{{$.T "The rent as it was booked, and the charges the customer has been told of. Nothing is priced again."}}</p>

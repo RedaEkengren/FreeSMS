@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RedaEkengren/FreeSMS/internal/vehicledata"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
@@ -335,7 +336,7 @@ func (s *Server) handleBuyCarForm(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusForbidden, "Not for your role", "Buying a car is the buyer's.")
 		return
 	}
-	s.render(w, r, http.StatusOK, "carbuy", pageData{Title: "Record a car bought", Session: session,
+	s.render(w, r, http.StatusOK, "carbuy", pageData{Title: "Record a car bought", Session: session, CanLookUp: s.canLookUp(),
 		Dealer: &dealerData{Key: newFormKey(), Form: map[string]string{
 			"registration": r.URL.Query().Get("registration"), "reason": workshop.StockFromPurchase,
 			"seller_kind": "private", "purchased_on": time.Now().In(s.shopLocation(r)).Format(time.DateOnly)}}})
@@ -353,6 +354,7 @@ func (s *Server) handleBuyCar(w http.ResponseWriter, r *http.Request) {
 	key := r.FormValue("key")
 	refuse := func(msg string) {
 		s.render(w, r, http.StatusBadRequest, "carbuy", pageData{Title: "Record a car bought", Session: session,
+			CanLookUp: s.canLookUp(), Lookup: typedVehicle(form["vin"], form["make"], form["model"]),
 			Dealer: &dealerData{Form: form, Key: key}, Error: msg})
 	}
 	if !session.Scope.Role.BuysVehicles() {
@@ -512,4 +514,13 @@ func (s *Server) handleCarResults(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, http.StatusOK, "carresults", pageData{Title: "What the cars sold earned", Session: session,
 		Dealer: &dealerData{Results: res, Form: map[string]string{"month": start.Format("2006-01"),
 			"previous": start.AddDate(0, -1, 0).Format("2006-01"), "next": start.AddDate(0, 1, 0).Format("2006-01")}}})
+}
+
+// typedVehicle is what was typed of a car, as a lookup fragment shows it.
+func typedVehicle(vin, make, model string) vehicledata.Vehicle {
+	v := vehicledata.Vehicle{Make: make, Model: model}
+	if vin != "" {
+		v.VIN = vehicledata.Of(vin)
+	}
+	return v
 }

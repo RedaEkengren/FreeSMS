@@ -319,10 +319,11 @@ type CounterFlow struct {
 }
 
 // CounterPaymentFlows lists the flows a cash invoice can be paid through
-// -- cash, card or Swish -- for the front desk, who issues one: so the
-// invoice says which, and the owner sees the flows in use.
+// -- cash, card or Swish -- for the front desk and the rental desk, who
+// issue one: so the invoice says which, and the owner sees the flows in
+// use.
 func CounterPaymentFlows(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]CounterFlow, error) {
-	if !scope.Role.SeesCustomerPersonalData() {
+	if !scope.Role.SeesCustomerPersonalData() && !scope.Role.HandsOverRentals() {
 		return nil, access.ErrForbidden
 	}
 	var out []CounterFlow
