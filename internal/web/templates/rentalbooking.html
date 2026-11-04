@@ -3,7 +3,7 @@
 <h1>{{.Reference}} &middot; {{.UnitLabel}}</h1>
 <p><span class="tag{{if or ($.Rental.Booking.Overdue $.Rental.Now) .AtRisk}} late{{end}}">{{if .Overdue $.Rental.Now}}{{$.T "out past its return"}}{{else if .AtRisk}}{{$.T "at risk"}}{{else}}{{$.T ($.Rental.StateLabel .State)}}{{end}}</span>
   {{.RenterName}} &middot; {{$.Date ($.Local .Starts) "Mon 2 Jan 2006 15:04"}} &ndash; {{$.Date ($.Local .Ends) "Mon 2 Jan 2006 15:04"}}
-  &middot; <a href="/rental/units/{{.UnitID}}">{{$.T "the unit"}}</a></p>
+  &middot; <a href="/rental/units/{{.UnitID}}">{{$.T "the unit"}}</a> &middot; <a href="/parties/{{.RenterID}}/identity">{{$.T "identity checks"}}</a></p>
 {{if .HeldUntil}}<p class="waiting">{{$.T "Held until %s" ($.Date ($.Local .HeldUntil) "Mon 2 Jan 15:04")}}</p>{{end}}
 {{if .AtRisk}}<p class="waiting">{{$.T "The unit is out with somebody else past its return, and may not be back in time."}}</p>{{end}}
 

@@ -4,6 +4,7 @@
   <h1>{{.Name}}</h1>
   <span class="tag">{{if .Private}}{{$.T "person"}}{{else}}{{$.T "company"}}{{end}}</span>
 </div>
+{{if and $.PartyID (not .MergedInto) (not .Erased)}}<p><a href="/parties/{{$.PartyID}}/identity">{{$.T "Identity checks"}}</a></p>{{end}}
 
 {{if .MergedInto}}
 <p class="waiting"><span class="tag warranty">{{$.T "merged"}}</span> {{$.T "This record was found to be the same as another."}}

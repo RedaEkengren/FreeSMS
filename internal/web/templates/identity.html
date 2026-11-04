@@ -1,0 +1,47 @@
+{{define "content"}}
+{{with .Identity}}
+<h1>{{$.T "Identity checks"}}: {{.Party.Name}}</h1>
+{{if $.Error}}<p class="error" role="alert">{{$.Sentence $.Error}}</p>{{end}}
+<p class="waiting">{{$.T "A personal identity number, a driving licence or an ID document is held here only for a purpose the law or a contract gives, sealed with a key the database does not hold, and removed when the purpose ends. Every read of a value is logged with who read it and why."}}</p>
+
+<h2>{{$.T "Checks made"}}</h2>
+{{if .Records}}
+<ul class="lines">
+  {{range $r := .Records}}<li>
+    <div class="row"><span>{{$.T ($.Identity.IdentityKindName $r.Kind)}} &middot; {{$.T ($.Identity.IdentityPurposeName $r.Purpose)}}</span><span>{{$.Date ($.Local $r.RecordedAt) "2 Jan 2006"}}</span></div>
+    <div class="waiting">{{$.T "Verified by %s, on the basis of %s." $r.RecordedBy ($.T ($.Identity.IdentityBasisName $r.LegalBasis))}}
+      {{if $r.EndedAt}}{{$.T "The purpose ended on %s." ($.Date ($.Local $r.EndedAt) "2 Jan 2006")}}{{else if $r.ValueRemoved}}{{$.T "The value has been removed; that the check was made is kept."}}{{else}}{{$.T "Kept until %s." ($.Date ($.Local $r.ExpiresAt) "2 Jan 2006")}}{{end}}</div>
+    {{with $r.Reference}}<div>{{$.T "Reference"}}: {{.}}</div>{{end}}
+    {{if and $.Identity.Reads $r.HasValue}}
+      {{if eq $.Identity.ShownID $r.ID}}<div><strong class="mono">{{$.Identity.Shown}}</strong></div>{{end}}
+      <form method="post" action="/parties/{{$.Identity.Party.ID}}/identity/{{$r.ID}}/show" class="inline">
+        <button type="submit" class="secondary">{{$.T "Show the last four"}}</button>
+      </form>
+      <form method="post" action="/parties/{{$.Identity.Party.ID}}/identity/{{$r.ID}}/show" class="inline">
+        <input type="hidden" name="full" value="1">
+        <button type="submit" class="secondary">{{$.T "Show in full"}}</button>
+      </form>
+    {{end}}
+    {{if and $.Identity.Reads (not $r.EndedAt) (not $r.ValueRemoved)}}
+      <form method="post" action="/parties/{{$.Identity.Party.ID}}/identity/{{$r.ID}}/end">
+        <label><span>{{$.T "Why the purpose has ended"}}</span><input name="reason" maxlength="300" required></label>
+        <button type="submit" class="secondary">{{$.T "End the purpose and remove the value"}}</button>
+      </form>
+    {{end}}
+  </li>{{end}}
+</ul>
+{{else}}<p>{{$.T "No check has been recorded."}}</p>{{end}}
+
+{{with .Purposes}}
+<h2>{{$.T "Record a check"}}</h2>
+<form method="post" action="/parties/{{$.Identity.Party.ID}}/identity" autocomplete="off">
+  <label><span>{{$.T "Purpose"}}</span><select name="purpose">{{range .}}<option value="{{.Name}}">{{$.T ($.Identity.IdentityPurposeName .Name)}}</option>{{end}}</select></label>
+  <label><span>{{$.T "Kind"}}</span><select name="kind">{{range $.Identity.Kinds}}<option value="{{.}}">{{$.T ($.Identity.IdentityKindName .)}}</option>{{end}}</select></label>
+  <label><span>{{$.T "Value"}}</span><input name="value" maxlength="100" autocomplete="off"></label>
+  <label><span>{{$.T "Or a reference to where it was checked"}}</span><input name="reference" maxlength="200"></label>
+  <p class="waiting">{{$.T "Give either the value or a reference, not both. A licence check keeps only the reference."}}</p>
+  <button type="submit">{{$.T "Record the check"}}</button>
+</form>
+{{end}}
+{{end}}
+{{end}}

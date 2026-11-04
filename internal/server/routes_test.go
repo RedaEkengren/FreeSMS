@@ -60,6 +60,8 @@ var swept = map[string]string{
 	"GET /jobs/new/lookup": "", "GET /jobs/new/customers": "", "GET /figures": "", "GET /accounting": "",
 	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/modules": "", "POST /shop/charges": "", "POST /shop/final-check": "",
 	"GET /reconcile": "", "POST /reconcile/lines": "", "POST /reconcile/import": "", "POST /reconcile/match": "",
+	"GET /parties/{id}/identity": "sweep", "POST /parties/{id}/identity": "sweep",
+	"POST /parties/{id}/identity/{record}/show": "sweep", "POST /parties/{id}/identity/{record}/end": "sweep",
 	"GET /payment-flows": "", "POST /payment-flows": "", "POST /payment-flows/threshold": "",
 	// An invoice by its payment reference (#234), read under the shop's row level security.
 	"POST /payments/by-reference": "",
@@ -348,7 +350,10 @@ func fill(pattern string) (method, path string) {
 		"{photo}":                 "bbbbbbbb-0000-0000-0000-0000000000d6",
 		"{what}":                  "damage",
 		"{charge}":                "bbbbbbbb-0000-0000-0000-0000000000eb",
-		"/cars/trade-ins/{sale}":  "/cars/trade-ins/bbbbbbbb-0000-0000-0000-0000000000cd",
+		// A party and an identity record that are nobody\'s.
+		"/parties/{id}":          "/parties/bbbbbbbb-0000-0000-0000-0000000000f1",
+		"{record}":               "bbbbbbbb-0000-0000-0000-0000000000f2",
+		"/cars/trade-ins/{sale}": "/cars/trade-ins/bbbbbbbb-0000-0000-0000-0000000000cd",
 		// Rental: ids that are nobody's.
 		"/rental/permits/{id}":     "/rental/permits/bbbbbbbb-0000-0000-0000-0000000000e1",
 		"/rental/profiles/{id}":    "/rental/profiles/bbbbbbbb-0000-0000-0000-0000000000e2",
