@@ -19,7 +19,7 @@ import (
 
 // rentalPages are the templates Rental adds.
 var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "rentalprices", "rentalbooking", "rentalhandover", "rentalregister",
-	"rentaldamage"}
+	"rentaldamage", "rentalfines", "rentalfigures"}
 
 // rentalData is what Rental's pages are given.
 type rentalData struct {
@@ -56,6 +56,22 @@ type rentalData struct {
 	Retention     *workshop.RegisterRetention
 	// A damage case and its steps (#197).
 	DamageCase workshop.DamageCaseDetail
+	// A booking's deposit (#196).
+	Deposit workshop.RentalDeposit
+	// A booking's return charges, and how each kind is taxed (#195).
+	Charges []workshop.RentalCharge
+	// The units' figures for a month, and per category (#203).
+	Figures      []workshop.UnitFigures
+	FigureTotals []workshop.UnitFigures
+	// The month shown, as the month field holds it.
+	MonthValue string
+	// Charges for vehicles (#198), and an import's preview and its file.
+	Fines       []workshop.Fine
+	FinePreview []workshop.Fine
+	FineFile    string
+	// A booking's invoices and credit notes (#199).
+	Invoices      []workshop.RentalInvoice
+	ChargeClasses []workshop.ChargeClass
 	// A booking form's own key: sent twice, one booking.
 	Key string
 	Now time.Time
@@ -189,6 +205,7 @@ func (rentalData) HasCategory(p workshop.RentalProfile, c string) bool {
 func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("GET /rental/damage/{id}", s.requireSession(s.handleRentalDamage))
 	m.HandleFunc("POST /rental/damage/{id}/steps", s.requireSession(s.handleRentalDamageStep))
+	m.HandleFunc("POST /rental/bookings/{id}/deposit/{what}", s.requireSession(s.handleRentalDeposit))
 	m.HandleFunc("GET /rental", s.requireSession(s.handleRentalUnits))
 	m.HandleFunc("GET /rental/prices", s.requireSession(s.handleRentalPrices))
 	m.HandleFunc("POST /rental/bookings", s.requireSession(s.handleRentalBook))
@@ -215,6 +232,8 @@ func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("POST /rental/profiles/{id}", s.requireSession(s.handleRentalProfileSave))
 	m.HandleFunc("POST /rental/register/retention", s.requireSession(s.handleRegisterRetention))
 	s.rentalHandoverRoutes(m)
+	s.chargeRoutes(m)
+	s.fineRoutes(m)
 }
 
 // handleRentalSettings shows the permit and the rule profiles: the rental
@@ -235,6 +254,9 @@ func (s *Server) handleRentalSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if d.Retention, err = workshop.RentalRegisterRetention(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
+	}
+	if d.ChargeClasses, err = workshop.ChargeClasses(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
 		return
 	}
 	s.render(w, r, http.StatusOK, "rentalsettings", pageData{Title: "Rental settings", Session: session, Rental: d,
@@ -624,9 +646,6 @@ func (s *Server) handleRentalBooking(w http.ResponseWriter, r *http.Request) {
 		if d.Gaps, err = workshop.RentalBookingGaps(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
 			return
 		}
-		if d.Renters, err = workshop.Renters(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
-			return
-		}
 		if d.Templates, err = workshop.RentalAgreementTemplates(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
 			return
 		}
@@ -640,7 +659,21 @@ func (s *Server) handleRentalBooking(w http.ResponseWriter, r *http.Request) {
 	if d.Overrides, err = workshop.RentalGapOverrides(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
 		return
 	}
-	s.render(w, r, http.StatusOK, "rentalbooking", pageData{Title: "Rental booking", Session: session, Rental: d,
+	if d.Deposit, err = workshop.RentalDepositOf(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
+		return
+	}
+	if d.Charges, err = workshop.RentalCharges(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
+		return
+	}
+	// Whom a driver or an invoice can be: the renters there are.
+	if d.Renters, err = workshop.Renters(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
+	}
+	if d.Invoices, err = workshop.RentalInvoices(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
+		return
+	}
+	d.Key = newFormKey()
+	s.render(w, r, http.StatusOK, "rentalbooking", pageData{Title: "Rental booking", Session: session, Rental: d, Methods: workshop.PaymentMethods,
 		Today: time.Now().In(s.shopLocation(r)).Format("2006-01-02")})
 }
 

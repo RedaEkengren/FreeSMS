@@ -277,7 +277,7 @@ func TestTheYearInPersonIsSalesTakenInPerson(t *testing.T) {
 		t.Errorf("200000 of a Swish deposit applied: %d, want 300000", got)
 	}
 	// A deposit by bank applied: not in person.
-	bank, err := workshop.CreateDeposit(ctx, pool, desk, workshop.NewHolding{PartyID: partyOf(t, pool, fixtureCustomer), Purpose: "rental"})
+	bank, err := workshop.CreateDeposit(ctx, pool, desk, workshop.NewHolding{PartyID: partyOf(t, pool, fixtureCustomer), Purpose: "other"})
 	if err != nil {
 		t.Fatal(err)
 	}

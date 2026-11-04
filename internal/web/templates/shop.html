@@ -3,7 +3,7 @@
 <p class="waiting">{{.T "What goes at the top of an invoice. Changing it changes the next invoice and nothing that has already been sent: an issued document carries its own copy."}}</p>
 <p><a href="/checklists">{{.T "Inspection checklists"}}</a></p>
 {{if .Session.Scope.Role.RunsTheShop}}<p><a href="/outbox">{{.T "Calls to other services"}}</a></p>{{end}}
-{{if .Session.Scope.Role.RunsTheShop}}<p><a href="/payment-flows">{{.T "Money taken in person"}}</a>{{if .Runs "workshop"}} &middot; <a href="/technicians">{{.T "What technicians see"}}</a>{{end}}</p>{{end}}
+{{if .Session.Scope.Role.RunsTheShop}}<p><a href="/payment-flows">{{.T "Money taken in person"}}</a> &middot; <a href="/reconcile">{{.T "Reconciliation"}}</a>{{if .Runs "workshop"}} &middot; <a href="/technicians">{{.T "What technicians see"}}</a>{{end}}</p>{{end}}
 
 <form method="post" action="/shop" data-keep="shop-details">
   <label>

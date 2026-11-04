@@ -59,6 +59,7 @@ var swept = map[string]string{
 	"GET /board": "", "GET /jobs/new": "", "POST /jobs/new": "",
 	"GET /jobs/new/lookup": "", "GET /jobs/new/customers": "", "GET /figures": "", "GET /accounting": "",
 	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/modules": "", "POST /shop/charges": "", "POST /shop/final-check": "",
+	"GET /reconcile": "", "POST /reconcile/lines": "", "POST /reconcile/import": "", "POST /reconcile/match": "",
 	"GET /payment-flows": "", "POST /payment-flows": "", "POST /payment-flows/threshold": "",
 	// An invoice by its payment reference (#234), read under the shop's row level security.
 	"POST /payments/by-reference": "",
@@ -264,6 +265,13 @@ var swept = map[string]string{
 	"POST /cars/stock/{id}/reservations/{res}/deposit": "sweep", "POST /cars/stock/{id}/reservations/{res}/end": "sweep",
 	"POST /cars/stock/{id}/reservations/{res}/terms": "sweep",
 	"GET /rental/damage/{id}":                        "sweep", "POST /rental/damage/{id}/steps": "sweep",
+	"POST /rental/bookings/{id}/deposit/{what}": "sweep",
+	"POST /rental/charge-classes":               "sweep", "POST /rental/bookings/{id}/charges": "sweep",
+	"POST /rental/bookings/{id}/charges/{charge}/{what}": "sweep",
+	"POST /rental/bookings/{id}/invoice":                 "sweep", "POST /rental/bookings/{id}/deposit-apply": "sweep",
+	"GET /rental/figures": "",
+	"GET /rental/fines":   "sweep", "POST /rental/fines": "sweep", "POST /rental/fines/import": "sweep",
+	"POST /rental/fines/{id}/{what}":      "sweep",
 	"POST /cars/trade-ins/{sale}/receive": "sweep", "POST /cars/trade-ins/{sale}/credit": "sweep",
 	"POST /cars/stock/{id}/consignment/{agreement}/end": "sweep",
 	"POST /cars/stock/{id}/card/{what}":                 "sweep",
@@ -339,6 +347,7 @@ func fill(pattern string) (method, path string) {
 		"{filing}":                "bbbbbbbb-0000-0000-0000-0000000000d5",
 		"{photo}":                 "bbbbbbbb-0000-0000-0000-0000000000d6",
 		"{what}":                  "damage",
+		"{charge}":                "bbbbbbbb-0000-0000-0000-0000000000eb",
 		"/cars/trade-ins/{sale}":  "/cars/trade-ins/bbbbbbbb-0000-0000-0000-0000000000cd",
 		// Rental: ids that are nobody's.
 		"/rental/permits/{id}":     "/rental/permits/bbbbbbbb-0000-0000-0000-0000000000e1",
@@ -353,6 +362,7 @@ func fill(pattern string) (method, path string) {
 		"/rental/drivers/{id}":     "/rental/drivers/bbbbbbbb-0000-0000-0000-0000000000e8",
 		"/rental/agreements/{id}":  "/rental/agreements/bbbbbbbb-0000-0000-0000-0000000000e9",
 		"/rental/handovers/{id}":   "/rental/handovers/bbbbbbbb-0000-0000-0000-0000000000ea",
+		"/rental/fines/{id}":       "/rental/fines/bbbbbbbb-0000-0000-0000-0000000000ec",
 	} {
 		path = strings.ReplaceAll(path, from, to)
 	}

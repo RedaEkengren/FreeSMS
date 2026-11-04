@@ -1,6 +1,6 @@
 {{define "content"}}
 <h1>{{.T "Rental"}}</h1>
-<p><a href="/rental/settings">{{.T "Rental settings"}}</a> &middot; <a href="/rental/prices">{{.T "Rental prices"}}</a></p>
+<p><a href="/rental/settings">{{.T "Rental settings"}}</a> &middot; <a href="/rental/prices">{{.T "Rental prices"}}</a> &middot; <a href="/rental/fines">{{.T "Charges for vehicles"}}</a>{{if .Session.Scope.Role.RunsTheShop}} &middot; <a href="/rental/figures">{{.T "Rental figures"}}</a>{{end}}</p>
 
 <h2>{{.T "Today"}}</h2>
 {{if .Rental.Day}}

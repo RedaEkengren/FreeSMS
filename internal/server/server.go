@@ -456,6 +456,11 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("POST /shop/modules", s.requireSession(s.handleSwitchModule))
 	workshopMux.HandleFunc("POST /shop/charges", s.requireSession(s.handleSaveSurcharges))
 	mux.HandleFunc("GET /privacy", s.requireSession(s.handlePrivacy))
+	// Reconciliation with the bank (#152).
+	mux.HandleFunc("GET /reconcile", s.requireSession(s.handleReconcile))
+	mux.HandleFunc("POST /reconcile/lines", s.requireSession(s.handleReconcileLine))
+	mux.HandleFunc("POST /reconcile/import", s.requireSession(s.handleReconcileImport))
+	mux.HandleFunc("POST /reconcile/match", s.requireSession(s.handleReconcileMatch))
 	mux.HandleFunc("GET /payment-flows", s.requireSession(s.handlePaymentFlows))
 	mux.HandleFunc("POST /payment-flows", s.requireSession(s.handlePaymentFlowAction("add")))
 	mux.HandleFunc("POST /payment-flows/threshold", s.requireSession(s.handlePaymentFlowAction("threshold")))

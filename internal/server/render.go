@@ -120,10 +120,12 @@ type pageData struct {
 	ContractLink     string
 	ContractCustomer bool
 	// What an invoice lacks to be written as an electronic invoice.
-	Missing                    []string
-	Balance                    workshop.Balance
-	Receivables                []workshop.Balance
-	Methods                    []string
+	Missing     []string
+	Balance     workshop.Balance
+	Receivables []workshop.Balance
+	Methods     []string
+	// Reconciliation with the bank (#152).
+	Reconcile                  *reconcileData
 	Today                      string
 	Contact                    workshop.Contact
 	Shop                       workshop.ShopDetails
@@ -528,7 +530,7 @@ func (d pageData) Plural(key string, count int) string {
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "planclash", "lineedit", "enquiries", "enquiry", "proposal", "offer", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "einvoice", "shop", "customer", "day", "followup", "comeback", "outsourced", "outsourcedlist", "import", "importbatch", "start", "invoiceexample", "help", "credit", "rebill", "docview", "summary", "summarydoc", "supply", "order", "timeline", "duplicates", "merge", "customers", "customercard", "sell", "checklists", "part", "staff", "account", "mine", "rota", "schedule", "receivables", "setup", "contract", "outbox", "paymentflows", "technicians", "home", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "planclash", "lineedit", "enquiries", "enquiry", "proposal", "offer", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "einvoice", "shop", "customer", "day", "followup", "comeback", "outsourced", "outsourcedlist", "import", "importbatch", "start", "invoiceexample", "help", "credit", "rebill", "docview", "summary", "summarydoc", "supply", "order", "timeline", "duplicates", "merge", "customers", "customercard", "sell", "checklists", "part", "staff", "account", "mine", "rota", "schedule", "receivables", "setup", "contract", "outbox", "paymentflows", "reconcile", "technicians", "home", "error"}
 	// Dealer
 	pages = append(pages, "carcalc", "leads", "lead", "testdrive", "deal", "carstock", "carbuy", "carunit", "carconsign", "carresults", "feedtoken")
 	pages = append(pages, rentalPages...)

@@ -57,7 +57,20 @@
 <h3>{{$.T "The return suggests"}}</h3>
 <p class="waiting">{{$.T "Nothing here is charged until a person confirms it."}}</p>
 <ul class="lines">
-  {{range .Proposed}}<li><div class="row"><span>{{$.T ($.Rental.ChargeLabel .Kind) ($.Num .Quantity)}}</span>{{if .UnitPriceMinor}}<span>{{$.T "%s each, net" ($.Money .Price)}}</span>{{end}}</div></li>{{end}}
+  {{range .Proposed}}<li><div class="row"><span>{{$.T ($.Rental.ChargeLabel .Kind) ($.Num .Quantity)}}</span>{{if .UnitPriceMinor}}<span>{{$.T "%s each, net" ($.Money .Price)}}</span>{{end}}</div>
+  {{if eq $.Rental.Booking.State "returned"}}
+  <details><summary>{{$.T "Confirm it as a charge"}}</summary>
+  <form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/charges">
+    <input type="hidden" name="kind" value="{{.Kind}}"><input type="hidden" name="proposed" value="1"><input type="hidden" name="key" value="{{$.Rental.Key}}-{{.Kind}}">
+    <label><span>{{$.T "What it says"}}</span><input name="description" maxlength="200" value="{{$.T ($.Rental.ChargeName .Kind)}}" required></label>
+    <div class="pair">
+      <label><span>{{$.T "Quantity"}}</span><input name="quantity" inputmode="decimal" value="{{.Quantity}}" required></label>
+      <label><span>{{$.T "Price of one, net, in kronor"}}</span><input name="price" inputmode="decimal" value="{{if .UnitPriceMinor}}{{$.Rental.Kronor .Price}}{{end}}" required></label>
+    </div>
+    <button type="submit">{{$.T "Confirm the charge"}}</button>
+  </form>
+  </details>
+  {{end}}</li>{{end}}
 </ul>
 {{end}}
 {{if .Damage}}
@@ -73,6 +86,148 @@
 <form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/check-in"><button type="submit">{{$.T "Check it in"}}</button></form>
 {{end}}
 {{end}}
+{{end}}
+
+<h2 id="charges">{{$.T "Charges"}}</h2>
+<p class="waiting">{{$.T "A charge is owed once a person confirms it, and invoiced once the customer has been told of it."}}</p>
+{{with $.Rental.Charges}}
+<ul class="lines">
+  {{range .}}<li>
+    <div class="row"><span>{{if not .Stands}}<s>{{end}}{{.Description}} &middot; {{$.Num ($.Rental.Count .QuantityMilli)}}{{if not .Stands}}</s>{{end}}</span><span>{{$.Money .Gross}}</span></div>
+    <div class="waiting">{{$.T ($.Rental.ChargeName .Kind)}} &middot; {{if eq .VATCategory "O"}}{{$.T "outside the scope of VAT"}}{{else}}{{$.T "VAT %d%%" ($.Rental.Percent .VATRateBp)}}{{end}}
+      {{if not .ClassConfirmed}} &middot; <span class="tag late">{{$.T "VAT treatment not confirmed"}}</span>{{end}}
+      {{if .InformedAt}} &middot; {{$.T "customer told %s" ($.Date ($.Local .InformedAt) "2 Jan 2006")}}{{end}}
+      {{with .Withdrawn}} &middot; {{$.T "withdrawn: %s" .}}{{end}}</div>
+    {{if .Stands}}
+    {{if not .InformedAt}}
+    <form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/charges/{{.ID}}/inform">
+      <label><span>{{$.T "Told how"}}</span><select name="channel">{{range $.Rental.ChargeChannels}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+      <button type="submit" class="secondary">{{$.T "The customer has been told"}}</button>
+    </form>
+    {{end}}
+    <details><summary>{{$.T "Withdraw it"}}</summary>
+    <form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/charges/{{.ID}}/withdraw">
+      <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="300" required></label>
+      <button type="submit" class="secondary">{{$.T "Withdraw the charge"}}</button>
+    </form>
+    </details>
+    {{end}}
+  </li>{{end}}
+</ul>
+{{end}}
+{{if or (eq $.Rental.Booking.State "returned") (eq $.Rental.Booking.State "cancelled") (eq $.Rental.Booking.State "no_show")}}
+<details><summary>{{$.T "Add a charge"}}</summary>
+<form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/charges">
+  <input type="hidden" name="key" value="{{$.Rental.Key}}-charge">
+  <label><span>{{$.T "Kind"}}</span><select name="kind">{{range $.Rental.ChargeKinds}}{{if ne . "damage"}}<option value="{{.}}">{{$.T ($.Rental.ChargeName .)}}</option>{{end}}{{end}}</select></label>
+  <label><span>{{$.T "What it says"}}</span><input name="description" maxlength="200" required></label>
+  <div class="pair">
+    <label><span>{{$.T "Quantity"}}</span><input name="quantity" inputmode="decimal" value="1" required></label>
+    <label><span>{{$.T "Price of one, net, in kronor"}}</span><input name="price" inputmode="decimal" required></label>
+  </div>
+  <button type="submit">{{$.T "Confirm the charge"}}</button>
+</form>
+</details>
+{{range $.Rental.Handovers.Damage}}
+<form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/charges">
+  <input type="hidden" name="kind" value="damage"><input type="hidden" name="damage_case" value="{{.ID}}"><input type="hidden" name="key" value="{{$.Rental.Key}}-{{.ID}}">
+  <button type="submit" class="secondary">{{$.T "Charge the damage as settled: %s" .Description}}</button>
+</form>
+{{end}}
+{{end}}
+
+<h2 id="invoices">{{$.T "Invoices"}}</h2>
+{{with $.Rental.Invoices}}
+<ul class="lines">
+  {{range .}}<li><div class="row"><span>{{if $.Session.Scope.Role.SeesCustomerPersonalData}}<a href="/invoices/{{.ID}}">{{.Reference}}</a>{{else}}{{.Reference}}{{end}}
+    {{if .CreditNote}} &middot; {{$.T "credit note"}}{{else if .Credited}} &middot; {{$.T "credited"}}{{end}}</span><span>{{$.Money .GrossMinor}}</span></div></li>{{end}}
+</ul>
+{{end}}
+{{if or (eq $.Rental.Booking.State "returned") (eq $.Rental.Booking.State "cancelled") (eq $.Rental.Booking.State "no_show")}}
+<form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/invoice">
+  <label><span>{{$.T "To"}}</span><select name="payer"><option value="">{{$.Rental.Booking.RenterName}}</option>{{range $.Rental.Renters}}{{if ne .ID $.Rental.Booking.RenterID}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}</select></label>
+  <button type="submit">{{$.T "Invoice what is not invoiced yet"}}</button>
+</form>
+<p class="waiting">{{$.T "The rent as it was booked, and the charges the customer has been told of. Nothing is priced again."}}</p>
+{{end}}
+
+<h2 id="deposit">{{$.T "Deposit"}}</h2>
+<p class="waiting">{{$.T "A deposit is the customer's money until a settled claim is set against it. FreeSMS records it; it is not a cash register, and a recorded payment is not a cash-register receipt."}}</p>
+{{with $.Rental.Deposit}}
+{{if .ID}}
+<dl>
+  <dt>{{$.T "Asked"}}</dt><dd>{{$.Money .RequiredMinor}} &middot; {{$.T .Method}}</dd>
+  <dt>{{$.T "Paid by"}}</dt><dd>{{.PayerName}}</dd>
+  {{with .Hold}}<dt>{{$.T "Held on the card"}}</dt><dd>{{$.Money .AmountMinor}} &middot; {{.Reference}} &middot; {{$.T "until %s" ($.Date ($.Local .ValidUntil) "2 Jan 2006 15:04")}}</dd>{{end}}
+  <dt>{{$.T "Received"}}</dt><dd>{{$.Money .Balance.Received}}</dd>
+  <dt>{{$.T "Applied to a claim"}}</dt><dd>{{$.Money .Balance.Applied}}</dd>
+  <dt>{{$.T "Given back"}}</dt><dd>{{$.Money .Balance.Refunded}}</dd>
+  <dt>{{$.T "Held for the customer"}}</dt><dd>{{$.Money .OwedBack}}</dd>
+</dl>
+{{if .HoldEndsTooSoon}}<p class="waiting"><span class="tag late">{{$.T "The hold on the card runs out before the rental is due back. Take the deposit another way."}}</span></p>{{end}}
+{{if and .Short $.Rental.Booking.Open}}<p class="waiting"><span class="tag late">{{$.T "%s of the deposit asked is neither held nor received." ($.Money .Short)}}</span></p>{{end}}
+{{with .Balance.Payments}}
+<ul class="lines">
+  {{range .}}<li><div class="row"><span>{{.Series}}-{{.Number}} &middot; {{$.T .Method}}{{with .Reference}} &middot; {{.}}{{end}}</span><span>{{$.Money .AmountMinor}}</span></div>
+  {{if and (gt .AmountMinor 0) (ne .Method "deposit") (not .Reversed) (not .Reverses) (not .RefundsID)}}
+  <details><summary>{{$.T "Give back"}}</summary>
+  <form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/deposit/refund">
+    <input type="hidden" name="payment" value="{{.ID}}"><input type="hidden" name="key" value="{{$.Rental.Key}}">
+    <label><span>{{$.T "Amount, in kronor"}}</span><input name="amount" inputmode="decimal" required></label>
+    <label><span>{{$.T "How"}}</span><select name="method">{{range $.Methods}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+    <label><span>{{$.T "Reference"}}</span><input name="reference" maxlength="100"></label>
+    <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="300" required></label>
+    <button type="submit" class="secondary">{{$.T "Give it back"}}</button>
+  </form>
+  </details>
+  {{end}}</li>{{end}}
+</ul>
+{{end}}
+{{if and .OwedBack $.Rental.Invoices $.Rental.Handovers.Damage}}
+<details><summary>{{$.T "Set part of it against a settled claim"}}</summary>
+<form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/deposit-apply">
+  <input type="hidden" name="key" value="{{$.Rental.Key}}-apply">
+  <label><span>{{$.T "Damage case"}}</span><select name="damage_case">{{range $.Rental.Handovers.Damage}}<option value="{{.ID}}">{{.Description}}</option>{{end}}</select></label>
+  <label><span>{{$.T "Invoice"}}</span><select name="invoice">{{range $.Rental.Invoices}}{{if not (or .CreditNote .Credited)}}<option value="{{.ID}}">{{.Reference}}</option>{{end}}{{end}}</select></label>
+  <label><span>{{$.T "Amount, in kronor"}}</span><input name="amount" inputmode="decimal" required></label>
+  <button type="submit">{{$.T "Set it against the claim"}}</button>
+</form>
+</details>
+{{end}}
+<details><summary>{{$.T "Record money received"}}</summary>
+<form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/deposit/receive">
+  <input type="hidden" name="key" value="{{$.Rental.Key}}">
+  <label><span>{{$.T "Amount, in kronor"}}</span><input name="amount" inputmode="decimal" required></label>
+  <label><span>{{$.T "How"}}</span><select name="method">{{range $.Methods}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+  <label><span>{{$.T "Reference"}}</span><input name="reference" maxlength="100"></label>
+  <button type="submit">{{$.T "Record it"}}</button>
+</form>
+</details>
+{{if .Hold}}
+<details><summary>{{$.T "Release the hold"}}</summary>
+<form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/deposit/release">
+  <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="300" required></label>
+  <button type="submit" class="secondary">{{$.T "Release it"}}</button>
+</form>
+</details>
+{{else}}
+<details><summary>{{$.T "Record a hold on the card"}}</summary>
+<form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/deposit/hold">
+  <label><span>{{$.T "Amount, in kronor"}}</span><input name="amount" inputmode="decimal" required></label>
+  <label><span>{{$.T "Terminal receipt number"}}</span><input name="reference" maxlength="100" required></label>
+  <label><span>{{$.T "Held until"}}</span><input type="datetime-local" name="valid_until" required></label>
+  <button type="submit">{{$.T "Record the hold"}}</button>
+</form>
+</details>
+{{end}}
+{{end}}
+<details{{if not .ID}} open{{end}}><summary>{{if .ID}}{{$.T "Change what is asked"}}{{else}}{{$.T "Ask for a deposit"}}{{end}}</summary>
+<form method="post" action="/rental/bookings/{{$.Rental.Booking.ID}}/deposit/require">
+  <label><span>{{$.T "Amount, in kronor"}}</span><input name="amount" inputmode="decimal" required></label>
+  <label><span>{{$.T "How"}}</span><select name="method">{{range $.Rental.RentalDepositMethods}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+  <button type="submit">{{$.T "Save"}}</button>
+</form>
+</details>
 {{end}}
 
 <h2>{{$.T "Drivers"}}</h2>

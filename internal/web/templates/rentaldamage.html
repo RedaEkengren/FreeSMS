@@ -7,7 +7,7 @@
 <p class="waiting">{{.T "A damage is not a debt: it is owed only once its amount is settled and the customer has been told."}}</p>
 {{with $c.Steps}}
 <ul class="lines">
-  {{range .}}<li><div class="row"><span>{{$.T .Step}}{{with .Liability}}: {{$.T .}}{{end}}{{with .AmountMinor}}: {{$.MoneyOrBlank .}}{{end}}{{with .Channel}}: {{$.T .}}{{end}}{{with .Response}}: {{$.T .}}{{end}}{{with .Outcome}}: {{$.T .}}{{end}}</span>
+  {{range .}}<li><div class="row"><span>{{$.T .Step}}{{with .Liability}}: {{$.T .}}{{end}}{{with .AmountMinor}}: {{$.MoneyOrBlank .}}{{end}}{{with .Channel}}: {{$.T .}}{{end}}{{with .RespondBy}} &middot; {{$.T "may object until %s" ($.Date . "2 Jan 2006")}}{{end}}{{with .Response}}: {{$.T .}}{{end}}{{with .Outcome}}: {{$.T .}}{{end}}</span>
     <span>{{$.Date ($.Local .At) "2 Jan 2006"}}</span></div><div class="waiting">{{.Reason}}{{if .By}} &middot; {{.By}}{{end}}</div></li>{{end}}
 </ul>
 {{end}}
@@ -16,6 +16,7 @@
   <label><span>{{.T "Liable"}}</span><select name="liability"><option value=""></option>{{range .Rental.DamageLiabilities}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
   <label><span>{{.T "Amount, in kronor"}}</span><input name="amount" inputmode="decimal"></label>
   <label><span>{{.T "Told how"}}</span><select name="channel"><option value=""></option>{{range .Rental.DamageChannels}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+  <label><span>{{.T "May object until"}}</span><input type="date" name="respond_by"></label>
   <label><span>{{.T "Their answer"}}</span><select name="response"><option value=""></option>{{range .Rental.DamageResponses}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
   <label><span>{{.T "Outcome"}}</span><select name="outcome"><option value=""></option>{{range .Rental.DamageOutcomes}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
   <label><span>{{.T "Why"}}</span><input name="reason" maxlength="500" required></label>

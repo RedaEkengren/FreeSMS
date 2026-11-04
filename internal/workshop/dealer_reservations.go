@@ -580,7 +580,8 @@ func applyReservationDepositTx(ctx context.Context, tx pgx.Tx, scope access.Scop
 	if amount <= 0 {
 		return nil
 	}
-	return applyDepositTx(ctx, tx, scope, deposit, invoiceID, amount, "")
+	_, err = applyDepositTx(ctx, tx, scope, deposit, invoiceID, amount, "")
+	return err
 }
 
 // ReservationTermsName is the shipped reservation terms' name.

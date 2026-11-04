@@ -1,0 +1,70 @@
+{{define "content"}}
+<h1>{{.T "Charges for vehicles"}}</h1>
+{{if .Error}}<p class="error" role="alert">{{.Sentence .Error}}</p>{{end}}
+<p class="waiting">{{.T "Congestion tax, parking fees and tolls come to the shop as the vehicle's owner. Passing one to a renter is for the agreement to allow. Which rental had the car is read from the registration then and the actual handovers; near a handover, a person chooses."}}</p>
+
+{{with .Rental.FinePreview}}
+<h2>{{$.T "What the file holds"}}</h2>
+<ul class="lines">
+  {{range .}}<li><div class="row"><span>{{$.T ($.Rental.FineKindName .Kind)}} &middot; {{.Registration}} &middot; {{$.Date ($.Local .OccurredAt) "2 Jan 2006 15:04"}} &middot; {{.Issuer}} {{.Reference}}</span><span>{{$.Money .AmountMinor}}</span></div>
+    <div class="waiting">{{$.T ($.Rental.FineMatchSays .Match)}}</div></li>{{end}}
+</ul>
+<form method="post" action="/rental/fines/import">
+  <input type="hidden" name="file_text" value="{{$.Rental.FineFile}}"><input type="hidden" name="save" value="1">
+  <button type="submit">{{$.T "Record them"}}</button>
+</form>
+{{end}}
+
+{{with .Rental.Fines}}
+<ul class="lines">
+  {{range .}}<li>
+    <div class="row"><span>{{$.T ($.Rental.FineKindName .Kind)}} &middot; {{.Registration}} &middot; {{$.Date ($.Local .OccurredAt) "2 Jan 2006 15:04"}} &middot; {{.Issuer}} {{.Reference}}</span><span>{{$.Money .AmountMinor}}</span></div>
+    <div class="waiting">{{$.T ($.Rental.FineMatchSays .Match)}}{{with .DueOn}} &middot; {{$.T "due %s" ($.Date . "2 Jan 2006")}}{{end}}
+      {{if eq .Decision "renter"}} &middot; <a href="/rental/bookings/{{.BookingID}}#charges">{{$.T "passed to the rental"}}</a>{{else if eq .Decision "shop"}} &middot; {{$.T "the shop's own"}}{{end}}
+      {{if .Paid}} &middot; {{$.T "paid to the authority"}}{{end}}</div>
+    {{if not .Decision}}
+    {{if .Candidates}}
+    <form method="post" action="/rental/fines/{{.ID}}/renter">
+      <label><span>{{$.T "The rental"}}</span><select name="booking">{{$refs := .CandidateRefs}}{{range $i, $id := .Candidates}}<option value="{{$id}}">{{index $refs $i}}</option>{{end}}</select></label>
+      <button type="submit">{{$.T "Pass it to the rental"}}</button>
+    </form>
+    {{end}}
+    <details><summary>{{$.T "The shop's own"}}</summary>
+    <form method="post" action="/rental/fines/{{.ID}}/shop">
+      <label><span>{{$.T "Why"}}</span><input name="reason" maxlength="300" required></label>
+      <button type="submit" class="secondary">{{$.T "Keep it"}}</button>
+    </form>
+    </details>
+    {{end}}
+    {{if not .Paid}}<form method="post" action="/rental/fines/{{.ID}}/paid"><button type="submit" class="secondary">{{$.T "Paid to the authority"}}</button></form>{{end}}
+  </li>{{end}}
+</ul>
+{{else}}
+<p>{{.T "No charges recorded."}}</p>
+{{end}}
+
+<h2>{{.T "Record a charge"}}</h2>
+<form method="post" action="/rental/fines">
+  <label><span>{{.T "Kind"}}</span><select name="kind">{{range .Rental.FineKinds}}<option value="{{.}}">{{$.T ($.Rental.FineKindName .)}}</option>{{end}}</select></label>
+  <div class="pair">
+    <label><span>{{.T "Registration"}}</span><input name="registration" maxlength="20" required></label>
+    <label><span>{{.T "When"}}</span><input type="datetime-local" name="when" required></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "Amount, in kronor"}}</span><input name="amount" inputmode="decimal" required></label>
+    <label><span>{{.T "Due"}}</span><input type="date" name="due_on"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "Issued by"}}</span><input name="issuer" maxlength="100" required></label>
+    <label><span>{{.T "Their reference"}}</span><input name="reference" maxlength="100" required></label>
+  </div>
+  <button type="submit">{{.T "Record the charge"}}</button>
+</form>
+
+<h2>{{.T "Import a file"}}</h2>
+<p class="waiting">{{.T "Comma-separated: kind, registration, when, amount in kronor, issuer, reference, due date. A time that happens twice when the clocks go back needs its offset. You see what it holds before anything is saved."}}</p>
+<form method="post" action="/rental/fines/import" enctype="multipart/form-data">
+  <label><span>{{.T "File"}}</span><input type="file" name="file" accept=".csv,text/csv" required></label>
+  <button type="submit" class="secondary">{{.T "Show what it holds"}}</button>
+</form>
+{{end}}

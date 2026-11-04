@@ -28,7 +28,7 @@ func TestAPartlyRefundedDepositReconcilesWithBothBalances(t *testing.T) {
 	ctx := context.Background()
 	desk := everything(advisor())
 	party := partyOf(t, pool, fixtureCustomer)
-	dep, err := workshop.CreateDeposit(ctx, pool, desk, workshop.NewHolding{PartyID: party, Purpose: "rental"})
+	dep, err := workshop.CreateDeposit(ctx, pool, desk, workshop.NewHolding{PartyID: party, Purpose: "other"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,9 +303,16 @@ func placeholders(from, n int) string {
 
 func depositWith(t *testing.T, pool *pgxpool.Pool, amount int64) (string, workshop.Payment) {
 	t.Helper()
+	return depositFor(t, pool, amount, "other")
+}
+
+// depositFor is depositWith for a purpose: a rental's is applied only from
+// its damage case (#196).
+func depositFor(t *testing.T, pool *pgxpool.Pool, amount int64, purpose string) (string, workshop.Payment) {
+	t.Helper()
 	ctx := context.Background()
 	desk := everything(advisor())
-	dep, err := workshop.CreateDeposit(ctx, pool, desk, workshop.NewHolding{PartyID: partyOf(t, pool, fixtureCustomer), Purpose: "rental"})
+	dep, err := workshop.CreateDeposit(ctx, pool, desk, workshop.NewHolding{PartyID: partyOf(t, pool, fixtureCustomer), Purpose: purpose})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -574,7 +581,7 @@ func TestARequestKeyNamesOneRequest(t *testing.T) {
 func TestAHeldDepositIsRefundedWithRentalSwitchedOff(t *testing.T) {
 	pool := setup(t)
 	ctx := context.Background()
-	dep, in := depositWith(t, pool, 300000)
+	dep, in := depositFor(t, pool, 300000, "rental")
 	off := func(s access.Scope) access.Scope { s.Modules = []access.Module{access.Workshop}; return s }
 	desk, front := off(otherRoles(access.Of(access.RoleRentalAgent))), off(advisor())
 	if _, err := workshop.CreateDeposit(ctx, pool, desk, workshop.NewHolding{PartyID: partyOf(t, pool, fixtureCustomer), Purpose: "rental"}); !errors.Is(err, access.ErrModuleOff) {

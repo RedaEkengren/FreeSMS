@@ -42,7 +42,19 @@ type SourcedLine struct {
 	// it at the rate (money.VATInGross) and the net the rest, so the line
 	// comes to exactly this; UnitPriceMinor is then not given.
 	GrossMinor int64
+	// A rental's (#199): UNCL5305 S or O, the category the line was priced
+	// or charged under, and what it is counted in -- day, hour.
+	VATCategory string
+	Unit        string
 }
+
+// Kinds of line only a rental invoices: its rent and extras, and its
+// confirmed return charges (#195). How they are posted waits on the
+// accountant (#207), so a period holding one is not exported.
+const (
+	LineRent         = "rent"
+	LineRentalCharge = "rental_charge"
+)
 
 // MarginSchemeStatement is the statement a margin-scheme invoice carries,
 // frozen onto it in Swedish whatever the reader's language (#177).
@@ -136,13 +148,21 @@ func issueSourcedTx(ctx context.Context, tx pgx.Tx, scope access.Scope, of sourc
 		if g.Kind == "" {
 			g.Kind = "part"
 		}
+		rental := g.Kind == LineRent || g.Kind == LineRentalCharge
+		switch {
+		case (rental || g.VATCategory != "") && of.source != SourceRental:
+			return Invoice{}, fmt.Errorf("%w: rent and return charges are a rental's", ErrInvalid)
+		case g.VATCategory == "O" && g.VATRateBasis != 0, g.VATCategory == "S" && g.VATRateBasis <= 0,
+			g.VATCategory != "" && g.VATCategory != "S" && g.VATCategory != "O":
+			return Invoice{}, fmt.Errorf("%w: a line outside the scope of VAT has none, and a taxed line a rate", ErrInvalid)
+		}
 		// A car sold is a vehicle sale's, and under the margin scheme
 		// carries no VAT of its own on the invoice.
 		if g.Kind == "vehicle" || g.MarginScheme {
 			if of.source != SourceVehicleSale || g.Kind != "vehicle" || (g.MarginScheme && g.VATRateBasis != 0) {
 				return Invoice{}, fmt.Errorf("%w: a car is sold on a vehicle sale's invoice, under the margin scheme at no VAT of its own", ErrInvalid)
 			}
-		} else if _, booked := salesAccounts[g.Kind]; !booked {
+		} else if _, booked := salesAccounts[g.Kind]; !booked && !rental {
 			return Invoice{}, fmt.Errorf("%w: a line is labour, a part, sublet work, consumables or a fee", ErrInvalid)
 		}
 		net := money.LineNet(g.QuantityMilli, g.UnitPriceMinor)
@@ -159,7 +179,7 @@ func issueSourcedTx(ctx context.Context, tx pgx.Tx, scope access.Scope, of sourc
 			Kind: g.Kind, Description: g.Description, QuantityMilli: g.QuantityMilli,
 			UnitPriceMinor: g.UnitPriceMinor, VATRateBasis: g.VATRateBasis,
 			NetMinor: net, VATMinor: vat,
-			UnitCode: unitCode(g.Kind, ""), MarginScheme: g.MarginScheme,
+			UnitCode: unitCode(g.Kind, g.Unit), MarginScheme: g.MarginScheme, VATCategory: g.VATCategory,
 		})
 	}
 	// The lines' own amounts, summed: each line's VAT is rounded on its

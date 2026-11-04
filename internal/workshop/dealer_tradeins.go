@@ -355,7 +355,8 @@ func applyHeldTx(ctx context.Context, tx pgx.Tx, scope access.Scope, deposit, in
 		return err
 	}
 	if amount := min(d.Held(), b.OutstandingMinor()); amount > 0 {
-		return applyDepositTx(ctx, tx, scope, deposit, invoice, amount, "")
+		_, err := applyDepositTx(ctx, tx, scope, deposit, invoice, amount, "")
+		return err
 	}
 	return nil
 }
