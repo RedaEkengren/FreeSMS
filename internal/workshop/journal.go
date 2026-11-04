@@ -2,8 +2,10 @@ package workshop
 
 import (
 	"context"
+	"encoding/csv"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -831,4 +833,104 @@ func Unreconciled(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (
 		return rows.Err()
 	})
 	return r, err
+}
+
+// Match is a payment matched to a line of the bank's statement, standing.
+type Match struct {
+	Payment Payment
+	Line    StatementLine
+	At      time.Time
+}
+
+// Matches reads the matches standing, newest first, so a wrong one can be
+// undone: whoever runs the shop.
+func Matches(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, limit int) ([]Match, error) {
+	if !scope.Role.RunsTheShop() {
+		return nil, access.ErrForbidden
+	}
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	var out []Match
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `
+			SELECT p.id, p.series, p.number, p.amount_minor, p.method, p.paid_on, coalesce(p.reference, ''),
+			       l.id, l.booked_on, l.amount_minor, coalesce(l.reference, ''), coalesce(l.external_id, ''), m.matched_at
+			FROM payment_matches m
+			JOIN invoice_payments p ON p.id = m.payment_id
+			JOIN bank_statement_lines l ON l.id = m.statement_line_id
+			WHERE m.undone_at IS NULL
+			ORDER BY m.matched_at DESC LIMIT $1`, limit)
+		if err != nil {
+			return fmt.Errorf("read matches: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var m Match
+			if err := rows.Scan(&m.Payment.ID, &m.Payment.Series, &m.Payment.Number, &m.Payment.AmountMinor, &m.Payment.Method,
+				&m.Payment.PaidOn, &m.Payment.Reference, &m.Line.ID, &m.Line.BookedOn, &m.Line.AmountMinor, &m.Line.Reference,
+				&m.Line.ExternalID, &m.At); err != nil {
+				return err
+			}
+			out = append(out, m)
+		}
+		return rows.Err()
+	})
+	return out, err
+}
+
+// ParseStatementCSV reads a bank's statement exported as text: the day
+// booked, the amount -- negative going out, öre after a comma or a point
+// -- the reference and, where the bank gives one, its own id for the
+// line, so importing the same file twice records each line once.
+// Semicolons or commas between fields, as Swedish banks export either; a
+// first line naming the columns is skipped. Every line is read before any
+// is recorded.
+func ParseStatementCSV(r io.Reader) ([]StatementLine, error) {
+	raw, err := io.ReadAll(io.LimitReader(r, 2<<20))
+	if err != nil {
+		return nil, fmt.Errorf("%w: the file could not be read", ErrInvalid)
+	}
+	text := strings.TrimPrefix(string(raw), "\ufeff")
+	cr := csv.NewReader(strings.NewReader(text))
+	if first, _, _ := strings.Cut(text, "\n"); strings.Count(first, ";") > strings.Count(first, ",") {
+		cr.Comma = ';'
+	}
+	cr.FieldsPerRecord = -1
+	cr.TrimLeadingSpace = true
+	records, err := cr.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("%w: the file is not separated text", ErrInvalid)
+	}
+	var out []StatementLine
+	for i, rec := range records {
+		if len(rec) == 0 || (len(rec) == 1 && strings.TrimSpace(rec[0]) == "") {
+			continue
+		}
+		if len(rec) < 3 {
+			return nil, fmt.Errorf("%w: line %d has %d fields, not 3 or 4", ErrInvalid, i+1, len(rec))
+		}
+		day, err := time.Parse("2006-01-02", strings.TrimSpace(rec[0]))
+		if err != nil {
+			if i == 0 {
+				continue // the header
+			}
+			return nil, fmt.Errorf("%w: line %d: the day does not read", ErrInvalid, i+1)
+		}
+		v := strings.TrimSpace(rec[1])
+		sign := int64(1)
+		if strings.HasPrefix(v, "-") || strings.HasPrefix(v, "−") {
+			sign, v = -1, strings.TrimLeft(v, "-−")
+		}
+		amount, err := parseKronor(v)
+		if err != nil || amount == 0 {
+			return nil, fmt.Errorf("%w: line %d: the amount does not read", ErrInvalid, i+1)
+		}
+		l := StatementLine{BookedOn: day, AmountMinor: sign * amount, Reference: strings.TrimSpace(rec[2])}
+		if len(rec) > 3 {
+			l.ExternalID = strings.TrimSpace(rec[3])
+		}
+		out = append(out, l)
+	}
+	return out, nil
 }

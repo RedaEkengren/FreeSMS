@@ -59,6 +59,7 @@ var swept = map[string]string{
 	"GET /board": "", "GET /jobs/new": "", "POST /jobs/new": "",
 	"GET /jobs/new/lookup": "", "GET /jobs/new/customers": "", "GET /figures": "", "GET /accounting": "",
 	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/modules": "", "POST /shop/charges": "", "POST /shop/final-check": "",
+	"GET /reconcile": "", "POST /reconcile/lines": "", "POST /reconcile/import": "", "POST /reconcile/match": "",
 	"GET /payment-flows": "", "POST /payment-flows": "", "POST /payment-flows/threshold": "",
 	// An invoice by its payment reference (#234), read under the shop's row level security.
 	"POST /payments/by-reference": "",

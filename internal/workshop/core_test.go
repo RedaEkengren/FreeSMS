@@ -65,7 +65,7 @@ var core = map[string]string{
 	// Opening a deposit or a payout checks the module of its purpose.
 	"DepositBalanceFor": "money held, readable whatever is switched off", "ApplyDeposit": "money held, applied to what is owed",
 	"RefundPayment": "money received, given back", "AddStatementLines": "the bank's statement",
-	"MatchPayment": "the bank's statement", "UndoMatch": "the bank's statement", "Unreconciled": "the bank's statement",
+	"MatchPayment": "the bank's statement", "UndoMatch": "the bank's statement", "Unreconciled": "the bank's statement", "Matches": "the bank's statement",
 	"FollowUpFor": "chasing what is owed", "Worklist": "chasing what is owed", "TakeFollowUp": "chasing what is owed",
 	"LogContact": "chasing what is owed", "RecordPromise": "chasing what is owed", "Dispute": "chasing what is owed",
 	"ResolveDispute": "chasing what is owed", "RecordRefund": "chasing what is owed",

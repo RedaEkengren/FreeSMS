@@ -1,0 +1,55 @@
+{{define "content"}}
+<h1>{{.T "Reconciliation"}}</h1>
+{{if .Error}}<p class="error" role="alert">{{.Sentence .Error}}</p>{{end}}
+<p class="waiting">{{.T "The bank's statement against the payments recorded as through the bank, Swish or the card terminal. Cash and a deposit applied never reach the bank. FreeSMS records payments; it is not a cash register, and a recorded payment is not a cash-register receipt."}}</p>
+{{with .Reconcile}}
+<h2>{{$.T "Lines with no payment"}}</h2>
+{{if .Open.Lines}}
+<ul class="lines">
+  {{range $l := .Open.Lines}}<li>
+    <div class="row"><span>{{$.Date $l.BookedOn "2 Jan 2006"}}{{with $l.Reference}} &middot; {{.}}{{end}}</span><span>{{$.Money $l.AmountMinor}}</span></div>
+    {{with $.Reconcile.Candidates $l}}
+    <form method="post" action="/reconcile/match">
+      <input type="hidden" name="line" value="{{$l.ID}}">
+      <label><span>{{$.T "The payment"}}</span><select name="payment">{{range .}}<option value="{{.ID}}">{{.Series}}-{{.Number}} &middot; {{$.Date .PaidOn "2 Jan 2006"}} &middot; {{$.T .Method}}{{with .Reference}} &middot; {{.}}{{end}}</option>{{end}}</select></label>
+      <button type="submit" class="secondary">{{$.T "Match"}}</button>
+    </form>
+    {{else}}<div class="waiting">{{$.T "No unmatched payment of this amount."}}</div>{{end}}
+  </li>{{end}}
+</ul>
+{{else}}<p>{{$.T "Every line is matched."}}</p>{{end}}
+
+<h2>{{$.T "Payments with no line"}}</h2>
+{{if .Open.Payments}}
+<ul class="lines">
+  {{range .Open.Payments}}<li><div class="row"><span>{{.Series}}-{{.Number}} &middot; {{$.Date .PaidOn "2 Jan 2006"}} &middot; {{$.T .Method}}{{with .Reference}} &middot; {{.}}{{end}}</span><span>{{$.Money .AmountMinor}}</span></div></li>{{end}}
+</ul>
+{{else}}<p>{{$.T "Every payment through the bank is matched."}}</p>{{end}}
+
+{{with .Matches}}
+<h2>{{$.T "Matched"}}</h2>
+<ul class="lines">
+  {{range .}}<li><div class="row"><span>{{.Payment.Series}}-{{.Payment.Number}} &middot; {{$.Date .Line.BookedOn "2 Jan 2006"}}{{with .Line.Reference}} &middot; {{.}}{{end}}</span><span>{{$.Money .Line.AmountMinor}}</span></div>
+    <form method="post" action="/reconcile/match"><input type="hidden" name="payment" value="{{.Payment.ID}}"><input type="hidden" name="undo" value="1">
+      <button type="submit" class="secondary">{{$.T "Undo the match"}}</button></form></li>{{end}}
+</ul>
+{{end}}
+{{end}}
+
+<h2>{{.T "Add a line of the statement"}}</h2>
+<form method="post" action="/reconcile/lines">
+  <div class="pair">
+    <label><span>{{.T "Booked"}}</span><input type="date" name="booked_on" required></label>
+    <label><span>{{.T "Amount, in kronor"}}</span><input name="amount" inputmode="decimal" required></label>
+  </div>
+  <label><span>{{.T "Reference"}}</span><input name="reference" maxlength="200"></label>
+  <button type="submit">{{.T "Add the line"}}</button>
+</form>
+
+<h2>{{.T "Import the statement"}}</h2>
+<p class="waiting">{{.T "Text separated by semicolons or commas: day, amount (negative going out), reference, and the bank's own id for the line if it has one. A line with the bank's id is recorded once, however often the file is imported."}}</p>
+<form method="post" action="/reconcile/import" enctype="multipart/form-data">
+  <label><span>{{.T "File"}}</span><input type="file" name="file" accept=".csv,text/csv,text/plain" required></label>
+  <button type="submit" class="secondary">{{.T "Import"}}</button>
+</form>
+{{end}}
