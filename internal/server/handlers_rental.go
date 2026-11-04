@@ -673,9 +673,17 @@ func (s *Server) handleRentalBooking(w http.ResponseWriter, r *http.Request) {
 	if d.Invoices, err = workshop.RentalInvoices(r.Context(), s.pool, session.Scope, d.Booking.ID); s.handoverError(w, r, err) {
 		return
 	}
+	// The ways it can be paid at the counter as it is invoiced (#156),
+	// once it is over and can be.
+	var flows []workshop.CounterFlow
+	if st := d.Booking.State; st == workshop.RentalReturned || st == workshop.RentalCancelled || st == workshop.RentalNoShow {
+		if flows, err = workshop.CounterPaymentFlows(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+			return
+		}
+	}
 	d.Key = newFormKey()
 	s.render(w, r, http.StatusOK, "rentalbooking", pageData{Title: "Rental booking", Session: session, Rental: d, Methods: workshop.PaymentMethods,
-		Today: time.Now().In(s.shopLocation(r)).Format("2006-01-02")})
+		CounterFlows: flows, Today: time.Now().In(s.shopLocation(r)).Format("2006-01-02")})
 }
 
 func (s *Server) handleRentalBookingAction(w http.ResponseWriter, r *http.Request) {
