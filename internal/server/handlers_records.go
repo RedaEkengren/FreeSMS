@@ -31,8 +31,11 @@ func (s *Server) handleCustomerCard(w http.ResponseWriter, r *http.Request) {
 	if s.handoverError(w, r, err) {
 		return
 	}
+	// The party behind the card, for its identity checks (#153); a card
+	// with none simply has no way there.
+	party, _ := workshop.PartyOfCustomer(r.Context(), s.pool, session.Scope, card.ID)
 	s.render(w, r, http.StatusOK, "customercard", pageData{
-		Title: card.Name, Session: session, CustomerCard: card, Saved: r.URL.Query().Get("saved") != "",
+		Title: card.Name, Session: session, CustomerCard: card, Saved: r.URL.Query().Get("saved") != "", PartyID: party,
 	})
 }
 

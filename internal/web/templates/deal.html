@@ -85,7 +85,7 @@
 <p class="waiting"><span class="tag">{{.T ($d.Word $x.State)}}</span> &middot; {{.T "Version %d" $x.Version}} &middot; {{$x.SalespersonName}}
   {{with $x.LeadID}}&middot; <a href="/cars/leads/{{.}}">{{$.T "Lead"}}</a>{{end}}</p>
 <ul class="lines">
-  <li><div class="row"><span>{{.T "Buyers"}}</span><span>{{range $i, $b := $x.Buyers}}{{if $i}}, {{end}}{{$b.Name}}{{end}} ({{.T ($d.Word $x.Terms.BuyerKind)}})</span></div></li>
+  <li><div class="row"><span>{{.T "Buyers"}}</span><span>{{range $i, $b := $x.Buyers}}{{if $i}}, {{end}}<a href="/parties/{{$b.PartyID}}/identity">{{$b.Name}}</a>{{end}} ({{.T ($d.Word $x.Terms.BuyerKind)}})</span></div></li>
   <li><div class="row"><span>{{.T "Price of the car"}}</span><span>{{.Money $x.Terms.PriceMinor}}</span></div></li>
   {{range $x.Terms.Lines}}<li><div class="row"><span>{{.Description}}</span><span>{{$.Money .GrossMinor}}</span></div></li>{{end}}
   <li><div class="row"><span>{{.T "To pay in all"}}</span><strong>{{.Money $x.TotalMinor}}</strong></div></li>
