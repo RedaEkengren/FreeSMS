@@ -10,7 +10,9 @@ import (
 	"testing"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/database"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
+	"github.com/jackc/pgx/v5"
 )
 
 // A contract (#150) through the pages: the owner reads and prints it, makes
@@ -54,6 +56,18 @@ func TestAContractIsPrintedAndOpenedOnTheCustomersLink(t *testing.T) {
 	status, body := get(client, "/contracts/"+id)
 	if status != http.StatusOK || !strings.Contains(body, "Bilen säljs för 120 000 kr.") || !strings.Contains(body, "Not signed by anybody yet") {
 		t.Fatalf("the owner's page: %d\n%s", status, body)
+	}
+	// The contract is the shop's own text and keeps it for every reader; the
+	// headings and the system's sentences are the reader's language.
+	if err := database.InShop(ctx, pool, shopA, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE users SET locale = 'sv' WHERE id = $1`, owner.UserID)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if status, sv := get(client, "/contracts/"+id); status != http.StatusOK || !strings.Contains(sv, "Bilen säljs för 120 000 kr.") ||
+		!strings.Contains(sv, "Inte underskriven av någon ännu") || strings.Contains(sv, "Not signed by anybody yet") {
+		t.Errorf("a Swedish reader's page: %d\n%s", status, sv)
 	}
 	if status, _ := get(signIn(t, ts, techEmail), "/contracts/"+id); status != http.StatusForbidden {
 		t.Errorf("a technician opening a contract: %d, want 403", status)

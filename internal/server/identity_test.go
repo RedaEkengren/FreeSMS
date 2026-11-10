@@ -1,7 +1,9 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -155,5 +157,75 @@ func TestRetentionOnTheShopPage(t *testing.T) {
 	}
 	if st := post(signIn(t, ts, advisorEmail), "identity", "ownership_change", "10"); st != http.StatusForbidden {
 		t.Errorf("the front desk set a retention: %d", st)
+	}
+}
+
+// A stored identity value is in no log line and on no page that is not the
+// identity page's own reading of it (#153): not while it is recorded, read
+// masked, read in full, refused for want of a key or ended; not in the
+// owner's queue, the home page or a search for it.
+func TestAnIdentityValueIsInNoLogAndNoOtherPage(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	party, err := workshop.PartyOfCustomer(ctx, pool, owner, "aaaaaaaa-0000-0000-0000-000000000004")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.StartPartyRole(ctx, pool, owner, party, workshop.PartyBuyer, ""); err != nil {
+		t.Fatal(err)
+	}
+	k, _ := identity.NewKey("k1")
+	keys, err := identity.ParseKeys(k)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _ := testServers.Load(ts.URL)
+	srv := v.(*Server)
+	srv.identityKeys = keys
+	var logged bytes.Buffer
+	old := srv.log
+	srv.log = slog.New(slog.NewTextHandler(&logged, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	defer func() { srv.log = old }()
+
+	const digits = "198001014321"
+	const number = "19800101-4321"
+	base := ts.URL + "/parties/" + party + "/identity"
+	seller := signIn(t, ts, salesEmail)
+	if resp := postResponse(t, seller, base, url.Values{"purpose": {"aml_due_diligence"}, "kind": {workshop.IdentityNumber},
+		"value": {number}}); resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("recording: %d", resp.StatusCode)
+	}
+	records, err := workshop.IdentityRecordsFor(ctx, pool, owner, party)
+	if err != nil || len(records) != 1 {
+		t.Fatalf("recorded: %+v, %v", records, err)
+	}
+	path := "/parties/" + party + "/identity/" + records[0].ID
+	postModuleForm(t, seller, ts.URL, path+"/show", url.Values{})
+	postModuleForm(t, seller, ts.URL, path+"/show", url.Values{"full": {"1"}})
+	srv.identityKeys = nil
+	postModuleForm(t, seller, ts.URL, path+"/show", url.Values{"full": {"1"}})
+	srv.identityKeys = keys
+
+	// Other pages, for the people who work with it and for the owner.
+	for name, c := range map[string]*http.Client{"seller": seller, "owner": signIn(t, ts, ownerEmail)} {
+		for _, p := range []string{"/", "/mine", "/search?q=4321", "/customers/aaaaaaaa-0000-0000-0000-000000000004"} {
+			if _, body := getBody(t, c, ts.URL+p); strings.Contains(body, number) || strings.Contains(body, digits) {
+				t.Errorf("%s: the value is on %s", name, p)
+			}
+		}
+	}
+	// A search for the value finds nothing: it is typed, so the page repeats
+	// what was typed, but no record comes back.
+	for _, q := range []string{number, digits} {
+		if _, body := getBody(t, seller, ts.URL+"/search?q="+url.QueryEscape(q)); !strings.Contains(body, "Nothing matched") {
+			t.Errorf("a search for the stored value found something:\n%s", visibleText(body))
+		}
+	}
+	if postResponse(t, seller, base+"/"+records[0].ID+"/end", url.Values{"reason": {"The sale fell through"}}).StatusCode != http.StatusSeeOther {
+		t.Fatal("ending")
+	}
+	if strings.Contains(logged.String(), number) || strings.Contains(logged.String(), digits) {
+		t.Errorf("the value is in the log:\n%s", logged.String())
 	}
 }
