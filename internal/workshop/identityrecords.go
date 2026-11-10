@@ -212,6 +212,26 @@ func identityRetentionTx(ctx context.Context, tx pgx.Tx, p IdentityPurpose) (tim
 	return time.Duration(*days) * 24 * time.Hour, nil
 }
 
+// IdentityRetention is how long each purpose keeps its values, in days: the
+// shop's latest setting, or the purpose's default. Whoever runs the shop.
+func IdentityRetention(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (map[string]int, error) {
+	if !scope.Role.RunsTheShop() {
+		return nil, access.ErrForbidden
+	}
+	out := map[string]int{}
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		for _, p := range IdentityPurposes {
+			d, err := identityRetentionTx(ctx, tx, p)
+			if err != nil {
+				return err
+			}
+			out[p.Name] = int(d / (24 * time.Hour))
+		}
+		return nil
+	})
+	return out, err
+}
+
 // SetIdentityRetention sets how long a purpose keeps its values, in days,
 // as a row: what it was before stays. Whoever runs the shop, who answers
 // for it. Records made before keep the expiry they were made with.

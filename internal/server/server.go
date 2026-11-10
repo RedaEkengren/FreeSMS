@@ -454,6 +454,7 @@ func (s *Server) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /shop", s.requireSession(s.handleShop))
 	mux.HandleFunc("POST /shop", s.requireSession(s.handleSaveShop))
 	mux.HandleFunc("POST /shop/modules", s.requireSession(s.handleSwitchModule))
+	mux.HandleFunc("POST /shop/retention", s.requireSession(s.handleSaveRetention))
 	workshopMux.HandleFunc("POST /shop/charges", s.requireSession(s.handleSaveSurcharges))
 	mux.HandleFunc("GET /privacy", s.requireSession(s.handlePrivacy))
 	// Reconciliation with the bank (#152).

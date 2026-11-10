@@ -58,7 +58,7 @@ var swept = map[string]string{
 	"GET /login": "", "POST /login": "", "POST /logout": "", "GET /{$}": "",
 	"GET /board": "", "GET /jobs/new": "", "POST /jobs/new": "",
 	"GET /jobs/new/lookup": "", "GET /cars/stock/new/lookup": "", "GET /rental/units/lookup": "", "GET /jobs/new/customers": "", "GET /figures": "", "GET /accounting": "",
-	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/modules": "", "POST /shop/charges": "", "POST /shop/final-check": "",
+	"POST /accounting/export": "", "GET /shop": "", "POST /shop": "", "POST /shop/modules": "", "POST /shop/retention": "", "POST /shop/charges": "", "POST /shop/final-check": "",
 	"GET /reconcile": "", "POST /reconcile/lines": "", "POST /reconcile/import": "", "POST /reconcile/match": "",
 	"GET /parties/{id}/identity": "sweep", "POST /parties/{id}/identity": "sweep",
 	"POST /parties/{id}/identity/{record}/show": "sweep", "POST /parties/{id}/identity/{record}/end": "sweep",

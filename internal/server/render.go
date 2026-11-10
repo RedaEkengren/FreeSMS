@@ -86,6 +86,7 @@ type pageData struct {
 	ModuleChanges []workshop.ModuleChange
 	ModuleOpen    *workshop.OpenBusiness
 	ModuleReason  string
+	Retention     *retentionData
 	// What a checklist may be made for in this shop (#147).
 	Subjects []string
 	MyLocale string

@@ -24,7 +24,7 @@ import (
 
 // Found is one result, whatever it is.
 type Found struct {
-	// "vehicle", "job" or "customer".
+	// "vehicle", "job", "customer", "deal" or "rental".
 	Kind   string
 	Module access.Module
 	ID     string
@@ -49,6 +49,10 @@ func (f Found) Link() string {
 		return "/jobs/" + f.ID
 	case "customer":
 		return "/customers/" + f.ID
+	case "deal":
+		return "/cars/deals/" + f.ID
+	case "rental":
+		return "/rental/bookings/" + f.ID
 	}
 	return "/vehicles/" + f.ID
 }
@@ -78,6 +82,8 @@ var searchProviders = []SearchProvider{
 	{Name: "vehicles", Find: findVehicles},
 	{Name: "customers", Find: findCustomers},
 	{Module: access.Workshop, Name: "jobs", Find: findJobs},
+	{Module: access.Dealer, Name: "deals", Find: findDeals},
+	{Module: access.Rental, Name: "rental bookings", Find: findRentalBookings},
 }
 
 // searchLimit is the most characters a search is asked with.
@@ -242,6 +248,76 @@ func findJobs(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query
 		}
 		f.Heading = "#" + strconv.FormatInt(number, 10)
 		f.Detail = strings.TrimSpace(plate + " " + make_ + " " + model)
+		out = append(out, f)
+		return nil
+	})
+	return out, err
+}
+
+// findDeals is a car sale by its number, "#123" or "123", for whoever sells
+// cars. It shows the car, never the buyer: the buyer is on the deal.
+func findDeals(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query string) ([]Found, error) {
+	if !scope.Role.SellsVehicles() {
+		return nil, nil
+	}
+	number, err := strconv.ParseInt(strings.TrimPrefix(query, "#"), 10, 64)
+	if err != nil || number <= 0 {
+		return nil, nil
+	}
+	var out []Found
+	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		f := Found{Kind: "deal", Module: access.Dealer, MatchedOn: "deal number", rank: rankReference, exact: true}
+		var plate, make_, model string
+		err := tx.QueryRow(ctx, `
+			SELECT d.id::text, d.number, coalesce(r.registration, ''), coalesce(v.make, ''), coalesce(v.model, '')
+			FROM vehicle_sales d JOIN stock_units u ON u.id = d.stock_unit_id JOIN vehicles v ON v.id = u.vehicle_id
+			LEFT JOIN vehicle_registrations r ON r.vehicle_id = v.id AND r.valid_to IS NULL
+			WHERE d.number = $1`, number).Scan(&f.ID, &number, &plate, &make_, &model)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		f.Heading = "#" + strconv.FormatInt(number, 10)
+		f.Detail = strings.TrimSpace(plate + " " + make_ + " " + model)
+		out = append(out, f)
+		return nil
+	})
+	return out, err
+}
+
+// findRentalBookings is a rental booking by its reference, "R-12" or "r12",
+// for whoever hands out rentals. It shows the unit and the period, never
+// the renter.
+func findRentalBookings(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query string) ([]Found, error) {
+	if !scope.Role.HandsOverRentals() {
+		return nil, nil
+	}
+	q := strings.ToUpper(strings.TrimSpace(query))
+	if !strings.HasPrefix(q, "R") {
+		return nil, nil
+	}
+	number, err := strconv.ParseInt(strings.TrimLeft(strings.TrimPrefix(q, "R"), "-# "), 10, 32)
+	if err != nil || number <= 0 {
+		return nil, nil
+	}
+	var out []Found
+	err = inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		f := Found{Kind: "rental", Module: access.Rental, MatchedOn: "rental booking number", rank: rankReference, exact: true}
+		var fleet, category string
+		err := tx.QueryRow(ctx, `
+			SELECT b.id::text, u.fleet_number, u.category
+			FROM rental_bookings b JOIN rental_units u ON u.id = b.unit_id
+			WHERE b.number = $1`, number).Scan(&f.ID, &fleet, &category)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		f.Heading = "R-" + strconv.FormatInt(number, 10)
+		f.Detail = fleet + " · " + category
 		out = append(out, f)
 		return nil
 	})

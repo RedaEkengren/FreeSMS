@@ -119,3 +119,41 @@ func TestIdentityChecksOnTheirPage(t *testing.T) {
 		t.Errorf("after the end:\n%s", visibleText(page))
 	}
 }
+
+// The shop page's retention section (#150, #153): the owner sees how long
+// documents and identity values are kept and changes it; a setting is a new
+// row, so the page shows the latest; nobody else may.
+func TestRetentionOnTheShopPage(t *testing.T) {
+	ts, pool := testServer(t)
+	dealerShop(t, pool)
+	owner := signIn(t, ts, ownerEmail)
+
+	page := get(t, owner, ts.URL+"/shop", http.StatusOK)
+	if !strings.Contains(page, `id="retention"`) || !strings.Contains(page, `name="what" value="identity"`) {
+		t.Fatalf("no retention section:\n%s", visibleText(page))
+	}
+	post := func(c *http.Client, what, name, value string) int {
+		return postResponse(t, c, ts.URL+"/shop/retention", url.Values{"what": {what}, "name": {name}, "value": {value}}).StatusCode
+	}
+	if st := post(owner, "identity", "ownership_change", "45"); st != http.StatusSeeOther {
+		t.Fatalf("identity retention: %d", st)
+	}
+	if st := post(owner, "document", workshop.DocPurchaseAgreement, "3"); st != http.StatusSeeOther {
+		t.Fatalf("document retention: %d", st)
+	}
+	page = get(t, owner, ts.URL+"/shop", http.StatusOK)
+	if !strings.Contains(page, `value="45"`) || !strings.Contains(page, `value="3"`) {
+		t.Errorf("the page does not show the new settings:\n%s", visibleText(page))
+	}
+	for _, bad := range []struct{ what, name, value string }{
+		{"identity", "ownership_change", "0"}, {"identity", "nonsense", "10"},
+		{"document", workshop.DocPurchaseAgreement, "99"}, {"document", workshop.DocPurchaseAgreement, "x"},
+	} {
+		if st := post(owner, bad.what, bad.name, bad.value); st != http.StatusBadRequest && st != http.StatusNotFound {
+			t.Errorf("%+v accepted: %d", bad, st)
+		}
+	}
+	if st := post(signIn(t, ts, advisorEmail), "identity", "ownership_change", "10"); st != http.StatusForbidden {
+		t.Errorf("the front desk set a retention: %d", st)
+	}
+}
