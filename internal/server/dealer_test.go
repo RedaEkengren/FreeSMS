@@ -413,6 +413,9 @@ func TestASalespersonReservesACarOnItsPage(t *testing.T) {
 	if !strings.Contains(text, "Reserved for Kim Köpare") || !strings.Contains(text, "Deposit held SEK 5,000.00") {
 		t.Errorf("the reserved car's page:\n%s", text)
 	}
+	if !strings.Contains(text, "not a cash-register receipt") {
+		t.Errorf("the deposit form does not say a payment is no cash-register receipt (#156):\n%s", text)
+	}
 	if resp := postResponse(t, seller, res+"/terms", url.Values{}); resp.StatusCode != http.StatusSeeOther ||
 		!strings.HasPrefix(resp.Header.Get("Location"), "/contracts/") {
 		t.Errorf("making the terms answered %d to %q", resp.StatusCode, resp.Header.Get("Location"))

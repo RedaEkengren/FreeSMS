@@ -112,6 +112,7 @@
       <button type="submit" class="secondary">{{if $d.TermsID}}{{$.T "Make the terms again"}}{{else}}{{$.T "Make the terms for the customer"}}{{end}}</button>
     </form>
     <form method="post" action="/cars/stock/{{$u.ID}}/reservations/{{.ID}}/deposit">
+      <p class="waiting">{{$.T "A deposit is the customer's money until a settled claim is set against it. FreeSMS records it; it is not a cash register, and a recorded payment is not a cash-register receipt."}}</p>
       <input type="hidden" name="key" value="{{$d.Key}}">
       <label><span>{{$.T "Deposit received, in kronor"}}</span><input name="amount" value="{{index $d.Form "amount"}}" inputmode="decimal" required></label>
       <label><span>{{$.T "How"}}</span><select name="method">{{range $d.Methods}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>

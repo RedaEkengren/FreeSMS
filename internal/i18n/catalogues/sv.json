@@ -7632,6 +7632,23 @@
     "Waiting for a signature: %s": {
       "other": "Väntar på underskrift: %s"
     },
+    "%d payment is not on the bank's statement": {
+      "one": "%d betalning finns inte på bankens kontoutdrag",
+      "other": "%d betalningar finns inte på bankens kontoutdrag"
+    },
+    "%d sold car to deliver": {
+      "one": "%d såld bil att leverera",
+      "other": "%d sålda bilar att leverera"
+    },
+    "%d reservation runs out within a day": {
+      "one": "%d reservation går ut inom ett dygn",
+      "other": "%d reservationer går ut inom ett dygn"
+    },
+    "%d car waiting to be made ready": {
+      "one": "%d bil väntar på att göras i ordning",
+      "other": "%d bilar väntar på att göras i ordning"
+    },
+    "Cars in stock, at purchase price": {"other": "Bilar i lager, till inköpspris"},
     "%d call to another service was given up": {
       "one": "%d anrop till en annan tjänst har getts upp",
       "other": "%d anrop till andra tjänster har getts upp"

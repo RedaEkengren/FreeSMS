@@ -656,3 +656,121 @@ func TestAnApplicationHalfReversedBefore0082IsPutRight(t *testing.T) {
 		}
 	}
 }
+
+// A payment through the bank with no line on the statement five days on is
+// one item on the owner's queue (#158); matched, it leaves; the front desk
+// never has it.
+func TestAnUnmatchedPaymentWaitsForTheOwnerUntilItIsMatched(t *testing.T) {
+	pool := setup(t)
+	currentPool = pool
+	ctx := context.Background()
+	inv, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{Method: "bank", PaidOn: time.Now().AddDate(0, 0, -10)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := waiting(t, owner(), "payments_unmatched")
+	if len(items) != 1 || items[0].Count != 1 || items[0].Link() != "/reconcile" {
+		t.Fatalf("the owner's queue: %+v", items)
+	}
+	if got := waiting(t, advisor(), "payments_unmatched"); len(got) != 0 {
+		t.Errorf("the front desk has it: %+v", got)
+	}
+	if _, err := workshop.AddStatementLines(ctx, pool, owner(), "imported", []workshop.StatementLine{
+		{BookedOn: time.Now(), AmountMinor: p.AmountMinor, Reference: "OCR 1", ExternalID: "bank-1"}}); err != nil {
+		t.Fatal(err)
+	}
+	r, _ := workshop.Unreconciled(ctx, pool, owner())
+	if err := workshop.MatchPayment(ctx, pool, owner(), p.ID, r.Lines[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := waiting(t, owner(), "payments_unmatched"); len(got) != 0 {
+		t.Errorf("matched, and still waiting: %+v", got)
+	}
+}
+
+// A deposit received and a payout are money that moved, so the day counts
+// them under their way of paying, each pointing at what it was for; they
+// are not sales, and the accounting export leaves them out until the
+// accounts they use are decided (G2, #207, #221).
+func TestADepositAndAPayoutAreInTheDayAndNotInTheAccountingExport(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	_, in := depositWith(t, pool, 1234500)
+	seller := privateSeller(t, pool)
+	payout := purchasePayout(t, pool, buyerScope(), seller)
+	out, err := workshop.RecordPayout(ctx, pool, buyerScope(), payout, workshop.NewPayment{
+		AmountMinor: minor(8500000), Method: "bank", PaidOn: time.Now(), Reference: "Köp ABC 12D"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	d := dayOf(t, pool, today())
+	if d.InvoicedGross != 0 || d.CreditedGross != 0 {
+		t.Errorf("a deposit or a payout counted as a sale: invoiced %d credited %d", d.InvoicedGross, d.CreditedGross)
+	}
+	swish, bank := method(d, "swish"), method(d, "bank")
+	if swish.Received != in.AmountMinor || len(swish.Entries) != 1 || swish.Entries[0].Target != "deposit" {
+		t.Errorf("the deposit in the day: %+v", swish)
+	}
+	if bank.PaidOut != -out.AmountMinor || len(bank.Entries) != 1 || bank.Entries[0].Target != "payout" {
+		t.Errorf("the payout in the day: %+v", bank)
+	}
+
+	from := time.Now().AddDate(0, 0, -1)
+	to := time.Now().AddDate(0, 0, 1)
+	// The only money in the period is a deposit and a payout, so there is
+	// nothing to export.
+	_, n, err := workshop.ExportAccounting(ctx, pool, owner(), from, to, false)
+	if !errors.Is(err, workshop.ErrNothingToExport) {
+		t.Fatalf("exported a deposit or a payout: %d rows, %v", n, err)
+	}
+	var exported int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM invoice_payments WHERE accounting_export_id IS NOT NULL`).Scan(&exported); err != nil {
+		t.Fatal(err)
+	}
+	if exported != 0 {
+		t.Errorf("%d deposit or payout rows were exported (the export reported %d)", exported, n)
+	}
+}
+
+// A payment may be dated a little before its invoice (the counter paid on
+// Friday, the invoice written on Monday) and not a month before (a year
+// typed wrong); and a finance company paying for a buyer is a payment
+// against the buyer's invoice that says who paid in its reference (#152).
+func TestAPaymentDatedBeforeItsInvoiceAndAThirdPartyPayer(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	inv, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
+	if err != nil {
+		t.Fatal(err)
+	}
+	half := inv.GrossMinor / 2
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: &half, Method: "bank", PaidOn: time.Now().AddDate(0, 0, -60)}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a payment dated two months before the invoice: %v", err)
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: &half, Method: "bank", PaidOn: time.Now().AddDate(0, 0, 5)}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a payment dated five days ahead: %v", err)
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: &half, Method: "bank", PaidOn: time.Now().AddDate(0, 0, -3)}); err != nil {
+		t.Errorf("a payment dated three days before the invoice: %v", err)
+	}
+	rest := inv.GrossMinor - half
+	p, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: &rest, Method: "bank", PaidOn: time.Now(), Reference: "Finansbolaget AB, köparens finansiering"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Reference != "Finansbolaget AB, köparens finansiering" {
+		t.Errorf("the payer is not on the payment: %q", p.Reference)
+	}
+	if b, _ := workshop.BalanceFor(ctx, pool, advisor(), inv.ID); !b.Settled() {
+		t.Errorf("paid by two payers and not settled: %d outstanding", b.OutstandingMinor())
+	}
+}

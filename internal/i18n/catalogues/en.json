@@ -175,6 +175,22 @@
     "no_show": {
       "other": "did not come"
     },
+    "%d sold car to deliver": {
+      "one": "%d sold car to deliver",
+      "other": "%d sold cars to deliver"
+    },
+    "%d reservation runs out within a day": {
+      "one": "%d reservation runs out within a day",
+      "other": "%d reservations run out within a day"
+    },
+    "%d car waiting to be made ready": {
+      "one": "%d car waiting to be made ready",
+      "other": "%d cars waiting to be made ready"
+    },
+    "%d payment is not on the bank's statement": {
+      "one": "%d payment is not on the bank's statement",
+      "other": "%d payments are not on the bank's statement"
+    },
     "%d call to another service was given up": {
       "one": "%d call to another service was given up",
       "other": "%d calls to other services were given up"

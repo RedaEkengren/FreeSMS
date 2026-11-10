@@ -7,6 +7,7 @@
      with (#234); a mistyped reference is refused by its check digit. */}}
 <details>
   <summary>{{.T "A payment, by its reference"}}</summary>
+  <p class="waiting">{{.T "A payment recorded here is a note that money arrived, not a cash-register receipt: FreeSMS is not a cash register."}}</p>
   <form method="post" action="/payments/by-reference">
     <div class="pair">
       <label><span>{{.T "Payment reference (OCR)"}}</span><input name="ocr" inputmode="numeric" maxlength="40" required></label>

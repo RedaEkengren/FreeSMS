@@ -88,6 +88,9 @@ func TestAnInvoiceIsPaidByItsReference(t *testing.T) {
 		t.Fatalf("the invoice shows no reference or no code:\n%s", page)
 	}
 	wrong := ref[1][:len(ref[1])-1] + string('0'+(ref[1][len(ref[1])-1]-'0'+1)%10)
+	if page := get(t, desk, ts.URL+"/receivables", http.StatusOK); !strings.Contains(page, "not a cash-register receipt") {
+		t.Error("the payment-by-reference form does not say a payment is no cash-register receipt (#156)")
+	}
 	if body := post(t, desk, ts.URL+"/payments/by-reference", url.Values{"ocr": {wrong}, "amount": {"500"}, "paid_on": {time.Now().Format("2006-01-02")}, "method": {"bank"}}); !strings.Contains(body, "check digit") {
 		t.Errorf("a mistyped reference was not refused for its check digit:\n%s", visibleText(body))
 	}

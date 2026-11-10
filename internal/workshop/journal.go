@@ -835,6 +835,31 @@ func Unreconciled(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (
 	return r, err
 }
 
+// unmatchedPaymentDays is how long money recorded as through the bank may
+// go without a line on the statement before somebody is asked to look: the
+// bank's own clearing takes days, and an item that is true for every
+// payment on the day it is recorded would be noise.
+const unmatchedPaymentDays = 5
+
+// unmatchedPaymentsTx is the queue's item for payments with no line on the
+// statement after unmatchedPaymentDays (#158): one item, a count, saying
+// nothing of whose they are. It runs in the transaction of the money
+// provider (uncheckedFlowsWaiting), for whoever runs the shop, because each
+// provider of its own costs the home page a transaction.
+func unmatchedPaymentsTx(ctx context.Context, tx pgx.Tx) ([]ActionItem, error) {
+	var n int
+	err := tx.QueryRow(ctx, `
+		SELECT count(*) FROM invoice_payments p
+		WHERE p.method NOT IN ('cash', 'deposit')
+		  AND p.paid_on < current_date - $1::int
+		  AND NOT EXISTS (SELECT 1 FROM payment_matches m WHERE m.payment_id = p.id AND m.undone_at IS NULL)`,
+		unmatchedPaymentDays).Scan(&n)
+	if err != nil || n == 0 {
+		return nil, err
+	}
+	return []ActionItem{{Kind: "payments_unmatched", SubjectKind: "reconcile", Count: n, Urgency: UrgencySoon}}, nil
+}
+
 // Match is a payment matched to a line of the bank's statement, standing.
 type Match struct {
 	Payment Payment
