@@ -148,12 +148,22 @@ func TestTheRentalDeskChecksAUnitOutAndIn(t *testing.T) {
 	if resp := postModuleForm(t, client, ts.URL, page+"/charges/"+charges[0].ID+"/inform", url.Values{"channel": {"email"}}); resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("telling the customer: %d %s", resp.StatusCode, readBody(t, resp))
 	}
-	if resp := postModuleForm(t, client, ts.URL, page+"/invoice", url.Values{}); resp.StatusCode != http.StatusSeeOther {
+	// Paid by card at the counter as it is invoiced: a cash invoice
+	// (#156).
+	resp, _ = client.Get(ts.URL + page)
+	if body := readBody(t, resp); !strings.Contains(body, `name="paid_now"`) {
+		t.Errorf("the invoice form offers no payment at the counter")
+	}
+	if resp := postModuleForm(t, client, ts.URL, page+"/invoice", url.Values{"paid_now": {"card"}, "paid_reference": {"T-9"}}); resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("invoicing the rental: %d %s", resp.StatusCode, readBody(t, resp))
 	}
 	invoices, err := workshop.RentalInvoices(ctx, pool, desk, booking)
 	if err != nil || len(invoices) != 1 {
 		t.Fatalf("the rental's invoices: %+v, %v", invoices, err)
+	}
+	if doc, err := workshop.DocumentByID(ctx, pool, dealerShopOwner(), invoices[0].ID); err != nil || doc.PaidOnIssue == nil ||
+		doc.PaidOnIssue.With[0].Method != "card" || doc.PaidOnIssue.With[0].Reference != "T-9" {
+		t.Errorf("not paid on issue: %+v, %v", doc.PaidOnIssue, err)
 	}
 	resp, _ = client.Get(ts.URL + page)
 	if body := readBody(t, resp); !strings.Contains(body, invoices[0].Reference) {

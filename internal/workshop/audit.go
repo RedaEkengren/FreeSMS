@@ -91,6 +91,21 @@ var AuditedTransitions = []AuditTransition{
 	{"rental.price_overridden", "rental_booking", "audit_events", true},
 	// Every read of the rental register, with its purpose (#200).
 	{"rental_register.read", "shop", "audit_events", true},
+	// A car handed out and returned (#194).
+	{"rental.handed_out", "rental_booking", "rental_handovers", false},
+	{"rental.returned", "rental_booking", "rental_handovers", false},
+	// A deposit asked for, a hold on a card taken and let go (#196).
+	{"rental_deposit.required", "rental_booking", "rental_deposit_events", false},
+	{"rental_deposit.held", "rental_booking", "rental_deposit_events", false},
+	{"rental_deposit.hold_released", "rental_booking", "rental_deposit_events", true},
+	// A return charge confirmed, told to the customer, withdrawn (#195).
+	{"rental_charge.confirmed", "rental_booking", "rental_charges", false},
+	{"rental_charge.informed", "rental_booking", "rental_charge_events", false},
+	{"rental_charge.withdrawn", "rental_booking", "rental_charge_events", true},
+	// A fine passed to the renter, kept as the shop's, paid (#198).
+	{"fine.passed_to_renter", "vehicle_fine", "vehicle_fine_events", false},
+	{"fine.kept", "vehicle_fine", "vehicle_fine_events", false},
+	{"fine.paid", "vehicle_fine", "vehicle_fine_events", false},
 }
 
 func auditTransition(event string) (AuditTransition, bool) {
@@ -235,7 +250,7 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 		if !scope.Role.SeesPurchasePrice() {
 			return nil, access.ErrForbidden
 		}
-	case "rental_booking":
+	case "rental_booking", "vehicle_fine":
 		if !scope.Role.HandsOverRentals() {
 			return nil, access.ErrForbidden
 		}

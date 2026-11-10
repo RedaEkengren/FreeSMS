@@ -246,6 +246,8 @@ type pageData struct {
 	Turnover           workshop.InPersonTurnover
 	LookupConflict     string
 	LookupRegistration string
+	// Where a lookup fragment asks again, and the element it fills.
+	LookupURL, LookupTarget string
 
 	// Whether a vehicle lookup provider is configured at all. Empty is the
 	// default and is not a degraded mode -- a shop without an arrangement
@@ -541,7 +543,7 @@ func parseTemplates() (map[string]*template.Template, error) {
 	out := make(map[string]*template.Template, len(pages))
 	for _, name := range pages {
 		t, err := template.New(name).Funcs(templateFuncs).ParseFS(web.Templates,
-			"templates/layout.html", "templates/_document.html", "templates/_home.html", "templates/"+name+".html")
+			"templates/layout.html", "templates/_document.html", "templates/_home.html", "templates/_lookup.html", "templates/"+name+".html")
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", name, err)
 		}

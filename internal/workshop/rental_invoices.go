@@ -119,57 +119,89 @@ func IssueRentalInvoice(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 	}
 	var inv Invoice
 	err := inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		// The charges' lock: nothing is confirmed, told or withdrawn while
-		// the invoice is made of them.
-		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('rental_charges:' || $1::text, 0))`, bookingID); err != nil {
-			return fmt.Errorf("lock the charges: %w", err)
-		}
-		var state, renter string
-		err := tx.QueryRow(ctx, `SELECT `+rentalState+`, b.renter_party_id::text FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id
-			WHERE b.id = $1`, bookingID).Scan(&state, &renter)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNotFound
-		}
-		if err != nil {
-			return fmt.Errorf("read the booking: %w", err)
-		}
-		if state != RentalReturned && state != RentalCancelled && state != RentalNoShow {
-			return errRentalNotOver
-		}
-		items, err := openRentalItemsTx(ctx, tx, bookingID, state == RentalReturned)
-		if err != nil {
-			return err
-		}
-		if len(items) == 0 {
-			return ErrNothingToInvoice
-		}
-		if payerID == "" {
-			payerID = renter
-		} else if err := partySeenTx(ctx, tx, scope, payerID); err != nil {
-			return err
-		}
-		customer, err := customerForPartyTx(ctx, tx, scope, payerID)
-		if err != nil {
-			return err
-		}
-		lines := make([]SourcedLine, len(items))
-		for i, it := range items {
-			lines[i] = it.line
-		}
-		if inv, err = issueSourcedTx(ctx, tx, scope, sourced{source: SourceRental, rentalID: bookingID, customerID: customer}, lines); err != nil {
-			return err
-		}
-		for _, it := range items {
-			if _, err := tx.Exec(ctx, `
-				INSERT INTO rental_invoice_items (shop_id, invoice_id, booking_line_id, charge_id, round)
-				VALUES ($1, $2, NULLIF($3, '')::uuid, NULLIF($4, '')::uuid, $5)`,
-				scope.ShopID, inv.ID, it.lineID, it.chargeID, it.round); err != nil {
-				return fmt.Errorf("record what the invoice charges: %w", err)
-			}
-		}
-		return nil
+		var err error
+		inv, err = issueRentalInvoiceTx(ctx, tx, scope, bookingID, payerID)
+		return err
 	})
 	return inv, err
+}
+
+// IssueRentalInvoiceAndPay is IssueRentalInvoice paid at the counter as it
+// is issued, a cash invoice (#156): the rent and the charges paid at the
+// return, in one transaction. Either the invoice and its payments exist,
+// or neither does.
+func IssueRentalInvoiceAndPay(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, bookingID, payerID string, sale CashSale) (Invoice, error) {
+	if !scope.Role.HandsOverRentals() && !scope.Role.SeesCustomerPersonalData() {
+		return Invoice{}, access.ErrForbidden
+	}
+	if !looksLikeUUID(bookingID) || (payerID != "" && !looksLikeUUID(payerID)) {
+		return Invoice{}, ErrNotFound
+	}
+	if err := checkCashSale(sale); err != nil {
+		return Invoice{}, err
+	}
+	var inv Invoice
+	err := inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		if inv, err = issueRentalInvoiceTx(ctx, tx, scope, bookingID, payerID); err != nil {
+			return err
+		}
+		return payOnIssueTx(ctx, tx, scope, inv, sale)
+	})
+	return inv, err
+}
+
+func issueRentalInvoiceTx(ctx context.Context, tx pgx.Tx, scope access.Scope, bookingID, payerID string) (Invoice, error) {
+	// The charges' lock: nothing is confirmed, told or withdrawn while the
+	// invoice is made of them.
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('rental_charges:' || $1::text, 0))`, bookingID); err != nil {
+		return Invoice{}, fmt.Errorf("lock the charges: %w", err)
+	}
+	var state, renter string
+	err := tx.QueryRow(ctx, `SELECT `+rentalState+`, b.renter_party_id::text FROM rental_bookings b JOIN resource_blocks k ON k.id = b.block_id
+		WHERE b.id = $1`, bookingID).Scan(&state, &renter)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Invoice{}, ErrNotFound
+	}
+	if err != nil {
+		return Invoice{}, fmt.Errorf("read the booking: %w", err)
+	}
+	if state != RentalReturned && state != RentalCancelled && state != RentalNoShow {
+		return Invoice{}, errRentalNotOver
+	}
+	items, err := openRentalItemsTx(ctx, tx, bookingID, state == RentalReturned)
+	if err != nil {
+		return Invoice{}, err
+	}
+	if len(items) == 0 {
+		return Invoice{}, ErrNothingToInvoice
+	}
+	if payerID == "" {
+		payerID = renter
+	} else if err := partySeenTx(ctx, tx, scope, payerID); err != nil {
+		return Invoice{}, err
+	}
+	customer, err := customerForPartyTx(ctx, tx, scope, payerID)
+	if err != nil {
+		return Invoice{}, err
+	}
+	lines := make([]SourcedLine, len(items))
+	for i, it := range items {
+		lines[i] = it.line
+	}
+	inv, err := issueSourcedTx(ctx, tx, scope, sourced{source: SourceRental, rentalID: bookingID, customerID: customer}, lines)
+	if err != nil {
+		return Invoice{}, err
+	}
+	for _, it := range items {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO rental_invoice_items (shop_id, invoice_id, booking_line_id, charge_id, round)
+			VALUES ($1, $2, NULLIF($3, '')::uuid, NULLIF($4, '')::uuid, $5)`,
+			scope.ShopID, inv.ID, it.lineID, it.chargeID, it.round); err != nil {
+			return Invoice{}, fmt.Errorf("record what the invoice charges: %w", err)
+		}
+	}
+	return inv, nil
 }
 
 // RentalInvoice is an invoice of a rental, as its booking's page lists it.
