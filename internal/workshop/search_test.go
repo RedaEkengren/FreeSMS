@@ -331,3 +331,54 @@ func TestAVehicleResultSaysWhereItIsActive(t *testing.T) {
 		t.Errorf("a car in stock with Dealer off: %v", got)
 	}
 }
+
+// A renter or a seller is found by name by the roles that deal with them,
+// and a person who is both a customer and a renter is one result for the
+// front desk and one for the rental desk, never two (#159).
+func TestAPartyWhoIsCustomerAndRenterIsFoundOnce(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	van := rentableVanWith(t, pool, "RNT 123")
+	_ = van
+
+	kinds := func(s access.Scope, q string) []string {
+		t.Helper()
+		found, err := workshop.SearchAll(ctx, pool, s, q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, f := range found {
+			if f.Kind == "customer" || f.Kind == "party" {
+				out = append(out, f.Kind)
+			}
+		}
+		return out
+	}
+	// A renter who is nobody's customer: the rental desk and the front desk
+	// find them; the buyer, who does not deal with renters, does not.
+	for _, s := range []access.Scope{rentalDesk(), advisor()} {
+		if got := kinds(s, "Rita Hyrare"); !slices.Equal(got, []string{"party"}) {
+			t.Errorf("%s: a renter by name: %v", s.Role, got)
+		}
+	}
+	if got := kinds(buyerScope(), "Rita Hyrare"); len(got) != 0 {
+		t.Errorf("the buyer finds a renter: %v", got)
+	}
+	if got := kinds(technician(), "Rita Hyrare"); len(got) != 0 {
+		t.Errorf("a technician finds a renter: %v", got)
+	}
+
+	// A customer who also rents: one result for the front desk, as the
+	// customer, and one for the rental desk, as the party.
+	party := partyOf(t, pool, fixtureCustomer)
+	if err := workshop.StartPartyRole(ctx, pool, everything(owner()), party, workshop.PartyRenter, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := kinds(advisor(), "A Customer"); !slices.Equal(got, []string{"customer"}) {
+		t.Errorf("the front desk, a customer who also rents: %v", got)
+	}
+	if got := kinds(rentalDesk(), "A Customer"); !slices.Equal(got, []string{"party"}) {
+		t.Errorf("the rental desk, a customer who also rents: %v", got)
+	}
+}

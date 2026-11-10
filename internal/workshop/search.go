@@ -24,7 +24,7 @@ import (
 
 // Found is one result, whatever it is.
 type Found struct {
-	// "vehicle", "job", "customer", "deal" or "rental".
+	// "vehicle", "job", "customer", "party", "deal" or "rental".
 	Kind   string
 	Module access.Module
 	ID     string
@@ -49,6 +49,8 @@ func (f Found) Link() string {
 		return "/jobs/" + f.ID
 	case "customer":
 		return "/customers/" + f.ID
+	case "party":
+		return "/parties/" + f.ID
 	case "deal":
 		return "/cars/deals/" + f.ID
 	case "rental":
@@ -81,6 +83,7 @@ type SearchProvider struct {
 var searchProviders = []SearchProvider{
 	{Name: "vehicles", Find: findVehicles},
 	{Name: "customers", Find: findCustomers},
+	{Name: "parties", Find: findParties},
 	{Module: access.Workshop, Name: "jobs", Find: findJobs},
 	{Module: access.Dealer, Name: "deals", Find: findDeals},
 	{Module: access.Rental, Name: "rental bookings", Find: findRentalBookings},
@@ -345,6 +348,46 @@ func findRentalBookings(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		f.Detail = fleet + " · " + category
 		out = append(out, f)
 		return nil
+	})
+	return out, err
+}
+
+// findParties is a person or a company by name, by the roles the caller
+// deals in: a seller to the buyer, a renter to the rental desk. A party who
+// is a customer is found as the customer for a role that sees customers, so
+// one person is not two results; for any other role the party is found
+// through the roles it is allowed to know, and a party with none of them is
+// not there at all. An erased person is not found by the name they had.
+func findParties(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query string) ([]Found, error) {
+	seen := partyRolesSeen(scope.Role, PartyRoles)
+	if len(seen) == 0 {
+		return nil, nil
+	}
+	var out []Found
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `
+			SELECT pa.id::text, `+partyNameSQL+`
+			`+partyJoins+`
+			WHERE pa.merged_into IS NULL
+			  AND (pa.customer_id IS NULL OR NOT $3)
+			  AND coalesce(cp.erased_at, pp.erased_at) IS NULL
+			  AND EXISTS (SELECT 1 FROM party_roles r WHERE r.party_id = pa.id AND r.role = ANY($2)
+			              AND (r.valid_to IS NULL OR r.valid_to > clock_timestamp()))
+			  AND `+partyNameSQL+` ILIKE '%' || $1 || '%'
+			ORDER BY 2
+			LIMIT 20`, query, seen, scope.Role.SeesCustomerPersonalData())
+		if err != nil {
+			return fmt.Errorf("find parties: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			f := Found{Kind: "party", MatchedOn: "party", rank: rankName}
+			if err := rows.Scan(&f.ID, &f.Heading); err != nil {
+				return err
+			}
+			out = append(out, f)
+		}
+		return rows.Err()
 	})
 	return out, err
 }

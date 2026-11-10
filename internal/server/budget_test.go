@@ -72,9 +72,11 @@ var queryBudgets = map[string]int{
 	"desk GET /": 17,
 	// The one search (#159): every provider of a module the shop runs
 	// asks once, as the role it is asked as; 16 with all three modules on,
-	// the same with years of history.
-	"desk GET /search?q=customer":  16,
-	"owner GET /search?q=customer": 16,
+	// the same with years of history. 16 to 21: parties found by name for
+	// the roles that deal with them, a provider of its own (one
+	// transaction, five statements).
+	"desk GET /search?q=customer":  21,
+	"owner GET /search?q=customer": 21,
 	"owner GET /":                  32,
 	"desk GET /board":              21,
 	// 35: the quote the customer was shown and what they answered to it
