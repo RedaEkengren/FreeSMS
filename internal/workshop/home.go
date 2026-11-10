@@ -66,7 +66,11 @@ type CardSource struct {
 	// where it holds, a condition on rental_bookings b, its block k and
 	// the shop's today t (rentalToday), every one in one statement.
 	RentalWhere string
-	Money       bool
+	// StockWhere is JobsWhere for Dealer: a count of the open stock units
+	// where it holds, a condition on stock_units u, every one in one
+	// statement.
+	StockWhere string
+	Money      bool
 }
 
 // cardSources are the home page's cards, in the order they come. The
@@ -89,6 +93,17 @@ var cardSources = []CardSource{
 		May: access.Roles.RunsTheShop, JobsWhere: openJob},
 	{Module: access.Workshop, Kind: CardInformation, Title: "Work ready to invoice, before VAT",
 		May: access.Roles.RunsTheShop, Read: readyToInvoiceMinor, Money: true},
+	// Dealer: the cars (#157). The stock value is a sum of purchase prices,
+	// so only for a role that may see them.
+	{Module: access.Dealer, Kind: CardAction, Title: "%d sold car to deliver", Link: "/cars/stock",
+		May: access.Roles.SellsVehicles, StockWhere: `u.status = 'sold'`},
+	{Module: access.Dealer, Kind: CardAction, Title: "%d reservation runs out within a day", Link: "/cars/stock",
+		May: access.Roles.SellsVehicles, StockWhere: reservationRunsOut},
+	{Module: access.Dealer, Kind: CardAction, Title: "%d car waiting to be made ready", Link: "/cars/stock",
+		May:        func(r access.Roles) bool { return r.SellsVehicles() || r.BuysVehicles() },
+		StockWhere: `u.status = 'in_preparation'`},
+	{Module: access.Dealer, Kind: CardInformation, Title: "Cars in stock, at purchase price", Link: "/cars/stock",
+		May: access.Roles.SeesPurchasePrice, Read: stockAtPurchasePrice, Money: true},
 	// Rental
 	{Module: access.Rental, Kind: CardAction, Title: "%d rental to hand over today", Link: "/rental",
 		May: access.Roles.HandsOverRentals, RentalWhere: rentalHandoverToday},
@@ -166,7 +181,7 @@ const homeWaiting = 5
 func HomeFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (Home, []error) {
 	var h Home
 	var failed []error
-	var shown, counted, rented []CardSource
+	var shown, counted, rented, stocked []CardSource
 	for _, c := range cardSources {
 		if !scope.Uses(c.Module) || !c.May(scope.Role) {
 			continue
@@ -178,46 +193,81 @@ func HomeFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (Home,
 		if c.RentalWhere != "" {
 			rented = append(rented, c)
 		}
+		if c.StockWhere != "" {
+			stocked = append(stocked, c)
+		}
 	}
-	var jobs, rentals []int
-	if len(counted) > 0 || len(rented) > 0 {
+	// Every card is counted in one transaction: the workshop's jobs in one
+	// statement, the rental's in one, and the rest one statement each. One
+	// round trip to open it, not one per card; if it fails the cards fail
+	// together and the page says some are missing.
+	type reading struct {
+		n     int
+		minor int64
+	}
+	var jobs, rentals, stock []int
+	read := map[string]reading{}
+	if len(shown) > 0 {
 		err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 			var err error
-			if jobs, err = countJobs(ctx, tx, counted); err != nil {
-				return err
+			if len(counted) > 0 {
+				if jobs, err = countJobs(ctx, tx, counted); err != nil {
+					return err
+				}
 			}
-			rentals, err = countRentals(ctx, tx, rented)
-			return err
+			if len(rented) > 0 {
+				if rentals, err = countRentals(ctx, tx, rented); err != nil {
+					return err
+				}
+			}
+			if len(stocked) > 0 {
+				if stock, err = countStock(ctx, tx, stocked); err != nil {
+					return err
+				}
+			}
+			for _, c := range shown {
+				if c.Read == nil {
+					continue
+				}
+				n, minor, err := c.Read(ctx, tx, scope)
+				if err != nil {
+					return fmt.Errorf("card %q: %w", c.Title, err)
+				}
+				read[c.Title] = reading{n, minor}
+			}
+			return nil
 		})
 		if err != nil {
-			jobs, rentals = nil, nil
+			jobs, rentals, stock, read = nil, nil, nil, map[string]reading{}
 			failed = append(failed, fmt.Errorf("the cards counted together: %w", err))
 		}
 	}
 	for _, c := range shown {
 		var n int
 		var minor int64
-		if c.JobsWhere != "" {
+		switch {
+		case c.JobsWhere != "":
 			// In the order counted, which is the order shown.
 			if len(jobs) == 0 {
 				continue
 			}
 			n, jobs = jobs[0], jobs[1:]
-		} else if c.RentalWhere != "" {
+		case c.RentalWhere != "":
 			if len(rentals) == 0 {
 				continue
 			}
 			n, rentals = rentals[0], rentals[1:]
-		} else {
-			err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-				var err error
-				n, minor, err = c.Read(ctx, tx, scope)
-				return err
-			})
-			if err != nil {
-				failed = append(failed, fmt.Errorf("card %q: %w", c.Title, err))
+		case c.StockWhere != "":
+			if len(stock) == 0 {
 				continue
 			}
+			n, stock = stock[0], stock[1:]
+		default:
+			r, ok := read[c.Title]
+			if !ok {
+				continue
+			}
+			n, minor = r.n, r.minor
 		}
 		if n == 0 {
 			continue
@@ -244,4 +294,42 @@ func HomeFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (Home,
 	h.Waiting = items
 	h.Incomplete = failed != nil
 	return h, failed
+}
+
+// reservationRunsOut holds for a stock unit with a reservation standing
+// that runs out within a day or already has: the same facts as the queue's.
+const reservationRunsOut = `EXISTS (SELECT 1 FROM vehicle_reservations r WHERE r.stock_unit_id = u.id
+	AND r.ended_at IS NULL AND r.expires_at <= clock_timestamp() + interval '1 day')`
+
+// countStock counts the open stock units for every card that counts them, in
+// one statement: the counts in the cards' order.
+func countStock(ctx context.Context, tx pgx.Tx, cards []CardSource) ([]int, error) {
+	if len(cards) == 0 {
+		return nil, nil
+	}
+	cols := make([]string, len(cards))
+	for i, c := range cards {
+		cols[i] = `count(*) FILTER (WHERE ` + c.StockWhere + `)`
+	}
+	counts := make([]int, len(cards))
+	dest := make([]any, len(cards))
+	for i := range counts {
+		dest[i] = &counts[i]
+	}
+	err := tx.QueryRow(ctx, `SELECT `+strings.Join(cols, ", ")+` FROM stock_units u WHERE u.closed_at IS NULL`).Scan(dest...)
+	return counts, err
+}
+
+// stockAtPurchasePrice is the open stock's cars and what they were bought
+// for, in kronor, minor units. A car with no purchase on record (a
+// consignment) adds no price. Asked only of a role that sees purchase
+// prices; it is a sum made when the page is read, never kept.
+func stockAtPurchasePrice(ctx context.Context, tx pgx.Tx, _ access.Scope) (int, int64, error) {
+	var n int
+	var minor int64
+	err := tx.QueryRow(ctx, `
+		SELECT count(*), coalesce(sum(p.tax_purchase_price_minor), 0)::bigint
+		FROM stock_units u LEFT JOIN vehicle_purchases p ON p.stock_unit_id = u.id
+		WHERE u.closed_at IS NULL AND u.status IN ('in_preparation', 'for_sale', 'reserved')`).Scan(&n, &minor)
+	return n, minor, err
 }

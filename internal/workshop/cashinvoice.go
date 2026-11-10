@@ -532,6 +532,11 @@ func uncheckedFlowsWaiting(ctx context.Context, pool *pgxpool.Pool, scope access
 				out = append(out, ActionItem{Kind: "flow_unchecked", SubjectKind: "payment_flows", Text: f.Name, Urgency: UrgencySoon})
 			}
 		}
+		if err != nil {
+			return err
+		}
+		unmatched, err := unmatchedPaymentsTx(ctx, tx)
+		out = append(out, unmatched...)
 		return err
 	})
 	return out, err

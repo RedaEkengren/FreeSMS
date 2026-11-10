@@ -357,3 +357,50 @@ func TestASellerTypedWithThePurchaseIsMadeOnlyWithIt(t *testing.T) {
 		t.Errorf("a refused purchase left its seller behind: %d people", people())
 	}
 }
+
+// The dealer's cards on the home page (#157): a car bought and being made
+// ready is a card for whoever sells or buys, its price in the stock value
+// only for a role that sees purchase prices, nothing for a role that does
+// neither, and nothing with Dealer switched off.
+func TestTheDealersCardsOnTheHomePage(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	boughtCar(t, pool)
+
+	titles := func(s access.Scope) map[string]workshop.Card {
+		h, failed := workshop.HomeFor(ctx, pool, s)
+		if failed != nil {
+			t.Fatalf("%s: %v", s.Role, failed)
+		}
+		out := map[string]workshop.Card{}
+		for _, c := range append(h.Actions, h.Information...) {
+			if c.Module == access.Dealer {
+				out[c.Title] = c
+			}
+		}
+		return out
+	}
+	const prep, value = "%d car waiting to be made ready", "Cars in stock, at purchase price"
+	if c, ok := titles(buyerScope())[prep]; !ok || c.Count != 1 {
+		t.Errorf("the buyer's cards: %+v", titles(buyerScope()))
+	}
+	if c, ok := titles(buyerScope())[value]; !ok || !c.Money || c.Minor != 20_000_000 {
+		t.Errorf("the stock value for the buyer: %+v", titles(buyerScope()))
+	}
+	if _, ok := titles(sales())[value]; ok {
+		t.Error("a salesperson has the stock value, a sum of purchase prices")
+	}
+	if _, ok := titles(sales())[prep]; !ok {
+		t.Error("a salesperson has no car to make ready")
+	}
+	for _, s := range []access.Scope{technician(), advisor(), rentalDesk()} {
+		if got := titles(s); len(got) != 0 {
+			t.Errorf("%s has dealer cards: %v", s.Role, got)
+		}
+	}
+	off := buyerScope()
+	off.Modules = []access.Module{access.Workshop}
+	if got := titles(off); len(got) != 0 {
+		t.Errorf("Dealer off, and cards: %v", got)
+	}
+}

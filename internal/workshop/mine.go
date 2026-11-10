@@ -79,12 +79,12 @@ type ActionProvider struct {
 // issues that build what they wait on.
 var actionProviders = []ActionProvider{
 	{Name: "schedule", Items: scheduleChanged},
-	// Money taken in person (#156), for whoever runs the shop.
+	// Money taken in person (#156) and money through the bank with no line
+	// on the statement (#152), for whoever runs the shop: one provider, one
+	// transaction.
 	{Name: "payment flows", Items: uncheckedFlowsWaiting},
 	// Documents waiting for a signature (#150), for whoever makes them.
 	{Name: "documents", Items: unsignedDocumentsWaiting},
-	// Money through the bank with no line on the statement (#152).
-	{Name: "reconciliation", Items: unmatchedPaymentsWaiting},
 	// Calls to the outside world a person has to look at (#154).
 	{Name: "outbox", Items: outboxWaiting},
 	{Module: access.Workshop, Name: "workshop", Items: workshopWaiting},

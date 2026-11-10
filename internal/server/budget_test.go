@@ -64,8 +64,13 @@ var queryBudgets = map[string]int{
 	// 28 to 29: rental damage cases nobody has assessed (#197), one
 	// statement, a provider of its own so a failure there does not take
 	// the day's handovers with it.
+	// 29 to 32 (#157, #158): the dealer's cards, the sold cars to deliver,
+	// the reservations running out and the cars to make ready counted in
+	// one statement, and the stock at purchase price in one; and payments
+	// with no line on the bank's statement, one more in the money
+	// provider's transaction (#152).
 	"desk GET /":      17,
-	"owner GET /":     29,
+	"owner GET /":     32,
 	"desk GET /board": 21,
 	// 35: the quote the customer was shown and what they answered to it
 	// (two statements), which the counter reads on every live refresh.
