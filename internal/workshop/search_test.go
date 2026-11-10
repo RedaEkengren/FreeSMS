@@ -400,13 +400,20 @@ func TestASearchForADealAnswersTheSameWhetherOrNotItExists(t *testing.T) {
 		if err1 != nil || err2 != nil {
 			t.Fatalf("%s: %v %v", s.Role, err1, err2)
 		}
-		for _, f := range with {
-			if f.Kind == "deal" {
-				t.Errorf("%s was handed the deal: %+v", s.Role, f)
+		// Other records may match the same digits for their own reasons --
+		// a job or booking with that number, a chassis number that contains
+		// them -- so what is compared is what the deal itself could add:
+		// a result found on its number, or one that says it is a deal.
+		viaDeal := func(found []workshop.Found) (n int) {
+			for _, f := range found {
+				if f.Kind == "deal" || f.MatchedOn == "deal number" {
+					n++
+				}
 			}
+			return n
 		}
-		if len(with) != len(without) {
-			t.Errorf("%s: %d results for a number with a deal, %d for one without", s.Role, len(with), len(without))
+		if viaDeal(with) != 0 || viaDeal(without) != 0 {
+			t.Errorf("%s was told of a deal: %+v", s.Role, with)
 		}
 	}
 }
