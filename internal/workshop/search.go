@@ -154,23 +154,42 @@ func findVehicles(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, q
 	for _, r := range results {
 		ids = append(ids, r.VehicleID)
 	}
-	// Where each is active, of what the caller may see: the workshop's
-	// open jobs for whoever works in it.
-	active := map[string]bool{}
-	if len(ids) > 0 && scope.Uses(access.Workshop) && scope.Role.WorksInTheWorkshop() {
-		err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-			rows, err := tx.Query(ctx, `SELECT DISTINCT w.vehicle_id::text FROM work_orders w WHERE w.vehicle_id = ANY($1::uuid[]) AND `+openJob, ids)
+	// Where each is active, of what the caller may see: an open job for
+	// whoever works in the workshop, a car in stock for whoever sells or buys
+	// cars, a place in the rental fleet for whoever hands out rentals -- each
+	// only in a module the shop runs. One statement for all of them; a module
+	// the caller may not see is false in the query, not filtered after.
+	type where struct{ workshop, dealer, rental bool }
+	active := map[string]where{}
+	if len(ids) > 0 {
+		inWorkshopRole := scope.Uses(access.Workshop) && scope.Role.WorksInTheWorkshop()
+		inDealerRole := scope.Uses(access.Dealer) && (scope.Role.SellsVehicles() || scope.Role.BuysVehicles())
+		inRentalRole := scope.Uses(access.Rental) && scope.Role.HandsOverRentals()
+		if inWorkshopRole || inDealerRole || inRentalRole {
+			err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+				rows, err := tx.Query(ctx, `
+					SELECT v.id::text,
+					  $2 AND EXISTS (SELECT 1 FROM work_orders w WHERE w.vehicle_id = v.id AND `+openJob+`),
+					  $3 AND EXISTS (SELECT 1 FROM stock_units u WHERE u.vehicle_id = v.id AND u.closed_at IS NULL),
+					  $4 AND EXISTS (SELECT 1 FROM fleet_memberships f WHERE f.vehicle_id = v.id AND f.left_at IS NULL)
+					FROM unnest($1::uuid[]) AS v(id)`, ids, inWorkshopRole, inDealerRole, inRentalRole)
+				if err != nil {
+					return err
+				}
+				defer rows.Close()
+				for rows.Next() {
+					var id string
+					var w where
+					if err := rows.Scan(&id, &w.workshop, &w.dealer, &w.rental); err != nil {
+						return err
+					}
+					active[id] = w
+				}
+				return rows.Err()
+			})
 			if err != nil {
-				return err
+				return nil, fmt.Errorf("read where the vehicles are active: %w", err)
 			}
-			got, err := pgx.CollectRows(rows, pgx.RowTo[string])
-			for _, id := range got {
-				active[id] = true
-			}
-			return err
-		})
-		if err != nil {
-			return nil, fmt.Errorf("read where the vehicles are active: %w", err)
 		}
 	}
 	vin := vinLike(NormaliseRegistration(query))
@@ -193,8 +212,14 @@ func findVehicles(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, q
 				f.rank, f.exact = rankExact, true
 			}
 		}
-		if active[r.VehicleID] {
-			f.ActiveIn = []access.Module{access.Workshop}
+		if w := active[r.VehicleID]; w.workshop {
+			f.ActiveIn = append(f.ActiveIn, access.Workshop)
+		}
+		if w := active[r.VehicleID]; w.dealer {
+			f.ActiveIn = append(f.ActiveIn, access.Dealer)
+		}
+		if w := active[r.VehicleID]; w.rental {
+			f.ActiveIn = append(f.ActiveIn, access.Rental)
 		}
 		out = append(out, f)
 	}

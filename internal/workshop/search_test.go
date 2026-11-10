@@ -282,3 +282,52 @@ func TestASearchThatCannotBeASearchIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// A vehicle result says where the vehicle is active -- in stock for whoever
+// sells or buys cars, in the rental fleet for the rental desk -- and a role
+// is told nothing about a module it does not work in (#159).
+func TestAVehicleResultSaysWhereItIsActive(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := boughtCar(t, pool)
+	var vin string
+	if err := pool.QueryRow(ctx, `SELECT v.vin FROM vehicles v JOIN stock_units u ON u.vehicle_id = v.id WHERE u.id = $1`, p.StockUnitID).Scan(&vin); err != nil {
+		t.Fatal(err)
+	}
+	rentableVanWith(t, pool, "RNT 123")
+
+	activeIn := func(s access.Scope, q string) []access.Module {
+		t.Helper()
+		found, err := workshop.SearchAll(ctx, pool, s, q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, f := range found {
+			if f.Kind == "vehicle" {
+				return f.ActiveIn
+			}
+		}
+		t.Fatalf("%s found no vehicle for %q", s.Role, q)
+		return nil
+	}
+	if got := activeIn(buyerScope(), vin); !slices.Equal(got, []access.Module{access.Dealer}) {
+		t.Errorf("a car in stock, for the buyer: %v", got)
+	}
+	if got := activeIn(rentalDesk(), "RNT 123"); !slices.Equal(got, []access.Module{access.Rental}) {
+		t.Errorf("a van in the fleet, for the rental desk: %v", got)
+	}
+	// The rental desk is not told the van's stock or jobs, and the buyer is
+	// not told it is in the fleet.
+	if got := activeIn(buyerScope(), "RNT 123"); len(got) != 0 {
+		t.Errorf("the buyer is told where the van is active: %v", got)
+	}
+	if got := activeIn(rentalDesk(), vin); len(got) != 0 {
+		t.Errorf("the rental desk is told the car is in stock: %v", got)
+	}
+	// With Dealer switched off the stock is not something to be shown.
+	off := buyerScope()
+	off.Modules = []access.Module{access.Workshop, access.Rental}
+	if got := activeIn(off, vin); len(got) != 0 {
+		t.Errorf("a car in stock with Dealer off: %v", got)
+	}
+}
