@@ -103,3 +103,19 @@ func TestEveryQueueKindHasASwedishSentenceAndAnItemCarriesNoPriceOrCustomer(t *t
 		t.Errorf("an ActionItem's fields are %v, want %v: a new field is a decision about what the queue may carry", fields, want)
 	}
 }
+
+// Every label a search result says it matched on has a Swedish sentence
+// (#159): the vehicle's come from its query, the others from the providers.
+func TestEverySearchLabelHasASwedishSentence(t *testing.T) {
+	cats, err := i18n.Load("en", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sv := cats.Messages("sv")
+	for _, label := range []string{"registration", "a plate it used to carry", "chassis number", "owner", "customer",
+		"party", "job number", "deal number", "rental booking number"} {
+		if _, ok := sv[label]; !ok {
+			t.Errorf("the search label %q has no Swedish sentence", label)
+		}
+	}
+}

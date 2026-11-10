@@ -382,3 +382,31 @@ func TestAPartyWhoIsCustomerAndRenterIsFoundOnce(t *testing.T) {
 		t.Errorf("the rental desk, a customer who also rents: %v", got)
 	}
 }
+
+// A deal or a booking a role may not see adds nothing to what it is told:
+// the search for its number answers exactly as for a number nobody has
+// (#159).
+func TestASearchForADealAnswersTheSameWhetherOrNotItExists(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	car := carForSaleAgain(t, pool)
+	d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: car, Terms: consumerTerms(driver(t, pool))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []access.Scope{technician(), rentalDesk(), advisor()} {
+		with, err1 := workshop.SearchAll(ctx, pool, s, "#"+itoa(d.Number))
+		without, err2 := workshop.SearchAll(ctx, pool, s, "#"+itoa(d.Number+1000))
+		if err1 != nil || err2 != nil {
+			t.Fatalf("%s: %v %v", s.Role, err1, err2)
+		}
+		for _, f := range with {
+			if f.Kind == "deal" {
+				t.Errorf("%s was handed the deal: %+v", s.Role, f)
+			}
+		}
+		if len(with) != len(without) {
+			t.Errorf("%s: %d results for a number with a deal, %d for one without", s.Role, len(with), len(without))
+		}
+	}
+}
