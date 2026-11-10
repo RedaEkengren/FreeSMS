@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
@@ -36,7 +37,10 @@ type Found struct {
 	MatchedOn string
 	// The modules a vehicle is active in, of those the caller may see.
 	ActiveIn []access.Module
-	rank     int
+	// When the plate searched for was on this vehicle, for a match on a
+	// plate; PlateTo is zero while it still is.
+	PlateFrom, PlateTo time.Time
+	rank               int
 	// The whole of what was typed is this record's plate, chassis number
 	// or job number, not a part of it.
 	exact bool
@@ -199,7 +203,7 @@ func findVehicles(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, q
 	out := make([]Found, 0, len(results))
 	for _, r := range results {
 		f := Found{Kind: "vehicle", ID: r.VehicleID, Heading: r.Describe(), MatchedOn: r.MatchedOn, rank: rankName,
-			Detail: strings.TrimSpace(r.Make + " " + r.Model)}
+			Detail: strings.TrimSpace(r.Make + " " + r.Model), PlateFrom: r.PlateFrom, PlateTo: r.PlateTo}
 		if r.ModelYear != nil {
 			f.Detail += " " + strconv.Itoa(int(*r.ModelYear))
 		}

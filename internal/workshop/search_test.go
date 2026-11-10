@@ -410,3 +410,42 @@ func TestASearchForADealAnswersTheSameWhetherOrNotItExists(t *testing.T) {
 		}
 	}
 }
+
+// A plate reissued to another vehicle years later finds both, the one that
+// holds it now first, each with the period it carried the plate (#159).
+func TestAReissuedPlateFindsBothVehiclesWithTheirPeriods(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	var older string
+	if err := pool.QueryRow(ctx, `INSERT INTO vehicles (shop_id, make, model) VALUES ($1, 'Volvo', '240') RETURNING id`, shopID).Scan(&older); err != nil {
+		t.Fatal(err)
+	}
+	// The plate was on the older car until the year before it was issued
+	// again; the current holder is vehicle A.
+	if _, err := pool.Exec(ctx, `UPDATE vehicle_registrations SET valid_from = '2018-01-01' WHERE vehicle_id = $1`, vehicleA); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO vehicle_registrations (shop_id, vehicle_id, registration, normalised, valid_from, valid_to)
+		VALUES ($1, $2, 'ABC 12D', 'ABC12D', '2005-03-01', '2017-06-30')`, shopID, older); err != nil {
+		t.Fatal(err)
+	}
+	found, err := workshop.SearchAll(ctx, pool, advisor(), "ABC 12D")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cars []workshop.Found
+	for _, f := range found {
+		if f.Kind == "vehicle" {
+			cars = append(cars, f)
+		}
+	}
+	if len(cars) != 2 || cars[0].ID != vehicleA || cars[1].ID != older {
+		t.Fatalf("a reissued plate: %+v", cars)
+	}
+	if cars[0].PlateFrom.Year() != 2018 || !cars[0].PlateTo.IsZero() {
+		t.Errorf("the current holder's period: %v to %v", cars[0].PlateFrom, cars[0].PlateTo)
+	}
+	if cars[1].PlateFrom.Year() != 2005 || cars[1].PlateTo.Year() != 2017 {
+		t.Errorf("the older car's period: %v to %v", cars[1].PlateFrom, cars[1].PlateTo)
+	}
+}

@@ -28,6 +28,11 @@ type SearchResult struct {
 	// car rather than wondering.
 	MatchedOn string
 	OwnerName string
+	// When the matched plate was carried by this vehicle, for a match on a
+	// plate: a plate reissued years later is on two cars, and a person
+	// needs to see which carried it when. PlateTo is zero while it still
+	// does.
+	PlateFrom, PlateTo time.Time
 }
 
 // Describe is what to show as the heading for a vehicle that may have no
@@ -81,7 +86,7 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 		// The ranking happens before the list is cut: the exact plate is
 		// first however many cars match a part of it.
 		const q = `
-			SELECT id, registration, vin, make, model, model_year, label, matched, owner
+			SELECT id, registration, vin, make, model, model_year, label, matched, owner, plate_from, plate_to
 			FROM (
 			SELECT DISTINCT ON (v.id)
 			       v.id, coalesce(cur.registration, '') AS registration, coalesce(v.vin, '') AS vin,
@@ -101,7 +106,9 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 			         WHEN $5 <> '' AND n.vin_n LIKE '%' || $5 || '%' THEN 3
 			         ELSE 4
 			       END AS rank,
-			       CASE WHEN $4 THEN coalesce(cp.display_name, c.company_name, '') ELSE '' END AS owner
+			       CASE WHEN $4 THEN coalesce(cp.display_name, c.company_name, '') ELSE '' END AS owner,
+			       CASE WHEN m.normalised = $1 THEN m.valid_from END AS plate_from,
+			       CASE WHEN m.normalised = $1 THEN m.valid_to END AS plate_to
 			FROM vehicles v
 			CROSS JOIN LATERAL (SELECT translate(upper(regexp_replace(coalesce(v.vin, ''), '[^A-Za-z0-9]', '', 'g')), 'OQI', '001') AS vin_n) n
 			LEFT JOIN vehicle_registrations m ON m.vehicle_id = v.id
@@ -131,9 +138,16 @@ func Search(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query s
 		defer rows.Close()
 		for rows.Next() {
 			var s SearchResult
+			var from, to *time.Time
 			if err := rows.Scan(&s.VehicleID, &s.Registration, &s.VIN, &s.Make, &s.Model,
-				&s.ModelYear, &s.Label, &s.MatchedOn, &s.OwnerName); err != nil {
+				&s.ModelYear, &s.Label, &s.MatchedOn, &s.OwnerName, &from, &to); err != nil {
 				return fmt.Errorf("scan result: %w", err)
+			}
+			if from != nil {
+				s.PlateFrom = *from
+			}
+			if to != nil {
+				s.PlateTo = *to
 			}
 			out = append(out, s)
 		}
