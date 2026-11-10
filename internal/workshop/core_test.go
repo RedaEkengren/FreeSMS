@@ -19,7 +19,7 @@ var core = map[string]string{
 	// Identity records (#153): who a party is, read across modules.
 	// Recording one checks the module of its purpose.
 	"IdentityRecordsFor": "that a party's identity was checked", "ReadIdentityValue": "an identity value, read under its purpose",
-	"EndIdentityPurpose": "an identity value's purpose ended, which removes it", "SetIdentityRetention": "how long identity values are kept",
+	"EndIdentityPurpose": "an identity value's purpose ended, which removes it", "SetIdentityRetention": "how long identity values are kept", "IdentityRetention": "how long identity values are kept, read for the shop page",
 	"RotateIdentityKeys": "the keys identity values are sealed with",
 	// The outbox (#154): the calls of every module, in front of the owner.
 	"OutboxNeedingAttention": "calls to the outside world that need a person", "RetryOutbox": "a call sent again",

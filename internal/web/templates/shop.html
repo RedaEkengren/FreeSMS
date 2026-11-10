@@ -146,6 +146,25 @@
 </ul>
 {{end}}
 
+{{with .Retention}}
+<h2 id="retention">{{$.T "How long things are kept"}}</h2>
+<p>{{$.T "Documents are kept this many years before a person's erasure may blank them; identity values this many days, then they are removed. A change applies from now on: records already made keep the expiry they were made with."}}</p>
+<table>
+  {{range .Documents}}<tr><td>{{$.T .Label}}</td><td>
+    <form method="post" action="/shop/retention" class="inline">
+      <input type="hidden" name="what" value="document"><input type="hidden" name="name" value="{{.Name}}">
+      <input name="value" value="{{.Value}}" inputmode="numeric" size="3" aria-label="{{$.T .Label}}"> {{$.T "years"}}
+      <button>{{$.T "Save"}}</button>
+    </form></td></tr>{{end}}
+  {{range .Identity}}<tr><td>{{$.T .Label}}</td><td>
+    <form method="post" action="/shop/retention" class="inline">
+      <input type="hidden" name="what" value="identity"><input type="hidden" name="name" value="{{.Name}}">
+      <input name="value" value="{{.Value}}" inputmode="numeric" size="4" aria-label="{{$.T .Label}}"> {{$.T "days"}}
+      <button>{{$.T "Save"}}</button>
+    </form></td></tr>{{end}}
+</table>
+{{end}}
+
 {{if not .Shop.OrgNumber}}
 <p class="error">{{.T "Without a company number and a VAT number an invoice from this workshop is not a complete invoice."}}</p>
 {{end}}

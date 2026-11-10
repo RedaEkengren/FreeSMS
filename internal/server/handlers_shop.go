@@ -58,8 +58,10 @@ func (s *Server) renderShop(w http.ResponseWriter, r *http.Request, status int, 
 	if err != nil {
 		s.log.Error("read module changes", "error", err)
 	}
+	retention := s.retentionFor(r, session.Scope)
 	s.render(w, r, status, "shop", pageData{
 		Title:         "The workshop",
+		Retention:     retention,
 		Session:       session,
 		Shop:          details,
 		Charges:       charges,
@@ -186,4 +188,72 @@ func (s *Server) handleSaveShop(w http.ResponseWriter, r *http.Request) {
 
 	s.submitted(w, r)
 	http.Redirect(w, r, "/shop", http.StatusSeeOther)
+}
+
+// retentionData is the shop page's retention section (#150, #153): how long
+// each kind of document and each purpose of an identity value is kept.
+type retentionData struct {
+	Documents []retentionRow
+	Identity  []retentionRow
+}
+
+// retentionRow is one setting: Name is what the form posts, Label a
+// catalogue key, Value the years or days now in force.
+type retentionRow struct {
+	Name, Label string
+	Value       int
+}
+
+// retentionFor reads both settings; a failure is logged and the section is
+// left out rather than the whole page.
+func (s *Server) retentionFor(r *http.Request, scope access.Scope) *retentionData {
+	docs, err := workshop.DocumentRetention(r.Context(), s.pool, scope)
+	if err != nil {
+		s.log.Error("read document retention", "error", err)
+		return nil
+	}
+	ids, err := workshop.IdentityRetention(r.Context(), s.pool, scope)
+	if err != nil {
+		s.log.Error("read identity retention", "error", err)
+		return nil
+	}
+	d := &retentionData{}
+	for _, k := range workshop.DocumentKinds {
+		d.Documents = append(d.Documents, retentionRow{k, workshop.DocumentKindLabel(k), docs[k]})
+	}
+	for _, p := range workshop.IdentityPurposes {
+		if scope.Require(p.Module) == nil {
+			d.Identity = append(d.Identity, retentionRow{p.Name, identityData{}.IdentityPurposeName(p.Name), ids[p.Name]})
+		}
+	}
+	return d
+}
+
+// handleSaveRetention sets one retention: a document kind in years or an
+// identity purpose in days. A row is added; the earlier setting stays.
+func (s *Server) handleSaveRetention(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	n, convErr := strconv.Atoi(strings.TrimSpace(r.FormValue("value")))
+	var err error
+	switch {
+	case convErr != nil:
+		err = workshop.ErrInvalid
+	case r.FormValue("what") == "identity":
+		err = workshop.SetIdentityRetention(r.Context(), s.pool, session.Scope, r.FormValue("name"), n)
+	default:
+		err = workshop.SetDocumentRetention(r.Context(), s.pool, session.Scope, r.FormValue("name"), n)
+	}
+	if errors.Is(err, workshop.ErrInvalid) {
+		s.renderError(w, r, http.StatusBadRequest, "Not a valid retention", "Give a whole number within the range shown.")
+		return
+	}
+	if errors.Is(err, access.ErrForbidden) {
+		s.renderError(w, r, http.StatusForbidden, "Not for your role", "How long things are kept belongs to whoever runs the workshop.")
+		return
+	}
+	if err != nil {
+		s.fault(w, r, "save retention", err)
+		return
+	}
+	http.Redirect(w, r, "/shop#retention", http.StatusSeeOther)
 }
