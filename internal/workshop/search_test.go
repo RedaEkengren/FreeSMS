@@ -3,9 +3,11 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
@@ -196,5 +198,76 @@ func TestAChassisNumberStoredWithSpacesIsFoundTypedWithout(t *testing.T) {
 	f, ok := workshop.Straight(must(workshop.SearchAll(ctx, pool, advisor(), "YV1SW612521234567")))
 	if !ok || f.Link() != "/vehicles/"+vehicleA {
 		t.Errorf("the whole number goes to %q (%v), want the car", f.Link(), ok)
+	}
+}
+
+// A deal is found by its number by whoever sells cars, and a rental booking
+// by its reference by whoever hands out rentals; no other role finds either,
+// and a shop that does not run the module finds nothing. The buyer and the
+// renter are never in what comes back.
+func TestADealAndARentalBookingAreFoundByTheirNumbers(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	currentPool = pool
+	car := carForSaleAgain(t, pool)
+	d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: car, Terms: consumerTerms(driver(t, pool))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	van := rentableVanWith(t, pool, "RNT 123")
+	booking, err := van.book(pool, time.Now().AddDate(0, 0, 2), time.Now().AddDate(0, 0, 4))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rn int64
+	if err := pool.QueryRow(ctx, `SELECT number FROM rental_bookings WHERE id = $1`, booking).Scan(&rn); err != nil {
+		t.Fatal(err)
+	}
+	dealQ, rentalQ := "#"+itoa(d.Number), "r-"+itoa(rn)
+
+	found, err := workshop.SearchAll(ctx, pool, sales(), dealQ)
+	// The digits may be part of a chassis number too; the deal is the one
+	// exact match, which is where the search goes without a list.
+	if only, ok := workshop.Straight(found); err != nil || !ok || only.Kind != "deal" || only.ID != d.ID || only.Link() != "/cars/deals/"+d.ID {
+		t.Fatalf("a deal's number, as sales: %+v, %v", found, err)
+	}
+	for _, f := range found {
+		if strings.Contains(f.Detail, "Kund") || strings.Contains(f.Heading, "Kund") {
+			t.Errorf("the buyer is in the result: %+v", f)
+		}
+	}
+	found, err = workshop.SearchAll(ctx, pool, rentalDesk(), rentalQ)
+	if err != nil || len(found) != 1 || found[0].Kind != "rental" || found[0].ID != booking || found[0].Link() != "/rental/bookings/"+booking {
+		t.Fatalf("a booking's reference, as the rental desk: %+v, %v", found, err)
+	}
+	if strings.Contains(found[0].Detail, "Rita") {
+		t.Errorf("the renter is in the result: %+v", found[0])
+	}
+
+	// Another role finds neither, and the result is the same as for a
+	// number that does not exist.
+	for _, s := range []access.Scope{technician(), advisor()} {
+		if got := foundKinds(t, s, dealQ); slices.Contains(got, "deal:deal number") {
+			t.Errorf("%s found a deal: %v", s.Role, got)
+		}
+		if got := foundKinds(t, s, rentalQ); len(got) != 0 {
+			t.Errorf("%s found a booking: %v", s.Role, got)
+		}
+	}
+	if got := foundKinds(t, rentalDesk(), dealQ); slices.Contains(got, "deal:deal number") {
+		t.Errorf("the rental desk found a deal: %v", got)
+	}
+	if got := foundKinds(t, sales(), rentalQ); len(got) != 0 {
+		t.Errorf("sales found a booking: %v", got)
+	}
+	off := sales()
+	off.Modules = []access.Module{access.Workshop}
+	if got := foundKinds(t, off, dealQ); slices.Contains(got, "deal:deal number") {
+		t.Errorf("a deal with Dealer off: %v", got)
+	}
+	off = rentalDesk()
+	off.Modules = []access.Module{access.Workshop}
+	if got := foundKinds(t, off, rentalQ); len(got) != 0 {
+		t.Errorf("a booking with Rental off: %v", got)
 	}
 }

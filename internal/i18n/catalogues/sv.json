@@ -8432,6 +8432,8 @@
     "that phone number has too few or too many digits": {"other": "telefonnumret har för få eller för många siffror"},
     "that request was already used for another enquiry": {"other": "den begäran har redan använts för en annan förfrågan"},
     "Lead": {"other": "Lead"},
+    "deal number": {"other": "affärsnummer"},
+    "rental booking number": {"other": "hyresbokningsnummer"},
     "Not a valid retention": {"other": "Ingen giltig sparperiod"},
     "Give a whole number within the range shown.": {"other": "Ange ett heltal inom det intervall som visas."},
     "How long things are kept belongs to whoever runs the workshop.": {"other": "Hur länge saker sparas avgör den som driver verkstaden."},
