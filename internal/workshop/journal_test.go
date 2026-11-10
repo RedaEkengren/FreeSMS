@@ -691,3 +691,48 @@ func TestAnUnmatchedPaymentWaitsForTheOwnerUntilItIsMatched(t *testing.T) {
 		t.Errorf("matched, and still waiting: %+v", got)
 	}
 }
+
+// A deposit received and a payout are money that moved, so the day counts
+// them under their way of paying, each pointing at what it was for; they
+// are not sales, and the accounting export leaves them out until the
+// accounts they use are decided (G2, #207, #221).
+func TestADepositAndAPayoutAreInTheDayAndNotInTheAccountingExport(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	_, in := depositWith(t, pool, 1234500)
+	seller := privateSeller(t, pool)
+	payout := purchasePayout(t, pool, buyerScope(), seller)
+	out, err := workshop.RecordPayout(ctx, pool, buyerScope(), payout, workshop.NewPayment{
+		AmountMinor: minor(8500000), Method: "bank", PaidOn: time.Now(), Reference: "Köp ABC 12D"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	d := dayOf(t, pool, today())
+	if d.InvoicedGross != 0 || d.CreditedGross != 0 {
+		t.Errorf("a deposit or a payout counted as a sale: invoiced %d credited %d", d.InvoicedGross, d.CreditedGross)
+	}
+	swish, bank := method(d, "swish"), method(d, "bank")
+	if swish.Received != in.AmountMinor || len(swish.Entries) != 1 || swish.Entries[0].Target != "deposit" {
+		t.Errorf("the deposit in the day: %+v", swish)
+	}
+	if bank.PaidOut != -out.AmountMinor || len(bank.Entries) != 1 || bank.Entries[0].Target != "payout" {
+		t.Errorf("the payout in the day: %+v", bank)
+	}
+
+	from := time.Now().AddDate(0, 0, -1)
+	to := time.Now().AddDate(0, 0, 1)
+	// The only money in the period is a deposit and a payout, so there is
+	// nothing to export.
+	_, n, err := workshop.ExportAccounting(ctx, pool, owner(), from, to, false)
+	if !errors.Is(err, workshop.ErrNothingToExport) {
+		t.Fatalf("exported a deposit or a payout: %d rows, %v", n, err)
+	}
+	var exported int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM invoice_payments WHERE accounting_export_id IS NOT NULL`).Scan(&exported); err != nil {
+		t.Fatal(err)
+	}
+	if exported != 0 {
+		t.Errorf("%d deposit or payout rows were exported (the export reported %d)", exported, n)
+	}
+}
