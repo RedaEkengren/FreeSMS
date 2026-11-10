@@ -271,3 +271,14 @@ func TestADealAndARentalBookingAreFoundByTheirNumbers(t *testing.T) {
 		t.Errorf("a booking with Rental off: %v", got)
 	}
 }
+
+// A search with a null character, invalid text or too long is refused, not
+// run (#159).
+func TestASearchThatCannotBeASearchIsRefused(t *testing.T) {
+	pool := setup(t)
+	for name, q := range map[string]string{"a null character": "ab\x00c", "text that is not text": "ab\xffc", "too long": strings.Repeat("A", 101)} {
+		if _, err := workshop.SearchAll(context.Background(), pool, advisor(), q); !errors.Is(err, workshop.ErrInvalid) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}

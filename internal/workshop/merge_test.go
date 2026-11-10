@@ -385,3 +385,37 @@ func TestTheRecordsReadAsOneAreFoundOnce(t *testing.T) {
 		t.Errorf("read as no customer: %v, want none", got)
 	}
 }
+
+// A name that was on a record merged into another still finds a customer:
+// the one that stands (#159).
+func TestSearchingTheNameOfAMergedAwayCustomerFindsTheSurvivor(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	dup, err := workshop.CreateCustomer(ctx, pool, advisor(), workshop.NewCustomer{Kind: "private", Name: "Zelda Gammalnamn", Email: "z@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := workshop.FindCustomers(ctx, pool, advisor(), "Gammalnamn"); err != nil || len(got) != 1 || got[0].ID != dup {
+		t.Fatalf("before the merge: %+v, %v", got, err)
+	}
+	pv, err := workshop.PreviewCustomerMerge(ctx, pool, advisor(), fixtureCustomer, dup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.MergeCustomers(ctx, pool, advisor(), fixtureCustomer, dup, pv.KeepRevision, pv.DropRevision, "The same person entered twice"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := workshop.FindCustomers(ctx, pool, advisor(), "Gammalnamn")
+	if err != nil || len(got) != 1 || got[0].ID != fixtureCustomer {
+		t.Errorf("the old name after the merge: %+v, %v; want the customer that stands", got, err)
+	}
+	found, err := workshop.SearchAll(ctx, pool, advisor(), "Gammalnamn")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range found {
+		if f.Kind == "customer" && f.ID != fixtureCustomer {
+			t.Errorf("a search leads to the merged-away record: %+v", f)
+		}
+	}
+}

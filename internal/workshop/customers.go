@@ -102,13 +102,29 @@ func FindCustomers(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 
 	var out []Customer
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `SELECT`+customerColumns+`
+		// A customer merged into another is found as the one it was merged
+		// into: the name on the old record leads to the record that stands.
+		// chain follows each merge to the record at its end, however many
+		// merges deep; a person erased is not found by what they were
+		// called, on the record that stands or on one merged into it.
+		rows, err := tx.Query(ctx, `
+			WITH RECURSIVE chain(root, id) AS (
+				SELECT id, id FROM customers WHERE merged_into IS NULL
+				UNION ALL
+				SELECT chain.root, m.id FROM customers m JOIN chain ON m.merged_into = chain.id
+			)
+			SELECT`+customerColumns+`
 			FROM customers c
 			LEFT JOIN people p ON p.id = c.person_id
 			WHERE p.erased_at IS NULL AND c.merged_into IS NULL
-			  AND (coalesce(p.display_name, c.company_name) ILIKE '%' || $1 || '%'
-			       OR c.org_number ILIKE $1 || '%'
-			       OR ($2 <> '' AND regexp_replace(coalesce(p.phone, ''), '\D', '', 'g') LIKE '%' || $2 || '%'))
+			  AND c.id IN (
+			    SELECT ch.root FROM chain ch
+			    JOIN customers x ON x.id = ch.id
+			    LEFT JOIN people xp ON xp.id = x.person_id
+			    WHERE xp.erased_at IS NULL
+			      AND (coalesce(xp.display_name, x.company_name) ILIKE '%' || $1 || '%'
+			           OR x.org_number ILIKE $1 || '%'
+			           OR ($2 <> '' AND regexp_replace(coalesce(xp.phone, ''), '\D', '', 'g') LIKE '%' || $2 || '%')))
 			ORDER BY 9 DESC, 3
 			LIMIT 20`, query, digits)
 		if err != nil {

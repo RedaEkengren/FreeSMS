@@ -69,9 +69,14 @@ var queryBudgets = map[string]int{
 	// one statement, and the stock at purchase price in one; and payments
 	// with no line on the bank's statement, one more in the money
 	// provider's transaction (#152).
-	"desk GET /":      17,
-	"owner GET /":     32,
-	"desk GET /board": 21,
+	"desk GET /": 17,
+	// The one search (#159): every provider of a module the shop runs
+	// asks once, as the role it is asked as; 16 with all three modules on,
+	// the same with years of history.
+	"desk GET /search?q=customer":  16,
+	"owner GET /search?q=customer": 16,
+	"owner GET /":                  32,
+	"desk GET /board":              21,
 	// 35: the quote the customer was shown and what they answered to it
 	// (two statements), which the counter reads on every live refresh.
 	// 39: the work list, as for the technician. 40: whether the job is a
