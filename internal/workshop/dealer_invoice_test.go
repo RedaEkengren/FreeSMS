@@ -54,6 +54,12 @@ func TestAMarginSchemeSaleIsInvoicedWithTheStatementAndNoMargin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Switched off, the module's history stays readable through Core.
+	dealerOff := everything(advisor())
+	dealerOff.Modules = []access.Module{access.Workshop}
+	if off, err := workshop.DocumentByID(ctx, pool, dealerOff, inv.ID); err != nil || off.ID != inv.ID {
+		t.Errorf("a deal's invoice with Dealer switched off: %v", err)
+	}
 	if again, err := workshop.IssueDealInvoice(ctx, pool, sales(), d.ID); err != nil || again.ID != inv.ID {
 		t.Errorf("invoiced again: %+v, %v", again, err)
 	}

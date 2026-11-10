@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
@@ -58,6 +59,12 @@ func TestARentalIsInvoicedOnceFromWhatWasFrozenAndConfirmed(t *testing.T) {
 	doc, err := workshop.DocumentByID(ctx, pool, everything(advisor()), inv.ID)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// Switched off, the module's history stays readable through Core.
+	rentalOff := everything(advisor())
+	rentalOff.Modules = []access.Module{access.Workshop}
+	if off, err := workshop.DocumentByID(ctx, pool, rentalOff, inv.ID); err != nil || off.ID != inv.ID || len(off.Lines) != len(doc.Lines) {
+		t.Errorf("a rental invoice with Rental switched off: %+v, %v", off.ID, err)
 	}
 	var net, vat int64
 	outside := 0

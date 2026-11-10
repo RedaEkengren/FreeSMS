@@ -3,12 +3,15 @@ package workshop
 import (
 	"context"
 	"errors"
+	"reflect"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/i18n"
 )
 
 // The queue's order for a mixed set, pinned: urgency, then due time --
@@ -73,4 +76,30 @@ func join(s []string) string {
 		out += k
 	}
 	return out
+}
+
+// Every kind of item on the queue says something in Swedish (#158), and an
+// item carries no price and no customer: its fields are the ones decided,
+// so adding a Price or a CustomerName to it fails here and is a decision
+// somebody makes on purpose.
+func TestEveryQueueKindHasASwedishSentenceAndAnItemCarriesNoPriceOrCustomer(t *testing.T) {
+	cats, err := i18n.Load("en", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sv := cats.Messages("sv")
+	for kind, says := range waitingSays {
+		if _, ok := sv[says]; !ok {
+			t.Errorf("the queue's %q (%q) has no Swedish sentence", kind, says)
+		}
+	}
+	var fields []string
+	typ := reflect.TypeOf(ActionItem{})
+	for i := 0; i < typ.NumField(); i++ {
+		fields = append(fields, typ.Field(i).Name)
+	}
+	want := []string{"Kind", "Module", "SubjectKind", "SubjectID", "Number", "Registration", "Count", "Text", "Urgency", "Due"}
+	if !slices.Equal(fields, want) {
+		t.Errorf("an ActionItem's fields are %v, want %v: a new field is a decision about what the queue may carry", fields, want)
+	}
 }
