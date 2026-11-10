@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -102,5 +104,66 @@ func TestTheCounterSaysWhichFlowAJobWasPaidThrough(t *testing.T) {
 	}
 	if _, mine := page(t, owner, ts.URL+"/mine"); !strings.Contains(mine, "not checked against the cash register rules: Kort i disken") {
 		t.Error("the owner's list does not have the flow in use and not checked")
+	}
+}
+
+// A cash invoice asked for twice with one Idempotency-Key -- a phone that
+// gave up waiting, the offline queue replaying -- is one invoice and one
+// payment, and the second answer is the first (#156). The same key for a
+// different request is refused, not answered with the first.
+func TestARepeatedCashInvoiceRequestIsOneInvoiceAndOnePayment(t *testing.T) {
+	ts, pool := testServer(t)
+	desk := signIn(t, ts, advisorEmail)
+	post(t, desk, ts.URL+"/jobs/"+jobA+"/lines", url.Values{
+		"kind": {"labour"}, "description": {"Replace front pads"},
+		"quantity": {"2.5"}, "unit_price": {"895.00"}, "vat_rate": {"25"},
+	})
+	for _, state := range []string{"estimated", "awaiting_approval", "approved", "in_progress", "ready"} {
+		if state == "approved" {
+			agreeAtTheCounter(t, ts.URL, jobA, desk, pool)
+		}
+		post(t, desk, ts.URL+"/jobs/"+jobA+"/state", url.Values{"state": {state}})
+	}
+	count := func(table string) int {
+		var n int
+		if err := pool.QueryRow(context.Background(), `SELECT count(*) FROM `+table).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	invoices, payments := count("invoices"), count("invoice_payments")
+	send := func(form url.Values, key string) int {
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/jobs/"+jobA+"/invoice", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", "http://"+req.URL.Host)
+		req.Header.Set(IdempotencyHeader, key)
+		client := *desk
+		client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 400 {
+			b, _ := io.ReadAll(resp.Body)
+			t.Logf("answer: %s", visibleText(string(b)))
+		}
+		return resp.StatusCode
+	}
+	form := url.Values{"paid_now": {"card"}, "paid_reference": {"Kvitto 1"}}
+	if st := send(form, "cash-invoice-key-0001"); st != http.StatusSeeOther {
+		t.Fatalf("the first request: %d", st)
+	}
+	if st := send(form, "cash-invoice-key-0001"); st != http.StatusSeeOther {
+		t.Errorf("the repeat: %d, want the first answer again", st)
+	}
+	if n := count("invoices") - invoices; n != 1 {
+		t.Errorf("%d invoices made by a request sent twice", n)
+	}
+	if n := count("invoice_payments") - payments; n != 1 {
+		t.Errorf("%d payments made by a request sent twice", n)
+	}
+	if st := send(url.Values{"paid_now": {"card"}, "paid_reference": {"Kvitto 2"}}, "cash-invoice-key-0001"); st != http.StatusConflict {
+		t.Errorf("the same key for a different request: %d, want %d", st, http.StatusConflict)
 	}
 }

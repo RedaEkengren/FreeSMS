@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -198,7 +200,22 @@ func (s *Server) refuseNUL(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && strings.HasPrefix(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded") ||
 			r.URL.RawQuery != "" {
-			if err := r.ParseForm(); err == nil {
+			// ParseForm reads the body. The idempotency check after this
+			// fingerprints the body, so it is handed back: otherwise every
+			// form posted to a path by one person looks like the same
+			// request, and a key reused for a different one is answered
+			// with the first instead of refused.
+			var body []byte
+			if r.Body != nil && r.Method == http.MethodPost {
+				body, _ = io.ReadAll(io.LimitReader(r.Body, 10<<20))
+				r.Body.Close()
+				r.Body = io.NopCloser(bytes.NewReader(body))
+			}
+			err := r.ParseForm()
+			if body != nil {
+				r.Body = io.NopCloser(bytes.NewReader(body))
+			}
+			if err == nil {
 				for k, vs := range r.Form {
 					if strings.ContainsRune(k, 0) {
 						s.renderError(w, r, http.StatusBadRequest, "Not accepted", "A text cannot contain a null character.")
