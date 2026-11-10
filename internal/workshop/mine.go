@@ -83,6 +83,8 @@ var actionProviders = []ActionProvider{
 	{Name: "payment flows", Items: uncheckedFlowsWaiting},
 	// Documents waiting for a signature (#150), for whoever makes them.
 	{Name: "documents", Items: unsignedDocumentsWaiting},
+	// Money through the bank with no line on the statement (#152).
+	{Name: "reconciliation", Items: unmatchedPaymentsWaiting},
 	// Calls to the outside world a person has to look at (#154).
 	{Name: "outbox", Items: outboxWaiting},
 	{Module: access.Workshop, Name: "workshop", Items: workshopWaiting},
@@ -134,6 +136,7 @@ var waitingSays = map[string]string{
 	"outsourced_invoice": "A supplier invoice nobody has handed on: %s",
 	"flow_unchecked":     "A way of taking money in person is in use and not checked against the cash register rules: %s",
 	"unsigned":           "Waiting for a signature: %s",
+	"payments_unmatched": "%d payment is not on the bank's statement",
 	"outbox_given_up":    "%d call to another service was given up",
 	"outbox_manual":      "%d call to another service is a task to do by hand",
 	// Dealer
@@ -172,7 +175,7 @@ func (w ActionItem) Says() string { return waitingSays[w.Kind] }
 // Plural reports whether the key counts, for the page to pick N or T.
 func (w ActionItem) Plural() bool {
 	switch w.Kind {
-	case "finding", "answer", "uncollected", "outbox_given_up", "outbox_manual":
+	case "finding", "answer", "uncollected", "outbox_given_up", "outbox_manual", "payments_unmatched":
 		return true
 	}
 	return false
@@ -193,6 +196,8 @@ func (w ActionItem) Link() string {
 		return "/payment-flows"
 	case w.SubjectKind == "outbox":
 		return "/outbox"
+	case w.SubjectKind == "reconcile":
+		return "/reconcile"
 	case w.SubjectKind == "lead":
 		return "/cars/leads/" + w.SubjectID
 	case w.SubjectKind == "test_drive":

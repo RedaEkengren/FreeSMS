@@ -656,3 +656,38 @@ func TestAnApplicationHalfReversedBefore0082IsPutRight(t *testing.T) {
 		}
 	}
 }
+
+// A payment through the bank with no line on the statement five days on is
+// one item on the owner's queue (#158); matched, it leaves; the front desk
+// never has it.
+func TestAnUnmatchedPaymentWaitsForTheOwnerUntilItIsMatched(t *testing.T) {
+	pool := setup(t)
+	currentPool = pool
+	ctx := context.Background()
+	inv, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{Method: "bank", PaidOn: time.Now().AddDate(0, 0, -10)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := waiting(t, owner(), "payments_unmatched")
+	if len(items) != 1 || items[0].Count != 1 || items[0].Link() != "/reconcile" {
+		t.Fatalf("the owner's queue: %+v", items)
+	}
+	if got := waiting(t, advisor(), "payments_unmatched"); len(got) != 0 {
+		t.Errorf("the front desk has it: %+v", got)
+	}
+	if _, err := workshop.AddStatementLines(ctx, pool, owner(), "imported", []workshop.StatementLine{
+		{BookedOn: time.Now(), AmountMinor: p.AmountMinor, Reference: "OCR 1", ExternalID: "bank-1"}}); err != nil {
+		t.Fatal(err)
+	}
+	r, _ := workshop.Unreconciled(ctx, pool, owner())
+	if err := workshop.MatchPayment(ctx, pool, owner(), p.ID, r.Lines[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := waiting(t, owner(), "payments_unmatched"); len(got) != 0 {
+		t.Errorf("matched, and still waiting: %+v", got)
+	}
+}

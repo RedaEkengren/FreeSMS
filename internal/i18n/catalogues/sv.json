@@ -7632,6 +7632,10 @@
     "Waiting for a signature: %s": {
       "other": "Väntar på underskrift: %s"
     },
+    "%d payment is not on the bank's statement": {
+      "one": "%d betalning finns inte på bankens kontoutdrag",
+      "other": "%d betalningar finns inte på bankens kontoutdrag"
+    },
     "%d call to another service was given up": {
       "one": "%d anrop till en annan tjänst har getts upp",
       "other": "%d anrop till andra tjänster har getts upp"
