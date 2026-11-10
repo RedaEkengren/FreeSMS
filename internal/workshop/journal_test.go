@@ -736,3 +736,41 @@ func TestADepositAndAPayoutAreInTheDayAndNotInTheAccountingExport(t *testing.T) 
 		t.Errorf("%d deposit or payout rows were exported (the export reported %d)", exported, n)
 	}
 }
+
+// A payment may be dated a little before its invoice (the counter paid on
+// Friday, the invoice written on Monday) and not a month before (a year
+// typed wrong); and a finance company paying for a buyer is a payment
+// against the buyer's invoice that says who paid in its reference (#152).
+func TestAPaymentDatedBeforeItsInvoiceAndAThirdPartyPayer(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	inv, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool))
+	if err != nil {
+		t.Fatal(err)
+	}
+	half := inv.GrossMinor / 2
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: &half, Method: "bank", PaidOn: time.Now().AddDate(0, 0, -60)}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a payment dated two months before the invoice: %v", err)
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: &half, Method: "bank", PaidOn: time.Now().AddDate(0, 0, 5)}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a payment dated five days ahead: %v", err)
+	}
+	if _, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: &half, Method: "bank", PaidOn: time.Now().AddDate(0, 0, -3)}); err != nil {
+		t.Errorf("a payment dated three days before the invoice: %v", err)
+	}
+	rest := inv.GrossMinor - half
+	p, err := workshop.RecordPayment(ctx, pool, advisor(), inv.ID, workshop.NewPayment{
+		AmountMinor: &rest, Method: "bank", PaidOn: time.Now(), Reference: "Finansbolaget AB, köparens finansiering"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Reference != "Finansbolaget AB, köparens finansiering" {
+		t.Errorf("the payer is not on the payment: %q", p.Reference)
+	}
+	if b, _ := workshop.BalanceFor(ctx, pool, advisor(), inv.ID); !b.Settled() {
+		t.Errorf("paid by two payers and not settled: %d outstanding", b.OutstandingMinor())
+	}
+}
