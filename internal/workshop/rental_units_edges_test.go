@@ -158,3 +158,92 @@ func TestTwoFleetCarsAreNotMergedIntoOne(t *testing.T) {
 		}
 	}
 }
+
+// A booking that fails after its block was written leaves neither: the
+// block and the booking are one transaction (#192).
+func TestABookingThatFailsHalfwayLeavesNoBlockAndNoBooking(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	for _, q := range []string{
+		`CREATE FUNCTION fail_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'broken on purpose'; END $$`,
+		`CREATE TRIGGER fail_event BEFORE INSERT ON rental_booking_events FOR EACH ROW EXECUTE FUNCTION fail_event()`,
+	} {
+		if _, err := pool.Exec(ctx, q); err != nil {
+			t.Skipf("the test role cannot create a trigger: %v", err)
+		}
+	}
+	dropped := false
+	drop := func() {
+		if !dropped {
+			dropped = true
+			_, _ = pool.Exec(ctx, `DROP TRIGGER fail_event ON rental_booking_events`)
+			_, _ = pool.Exec(ctx, `DROP FUNCTION fail_event()`)
+		}
+	}
+	defer drop()
+	if _, err := v.book(pool, in2031(10, 9), in2031(11, 9)); err == nil {
+		t.Fatal("a booking went through a broken event")
+	}
+	drop()
+	var blocks, bookings int
+	if err := pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM resource_blocks WHERE resource_id = $1 AND kind = 'rental'),
+	                                      (SELECT count(*) FROM rental_bookings)`, v.resource).Scan(&blocks, &bookings); err != nil {
+		t.Fatal(err)
+	}
+	if blocks != 0 || bookings != 0 {
+		t.Errorf("a failed booking left %d blocks and %d bookings", blocks, bookings)
+	}
+	if _, err := v.book(pool, in2031(10, 9), in2031(11, 9)); err != nil {
+		t.Errorf("the dates are free after the failure: %v", err)
+	}
+}
+
+// A renter who did not come is a no-show once the rental was due to start:
+// the block goes, the booking and its events stay, and the time is free
+// to book again (#192).
+func TestANoShowReleasesTheBlockAndKeepsTheBooking(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	from, to := time.Now().Add(-2*time.Hour), time.Now().Add(48*time.Hour)
+	id, err := v.book(pool, from, to)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.CancelRentalBooking(ctx, pool, rentalDesk(), id, "Kom aldrig", true); err != nil {
+		t.Fatalf("a no-show once it was due: %v", err)
+	}
+	b, err := workshop.RentalBookingByID(ctx, pool, rentalDesk(), id)
+	if err != nil || b.State != workshop.RentalNoShow {
+		t.Fatalf("the booking after a no-show: %+v, %v", b.State, err)
+	}
+	if len(b.Events) < 2 || b.Events[len(b.Events)-1].Kind != "no_show" {
+		t.Errorf("the events: %+v", b.Events)
+	}
+	if _, err := v.book(pool, from.Add(time.Hour), to); err != nil {
+		t.Errorf("the time after a no-show: %v", err)
+	}
+}
+
+// One renter may hold two units at once -- a company renting two vans --
+// while the same unit and days are taken (#192).
+func TestOneRenterBooksTwoUnitsAtOnce(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	second := addUnit(t, pool, workshop.NewRentalUnit{Registration: "DEF 34G", FleetNumber: "V2", Category: "Small van"})
+	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), second, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
+		t.Fatal(err)
+	}
+	from, to := in2031(10, 9), in2031(10, 12)
+	if _, err := v.book(pool, from, to); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: second, RenterID: v.renter, From: from, To: to}); err != nil {
+		t.Errorf("the same renter, a second unit, the same days: %v", err)
+	}
+	if _, err := v.book(pool, from, to); !errors.Is(err, workshop.ErrResourceTaken) {
+		t.Errorf("the first unit, the same days: %v", err)
+	}
+}
