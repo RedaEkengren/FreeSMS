@@ -286,6 +286,14 @@ func StartFleetMembership(ctx context.Context, pool *pgxpool.Pool, scope access.
 				from = *closed
 			}
 		}
+		// Read before the insert: a refused insert aborts the transaction, and
+		// the refusal names the stock record that caused it (#190).
+		var openStock string
+		if vehicle != nil {
+			if err := tx.QueryRow(ctx, `SELECT coalesce(max(id::text), '') FROM stock_units WHERE vehicle_id = $1 AND closed_at IS NULL`, *vehicle).Scan(&openStock); err != nil {
+				return fmt.Errorf("read the open stock record: %w", err)
+			}
+		}
 		err = tx.QueryRow(ctx, `
 			INSERT INTO fleet_memberships (shop_id, unit_id, vehicle_id, joined_at, joined_how, joined_by, joined_note)
 			VALUES ($1, $2, $3, $4, $5, NULLIF($6, '')::uuid, nullif($7, '')) RETURNING id`,
@@ -293,7 +301,7 @@ func StartFleetMembership(ctx context.Context, pool *pgxpool.Pool, scope access.
 		var pg *pgconn.PgError
 		switch {
 		case errors.As(err, &pg) && pg.ConstraintName == "vehicle_fleet_or_stock":
-			return errFleetInStock
+			return &FleetInStockError{StockUnitID: openStock}
 		case errors.As(err, &pg) && pg.Code == "23P01":
 			return errInFleetAlready
 		case err != nil:
@@ -306,6 +314,14 @@ func StartFleetMembership(ctx context.Context, pool *pgxpool.Pool, scope access.
 	})
 	return id, err
 }
+
+// FleetInStockError is the refusal to put a car in the fleet while it is in
+// stock for sale. It reads as the sentence above and says which stock unit
+// is open.
+type FleetInStockError struct{ StockUnitID string }
+
+func (e *FleetInStockError) Error() string { return errFleetInStock.Error() }
+func (e *FleetInStockError) Unwrap() error { return errFleetInStock }
 
 // EndFleetMembership ends a unit's period in the fleet at a moment. Refused,
 // listing them, while rentals are booked or held on it after then; what was
