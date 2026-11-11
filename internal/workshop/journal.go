@@ -446,18 +446,42 @@ func RecordPayout(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, p
 		// The same request again finds the payment it made, whatever the
 		// checks say now: the money left when they let it. So the checks
 		// are the gate, asked only of a payment not made yet.
-		_, err = insertPaymentOnceGated(ctx, tx, scope, &out, func() error {
+		var over *PurchaseBalance
+		var why string
+		replayed, err := insertPaymentOnceGated(ctx, tx, scope, &out, func() error {
 			// Dealer: no money leaves for a car before its checks pass
 			// (#162), so a purchase's payout names the purchase it pays.
 			if err := payoutSubjectTx(ctx, tx, purpose, subjectKind, subjectID, partyID); err != nil {
 				return err
 			}
-			if purpose == "purchase" {
-				return purchaseChecksClearTx(ctx, tx, subjectID)
+			if purpose != "purchase" {
+				return nil
+			}
+			if err := purchaseChecksClearTx(ctx, tx, subjectID); err != nil {
+				return err
+			}
+			// Nor more than the purchase says is owed, all payouts together
+			// (#248): asked, with a reason, not silently accepted.
+			b, err := purchaseBalanceTx(ctx, tx, subjectID)
+			if err != nil {
+				return err
+			}
+			if *p.AmountMinor > b.LeftMinor()+overpaymentMargin {
+				if !p.ConfirmedOverpayment {
+					return ErrPayoutOverPrice
+				}
+				if why, err = checkReason(p.OverpaymentReason, ErrOverpaymentNoReason); err != nil {
+					return err
+				}
+				over = &b
 			}
 			return nil
 		})
-		return err
+		if err != nil || replayed || over == nil {
+			return err
+		}
+		return auditTx(ctx, tx, scope, out.ID, "payment.overpayment_confirmed", "", "", why,
+			map[string]any{"purchase_id": subjectID, "amount_minor": -out.AmountMinor, "left_minor": over.LeftMinor()})
 	})
 	return out, err
 }
