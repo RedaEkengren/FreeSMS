@@ -77,8 +77,10 @@ var queryBudgets = map[string]int{
 	// transaction, five statements).
 	"desk GET /search?q=customer":  21,
 	"owner GET /search?q=customer": 21,
-	"owner GET /":                  32,
-	"desk GET /board":              21,
+	// 32 to 33: the rental invoiced this month, one statement for the
+	// owner's card (#157); the other rental cards are counted together.
+	"owner GET /":     33,
+	"desk GET /board": 21,
 	// 35: the quote the customer was shown and what they answered to it
 	// (two statements), which the counter reads on every live refresh.
 	// 39: the work list, as for the technician. 40: whether the job is a

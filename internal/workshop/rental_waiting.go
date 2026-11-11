@@ -28,7 +28,27 @@ const (
 	rentalHandoverToday = rentalState + ` = 'confirmed' AND b.starts_at < t.tomorrow`
 	rentalReturnToday   = rentalState + ` = 'checked_out' AND b.ends_at >= clock_timestamp() AND b.ends_at < t.tomorrow`
 	rentalOverdue       = rentalState + ` = 'checked_out' AND b.ends_at < clock_timestamp()`
+	rentalOutNow        = rentalState + ` = 'checked_out'`
+	// A rental with a damage case found on it that nobody has taken a first
+	// step on (#157): the cases the queue lists two days after, counted from
+	// the first day, as bookings so it is one more column of the same count.
+	rentalDamageToAssess = `EXISTS (SELECT 1 FROM damage_cases c WHERE c.booking_id = b.id
+	                                AND NOT EXISTS (SELECT 1 FROM damage_case_steps s WHERE s.case_id = c.id))`
 )
+
+// rentalInvoicedThisMonth is what rental invoices came to before VAT in the
+// shop's calendar month so far, credit notes counted as the negatives they
+// are (the dashboard does the same). Only for whoever runs the shop.
+func rentalInvoicedThisMonth(ctx context.Context, tx pgx.Tx, _ access.Scope) (int, int64, error) {
+	var n int
+	var net int64
+	err := tx.QueryRow(ctx, `
+		SELECT count(i.id), coalesce(sum(i.net_minor), 0)
+		FROM invoices i CROSS JOIN shops s
+		WHERE i.source = 'rental'
+		  AND i.issued_at >= date_trunc('month', clock_timestamp() AT TIME ZONE s.timezone) AT TIME ZONE s.timezone`).Scan(&n, &net)
+	return n, net, err
+}
 
 // rentalWaiting is the rental desk's part of the action queue.
 func rentalWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ActionItem, error) {

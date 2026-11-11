@@ -3,6 +3,7 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"testing"
 	"time"
 
@@ -245,5 +246,84 @@ func TestOneRenterBooksTwoUnitsAtOnce(t *testing.T) {
 	}
 	if _, err := v.book(pool, from, to); !errors.Is(err, workshop.ErrResourceTaken) {
 		t.Errorf("the first unit, the same days: %v", err)
+	}
+}
+
+// The home page's rental cards (#157): the desk is told of a damage case
+// nobody has assessed; the owner of what is out and what was invoiced this
+// month; nobody else of either. Read from the rows each time.
+func TestTheHomePageCountsRentalDamageAndInvoicingForTheRightRoles(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	dc, err := workshop.DamageCaseByID(ctx, pool, rentalDesk(), newDamageOn(t, pool, "GHI 56J", "V3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	inv, err := workshop.IssueRentalInvoice(ctx, pool, rentalDesk(), dc.BookingID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cards := func(s access.Scope) map[string]workshop.Card {
+		t.Helper()
+		home, errs := workshop.HomeFor(ctx, pool, s)
+		if len(errs) > 0 {
+			t.Fatal(errs)
+		}
+		out := map[string]workshop.Card{}
+		for _, c := range append(append([]workshop.Card{}, home.Actions...), home.Information...) {
+			out[c.Title] = c
+		}
+		return out
+	}
+	const damage, invoiced = "%d rental with damage nobody has assessed", "Rental invoiced this month, before VAT"
+	desk := cards(rentalDesk())
+	if desk[damage].Count != 1 {
+		t.Errorf("the desk's cards: %+v", desk)
+	}
+	if _, ok := desk[invoiced]; ok {
+		t.Error("the rental desk was shown what the shop invoiced")
+	}
+	boss := cards(rentalOwner())
+	var net int64
+	if err := pool.QueryRow(ctx, `SELECT net_minor FROM invoices WHERE id = $1`, inv.ID).Scan(&net); err != nil {
+		t.Fatal(err)
+	}
+	if boss[invoiced].Minor != net || boss[invoiced].Count != 1 || net == 0 {
+		t.Errorf("the owner's invoiced card: %+v, want %d", boss[invoiced], net)
+	}
+	for _, s := range []access.Scope{technician(), advisor(), sales()} {
+		for title := range cards(s) {
+			if title == damage || title == invoiced {
+				t.Errorf("%v was shown %q", s.Role, title)
+			}
+		}
+	}
+	// Switched off, a module's cards go with it.
+	off := rentalOwner()
+	off.Modules = workshopOnly
+	for title, c := range cards(off) {
+		if c.Module == access.Rental {
+			t.Errorf("a rental card with Rental off: %q", title)
+		}
+	}
+}
+
+// A unit out on a rental is counted for the owner, and only while it is out.
+func TestTheOwnersHomePageCountsTheUnitsOutNow(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	checkedOut(t, pool)
+	home, errs := workshop.HomeFor(ctx, pool, rentalOwner())
+	if len(errs) > 0 {
+		t.Fatal(errs)
+	}
+	found := 0
+	for _, c := range home.Information {
+		if c.Title == "%d rental unit out now" {
+			found = c.Count
+		}
+	}
+	if found != 1 {
+		t.Errorf("units out now: %d; cards %+v", found, home.Information)
 	}
 }
