@@ -271,3 +271,188 @@ func TestADealAndARentalBookingAreFoundByTheirNumbers(t *testing.T) {
 		t.Errorf("a booking with Rental off: %v", got)
 	}
 }
+
+// A search with a null character, invalid text or too long is refused, not
+// run (#159).
+func TestASearchThatCannotBeASearchIsRefused(t *testing.T) {
+	pool := setup(t)
+	for name, q := range map[string]string{"a null character": "ab\x00c", "text that is not text": "ab\xffc", "too long": strings.Repeat("A", 101)} {
+		if _, err := workshop.SearchAll(context.Background(), pool, advisor(), q); !errors.Is(err, workshop.ErrInvalid) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+// A vehicle result says where the vehicle is active -- in stock for whoever
+// sells or buys cars, in the rental fleet for the rental desk -- and a role
+// is told nothing about a module it does not work in (#159).
+func TestAVehicleResultSaysWhereItIsActive(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := boughtCar(t, pool)
+	var vin string
+	if err := pool.QueryRow(ctx, `SELECT v.vin FROM vehicles v JOIN stock_units u ON u.vehicle_id = v.id WHERE u.id = $1`, p.StockUnitID).Scan(&vin); err != nil {
+		t.Fatal(err)
+	}
+	rentableVanWith(t, pool, "RNT 123")
+
+	activeIn := func(s access.Scope, q string) []access.Module {
+		t.Helper()
+		found, err := workshop.SearchAll(ctx, pool, s, q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, f := range found {
+			if f.Kind == "vehicle" {
+				return f.ActiveIn
+			}
+		}
+		t.Fatalf("%s found no vehicle for %q", s.Role, q)
+		return nil
+	}
+	if got := activeIn(buyerScope(), vin); !slices.Equal(got, []access.Module{access.Dealer}) {
+		t.Errorf("a car in stock, for the buyer: %v", got)
+	}
+	if got := activeIn(rentalDesk(), "RNT 123"); !slices.Equal(got, []access.Module{access.Rental}) {
+		t.Errorf("a van in the fleet, for the rental desk: %v", got)
+	}
+	// The rental desk is not told the van's stock or jobs, and the buyer is
+	// not told it is in the fleet.
+	if got := activeIn(buyerScope(), "RNT 123"); len(got) != 0 {
+		t.Errorf("the buyer is told where the van is active: %v", got)
+	}
+	if got := activeIn(rentalDesk(), vin); len(got) != 0 {
+		t.Errorf("the rental desk is told the car is in stock: %v", got)
+	}
+	// With Dealer switched off the stock is not something to be shown.
+	off := buyerScope()
+	off.Modules = []access.Module{access.Workshop, access.Rental}
+	if got := activeIn(off, vin); len(got) != 0 {
+		t.Errorf("a car in stock with Dealer off: %v", got)
+	}
+}
+
+// A renter or a seller is found by name by the roles that deal with them,
+// and a person who is both a customer and a renter is one result for the
+// front desk and one for the rental desk, never two (#159).
+func TestAPartyWhoIsCustomerAndRenterIsFoundOnce(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	van := rentableVanWith(t, pool, "RNT 123")
+	_ = van
+
+	kinds := func(s access.Scope, q string) []string {
+		t.Helper()
+		found, err := workshop.SearchAll(ctx, pool, s, q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, f := range found {
+			if f.Kind == "customer" || f.Kind == "party" {
+				out = append(out, f.Kind)
+			}
+		}
+		return out
+	}
+	// A renter who is nobody's customer: the rental desk and the front desk
+	// find them; the buyer, who does not deal with renters, does not.
+	for _, s := range []access.Scope{rentalDesk(), advisor()} {
+		if got := kinds(s, "Rita Hyrare"); !slices.Equal(got, []string{"party"}) {
+			t.Errorf("%s: a renter by name: %v", s.Role, got)
+		}
+	}
+	if got := kinds(buyerScope(), "Rita Hyrare"); len(got) != 0 {
+		t.Errorf("the buyer finds a renter: %v", got)
+	}
+	if got := kinds(technician(), "Rita Hyrare"); len(got) != 0 {
+		t.Errorf("a technician finds a renter: %v", got)
+	}
+
+	// A customer who also rents: one result for the front desk, as the
+	// customer, and one for the rental desk, as the party.
+	party := partyOf(t, pool, fixtureCustomer)
+	if err := workshop.StartPartyRole(ctx, pool, everything(owner()), party, workshop.PartyRenter, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := kinds(advisor(), "A Customer"); !slices.Equal(got, []string{"customer"}) {
+		t.Errorf("the front desk, a customer who also rents: %v", got)
+	}
+	if got := kinds(rentalDesk(), "A Customer"); !slices.Equal(got, []string{"party"}) {
+		t.Errorf("the rental desk, a customer who also rents: %v", got)
+	}
+}
+
+// A deal or a booking a role may not see adds nothing to what it is told:
+// the search for its number answers exactly as for a number nobody has
+// (#159).
+func TestASearchForADealAnswersTheSameWhetherOrNotItExists(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	car := carForSaleAgain(t, pool)
+	d, err := workshop.CreateDeal(ctx, pool, sales(), workshop.NewDeal{UnitID: car, Terms: consumerTerms(driver(t, pool))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []access.Scope{technician(), rentalDesk(), advisor()} {
+		with, err1 := workshop.SearchAll(ctx, pool, s, "#"+itoa(d.Number))
+		without, err2 := workshop.SearchAll(ctx, pool, s, "#"+itoa(d.Number+1000))
+		if err1 != nil || err2 != nil {
+			t.Fatalf("%s: %v %v", s.Role, err1, err2)
+		}
+		// Other records may match the same digits for their own reasons --
+		// a job or booking with that number, a chassis number that contains
+		// them -- so what is compared is what the deal itself could add:
+		// a result found on its number, or one that says it is a deal.
+		viaDeal := func(found []workshop.Found) (n int) {
+			for _, f := range found {
+				if f.Kind == "deal" || f.MatchedOn == "deal number" {
+					n++
+				}
+			}
+			return n
+		}
+		if viaDeal(with) != 0 || viaDeal(without) != 0 {
+			t.Errorf("%s was told of a deal: %+v", s.Role, with)
+		}
+	}
+}
+
+// A plate reissued to another vehicle years later finds both, the one that
+// holds it now first, each with the period it carried the plate (#159).
+func TestAReissuedPlateFindsBothVehiclesWithTheirPeriods(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	var older string
+	if err := pool.QueryRow(ctx, `INSERT INTO vehicles (shop_id, make, model) VALUES ($1, 'Volvo', '240') RETURNING id`, shopID).Scan(&older); err != nil {
+		t.Fatal(err)
+	}
+	// The plate was on the older car until the year before it was issued
+	// again; the current holder is vehicle A.
+	if _, err := pool.Exec(ctx, `UPDATE vehicle_registrations SET valid_from = '2018-01-01' WHERE vehicle_id = $1`, vehicleA); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO vehicle_registrations (shop_id, vehicle_id, registration, normalised, valid_from, valid_to)
+		VALUES ($1, $2, 'ABC 12D', 'ABC12D', '2005-03-01', '2017-06-30')`, shopID, older); err != nil {
+		t.Fatal(err)
+	}
+	found, err := workshop.SearchAll(ctx, pool, advisor(), "ABC 12D")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cars []workshop.Found
+	for _, f := range found {
+		if f.Kind == "vehicle" {
+			cars = append(cars, f)
+		}
+	}
+	if len(cars) != 2 || cars[0].ID != vehicleA || cars[1].ID != older {
+		t.Fatalf("a reissued plate: %+v", cars)
+	}
+	if cars[0].PlateFrom.Year() != 2018 || !cars[0].PlateTo.IsZero() {
+		t.Errorf("the current holder's period: %v to %v", cars[0].PlateFrom, cars[0].PlateTo)
+	}
+	if cars[1].PlateFrom.Year() != 2005 || cars[1].PlateTo.Year() != 2017 {
+		t.Errorf("the older car's period: %v to %v", cars[1].PlateFrom, cars[1].PlateTo)
+	}
+}

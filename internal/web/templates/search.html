@@ -18,6 +18,7 @@
       <div class="row">
         <span class="plate">{{if eq .Kind "vehicle"}}{{$.T .Heading}}{{else}}{{.Heading}}{{end}}</span>
         <span class="tag">{{$.T .MatchedOn}}</span>
+        {{if not .PlateFrom.IsZero}}<span class="tag">{{$.Date ($.Local .PlateFrom) "2 Jan 2006"}} &ndash; {{if .PlateTo.IsZero}}{{$.T "now"}}{{else}}{{$.Date ($.Local .PlateTo) "2 Jan 2006"}}{{end}}</span>{{end}}
         {{range .ActiveIn}}<span class="tag running">{{$.T .Label}}</span>{{end}}
       </div>
       {{if .Detail}}<div class="vehicle">{{.Detail}}</div>{{end}}

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
@@ -24,7 +25,7 @@ import (
 
 // Found is one result, whatever it is.
 type Found struct {
-	// "vehicle", "job", "customer", "deal" or "rental".
+	// "vehicle", "job", "customer", "party", "deal" or "rental".
 	Kind   string
 	Module access.Module
 	ID     string
@@ -36,7 +37,10 @@ type Found struct {
 	MatchedOn string
 	// The modules a vehicle is active in, of those the caller may see.
 	ActiveIn []access.Module
-	rank     int
+	// When the plate searched for was on this vehicle, for a match on a
+	// plate; PlateTo is zero while it still is.
+	PlateFrom, PlateTo time.Time
+	rank               int
 	// The whole of what was typed is this record's plate, chassis number
 	// or job number, not a part of it.
 	exact bool
@@ -49,6 +53,8 @@ func (f Found) Link() string {
 		return "/jobs/" + f.ID
 	case "customer":
 		return "/customers/" + f.ID
+	case "party":
+		return "/parties/" + f.ID
 	case "deal":
 		return "/cars/deals/" + f.ID
 	case "rental":
@@ -81,6 +87,7 @@ type SearchProvider struct {
 var searchProviders = []SearchProvider{
 	{Name: "vehicles", Find: findVehicles},
 	{Name: "customers", Find: findCustomers},
+	{Name: "parties", Find: findParties},
 	{Module: access.Workshop, Name: "jobs", Find: findJobs},
 	{Module: access.Dealer, Name: "deals", Find: findDeals},
 	{Module: access.Rental, Name: "rental bookings", Find: findRentalBookings},
@@ -154,30 +161,49 @@ func findVehicles(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, q
 	for _, r := range results {
 		ids = append(ids, r.VehicleID)
 	}
-	// Where each is active, of what the caller may see: the workshop's
-	// open jobs for whoever works in it.
-	active := map[string]bool{}
-	if len(ids) > 0 && scope.Uses(access.Workshop) && scope.Role.WorksInTheWorkshop() {
-		err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-			rows, err := tx.Query(ctx, `SELECT DISTINCT w.vehicle_id::text FROM work_orders w WHERE w.vehicle_id = ANY($1::uuid[]) AND `+openJob, ids)
+	// Where each is active, of what the caller may see: an open job for
+	// whoever works in the workshop, a car in stock for whoever sells or buys
+	// cars, a place in the rental fleet for whoever hands out rentals -- each
+	// only in a module the shop runs. One statement for all of them; a module
+	// the caller may not see is false in the query, not filtered after.
+	type where struct{ workshop, dealer, rental bool }
+	active := map[string]where{}
+	if len(ids) > 0 {
+		inWorkshopRole := scope.Uses(access.Workshop) && scope.Role.WorksInTheWorkshop()
+		inDealerRole := scope.Uses(access.Dealer) && (scope.Role.SellsVehicles() || scope.Role.BuysVehicles())
+		inRentalRole := scope.Uses(access.Rental) && scope.Role.HandsOverRentals()
+		if inWorkshopRole || inDealerRole || inRentalRole {
+			err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+				rows, err := tx.Query(ctx, `
+					SELECT v.id::text,
+					  $2 AND EXISTS (SELECT 1 FROM work_orders w WHERE w.vehicle_id = v.id AND `+openJob+`),
+					  $3 AND EXISTS (SELECT 1 FROM stock_units u WHERE u.vehicle_id = v.id AND u.closed_at IS NULL),
+					  $4 AND EXISTS (SELECT 1 FROM fleet_memberships f WHERE f.vehicle_id = v.id AND f.left_at IS NULL)
+					FROM unnest($1::uuid[]) AS v(id)`, ids, inWorkshopRole, inDealerRole, inRentalRole)
+				if err != nil {
+					return err
+				}
+				defer rows.Close()
+				for rows.Next() {
+					var id string
+					var w where
+					if err := rows.Scan(&id, &w.workshop, &w.dealer, &w.rental); err != nil {
+						return err
+					}
+					active[id] = w
+				}
+				return rows.Err()
+			})
 			if err != nil {
-				return err
+				return nil, fmt.Errorf("read where the vehicles are active: %w", err)
 			}
-			got, err := pgx.CollectRows(rows, pgx.RowTo[string])
-			for _, id := range got {
-				active[id] = true
-			}
-			return err
-		})
-		if err != nil {
-			return nil, fmt.Errorf("read where the vehicles are active: %w", err)
 		}
 	}
 	vin := vinLike(NormaliseRegistration(query))
 	out := make([]Found, 0, len(results))
 	for _, r := range results {
 		f := Found{Kind: "vehicle", ID: r.VehicleID, Heading: r.Describe(), MatchedOn: r.MatchedOn, rank: rankName,
-			Detail: strings.TrimSpace(r.Make + " " + r.Model)}
+			Detail: strings.TrimSpace(r.Make + " " + r.Model), PlateFrom: r.PlateFrom, PlateTo: r.PlateTo}
 		if r.ModelYear != nil {
 			f.Detail += " " + strconv.Itoa(int(*r.ModelYear))
 		}
@@ -193,8 +219,14 @@ func findVehicles(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, q
 				f.rank, f.exact = rankExact, true
 			}
 		}
-		if active[r.VehicleID] {
-			f.ActiveIn = []access.Module{access.Workshop}
+		if w := active[r.VehicleID]; w.workshop {
+			f.ActiveIn = append(f.ActiveIn, access.Workshop)
+		}
+		if w := active[r.VehicleID]; w.dealer {
+			f.ActiveIn = append(f.ActiveIn, access.Dealer)
+		}
+		if w := active[r.VehicleID]; w.rental {
+			f.ActiveIn = append(f.ActiveIn, access.Rental)
 		}
 		out = append(out, f)
 	}
@@ -320,6 +352,46 @@ func findRentalBookings(ctx context.Context, pool *pgxpool.Pool, scope access.Sc
 		f.Detail = fleet + " · " + category
 		out = append(out, f)
 		return nil
+	})
+	return out, err
+}
+
+// findParties is a person or a company by name, by the roles the caller
+// deals in: a seller to the buyer, a renter to the rental desk. A party who
+// is a customer is found as the customer for a role that sees customers, so
+// one person is not two results; for any other role the party is found
+// through the roles it is allowed to know, and a party with none of them is
+// not there at all. An erased person is not found by the name they had.
+func findParties(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, query string) ([]Found, error) {
+	seen := partyRolesSeen(scope.Role, PartyRoles)
+	if len(seen) == 0 {
+		return nil, nil
+	}
+	var out []Found
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `
+			SELECT pa.id::text, `+partyNameSQL+`
+			`+partyJoins+`
+			WHERE pa.merged_into IS NULL
+			  AND (pa.customer_id IS NULL OR NOT $3)
+			  AND coalesce(cp.erased_at, pp.erased_at) IS NULL
+			  AND EXISTS (SELECT 1 FROM party_roles r WHERE r.party_id = pa.id AND r.role = ANY($2)
+			              AND (r.valid_to IS NULL OR r.valid_to > clock_timestamp()))
+			  AND `+partyNameSQL+` ILIKE '%' || $1 || '%'
+			ORDER BY 2
+			LIMIT 20`, query, seen, scope.Role.SeesCustomerPersonalData())
+		if err != nil {
+			return fmt.Errorf("find parties: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			f := Found{Kind: "party", MatchedOn: "party", rank: rankName}
+			if err := rows.Scan(&f.ID, &f.Heading); err != nil {
+				return err
+			}
+			out = append(out, f)
+		}
+		return rows.Err()
 	})
 	return out, err
 }

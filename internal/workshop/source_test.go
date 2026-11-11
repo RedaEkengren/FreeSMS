@@ -1,6 +1,7 @@
 package workshop_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"sort"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/database"
+	"github.com/RedaEkengren/FreeSMS/internal/ops"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -266,5 +268,37 @@ func TestConcurrentIssuesInDifferentSourcesShareTheSeriesWithoutAGap(t *testing.
 	}
 	if len(numbers) != 2*each {
 		t.Errorf("%d invoices, want %d", len(numbers), 2*each)
+	}
+}
+
+// An invoice with no job behind it -- written by hand, or from a rental --
+// goes through everything that reads invoices: the e-invoice writer names
+// what it lacks rather than failing, the shop's export carries it, and the
+// restore check (-verify) finds the books whole (#146).
+func TestAnInvoiceWithNoJobSurvivesTheExportsAndTheRestoreCheck(t *testing.T) {
+	pool := setup(t)
+	addTechnician(t, pool)
+	ctx := context.Background()
+	if _, err := workshop.Issue(ctx, pool, advisor(), readyToInvoice(t, pool)); err != nil {
+		t.Fatal(err)
+	}
+	byHand := manual(t, pool)
+
+	if _, _, err := workshop.EInvoice(ctx, pool, advisor(), byHand.ID); err != nil {
+		t.Errorf("the e-invoice of an invoice by hand: %v", err)
+	}
+	var export bytes.Buffer
+	if err := workshop.WriteShopExport(ctx, pool, owner(), &export, nil, "test"); err != nil {
+		t.Fatalf("the shop's export: %v", err)
+	}
+	if export.Len() == 0 {
+		t.Error("the shop's export is empty")
+	}
+	rep, err := ops.Verify(ctx, pool, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Failed() {
+		t.Errorf("the restore check fails with an invoice by hand in the books:\n%s", rep.Text())
 	}
 }
