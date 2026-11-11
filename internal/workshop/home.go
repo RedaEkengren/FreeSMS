@@ -111,6 +111,12 @@ var cardSources = []CardSource{
 		May: access.Roles.HandsOverRentals, RentalWhere: rentalReturnToday},
 	{Module: access.Rental, Kind: CardAction, Title: "%d rental out past its return", Link: "/rental",
 		May: access.Roles.HandsOverRentals, RentalWhere: rentalOverdue},
+	{Module: access.Rental, Kind: CardAction, Title: "%d rental with damage nobody has assessed", Link: "/rental",
+		May: access.Roles.HandsOverRentals, RentalWhere: rentalDamageToAssess},
+	{Module: access.Rental, Kind: CardInformation, Title: "%d rental unit out now", Link: "/rental",
+		May: access.Roles.RunsTheShop, RentalWhere: rentalOutNow},
+	{Module: access.Rental, Kind: CardInformation, Title: "Rental invoiced this month, before VAT", Link: "/rental",
+		May: access.Roles.RunsTheShop, Read: rentalInvoicedThisMonth, Money: true},
 }
 
 // countJobs counts the workshop's jobs for every card that counts them, in

@@ -59,7 +59,9 @@ func TestTheRepairSummaryThroughThePages(t *testing.T) {
 			t.Errorf("the issued summary does not say %q: %s", want, doc)
 		}
 	}
-	if strings.Contains(doc, "800") {
+	// The price, as a reader sees it: not the digits inside an id or a token
+	// in the markup, which once made this fail one run in a few.
+	if regexp.MustCompile(`\b800\b`).MatchString(visibleText(doc)) {
 		t.Error("the summary carries a price")
 	}
 
