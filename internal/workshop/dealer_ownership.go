@@ -74,7 +74,10 @@ type FilingChecklist struct {
 }
 
 var (
-	errFilingControl   = fmt.Errorf("%w: the control number is needed to file; get it from the registration certificate first", ErrInvalid)
+	errFilingControl = fmt.Errorf("%w: the control number is needed to file; get it from the registration certificate first", ErrInvalid)
+	// ErrFilingLeased is a purchase filed while the unit's latest leasing
+	// check says the lessor has not consented (#162).
+	ErrFilingLeased    = fmt.Errorf("%w: the car is leased and the lessor has not consented; record the lessor's consent before the change is filed", ErrInvalid)
 	errFilingStatus    = fmt.Errorf("%w: a filing is filed before it is confirmed or rejected, and not after it is confirmed", ErrInvalid)
 	errFilingReference = fmt.Errorf("%w: say Transportstyrelsen's reference for the confirmation, in 100 characters or fewer", ErrInvalid)
 	// ErrFilingNoReason is a filing rejected without saying why.
@@ -148,6 +151,23 @@ func RecordFilingFiled(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		}
 		if f.Status == "confirmed" {
 			return errFilingStatus
+		}
+		// A leased car is not filed on without the lessor's consent: said
+		// on the checklist, or by the unit's newest leasing check (#162).
+		if c.LeasingConsent != nil && !*c.LeasingConsent {
+			return ErrFilingLeased
+		}
+		if f.SubjectKind == "purchase" {
+			var result string
+			err := tx.QueryRow(ctx, `
+				SELECT k.result FROM stock_checks k JOIN vehicle_purchases p ON p.stock_unit_id = k.stock_unit_id
+				WHERE p.id = $1 AND k.kind = 'leasing_consent' ORDER BY k.seq DESC LIMIT 1`, f.SubjectID).Scan(&result)
+			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("read the leasing check: %w", err)
+			}
+			if err == nil && result != "pass" {
+				return ErrFilingLeased
+			}
 		}
 		_, err = tx.Exec(ctx, `
 			INSERT INTO ownership_filing_events (shop_id, filing_id, status, control_number_in_hand, leasing_consent, retention_of_title,

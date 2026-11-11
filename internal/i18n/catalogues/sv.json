@@ -8452,6 +8452,7 @@
     "that phone number has too few or too many digits": {"other": "telefonnumret har för få eller för många siffror"},
     "that request was already used for another enquiry": {"other": "den begäran har redan använts för en annan förfrågan"},
     "Lead": {"other": "Lead"},
+    "the car is leased and the lessor has not consented; record the lessor's consent before the change is filed": {"other": "bilen är leasad och leasegivaren har inte medgett; registrera leasegivarens medgivande innan ändringen anmäls"},
     "party": {"other": "part"},
     "deal number": {"other": "affärsnummer"},
     "rental booking number": {"other": "hyresbokningsnummer"},
