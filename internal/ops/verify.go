@@ -155,6 +155,13 @@ func verifyShop(ctx context.Context, tx pgx.Tx, files Files, sr *ShopReport) err
 		return n, nil
 	}
 
+	countTwo := func(q string) (a, b int, err error) {
+		if err := tx.QueryRow(ctx, q).Scan(&a, &b); err != nil {
+			return 0, 0, fmt.Errorf("%s: %w", strings.Fields(q)[0], err)
+		}
+		return a, b, nil
+	}
+
 	// Numbers are an unbroken series. A gap in a Swedish invoice series is a
 	// document that is missing or was deleted, and it is the first thing an
 	// auditor looks for.
@@ -232,6 +239,29 @@ func verifyShop(ctx context.Context, tx pgx.Tx, files Files, sr *ShopReport) err
 		add("payment reversals", Fail, "%d reversals that do not undo the payment they point at", n)
 	} else {
 		add("payment reversals", Pass, "every reversal undoes its payment")
+	}
+
+	// A purchase is paid out no more than it says is owed (#248): every
+	// payout together, reversals netted. More that an owner said was meant,
+	// with a reason on the trail, is a decision and only worth a look; more
+	// that nobody confirmed is not. A trade-in's credit against its sale is
+	// not subtracted here, so this errs towards flagging less.
+	if unconfirmed, confirmed, err := countTwo(`
+		SELECT count(*) FILTER (WHERE NOT q.confirmed), count(*) FILTER (WHERE q.confirmed) FROM (
+			SELECT p.id, p.tax_purchase_price_minor AS price, -sum(x.amount_minor + x.rounding_minor) AS paid,
+			       bool_or(EXISTS (SELECT 1 FROM audit_events e WHERE e.event = 'payment.overpayment_confirmed' AND e.subject_id = x.id)) AS confirmed
+			FROM vehicle_purchases p
+			JOIN payouts o ON o.subject_kind = 'purchase' AND o.subject_id = p.id
+			JOIN invoice_payments x ON x.payout_id = o.id
+			GROUP BY p.id) q
+		WHERE q.paid > q.price + 100`); err != nil {
+		return err
+	} else if unconfirmed > 0 {
+		add("purchase payouts", Fail, "%d purchases were paid out more than they cost, and nobody said that was meant", unconfirmed)
+	} else if confirmed > 0 {
+		add("purchase payouts", Warn, "%d purchases were paid out more than they cost, each confirmed with a reason", confirmed)
+	} else {
+		add("purchase payouts", Pass, "no purchase is paid out beyond its price")
 	}
 
 	// Jobs and their invoices agree.

@@ -530,3 +530,28 @@ func TestAPayoutReplayedAfterTheChecksAgedFindsItsPayment(t *testing.T) {
 		t.Errorf("a new payout on aged checks: %v", err)
 	}
 }
+
+// A registration and a chassis number that do not agree keep the money back
+// like any other failed check (#162).
+func TestAMismatchedChassisNumberKeepsTheMoneyBack(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := buy(t, pool, workshop.StockFromPurchase)
+	payout, err := workshop.CreatePayout(ctx, pool, buyerScope(), workshop.NewHolding{PartyID: p.SellerPartyID, Purpose: "purchase",
+		SubjectKind: "purchase", SubjectID: p.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	passEveryCheck(t, pool, p.StockUnitID)
+	if err := workshop.RecordStockCheck(ctx, pool, buyerScope(), p.StockUnitID, workshop.NewStockCheck{
+		Kind: workshop.CheckVINMatches, Result: workshop.CheckFail, Note: "Chassinumret på bilen stämmer inte med registreringsbeviset"}); err != nil {
+		t.Fatal(err)
+	}
+	kinds, _, err := workshop.ChecksOutstanding(ctx, pool, buyerScope(), p.StockUnitID)
+	if err != nil || !slices.Equal(kinds, []string{workshop.CheckVINMatches}) {
+		t.Errorf("outstanding after the mismatch: %v, %v", kinds, err)
+	}
+	if err := payOut(pool, buyerScope(), payout, 8_500_000); !errors.Is(err, workshop.ErrChecksOutstanding) {
+		t.Errorf("paid out for a car whose chassis number does not match: %v", err)
+	}
+}

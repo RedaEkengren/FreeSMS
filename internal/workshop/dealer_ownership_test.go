@@ -98,3 +98,42 @@ func TestAPurchaseIsFiledAndAnUnconfirmedSaleIsNotForgotten(t *testing.T) {
 		t.Errorf("an unconfirmed filing three days on is not in the queue: %+v", items)
 	}
 }
+
+// A leased car is not filed on without the lessor's consent (#162): said on
+// the checklist, or by the unit's newest leasing check, and a later check
+// that passes lets it through. A purchase with no leasing check at all is
+// filed as before.
+func TestALeasedCarIsNotFiledWithoutTheLessorsConsent(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := eligibleCar(t, pool)
+	var purchase string
+	if err := pool.QueryRow(ctx, `SELECT id FROM vehicle_purchases WHERE stock_unit_id = $1`, unit).Scan(&purchase); err != nil {
+		t.Fatal(err)
+	}
+	f, err := workshop.FilingOf(ctx, pool, buyerScope(), "purchase", purchase)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checked := workshop.FilingChecklist{ControlNumberInHand: true}
+	no := false
+	refused := workshop.FilingChecklist{ControlNumberInHand: true, LeasingConsent: &no}
+	if err := workshop.RecordFilingFiled(ctx, pool, buyerScope(), f.ID, refused); !errors.Is(err, workshop.ErrFilingLeased) {
+		t.Errorf("filed with the checklist saying no consent: %v", err)
+	}
+	for _, result := range []string{workshop.CheckFail, workshop.CheckUnknown} {
+		if err := workshop.RecordStockCheck(ctx, pool, buyerScope(), unit, workshop.NewStockCheck{Kind: workshop.CheckLeasingConsent, Result: result}); err != nil {
+			t.Fatal(err)
+		}
+		if err := workshop.RecordFilingFiled(ctx, pool, buyerScope(), f.ID, checked); !errors.Is(err, workshop.ErrFilingLeased) {
+			t.Errorf("filed with the leasing check at %q: %v", result, err)
+		}
+	}
+	if err := workshop.RecordStockCheck(ctx, pool, buyerScope(), unit, workshop.NewStockCheck{Kind: workshop.CheckLeasingConsent, Result: workshop.CheckPass,
+		Note: "Medgivande från leasegivaren"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.RecordFilingFiled(ctx, pool, buyerScope(), f.ID, checked); err != nil {
+		t.Errorf("filed once the lessor had consented: %v", err)
+	}
+}
