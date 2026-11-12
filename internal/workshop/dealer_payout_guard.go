@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/RedaEkengren/FreeSMS/internal/money"
 )
 
 // What a purchase has been paid against what it says is owed (#248): the
@@ -36,6 +38,8 @@ func (b PurchaseBalance) LeftMinor() int64 { return b.OwedMinor - b.PaidMinor }
 // that is never updated).
 func purchaseBalanceTx(ctx context.Context, tx pgx.Tx, purchaseID string) (PurchaseBalance, error) {
 	var b PurchaseBalance
+	var sellerType string
+	var price int64
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('purchase_payouts:' || $1::text, 0))`, purchaseID); err != nil {
 		return b, fmt.Errorf("lock the purchase's payouts: %w", err)
 	}
@@ -48,13 +52,21 @@ func purchaseBalanceTx(ctx context.Context, tx pgx.Tx, purchaseID string) (Purch
 		                   WHERE r.purchase_id = p.id), 0),
 		       coalesce((SELECT -sum(x.amount_minor + x.rounding_minor)
 		                 FROM invoice_payments x JOIN payouts o ON o.id = x.payout_id
-		                 WHERE o.subject_kind = 'purchase' AND o.subject_id = p.id), 0)
-		FROM vehicle_purchases p WHERE p.id = $1`, purchaseID).Scan(&b.OwedMinor, &b.PaidMinor)
+		                 WHERE o.subject_kind = 'purchase' AND o.subject_id = p.id), 0),
+		       coalesce((SELECT e.seller_type FROM vat_eligibility e
+		                 WHERE e.purchase_id = p.id AND NOT EXISTS (SELECT 1 FROM vat_eligibility n WHERE n.supersedes_id = e.id)), ''),
+		       p.tax_purchase_price_minor
+		FROM vehicle_purchases p WHERE p.id = $1`, purchaseID).Scan(&b.OwedMinor, &b.PaidMinor, &sellerType, &price)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return b, ErrNotFound
 	}
 	if err != nil {
 		return b, fmt.Errorf("read what the purchase is owed: %w", err)
+	}
+	// A company that charges VAT is paid the gross price: the tax purchase
+	// price is the net one, and what is owed is what was agreed (#248).
+	if sellerType == SellerCompanyChargedVAT {
+		b.OwedMinor += money.VAT(price, 2500)
 	}
 	return b, nil
 }

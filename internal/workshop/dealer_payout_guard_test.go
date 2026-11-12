@@ -185,3 +185,73 @@ func TestPayoutsForOnePurchaseWaitForEachOther(t *testing.T) {
 		t.Errorf("%d paid, %d refused; want one of each", paid, refused)
 	}
 }
+
+// A company that charges VAT is paid the gross price, though the tax
+// purchase price is the net one (#248).
+func TestACompanyChargingVATIsPaidTheGrossPrice(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	firm, err := workshop.CreateParty(ctx, pool, buyerScope(), workshop.NewParty{Kind: "company", Name: "Bilfirman AB", OrgNumber: "556000-0000",
+		City: "Solna", Role: workshop.PartySeller})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var vehicle string
+	if err := pool.QueryRow(ctx, `INSERT INTO vehicles (shop_id, make, model, vin)
+		VALUES ($1, 'Saab', '9-3', 'YS3' || upper(substr(md5(random()::text), 1, 14))) RETURNING id`, shopID).Scan(&vehicle); err != nil {
+		t.Fatal(err)
+	}
+	p, err := workshop.RecordPurchase(ctx, pool, buyerScope(), workshop.NewPurchase{VehicleID: vehicle, Reason: workshop.StockFromPurchase,
+		SellerPartyID: firm, PurchasedOn: time.Now(), PriceMinor: 10_000_000, SellerType: workshop.SellerCompanyChargedVAT})
+	if err != nil {
+		t.Fatal(err)
+	}
+	passEveryCheck(t, pool, p.StockUnitID)
+	payout, err := workshop.CreatePayout(ctx, pool, buyerScope(), workshop.NewHolding{PartyID: firm, Purpose: "purchase", SubjectKind: "purchase", SubjectID: p.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pay := func(minor int64) error {
+		_, err := workshop.RecordPayout(ctx, pool, buyerScope(), payout, workshop.NewPayment{AmountMinor: &minor, Method: "bank", PaidOn: time.Now()})
+		return err
+	}
+	if err := pay(12_500_001 + 200); !errors.Is(err, workshop.ErrPayoutOverPrice) {
+		t.Errorf("more than the gross price: %v", err)
+	}
+	if err := pay(12_500_000); err != nil {
+		t.Errorf("the gross price, net and VAT: %v", err)
+	}
+}
+
+// What a trade-in credits against its sale never leaves as money (#248,
+// #165): of a trade-in at 40 000 kr with a loan of 10 000, only the loan's
+// 10 000 may be paid out.
+func TestATradeInIsPaidOutOnlyWhatItsSaleDoesNotCredit(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	kim := driver(t, pool)
+	d := contractWith(t, pool, eligibleCar(t, pool), kim, tradeIn(4_000_000, 1_000_000))
+	if _, err := workshop.ReceiveTradeIn(ctx, pool, buyerScope(), d.ID, "TRD123", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	clearChecks(t, pool, d.ID, "TRD123")
+	var purchase, seller string
+	if err := pool.QueryRow(ctx, `SELECT p.id, p.seller_party_id FROM vehicle_sale_trade_in_receipts r JOIN vehicle_purchases p ON p.id = r.purchase_id
+		WHERE r.sale_id = $1`, d.ID).Scan(&purchase, &seller); err != nil {
+		t.Fatal(err)
+	}
+	payout, err := workshop.CreatePayout(ctx, pool, buyerScope(), workshop.NewHolding{PartyID: seller, Purpose: "purchase", SubjectKind: "purchase", SubjectID: purchase})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pay := func(minor int64) error {
+		_, err := workshop.RecordPayout(ctx, pool, buyerScope(), payout, workshop.NewPayment{AmountMinor: &minor, Method: "bank", PaidOn: time.Now()})
+		return err
+	}
+	if err := pay(4_000_000); !errors.Is(err, workshop.ErrPayoutOverPrice) {
+		t.Errorf("paying out the credit as money: %v", err)
+	}
+	if err := pay(1_000_000); err != nil {
+		t.Errorf("paying out the loan's part: %v", err)
+	}
+}
