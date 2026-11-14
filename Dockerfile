@@ -10,7 +10,13 @@ COPY . .
 
 # CGO off gives a static binary, which is what lets the runtime image hold
 # nothing but the binary itself.
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/freesms ./cmd/freesms
+#
+# The cache mount keeps Go's compiled packages between builds on the same
+# daemon, so a build after a small change compiles what changed and not the
+# whole tree again. It is not part of any layer and changes nothing in the
+# image: the rollback test builds well over a hundred releases one after
+# another, and this took each build from about nine seconds to about four.
+RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/freesms ./cmd/freesms
 
 # Create the attachments directory here, with the right ownership, so that
 # Docker copies it -- and that ownership -- into an empty named volume the
