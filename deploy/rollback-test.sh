@@ -178,6 +178,11 @@ build_release() {
     else
         tar -C "$ROOT" --exclude=.git -cf - . | tar -C "$dir" -xf -
     fi
+    # A release cut from history has the Dockerfile it was cut with. Give its
+    # build the same Go build cache this tree's has -- the line is the same
+    # in every one that has it, and one that has not is built as it was,
+    # only slower.
+    sed -i 's|^RUN CGO_ENABLED=0 go build|RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 go build|' "$dir/Dockerfile"
     docker build -q -t "freesms-rollback:$tag" "$dir" >/dev/null 2>&1 || fail "could not build $tag (${commit:-this tree})"
 }
 
@@ -266,6 +271,7 @@ for file in migrations/*.sql; do
     say "$name: building the release before it was added"
     build_release m6-previous "$(git -C "$ROOT" rev-parse "$previous_commit")"
 
+    snapshot=""
     for next in "${nexts[@]}"; do
         if [ "$next" = tree ]; then
             tag=m6-tree label="this tree"
@@ -276,11 +282,31 @@ for file in migrations/*.sql; do
         fi
 
         say "$name: the release before, with the seeded workshop in it"
-        fresh_database
-        run m6-previous
-        healthy || fail "the release before $name did not start"
-        docker exec -i "$DB_CONTAINER" psql -U freesms -d freesms -q -v ON_ERROR_STOP=1 \
-            < "$WORK/release-m6-previous/scripts/seed.sql" >/dev/null || fail "the seed did not load"
+        if [ -z "$snapshot" ]; then
+            fresh_database
+            run m6-previous
+            healthy || fail "the release before $name did not start"
+            docker exec -i "$DB_CONTAINER" psql -U freesms -d freesms -q -v ON_ERROR_STOP=1 \
+                < "$WORK/release-m6-previous/scripts/seed.sql" >/dev/null || fail "the seed did not load"
+            # What the next release is given, kept as a template database:
+            # starting the release before on an empty one means applying every
+            # migration again, and it is the same state each time. The app is
+            # stopped first -- a template cannot have a connection to it.
+            docker rm -f "$APP" >/dev/null
+            docker exec "$DB_CONTAINER" psql -U freesms -d postgres -q -v ON_ERROR_STOP=1 \
+                -c "DROP DATABASE IF EXISTS rollback_snapshot" \
+                -c "CREATE DATABASE rollback_snapshot TEMPLATE freesms" || fail "could not keep the seeded database"
+            snapshot=1
+        else
+            docker rm -f "$APP" >/dev/null 2>&1 || true
+            docker exec "$DB_CONTAINER" psql -U freesms -d postgres -q -v ON_ERROR_STOP=1 \
+                -c "DROP DATABASE freesms WITH (FORCE)" \
+                -c "CREATE DATABASE freesms TEMPLATE rollback_snapshot" || fail "could not put the seeded database back"
+            # Without this a copy that did not take would leave the car the
+            # last pass took in, and the board would show it for nothing.
+            [ "$(sql "SELECT count(*) FROM work_orders WHERE complaint LIKE 'Taken in after%'")" = 0 ] \
+                || fail "the seeded database was not put back as it was"
+        fi
 
         say "$name: $label, and a car taken in after the migration"
         run "$tag"
