@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +19,13 @@ import (
 
 // A stock car offered (#167) and the public stock feed (#183). The feed is
 // documented in docs/stock-feed.md.
+
+// The stock feed may be read ten times a second, all callers together, with
+// room for fifty at once: a site rebuilding its cache, not a loop.
+const (
+	feedRatePerSecond = 10
+	feedBurst         = 50
+)
 
 // feedToken is the token a feed request carries: a bearer header, or the
 // token query parameter for a site that can only fetch a URL.
@@ -31,6 +40,13 @@ func feedToken(r *http.Request) string {
 // publishes them, with Last-Modified and an ETag, and since=<RFC 3339> for
 // only what changed. Closed or wrong token: as a path that does not exist.
 func (s *Server) handleStockFeed(w http.ResponseWriter, r *http.Request) {
+	// Before anything is read, and the same whether or not the feed is
+	// published, so that being refused says nothing about it.
+	if ok, wait := s.feedLimit.take(); !ok {
+		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(wait.Seconds()))))
+		http.Error(w, "too many requests; send If-None-Match with the ETag, or use since", http.StatusTooManyRequests)
+		return
+	}
 	var since time.Time
 	if v := r.URL.Query().Get("since"); v != "" {
 		t, err := time.Parse(time.RFC3339, v)

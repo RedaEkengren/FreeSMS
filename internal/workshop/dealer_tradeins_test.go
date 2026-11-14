@@ -51,7 +51,7 @@ func clearChecks(t *testing.T, pool *pgxpool.Pool, saleID, key string) {
 	ctx := context.Background()
 	var unit string
 	if err := pool.QueryRow(ctx, `SELECT p.stock_unit_id FROM vehicle_sale_trade_in_receipts r JOIN vehicle_purchases p ON p.id = r.purchase_id
-		WHERE r.sale_id = $1`, saleID).Scan(&unit); err != nil {
+		WHERE r.sale_id = $1 AND r.key = $2`, saleID, key).Scan(&unit); err != nil {
 		t.Fatal(err)
 	}
 	if err := workshop.OverrideStockChecks(ctx, pool, everything(owner()), unit, "Kontrollerat per telefon"); err != nil {
