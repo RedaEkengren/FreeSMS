@@ -71,7 +71,7 @@ var ExportTables = []string{
 	"ownership_filings", "ownership_filing_events",
 	// How each stock car is offered, a row per change, and how the stock
 	// feed is published (#167, #183).
-	"stock_listings", "stock_feed_settings",
+	"stock_listings", "stock_feed_settings", "stock_photo_changes",
 	// A car's damage and repairs, keys and where they went, and service
 	// book (#167).
 	"vehicle_damages", "vehicle_damage_repairs", "vehicle_keys", "vehicle_key_movements", "vehicle_service_entries",

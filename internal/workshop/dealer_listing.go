@@ -204,13 +204,26 @@ func MakeCover(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, phot
 		if _, err := unitOpenTx(ctx, tx, unit); err != nil {
 			return err
 		}
-		_, err := tx.Exec(ctx, `
+		if _, err := tx.Exec(ctx, `
 			UPDATE attachments a SET position = o.n
 			FROM (SELECT id, row_number() OVER (ORDER BY (id = $2) DESC, position, created_at) AS n
 			      FROM attachments WHERE stock_unit_id = $1) o
-			WHERE a.id = o.id`, unit, photoID)
-		return err
+			WHERE a.id = o.id`, unit, photoID); err != nil {
+			return err
+		}
+		return photoChangedTx(ctx, tx, scope, unit, "cover")
 	})
+}
+
+// photoChangedTx notes that a car's photographs changed in a way its own
+// rows do not show -- one gone, another in front -- so that the feed's
+// changed_at moves and a site asking for what changed since hears of it.
+func photoChangedTx(ctx context.Context, tx pgx.Tx, scope access.Scope, unitID, kind string) error {
+	if _, err := tx.Exec(ctx, `INSERT INTO stock_photo_changes (shop_id, stock_unit_id, kind, changed_by) VALUES ($1, $2, $3, NULLIF($4, '')::uuid)`,
+		scope.ShopID, unitID, kind, scope.UserID); err != nil {
+		return fmt.Errorf("note the photographs changed: %w", err)
+	}
+	return nil
 }
 
 // RemoveStockPhoto removes a stock car's photograph, row and file: the
@@ -228,11 +241,15 @@ func RemoveStockPhoto(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 	}
 	var key string
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		err := tx.QueryRow(ctx, `DELETE FROM attachments WHERE id = $1 AND stock_unit_id IS NOT NULL RETURNING storage_key`, photoID).Scan(&key)
+		var unit string
+		err := tx.QueryRow(ctx, `DELETE FROM attachments WHERE id = $1 AND stock_unit_id IS NOT NULL RETURNING storage_key, stock_unit_id`, photoID).Scan(&key, &unit)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
-		return err
+		if err != nil {
+			return err
+		}
+		return photoChangedTx(ctx, tx, scope, unit, "removed")
 	})
 	if err != nil {
 		return err
@@ -348,7 +365,8 @@ func StockFeed(ctx context.Context, pool *pgxpool.Pool, shopID, token string, si
 			       coalesce(l.vat_deductible, false), coalesce(l.equipment, '{}'), coalesce(l.description, ''), u.status = 'reserved',
 			       ARRAY(SELECT a.id::text FROM attachments a WHERE a.stock_unit_id = u.id ORDER BY a.position, a.created_at),
 			       greatest(u.first_for_sale_at, l.created_at,
-			                (SELECT max(a.created_at) FROM attachments a WHERE a.stock_unit_id = u.id), u.opened_at)
+			                (SELECT max(a.created_at) FROM attachments a WHERE a.stock_unit_id = u.id),
+			                (SELECT max(c.changed_at) FROM stock_photo_changes c WHERE c.stock_unit_id = u.id), u.opened_at)
 			FROM stock_units u JOIN vehicles v ON v.id = u.vehicle_id
 			LEFT JOIN LATERAL (SELECT * FROM stock_listings x WHERE x.stock_unit_id = u.id ORDER BY x.created_at DESC, x.id DESC LIMIT 1) l ON true
 			WHERE u.closed_at IS NULL AND (u.status = 'for_sale' OR ($1 AND u.status = 'reserved'))

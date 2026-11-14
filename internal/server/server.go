@@ -71,6 +71,10 @@ type Server struct {
 	// What the shop runs, for requests with nobody signed in (moduleCache).
 	modules moduleCache
 
+	// How often the public stock feed may be read, all callers together
+	// (#183).
+	feedLimit *bucket
+
 	// Resolved once there is a shop. It starts empty on a fresh installation
 	// and is filled in by setup, while the process is running -- hence the
 	// mutex rather than a plain field read at boot.
@@ -245,6 +249,7 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 	srv := &Server{
 		pool:             pool,
 		log:              log,
+		feedLimit:        newBucket(feedRatePerSecond, feedBurst, time.Now),
 		live:             live.New(pool, log, liveStreams),
 		liveHeartbeat:    25 * time.Second,
 		release:          cfg.Release,

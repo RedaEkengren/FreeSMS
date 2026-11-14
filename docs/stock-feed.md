@@ -17,7 +17,8 @@ only its SHA-256. Making a new one stops the old one working.
     GET /feed/v1/stock.json?since=2026-11-03T12:00:00Z
 
 `since` returns only the cars whose details, price or photographs changed
-after that moment. A car that leaves the feed -- reserved, sold, delivered
+after that moment -- a photograph added, taken away, or moved to the front
+included. A car that leaves the feed -- reserved, sold, delivered
 or taken back into preparation -- is simply no longer in it, from the
 transaction that changed its status: compare the ids you hold with a full
 fetch to remove them.
@@ -28,6 +29,11 @@ change in it.
 
 A feed not published, or asked for without its token or with a wrong one,
 answers `404`, the same as a path that does not exist.
+
+The feed may be read about ten times a second, all callers together, with
+room for fifty at once. Past that it answers `429 Too Many Requests` with a
+`Retry-After` header in seconds; send `If-None-Match`, or use `since`, and a
+site is nowhere near it. The photographs are not counted: they are cacheable.
 
 ## The document
 
