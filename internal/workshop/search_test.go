@@ -456,3 +456,68 @@ func TestAReissuedPlateFindsBothVehiclesWithTheirPeriods(t *testing.T) {
 		t.Errorf("the older car's period: %v to %v", cars[1].PlateFrom, cars[1].PlateTo)
 	}
 }
+
+// The search answers in a time a person types into (#159) in a shop of
+// realistic size: twenty thousand cars, each with its plate and chassis
+// number, and five thousand companies as customers. A plate, a part of a
+// chassis number and a name that a thousand customers share are each asked
+// as the roles that search them; the answer is capped, and none takes a
+// second.
+func TestTheSearchIsFastInAShopOfRealisticSize(t *testing.T) {
+	if testing.Short() {
+		t.Skip("seeds twenty thousand cars")
+	}
+	pool := setup(t)
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO vehicles (id, shop_id, vin, make, model, model_year)
+		SELECT gen_random_uuid(), $1, 'YV1' || lpad(n::text, 14, '0'), 'Volvo', 'V70', 2010 + n % 12
+		FROM generate_series(1, 20000) n`, shopID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO vehicle_registrations (shop_id, vehicle_id, registration, normalised)
+		SELECT shop_id, id, 'QRS' || substr(vin, 15, 3) || substr(vin, 5, 3), 'QRS' || substr(vin, 15, 3) || substr(vin, 5, 3)
+		FROM vehicles WHERE vin LIKE 'YV1%' AND id NOT IN (SELECT vehicle_id FROM vehicle_registrations)
+		ON CONFLICT DO NOTHING`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO customers (shop_id, kind, company_name)
+		SELECT $1, 'company', 'Verkstad ' || (n % 1000) || ' AB nr ' || n FROM generate_series(1, 5000) n`, shopID); err != nil {
+		t.Fatal(err)
+	}
+	// Rows just loaded have no statistics, and the first plan is a guess:
+	// autovacuum would have looked within a minute of a real import.
+	if _, err := pool.Exec(ctx, `ANALYZE vehicles, vehicle_registrations, customers`); err != nil {
+		t.Fatal(err)
+	}
+	var plate string
+	if err := pool.QueryRow(ctx, `SELECT normalised FROM vehicle_registrations WHERE normalised LIKE 'QRS%' LIMIT 1`).Scan(&plate); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		who   string
+		scope access.Scope
+		query string
+	}{
+		{"owner", everything(owner()), plate},
+		{"owner", everything(owner()), "YV100000000012345"},
+		{"owner", everything(owner()), "00012345"},
+		{"owner", everything(owner()), "Verkstad 7 AB"},
+		{"advisor", everything(advisor()), "Verkstad"},
+		{"technician", everything(technician()), "Verkstad"},
+		{"sales", everything(sales()), "YV1"},
+	} {
+		start := time.Now()
+		found, err := workshop.SearchAll(ctx, pool, c.scope, c.query)
+		took := time.Since(start)
+		if err != nil {
+			t.Fatalf("%s searching %q: %v", c.who, c.query, err)
+		}
+		if took > time.Second {
+			t.Errorf("%s searching %q took %s for %d results", c.who, c.query, took, len(found))
+		}
+		t.Logf("%s %q: %d results in %s", c.who, c.query, len(found), took)
+	}
+}
