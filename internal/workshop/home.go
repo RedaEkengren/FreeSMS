@@ -215,6 +215,7 @@ func HomeFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (Home,
 	}
 	var jobs, rentals, stock []int
 	read := map[string]reading{}
+	var alone map[string]reading
 	if len(shown) > 0 {
 		err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 			var err error
@@ -246,14 +247,54 @@ func HomeFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (Home,
 			return nil
 		})
 		if err != nil {
+			// One card's query failing aborts the transaction they share.
+			// The happy path is one round trip; this one is slower and
+			// runs only now: each card asked for alone, so the one that
+			// fails is the one left out.
 			jobs, rentals, stock, read = nil, nil, nil, map[string]reading{}
 			failed = append(failed, fmt.Errorf("the cards counted together: %w", err))
+			alone = map[string]reading{}
+			for _, c := range shown {
+				err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+					var n []int
+					var err error
+					switch {
+					case c.JobsWhere != "":
+						n, err = countJobs(ctx, tx, []CardSource{c})
+					case c.RentalWhere != "":
+						n, err = countRentals(ctx, tx, []CardSource{c})
+					case c.StockWhere != "":
+						n, err = countStock(ctx, tx, []CardSource{c})
+					default:
+						var minor int64
+						var one int
+						one, minor, err = c.Read(ctx, tx, scope)
+						if err == nil {
+							alone[c.Title] = reading{one, minor}
+						}
+						return err
+					}
+					if err == nil && len(n) == 1 {
+						alone[c.Title] = reading{n[0], 0}
+					}
+					return err
+				})
+				if err != nil {
+					failed = append(failed, fmt.Errorf("card %q: %w", c.Title, err))
+				}
+			}
 		}
 	}
 	for _, c := range shown {
 		var n int
 		var minor int64
 		switch {
+		case alone != nil:
+			r, ok := alone[c.Title]
+			if !ok {
+				continue
+			}
+			n, minor = r.n, r.minor
 		case c.JobsWhere != "":
 			// In the order counted, which is the order shown.
 			if len(jobs) == 0 {
