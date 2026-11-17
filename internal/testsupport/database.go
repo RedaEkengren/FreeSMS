@@ -188,6 +188,18 @@ func buildTemplate(ctx context.Context, base *pgxpool.Config, name string, migra
 		return err
 	}
 	defer admin.Close(ctx)
+	// Migration 0003 creates the application's role unless it exists, and a
+	// role belongs to the whole cluster, not to the database being built:
+	// two test processes each building a template of their own can both find
+	// it missing and the second fails with a duplicate key. An advisory lock
+	// is per database, so it is taken on the one database every process is
+	// given -- the same lock that serialises the schema resets, which is why
+	// a package that resets the schema cannot be migrating at this moment
+	// either. Released with the connection if this process ends first.
+	if _, err := admin.Exec(ctx, `SELECT pg_advisory_lock($1)`, testLockKey); err != nil {
+		return fmt.Errorf("take test lock: %w", err)
+	}
+	defer func() { _, _ = admin.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock($1)`, testLockKey) }()
 	dropAbandoned(ctx, admin)
 	if _, err := admin.Exec(ctx, fmt.Sprintf(`CREATE DATABASE %s`, name)); err != nil {
 		return err

@@ -1,12 +1,15 @@
 package server
 
 import (
+	"encoding/csv"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/vehicledata"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
@@ -18,6 +21,9 @@ import (
 // field on pageData, so the pages of each module keep to their own.
 type dealerData struct {
 	Stock workshop.StockList
+	// The statuses to filter the stock list by, and the lines it is aged by.
+	Statuses []workshop.StockStatus
+	Lines    string
 	// Trade-ins waiting to be received or credited, for whoever buys cars.
 	TradeIns []workshop.ExpectedTradeIn
 	// What the cars sold in a period earned (#182), and the period.
@@ -273,21 +279,136 @@ func (s *Server) handleAcceptCalculation(w http.ResponseWriter, r *http.Request)
 	http.Redirect(w, r, "/cars/calculations/"+id, http.StatusSeeOther)
 }
 
+// stockFilter reads the list's filter from the query: a bucket, a status
+// and an order. What is not one of those is ignored, as a link from an old
+// page would be.
+func stockFilter(r *http.Request, buckets []string) workshop.StockFilter {
+	f := workshop.StockFilter{}
+	if b := r.URL.Query().Get("bucket"); slices.Contains(buckets, b) {
+		f.Bucket = b
+	}
+	if st := workshop.StockStatus(r.URL.Query().Get("status")); slices.Contains(workshop.StockStatuses, st) {
+		f.Status = st
+	}
+	if o := r.URL.Query().Get("sort"); o == "days_for_sale" || o == "registration" {
+		f.SortBy = o
+	}
+	return f
+}
+
+// readStock reads the list for a request: the buckets first, then the list
+// narrowed by what the query names.
+func (s *Server) readStock(r *http.Request, scope access.Scope) (workshop.StockList, workshop.StockFilter, []int, error) {
+	lines, buckets, err := workshop.StockAgeingOf(r.Context(), s.pool, scope)
+	if err != nil {
+		return workshop.StockList{}, workshop.StockFilter{}, nil, err
+	}
+	f := stockFilter(r, buckets)
+	list, err := workshop.StockFiltered(r.Context(), s.pool, scope, f)
+	return list, f, lines, err
+}
+
 // handleCarStock is the stock list (#168): every car in stock, longest there
-// first, and for whoever may see it what each has cost.
+// first, and for whoever may see it what each has cost. Narrowed by ageing
+// bucket and status, and ordered, by the query.
 func (s *Server) handleCarStock(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
-	list, err := workshop.Stock(r.Context(), s.pool, session.Scope)
+	list, f, lines, err := s.readStock(r, session.Scope)
 	if s.handoverError(w, r, err) {
 		return
 	}
-	d := &dealerData{Stock: list}
+	d := &dealerData{Stock: list, Statuses: workshop.StockStatuses,
+		Form: map[string]string{"bucket": f.Bucket, "status": string(f.Status), "sort": f.SortBy}}
+	days := make([]string, len(lines))
+	for i, l := range lines {
+		days[i] = strconv.Itoa(l)
+	}
+	d.Lines = strings.Join(days, ", ")
 	if session.Scope.Role.BuysVehicles() {
 		if d.TradeIns, err = workshop.ExpectedTradeIns(r.Context(), s.pool, session.Scope); err != nil {
 			s.log.Error("read expected trade-ins", "error", err)
 		}
 	}
 	s.render(w, r, http.StatusOK, "carstock", pageData{Title: "Cars in stock", Session: session, Dealer: d})
+}
+
+// handleCarStockCSV is the list as a spreadsheet: the rows the page shows,
+// narrowed the same way, and the figures only for whoever the page shows
+// them to -- a role that may not see what a car cost is not handed the
+// columns, not handed empty ones.
+func (s *Server) handleCarStockCSV(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	list, _, _, err := s.readStock(r, session.Scope)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	header := []string{"registration", "vin", "make", "model", "model_year", "odometer_km", "status", "days_in_stock",
+		"days_for_sale", "ageing", "consignment"}
+	figures := list.TotalValueMinor != nil
+	if figures {
+		header = append(header, "purchase_price", "costs", "stock_value")
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="stock.csv"`)
+	out := csv.NewWriter(w)
+	_ = out.Write(header)
+	minor := func(v *int64) string {
+		if v == nil {
+			return ""
+		}
+		return strconv.FormatInt(*v, 10)
+	}
+	for _, c := range list.Rows {
+		year, km, forSale := "", "", ""
+		if c.ModelYear != nil {
+			year = strconv.Itoa(*c.ModelYear)
+		}
+		if c.OdometerKm != nil {
+			km = strconv.FormatInt(*c.OdometerKm, 10)
+		}
+		if c.DaysForSale != nil {
+			forSale = strconv.Itoa(*c.DaysForSale)
+		}
+		row := []string{c.Registration, c.VIN, c.Make, c.Model, year, km, string(c.Status), strconv.Itoa(c.DaysInStock),
+			forSale, c.Ageing(), strconv.FormatBool(c.Consigned())}
+		if figures {
+			purchase, costs := "", ""
+			if c.Figures != nil {
+				purchase, costs = minor(c.Figures.PurchaseMinor), strconv.FormatInt(c.Figures.CostsMinor, 10)
+			}
+			row = append(row, purchase, costs, minor(c.ValueMinor()))
+		}
+		for i := range row {
+			row[i] = workshop.SpreadsheetCell(row[i])
+		}
+		_ = out.Write(row)
+	}
+	out.Flush()
+}
+
+// handleStockAgeing sets the days at which a car moves to the next bucket.
+func (s *Server) handleStockAgeing(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	var lines []int
+	for _, f := range strings.FieldsFunc(r.FormValue("lines"), func(c rune) bool { return c == ',' || c == ' ' || c == ';' }) {
+		n, err := strconv.Atoi(f)
+		if err != nil {
+			s.renderError(w, r, http.StatusBadRequest, "Not saved", "The ageing lines are one to six numbers of days, each more than the one before, at most ten years.")
+			return
+		}
+		lines = append(lines, n)
+	}
+	err := workshop.SetStockAgeing(r.Context(), s.pool, session.Scope, lines)
+	if errors.Is(err, workshop.ErrInvalid) {
+		s.renderError(w, r, http.StatusBadRequest, "Not saved", trimInvalid(err))
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/cars/stock", http.StatusSeeOther)
 }
 
 // handleReceiveTradeIn records a trade-in handed over, and credits it if

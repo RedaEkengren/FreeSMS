@@ -27,6 +27,8 @@ type StockRow struct {
 	Status       StockStatus
 	Reason       string
 	OpenedAt     time.Time
+	// The ageing bucket by the shop's own lines, named as the list names it.
+	Bucket string
 	// Days in stock, counted in the shop's own days: a car bought today
 	// has been in stock 0 days.
 	DaysInStock int
@@ -74,6 +76,9 @@ func (r StockRow) StatusLabel() string { return r.Status.Label() }
 // Ageing is which of the default ageing buckets the car is in, by days in
 // stock: "0-30", "31-60", "61-90" or "90+".
 func (r StockRow) Ageing() string {
+	if r.Bucket != "" {
+		return r.Bucket
+	}
 	switch d := r.DaysInStock; {
 	case d <= 30:
 		return "0-30"
@@ -93,6 +98,8 @@ func (r StockRow) Ageing() string {
 // them.
 type StockList struct {
 	Rows []StockRow
+	// The buckets the shop's lines make, shortest first.
+	Buckets []string
 	// The sum of every value the list can give; nil for a role that may
 	// not see it. Cars with a missing purchase price are counted apart.
 	TotalValueMinor *int64
@@ -104,12 +111,27 @@ func Stock(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (StockLi
 	if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
 		return StockList{}, access.ErrForbidden
 	}
+	return StockFiltered(ctx, pool, scope, StockFilter{})
+}
+
+// StockFiltered reads the stock list, narrowed and ordered. The total value
+// is of every car in stock, not of the rows shown: what the business holds
+// does not shrink because a filter is on.
+func StockFiltered(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, filter StockFilter) (StockList, error) {
+	if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+		return StockList{}, access.ErrForbidden
+	}
 	if err := scope.Require(access.Dealer); err != nil {
 		return StockList{}, err
 	}
 	figures := scope.Role.SeesPurchasePrice()
 	var out StockList
+	var lines []int
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		if lines, err = ageingTx(ctx, tx); err != nil {
+			return err
+		}
 		// $1 decides whether the figures are read at all: for a role that
 		// may not see them the columns are NULL in the statement itself.
 		rows, err := tx.Query(ctx, `
@@ -157,15 +179,22 @@ func Stock(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (StockLi
 					row.Figures.CostsMinor = *costs
 				}
 			}
+			row.Bucket = ageingBucket(row.DaysInStock, lines)
 			out.Rows = append(out.Rows, row)
 		}
 		return rows.Err()
 	})
-	if err != nil || !figures {
+	if err != nil {
 		return out, err
 	}
+	out.Buckets = ageingLabels(lines)
+	all := out.Rows
+	out.Rows = filter.apply(all)
+	if !figures {
+		return out, nil
+	}
 	var total int64
-	for _, r := range out.Rows {
+	for _, r := range all {
 		switch v := r.ValueMinor(); {
 		case v != nil:
 			total += *v

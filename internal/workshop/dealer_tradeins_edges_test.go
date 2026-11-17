@@ -267,3 +267,35 @@ func TestATradeInAlreadyCreditedCannotBeRevaluedByRevisingTheTerms(t *testing.T)
 		t.Errorf("the terms were revised under a trade-in already credited at another figure; held %d", heldForSale(t, pool, d.ID))
 	}
 }
+
+// The buyer's car arrives days after the car sold was delivered (#165): the
+// invoice was issued at the full price and stands owing until it does; the
+// trade-in is then received like any other, held and applied to the invoice
+// as a payment already made, and the delivered car is not moved.
+func TestATradeInArrivingAfterTheCarWasDeliveredIsAppliedToTheInvoice(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	kim := driver(t, pool)
+	d := contractWith(t, pool, eligibleCar(t, pool), kim, tradeIn(2_500_000, 0))
+	inv, err := workshop.IssueDealInvoice(ctx, pool, sales(), d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	moveStock(t, pool, d.StockUnitID, workshop.StockSold, workshop.StockDelivered)
+	if owed := outstanding(t, pool, inv.ID); owed != inv.GrossMinor {
+		t.Fatalf("owed before the trade-in arrives: %d, want the whole %d", owed, inv.GrossMinor)
+	}
+	if _, err := workshop.ReceiveTradeIn(ctx, pool, buyerScope(), d.ID, "TRD123", time.Now()); err != nil {
+		t.Fatalf("a trade-in after delivery: %v", err)
+	}
+	clearChecks(t, pool, d.ID, "TRD123")
+	if owed := outstanding(t, pool, inv.ID); owed != inv.GrossMinor-2_500_000 {
+		t.Errorf("owed once it has arrived: %d, want %d, the invoice less the trade-in", owed, inv.GrossMinor-2_500_000)
+	}
+	if held := heldForSale(t, pool, d.ID); held != 0 {
+		t.Errorf("held after it was applied to the invoice: %d", held)
+	}
+	if u, _ := workshop.StockUnitByID(ctx, pool, sales(), d.StockUnitID); u.Status != workshop.StockDelivered {
+		t.Errorf("the delivered car after the trade-in arrived: %s", u.Status)
+	}
+}
