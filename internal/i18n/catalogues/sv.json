@@ -626,6 +626,10 @@
       "one": "%d dag i lager i snitt",
       "other": "%d dagar i lager i snitt"
     },
+    "%d car has stood in one step of getting ready for too long": {
+      "one": "%d bil har stått för länge i ett steg av iordningställandet",
+      "other": "%d bilar har stått för länge i ett steg av iordningställandet"
+    },
     "Uncollected for %d day": {
       "one": "Ohämtad i %d dag",
       "other": "Ohämtad i %d dagar"
