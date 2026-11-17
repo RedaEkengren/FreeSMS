@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
@@ -50,5 +52,50 @@ func TestTheStockListShowsWhatACarCostOnlyToWhoMaySee(t *testing.T) {
 		if got, err := workshop.Stock(ctx, pool, s); !errors.Is(err, access.ErrForbidden) || len(got.Rows) != 0 {
 			t.Errorf("%v read the stock: %v", s.Role, err)
 		}
+	}
+}
+
+// The list is one read however long it is (#168): the same round trips for
+// one car as for three hundred, for the buyer who is handed the figures and
+// for the salesperson who is not.
+func TestTheStockListOf300CarsIsReadInTheRoundTripsOfOne(t *testing.T) {
+	if testing.Short() {
+		t.Skip("seeds 300 cars")
+	}
+	pool := setup(t)
+	ctx := context.Background()
+	cfg := pool.Config()
+	counter := &countingTracer{}
+	cfg.ConnConfig.Tracer = counter
+	counted, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer counted.Close()
+	read := func(scope access.Scope, want int) int64 {
+		t.Helper()
+		before := counter.n.Load()
+		list, err := workshop.Stock(ctx, counted, scope)
+		if err != nil || len(list.Rows) != want {
+			t.Fatalf("the list as %s: %d cars, %v; want %d", scope.Role, len(list.Rows), err, want)
+		}
+		return counter.n.Load() - before
+	}
+	p := boughtCar(t, pool)
+	if _, err := workshop.RecordStockCost(ctx, pool, buyerScope(), p.StockUnitID, cost(workshop.CostTransport, 1_000)); err != nil {
+		t.Fatal(err)
+	}
+	buyerOne, salesOne := read(buyerScope(), 1), read(sales(), 1)
+	for range 299 {
+		q := boughtCar(t, pool)
+		if _, err := workshop.RecordStockCost(ctx, pool, buyerScope(), q.StockUnitID, cost(workshop.CostTransport, 1_000)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := read(buyerScope(), 300); got != buyerOne {
+		t.Errorf("the buyer's list: %d round trips for 300 cars, %d for one", got, buyerOne)
+	}
+	if got := read(sales(), 300); got != salesOne {
+		t.Errorf("the salesperson's list: %d round trips for 300 cars, %d for one", got, salesOne)
 	}
 }
