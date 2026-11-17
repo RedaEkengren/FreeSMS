@@ -144,3 +144,47 @@ func TestTheFeedCarsFieldsAreTheOnesTheDocumentationNames(t *testing.T) {
 		t.Errorf("the feed's fields %v are not the documented %v", got, documented)
 	}
 }
+
+// A dealer with 300 cars and 80 photographs on each (#183): the feed names
+// every photograph, in order, from one statement's worth of work -- not one
+// read per car -- and answers in a time a site's request can wait for.
+func TestTheFeedOf300CarsWith80PhotographsEachIsOneReadAndFast(t *testing.T) {
+	if testing.Short() {
+		t.Skip("seeds 300 cars")
+	}
+	pool := setup(t)
+	ctx := context.Background()
+	for range 300 {
+		p := boughtCar(t, pool)
+		moveStock(t, pool, p.StockUnitID, workshop.StockForSale)
+	}
+	// Photographs are seeded in bulk: what is measured is the read, and
+	// AttachStockPhoto's own rules are tested above.
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO attachments (shop_id, stock_unit_id, position, storage_key, content_type, byte_size)
+		SELECT u.shop_id, u.id, n, md5(u.id::text || n::text) || md5(n::text || u.id::text), 'image/jpeg', 10
+		FROM stock_units u, generate_series(1, 80) n WHERE u.closed_at IS NULL`); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.SetFeed(ctx, pool, everything(owner()), true, true, false, ""); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	cars, _, err := workshop.StockFeed(ctx, pool, shopID, "", time.Time{})
+	took := time.Since(start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cars) != 300 {
+		t.Fatalf("%d cars in the feed, want 300", len(cars))
+	}
+	for _, c := range cars {
+		if len(c.Photos) != 80 {
+			t.Fatalf("car %s names %d photographs, want 80", c.ID, len(c.Photos))
+		}
+	}
+	if took > 3*time.Second {
+		t.Errorf("the feed took %s for 300 cars with 80 photographs each", took)
+	}
+	t.Logf("300 cars x 80 photographs: %s", took)
+}

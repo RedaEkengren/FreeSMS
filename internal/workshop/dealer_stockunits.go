@@ -376,6 +376,9 @@ func moveStockUnitTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id stri
 				return fmt.Errorf("record the sale falling through: %w", err)
 			}
 		}
+		if err := stockChangedTx(ctx, tx, scope); err != nil {
+			return err
+		}
 		return auditTx(ctx, tx, scope, id, "stock_unit.moved", string(from), string(to), reason, nil)
 	}
 }
