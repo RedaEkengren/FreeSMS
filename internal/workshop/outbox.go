@@ -64,6 +64,7 @@ func (ManualAdapter) Send(context.Context, OutboxItem) error { return ErrManualT
 var outboxKinds = map[string]bool{
 	"signature_request": true,
 	"vehicle_lookup":    true,
+	kindStockWebhook:    true,
 }
 
 // NewOutboxItem is a call to make. Key is what makes it once: the same

@@ -84,7 +84,10 @@ func SetListing(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, uni
 			VALUES ($1, $2, $3, nullif($4, ''), nullif($5, ''), nullif($6, ''), nullif($7, ''), $8, $9, nullif($10, ''), NULLIF($11, '')::uuid)`,
 			scope.ShopID, unitID, l.AskingPriceMinor, l.Variant, l.Fuel, l.Gearbox, l.Colour, l.VATDeductible, equipment,
 			l.Description, scope.UserID)
-		return err
+		if err != nil {
+			return err
+		}
+		return stockChangedTx(ctx, tx, scope)
 	})
 }
 
@@ -138,11 +141,14 @@ func AttachStockPhoto(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 			return err
 		}
 		out.Key = key
-		return tx.QueryRow(ctx, `
+		if err := tx.QueryRow(ctx, `
 			INSERT INTO attachments (shop_id, stock_unit_id, position, storage_key, content_type, byte_size, original_name, uploaded_by)
 			VALUES ($1, $2, coalesce((SELECT max(position) FROM attachments WHERE stock_unit_id = $2), 0) + 1, $3, $4, $5, nullif($6, ''),
 			        NULLIF($7, '')::uuid)
-			RETURNING id, position`, scope.ShopID, unitID, key, contentType, size, name, scope.UserID).Scan(&out.ID, &out.Position)
+			RETURNING id, position`, scope.ShopID, unitID, key, contentType, size, name, scope.UserID).Scan(&out.ID, &out.Position); err != nil {
+			return err
+		}
+		return stockChangedTx(ctx, tx, scope)
 	})
 	return out, err
 }
@@ -223,7 +229,7 @@ func photoChangedTx(ctx context.Context, tx pgx.Tx, scope access.Scope, unitID, 
 		scope.ShopID, unitID, kind, scope.UserID); err != nil {
 		return fmt.Errorf("note the photographs changed: %w", err)
 	}
-	return nil
+	return stockChangedTx(ctx, tx, scope)
 }
 
 // RemoveStockPhoto removes a stock car's photograph, row and file: the
@@ -292,8 +298,9 @@ func SetFeed(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, publis
 		if published && !open && hash == nil {
 			return fmt.Errorf("%w: a feed behind a token needs a token", ErrInvalid)
 		}
-		_, err := tx.Exec(ctx, `INSERT INTO stock_feed_settings (shop_id, published, open, token_sha256, include_reserved, changed_by)
-			VALUES ($1, $2, $3, $4, $5, NULLIF($6, '')::uuid)`, scope.ShopID, published, open, hash, includeReserved, scope.UserID)
+		_, err := tx.Exec(ctx, `INSERT INTO stock_feed_settings (shop_id, published, open, token_sha256, include_reserved, webhook_url, changed_by)
+			VALUES ($1, $2, $3, $4, $5, (SELECT webhook_url FROM stock_feed_settings ORDER BY changed_at DESC, id DESC LIMIT 1),
+			        NULLIF($6, '')::uuid)`, scope.ShopID, published, open, hash, includeReserved, scope.UserID)
 		return err
 	})
 }

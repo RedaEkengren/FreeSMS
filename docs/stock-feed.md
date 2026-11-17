@@ -84,8 +84,26 @@ checks the feed for them.
 A JPEG, cacheable by anyone for an hour. A photograph removed from the car,
 or of a car no longer in the feed, answers `404`.
 
+## Webhook
+
+The owner may give an address, https only, under the same heading. FreeSMS then
+calls it with a `POST` when stock changes: a car entering or leaving the feed,
+a new listing, a photograph added, removed or moved to the front.
+
+    {"event": "stock.changed", "since": "2026-11-03T12:00:00Z"}
+
+The call carries no car, price or photograph: ask the feed with the same
+token, `?since=` the value given, for what changed. Changes are gathered in
+windows of ten seconds and one call is made for each window that had any,
+when it has closed, so uploading eighty photographs is one call. The call goes
+through the outbox: a site that answers `5xx`, `429` or not at all is called
+again with back-off and the same `Idempotency-Key`, and an owner sees one that
+keeps failing. Any other `4xx` is not retried. Redirects are not followed, and
+an address inside the server's own network (loopback, private, link-local) is
+never called. The call is not signed, so treat it as a nudge to read the feed
+and nothing more.
+
 ## Not yet
 
-- A rate limit of its own.
-- A webhook when the feed changes; poll with `since` instead.
+
 - A financing example, which needs the information #184 requires beside it.

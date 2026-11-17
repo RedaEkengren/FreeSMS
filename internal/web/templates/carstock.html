@@ -64,6 +64,11 @@
     <label class="check"><input type="checkbox" name="new_token" value="yes"> <span>{{.T "Make a new token (the old one stops working)"}}</span></label>
     <button type="submit" class="secondary">{{.T "Save the feed"}}</button>
   </form>
+  <form method="post" action="/cars/feed/webhook">
+    <label>{{.T "Address to call when your stock changes (https)"}} <input type="url" name="webhook_url" maxlength="500" placeholder="https://"></label>
+    <p class="waiting">{{.T "The call says only that something changed. Ask the feed, with changes since, for what. Leave it empty to stop the calls."}}</p>
+    <button type="submit" class="secondary">{{.T "Save the address"}}</button>
+  </form>
 </section>
 {{end}}
 {{end}}

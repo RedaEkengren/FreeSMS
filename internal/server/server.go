@@ -306,10 +306,11 @@ func New(pool *pgxpool.Pool, log *slog.Logger, cfg *config.Config, shopID string
 		}
 		srv.sms = elks
 	}
+	srv.outboxAdapters = map[string]workshop.OutboxAdapter{
+		"stock_webhook": workshop.NewStockWebhookAdapter(pool),
+	}
 	if srv.canLookUp() {
-		srv.outboxAdapters = map[string]workshop.OutboxAdapter{
-			"vehicle_lookup": workshop.VehicleLookupAdapter{Pool: pool, Lookup: srv.vehicleLookup, Provider: srv.lookupProvider},
-		}
+		srv.outboxAdapters["vehicle_lookup"] = workshop.VehicleLookupAdapter{Pool: pool, Lookup: srv.vehicleLookup, Provider: srv.lookupProvider}
 	}
 	return srv, nil
 }

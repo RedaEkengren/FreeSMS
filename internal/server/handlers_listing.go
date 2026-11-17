@@ -252,6 +252,21 @@ func (s *Server) handleStockFeedSettings(w http.ResponseWriter, r *http.Request)
 	http.Redirect(w, r, "/cars/stock", http.StatusSeeOther)
 }
 
+// handleStockFeedWebhook sets the address called when stock changes.
+func (s *Server) handleStockFeedWebhook(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	err := workshop.SetFeedWebhook(r.Context(), s.pool, session.Scope, r.FormValue("webhook_url"))
+	if errors.Is(err, workshop.ErrInvalid) {
+		s.renderError(w, r, http.StatusBadRequest, "Not saved", trimInvalid(err))
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/cars/stock", http.StatusSeeOther)
+}
+
 // listingRoutes registers a stock car's listing and photographs, and the
 // feed.
 func (s *Server) listingRoutes(m routeMux) {
@@ -261,6 +276,7 @@ func (s *Server) listingRoutes(m routeMux) {
 	m.HandleFunc("POST /cars/stock/{id}/photos/{photo}/cover", s.requireSession(s.handleCarPhotoCover))
 	m.HandleFunc("POST /cars/stock/{id}/photos/{photo}/remove", s.requireSession(s.handleCarPhotoRemove))
 	m.HandleFunc("POST /cars/feed", s.requireSession(s.handleStockFeedSettings))
+	m.HandleFunc("POST /cars/feed/webhook", s.requireSession(s.handleStockFeedWebhook))
 	m.HandleFunc("GET /feed/v1/stock.json", s.handleStockFeed)
 	m.HandleFunc("GET /feed/v1/photos/{photo}", s.handleFeedPhoto)
 }

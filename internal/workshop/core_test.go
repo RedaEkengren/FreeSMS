@@ -143,6 +143,7 @@ var core = map[string]string{
 	"RentalDepositOf":          "a rental's deposit is the customer's money, readable whatever the shop runs",
 	"ReleaseRentalDepositHold": "a hold on a customer's card is let go after the module that took it is switched off",
 	"FeedSettingsOf":           "how the shop publishes, readable whatever it runs",
+	"FeedWebhookOf":            "the address called when stock changes, readable whatever it runs",
 	"FilingOf":                 "an ownership filing is kept with the sale or purchase it is for",
 	"ComplaintByID":            "the dealer answers for three years whatever it runs", "ComplaintsOfSale": "the dealer answers for three years whatever it runs",
 	"StockChecks": "a car's history in stock", "ChecksOutstanding": "a car's history in stock",
