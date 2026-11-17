@@ -126,6 +126,9 @@ type StockPhoto struct {
 // AttachStockPhoto adds a photograph, already stored, to a stock car, last
 // in order. For whoever buys or sells cars.
 func AttachStockPhoto(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, unitID, key, contentType string, size int64, name string) (StockPhoto, error) {
+	if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+		return StockPhoto{}, access.ErrForbidden
+	}
 	p, _, err := AttachStockPhotoOnce(ctx, pool, scope, unitID, key, contentType, size, name, nil)
 	return p, err
 }
