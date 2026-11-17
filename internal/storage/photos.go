@@ -7,6 +7,7 @@ package storage
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -79,6 +80,9 @@ type Saved struct {
 	Key         string
 	ContentType string
 	ByteSize    int64
+	// The SHA-256 of what was stored, the re-encoded image: the same
+	// photograph uploaded twice is the same bytes, whatever the phone wrote.
+	SHA256 []byte
 }
 
 // SavePhoto decodes, normalises and writes an uploaded image.
@@ -121,7 +125,8 @@ func (s *Store) SavePhoto(r io.Reader) (Saved, error) {
 	}
 	defer os.Remove(tmp.Name())
 
-	if err := jpeg.Encode(tmp, out, &jpeg.Options{Quality: quality}); err != nil {
+	sum := sha256.New()
+	if err := jpeg.Encode(io.MultiWriter(tmp, sum), out, &jpeg.Options{Quality: quality}); err != nil {
 		tmp.Close()
 		return Saved{}, fmt.Errorf("storage: encode: %w", err)
 	}
@@ -137,7 +142,7 @@ func (s *Store) SavePhoto(r io.Reader) (Saved, error) {
 		return Saved{}, fmt.Errorf("storage: store: %w", err)
 	}
 
-	return Saved{Key: key, ContentType: "image/jpeg", ByteSize: size}, nil
+	return Saved{Key: key, ContentType: "image/jpeg", ByteSize: size, SHA256: sum.Sum(nil)}, nil
 }
 
 // Open returns a stored photograph for reading.

@@ -188,3 +188,67 @@ func TestTheFeedOf300CarsWith80PhotographsEachIsOneReadAndFast(t *testing.T) {
 	}
 	t.Logf("300 cars x 80 photographs: %s", took)
 }
+
+// The same photograph put on the same car twice is one (#167): by its
+// content, whatever it is called, and also when two arrive at once. A removed
+// one may be put back, and another car may have the same picture.
+func TestThePhotographOfACarUploadedTwiceIsOnePhotograph(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	a := buy(t, pool, workshop.StockFromPurchase)
+	b := boughtCar(t, pool)
+	sum := func(c byte) []byte { return slices.Repeat([]byte{c}, 32) }
+	attach := func(unit, key string, s []byte) (workshop.StockPhoto, bool) {
+		t.Helper()
+		p, dup, err := workshop.AttachStockPhotoOnce(ctx, pool, sales(), unit, key, "image/jpeg", 10, "x.jpg", s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return p, dup
+	}
+	first, dup := attach(a.StockUnitID, strings.Repeat("a", 32), sum(1))
+	if dup {
+		t.Fatal("the first was a duplicate")
+	}
+	again, dup := attach(a.StockUnitID, strings.Repeat("b", 32), sum(1))
+	if !dup || again.ID != first.ID || again.Key != first.Key {
+		t.Errorf("the same content again: %+v duplicate %v, want the first %+v", again, dup, first)
+	}
+	if _, dup := attach(a.StockUnitID, strings.Repeat("c", 32), sum(2)); dup {
+		t.Error("another picture was a duplicate")
+	}
+	if _, dup := attach(b.StockUnitID, strings.Repeat("d", 32), sum(1)); dup {
+		t.Error("the same picture on another car was a duplicate")
+	}
+	// No hash, never compared.
+	if _, dup := attach(a.StockUnitID, strings.Repeat("e", 32), nil); dup {
+		t.Error("a photograph with no hash was a duplicate")
+	}
+	if _, dup := attach(a.StockUnitID, strings.Repeat("f", 32), nil); dup {
+		t.Error("two with no hash were duplicates")
+	}
+	if photos, _ := workshop.StockPhotos(ctx, pool, sales(), a.StockUnitID); len(photos) != 4 {
+		t.Errorf("the car has %d photographs, want 4", len(photos))
+	}
+	// Taken away, it may be put back.
+	if err := workshop.RemoveStockPhoto(ctx, pool, sales(), &gonePhotos{}, first.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, dup := attach(a.StockUnitID, strings.Repeat("0", 32), sum(1)); dup {
+		t.Error("a photograph taken away could not be put back")
+	}
+	// Two at once are one.
+	results := make(chan bool, 2)
+	for i := range 2 {
+		go func() {
+			_, dup, err := workshop.AttachStockPhotoOnce(ctx, pool, sales(), a.StockUnitID, strings.Repeat(string(rune('1'+i)), 32), "image/jpeg", 10, "x.jpg", sum(9))
+			if err != nil {
+				t.Error(err)
+			}
+			results <- dup
+		}()
+	}
+	if d1, d2 := <-results, <-results; d1 == d2 {
+		t.Errorf("two uploads at once: duplicates %v and %v, want exactly one", d1, d2)
+	}
+}

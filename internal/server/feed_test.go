@@ -1,7 +1,12 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"image"
+	"image/color"
+	"image/jpeg"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -93,5 +98,70 @@ func TestTheStockFeedRefusesAHammeringCallerAndSaysWhenToComeBack(t *testing.T) 
 	// get through; what matters is that it stops.
 	if served < feedBurst || refused == 0 {
 		t.Errorf("%d served and %d refused of %d requests; want the burst served and the rest, or most of it, refused", served, refused, feedBurst+40)
+	}
+}
+
+// A photograph sent twice -- a double tap, a retry after a lost connection --
+// is one photograph on the car, and the copy just stored is not kept (#167).
+func TestAPhotographSentTwiceFromThePhoneIsOnePhotograph(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	seller, err := workshop.CreateParty(ctx, pool, owner, workshop.NewParty{Kind: "private", Name: "Sam Säljare", Role: workshop.PartySeller})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := workshop.RecordPurchase(ctx, pool, owner, workshop.NewPurchase{VehicleID: vehicleA, Reason: workshop.StockFromPurchase,
+		SellerPartyID: seller, PurchasedOn: time.Now(), PriceMinor: 8_000_000, SellerType: workshop.SellerPrivate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	picture := func(shade uint8) []byte {
+		img := image.NewRGBA(image.Rect(0, 0, 200, 150))
+		for x := 0; x < 200; x++ {
+			for y := 0; y < 150; y++ {
+				img.Set(x, y, color.RGBA{shade, uint8(x), uint8(y), 255})
+			}
+		}
+		var buf bytes.Buffer
+		if err := jpeg.Encode(&buf, img, nil); err != nil {
+			t.Fatal(err)
+		}
+		return buf.Bytes()
+	}
+	client := signIn(t, ts, salesEmail)
+	send := func(file []byte, name string) int {
+		var body bytes.Buffer
+		mw := multipart.NewWriter(&body)
+		fw, _ := mw.CreateFormFile("photo", name)
+		fw.Write(file)
+		mw.Close()
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/cars/stock/"+p.StockUnitID+"/photos", &body)
+		req.Header.Set("Content-Type", mw.FormDataContentType())
+		req.Header.Set("Origin", ts.URL)
+		c := *client
+		c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		resp, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	a := picture(10)
+	for _, name := range []string{"IMG_1.jpg", "IMG_1 copy.jpg"} {
+		if status := send(a, name); status != http.StatusSeeOther {
+			t.Fatalf("sending %s answered %d", name, status)
+		}
+	}
+	photos, err := workshop.StockPhotos(ctx, pool, owner, p.StockUnitID)
+	if err != nil || len(photos) != 1 {
+		t.Fatalf("the car has %d photographs after the same one twice: %v", len(photos), err)
+	}
+	if status := send(picture(200), "IMG_2.jpg"); status != http.StatusSeeOther {
+		t.Fatalf("another picture answered %d", status)
+	}
+	if photos, _ := workshop.StockPhotos(ctx, pool, owner, p.StockUnitID); len(photos) != 2 {
+		t.Errorf("the car has %d photographs after another picture, want 2", len(photos))
 	}
 }
