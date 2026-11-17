@@ -108,6 +108,9 @@ type StockList struct {
 
 // Stock reads the stock list.
 func Stock(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (StockList, error) {
+	if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+		return StockList{}, access.ErrForbidden
+	}
 	return StockFiltered(ctx, pool, scope, StockFilter{})
 }
 
