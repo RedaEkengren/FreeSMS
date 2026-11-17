@@ -90,6 +90,10 @@ var actionProviders = []ActionProvider{
 	{Module: access.Workshop, Name: "workshop", Items: workshopWaiting},
 	// Dealer: leads (#172).
 	{Module: access.Dealer, Name: "dealer", Items: dealerWaiting},
+	// Dealer: cars in stock longer than the shop's oldest ageing line
+	// (#168), a provider of its own: it is for whoever buys cars as well as
+	// whoever sells them.
+	{Module: access.Dealer, Name: "stock ageing", Items: stockAgeingWaiting},
 	// Rental
 	{Module: access.Rental, Name: "rental", Items: rentalWaiting},
 	// The fleet's paperwork (#202), a provider of its own: today's page
@@ -150,6 +154,7 @@ var waitingSays = map[string]string{
 	"reservation_lapsed":    "A reservation has run out: end it and decide on the deposit: %s",
 	"complaint_stalled":     "A complaint has had nothing done for a week: %s",
 	"ownership_unconfirmed": "A change of ownership is not confirmed two days on: %s",
+	"stock_ageing":          "%d car has been in stock longer than your oldest age line",
 	// Rental
 	"rental_handover": "To hand over today: %s",
 	"rental_return":   "Due back today: %s",
@@ -175,7 +180,7 @@ func (w ActionItem) Says() string { return waitingSays[w.Kind] }
 // Plural reports whether the key counts, for the page to pick N or T.
 func (w ActionItem) Plural() bool {
 	switch w.Kind {
-	case "finding", "answer", "uncollected", "outbox_given_up", "outbox_manual", "payments_unmatched":
+	case "finding", "answer", "uncollected", "outbox_given_up", "outbox_manual", "payments_unmatched", "stock_ageing":
 		return true
 	}
 	return false
@@ -202,6 +207,8 @@ func (w ActionItem) Link() string {
 		return "/cars/leads/" + w.SubjectID
 	case w.SubjectKind == "test_drive":
 		return "/cars/test-drives/" + w.SubjectID
+	case w.SubjectKind == "stock_list":
+		return "/cars/stock?sort=days"
 	case w.SubjectKind == "stock_unit":
 		return "/cars/stock/" + w.SubjectID
 	case w.SubjectKind == "vehicle_sale":

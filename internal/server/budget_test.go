@@ -79,7 +79,10 @@ var queryBudgets = map[string]int{
 	"owner GET /search?q=customer": 21,
 	// 32 to 33: the rental invoiced this month, one statement for the
 	// owner's card (#157); the other rental cards are counted together.
-	"owner GET /":     33,
+	// 33 to 34: the cars in stock past the shop's oldest ageing line (#168),
+	// one statement in the dealer's own read -- not a provider of its own,
+	// which would have cost two more.
+	"owner GET /":     34,
 	"desk GET /board": 21,
 	// 35: the quote the customer was shown and what they answered to it
 	// (two statements), which the counter reads on every live refresh.

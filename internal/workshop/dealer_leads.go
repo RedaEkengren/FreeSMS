@@ -903,7 +903,14 @@ func dealerWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 			}
 			out = append(out, it)
 		}
-		return rows.Err()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		rows.Close()
+		// The cars past the shop's oldest ageing line (#168), in this read.
+		aged, err := stockAgeingTx(ctx, tx)
+		out = append(out, aged...)
+		return err
 	})
 	return out, err
 }

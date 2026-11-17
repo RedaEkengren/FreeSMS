@@ -146,3 +146,38 @@ func (f StockFilter) apply(rows []StockRow) []StockRow {
 	}
 	return out
 }
+
+// stockAgeingTx counts the cars still in the shop's hands that have been in
+// stock longer than its oldest ageing line, in one statement, in the caller's
+// transaction. A car sold and waiting for its delivery is not ageing stock;
+// one on consignment is, for it is in the shop's yard. A count, never a
+// car's cost.
+func stockAgeingTx(ctx context.Context, tx pgx.Tx) ([]ActionItem, error) {
+	var n int
+	err := tx.QueryRow(ctx, `
+		SELECT count(*) FROM stock_units u, shops s
+		WHERE u.closed_at IS NULL AND u.status IN ('in_preparation', 'for_sale', 'reserved')
+		  AND (clock_timestamp() AT TIME ZONE s.timezone)::date - (u.opened_at AT TIME ZONE s.timezone)::date >
+		      coalesce((SELECT thresholds[cardinality(thresholds)] FROM stock_ageing_settings ORDER BY changed_at DESC, id DESC LIMIT 1), $1)`,
+		defaultAgeing[len(defaultAgeing)-1]).Scan(&n)
+	if err != nil || n == 0 {
+		return nil, err
+	}
+	return []ActionItem{{Kind: "stock_ageing", Module: access.Dealer, SubjectKind: "stock_list", Count: n, Urgency: UrgencySoon}}, nil
+}
+
+// stockAgeingWaiting is the stock list's part of the action queue (#168) for
+// whoever buys cars and does not sell them: whoever sells reads it in
+// dealerWaiting's own transaction, which costs the page nothing more.
+func stockAgeingWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ActionItem, error) {
+	if !scope.Role.BuysVehicles() || scope.Role.SellsVehicles() {
+		return nil, nil
+	}
+	var out []ActionItem
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		out, err = stockAgeingTx(ctx, tx)
+		return err
+	})
+	return out, err
+}

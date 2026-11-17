@@ -110,6 +110,10 @@
       "one": "%d visit",
       "other": "%d visits"
     },
+    "%d car has been in stock longer than your oldest age line": {
+      "one": "%d car has been in stock longer than your oldest age line",
+      "other": "%d cars have been in stock longer than your oldest age line"
+    },
     "Uncollected for %d day": {
       "one": "Uncollected for %d day",
       "other": "Uncollected for %d days"
