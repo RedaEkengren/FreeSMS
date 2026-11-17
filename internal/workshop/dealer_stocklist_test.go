@@ -231,3 +231,39 @@ func TestCarsOlderThanTheOldestAgeingLineAreOneItemInTheQueue(t *testing.T) {
 	}
 	_ = fresh
 }
+
+// The owner's home page says how long the cars in the yard have been there,
+// on average (#157): a count of days, for whoever runs the shop, and not for
+// the roles that see the cars one at a time.
+func TestTheOwnersHomePageSaysHowLongTheCarsHaveBeenInStockOnAverage(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	for _, days := range []int{10, 30} {
+		p := boughtCar(t, pool)
+		if _, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = clock_timestamp() - make_interval(days => $2) WHERE id = $1`, p.StockUnitID, days); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const title = "%d day in stock on average"
+	card := func(s access.Scope) (workshop.Card, bool) {
+		t.Helper()
+		h, failed := workshop.HomeFor(ctx, pool, s)
+		if failed != nil {
+			t.Fatalf("%s: %v", s.Role, failed)
+		}
+		for _, c := range append(h.Actions, h.Information...) {
+			if c.Title == title {
+				return c, true
+			}
+		}
+		return workshop.Card{}, false
+	}
+	if c, ok := card(everything(owner())); !ok || c.Count != 20 || c.Money {
+		t.Errorf("the owner's card: %+v, %v", c, ok)
+	}
+	for _, s := range []access.Scope{buyerScope(), sales(), everything(technician()), rentalDesk()} {
+		if _, ok := card(s); ok {
+			t.Errorf("%s has the average days card", s.Role)
+		}
+	}
+}

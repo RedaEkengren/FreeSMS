@@ -104,6 +104,8 @@ var cardSources = []CardSource{
 		StockWhere: `u.status = 'in_preparation'`},
 	{Module: access.Dealer, Kind: CardInformation, Title: "Cars in stock, at purchase price", Link: "/cars/stock",
 		May: access.Roles.SeesPurchasePrice, Read: stockAtPurchasePrice, Money: true},
+	{Module: access.Dealer, Kind: CardInformation, Title: "%d day in stock on average", Link: "/cars/stock?sort=days",
+		May: access.Roles.RunsTheShop, Read: stockDaysOnAverage},
 	// Rental
 	{Module: access.Rental, Kind: CardAction, Title: "%d rental to hand over today", Link: "/rental",
 		May: access.Roles.HandsOverRentals, RentalWhere: rentalHandoverToday},
@@ -330,6 +332,18 @@ func countStock(ctx context.Context, tx pgx.Tx, cards []CardSource) ([]int, erro
 // for, in kronor, minor units. A car with no purchase on record (a
 // consignment) adds no price. Asked only of a role that sees purchase
 // prices; it is a sum made when the page is read, never kept.
+// stockDaysOnAverage is how long the cars still in the shop's hands have
+// been in stock, on average, in the shop's own days, rounded; 0 for an empty
+// yard. A count of days, never a price (#157, #168).
+func stockDaysOnAverage(ctx context.Context, tx pgx.Tx, _ access.Scope) (int, int64, error) {
+	var days int
+	err := tx.QueryRow(ctx, `
+		SELECT coalesce(round(avg((clock_timestamp() AT TIME ZONE s.timezone)::date - (u.opened_at AT TIME ZONE s.timezone)::date)), 0)::int
+		FROM stock_units u, shops s
+		WHERE u.closed_at IS NULL AND u.status IN ('in_preparation', 'for_sale', 'reserved')`).Scan(&days)
+	return days, 0, err
+}
+
 func stockAtPurchasePrice(ctx context.Context, tx pgx.Tx, _ access.Scope) (int, int64, error) {
 	var n int
 	var minor int64

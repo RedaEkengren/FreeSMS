@@ -114,6 +114,10 @@
       "one": "%d car has been in stock longer than your oldest age line",
       "other": "%d cars have been in stock longer than your oldest age line"
     },
+    "%d day in stock on average": {
+      "one": "%d day in stock on average",
+      "other": "%d days in stock on average"
+    },
     "Uncollected for %d day": {
       "one": "Uncollected for %d day",
       "other": "Uncollected for %d days"
