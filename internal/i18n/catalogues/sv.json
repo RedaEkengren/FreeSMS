@@ -618,6 +618,14 @@
     "Try again shortly.": {
       "other": "Försök igen om en stund."
     },
+    "%d car has been in stock longer than your oldest age line": {
+      "one": "%d bil har stått i lager längre än er äldsta åldersgräns",
+      "other": "%d bilar har stått i lager längre än er äldsta åldersgräns"
+    },
+    "%d day in stock on average": {
+      "one": "%d dag i lager i snitt",
+      "other": "%d dagar i lager i snitt"
+    },
     "Uncollected for %d day": {
       "one": "Ohämtad i %d dag",
       "other": "Ohämtad i %d dagar"

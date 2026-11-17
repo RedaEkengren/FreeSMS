@@ -178,3 +178,92 @@ func TestAShopDrawsItsOwnAgeingLinesAndNarrowsTheList(t *testing.T) {
 		t.Errorf("the salesperson's narrowed list: %+v, %v", seen, err)
 	}
 }
+
+// Cars in stock longer than the shop's oldest ageing line are one item in
+// the shared queue (#168), counting them, for whoever buys or sells cars
+// and nobody else: it carries a count, never a car's cost.
+func TestCarsOlderThanTheOldestAgeingLineAreOneItemInTheQueue(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	waiting := func(s access.Scope) (n int) {
+		t.Helper()
+		items, err := workshop.WaitingFor(ctx, pool, s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, it := range items {
+			if it.Kind == "stock_ageing" {
+				if it.SubjectKind != "stock_list" || it.Text != "" {
+					t.Errorf("the item: %+v", it)
+				}
+				n += it.Count
+			}
+		}
+		return n
+	}
+	fresh, old, older := boughtCar(t, pool), boughtCar(t, pool), boughtCar(t, pool)
+	for unit, days := range map[string]int{old.StockUnitID: 100, older.StockUnitID: 200} {
+		if _, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = clock_timestamp() - make_interval(days => $2) WHERE id = $1`, unit, days); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, s := range []access.Scope{buyerScope(), sales(), everything(owner())} {
+		if n := waiting(s); n != 2 {
+			t.Errorf("%s sees %d ageing cars, want the two past 90 days", s.Role, n)
+		}
+	}
+	for _, s := range []access.Scope{everything(technician()), everything(advisor()), rentalDesk()} {
+		if n := waiting(s); n != 0 {
+			t.Errorf("%s sees %d ageing cars in the queue", s.Role, n)
+		}
+	}
+	// A car sold and waiting to be delivered is not ageing stock.
+	moveStock(t, pool, older.StockUnitID, workshop.StockForSale, workshop.StockSold)
+	if n := waiting(buyerScope()); n != 1 {
+		t.Errorf("after one of them was sold: %d", n)
+	}
+	// The shop's own lines move what counts.
+	if err := workshop.SetStockAgeing(ctx, pool, everything(owner()), []int{150}); err != nil {
+		t.Fatal(err)
+	}
+	if n := waiting(buyerScope()); n != 0 {
+		t.Errorf("with the line at 150 days: %d", n)
+	}
+	_ = fresh
+}
+
+// The owner's home page says how long the cars in the yard have been there,
+// on average (#157): a count of days, for whoever runs the shop, and not for
+// the roles that see the cars one at a time.
+func TestTheOwnersHomePageSaysHowLongTheCarsHaveBeenInStockOnAverage(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	for _, days := range []int{10, 30} {
+		p := boughtCar(t, pool)
+		if _, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = clock_timestamp() - make_interval(days => $2) WHERE id = $1`, p.StockUnitID, days); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const title = "%d day in stock on average"
+	card := func(s access.Scope) (workshop.Card, bool) {
+		t.Helper()
+		h, failed := workshop.HomeFor(ctx, pool, s)
+		if failed != nil {
+			t.Fatalf("%s: %v", s.Role, failed)
+		}
+		for _, c := range append(h.Actions, h.Information...) {
+			if c.Title == title {
+				return c, true
+			}
+		}
+		return workshop.Card{}, false
+	}
+	if c, ok := card(everything(owner())); !ok || c.Count != 20 || c.Money {
+		t.Errorf("the owner's card: %+v, %v", c, ok)
+	}
+	for _, s := range []access.Scope{buyerScope(), sales(), everything(technician()), rentalDesk()} {
+		if _, ok := card(s); ok {
+			t.Errorf("%s has the average days card", s.Role)
+		}
+	}
+}
