@@ -99,3 +99,82 @@ func TestTheStockListOf300CarsIsReadInTheRoundTripsOfOne(t *testing.T) {
 		t.Errorf("the salesperson's list: %d round trips for 300 cars, %d for one", got, salesOne)
 	}
 }
+
+// A shop draws its own ageing lines (#168), narrows the list by bucket and
+// status and orders it; what the shop holds, in total, does not shrink
+// because a filter is on.
+func TestAShopDrawsItsOwnAgeingLinesAndNarrowsTheList(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	ages := []int{3, 15, 25, 40}
+	var units []string
+	for _, d := range ages {
+		p := boughtCar(t, pool)
+		units = append(units, p.StockUnitID)
+		if _, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = clock_timestamp() - make_interval(days => $2) WHERE id = $1`, p.StockUnitID, d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	moveStock(t, pool, units[0], workshop.StockForSale)
+
+	list, err := workshop.Stock(ctx, pool, buyerScope())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Rows) != 4 || list.Buckets[0] != "0-30" || list.Rows[0].DaysInStock != 40 || list.Rows[0].Ageing() != "31-60" {
+		t.Errorf("the default lines: %v, first %+v", list.Buckets, list.Rows[0])
+	}
+	total := *list.TotalValueMinor
+
+	for _, bad := range [][]int{nil, {}, {0}, {10, 10}, {20, 10}, {1, 2, 3, 4, 5, 6, 7}, {4000}} {
+		if err := workshop.SetStockAgeing(ctx, pool, everything(owner()), bad); !errors.Is(err, workshop.ErrInvalid) {
+			t.Errorf("lines %v accepted: %v", bad, err)
+		}
+	}
+	for _, s := range []access.Scope{buyerScope(), sales(), everything(technician())} {
+		if err := workshop.SetStockAgeing(ctx, pool, s, []int{10, 20}); !errors.Is(err, access.ErrForbidden) {
+			t.Errorf("%s set the lines: %v", s.Role, err)
+		}
+	}
+	if err := workshop.SetStockAgeing(ctx, pool, everything(owner()), []int{10, 20}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := workshop.Stock(ctx, pool, buyerScope())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[int]string{3: "0-10", 15: "11-20", 25: "20+", 40: "20+"}
+	for _, r := range got.Rows {
+		if r.Ageing() != want[r.DaysInStock] {
+			t.Errorf("a car %d days in stock is in %q, want %q", r.DaysInStock, r.Ageing(), want[r.DaysInStock])
+		}
+	}
+	if len(got.Buckets) != 3 || got.Buckets[0] != "0-10" || got.Buckets[2] != "20+" {
+		t.Errorf("the buckets: %v", got.Buckets)
+	}
+
+	old, err := workshop.StockFiltered(ctx, pool, buyerScope(), workshop.StockFilter{Bucket: "20+"})
+	if err != nil || len(old.Rows) != 2 || old.Rows[0].DaysInStock != 40 {
+		t.Fatalf("the oldest bucket: %+v, %v", old.Rows, err)
+	}
+	if *old.TotalValueMinor != total {
+		t.Errorf("the total of what is held shrank to %d from %d with a filter on", *old.TotalValueMinor, total)
+	}
+	forSale, err := workshop.StockFiltered(ctx, pool, buyerScope(), workshop.StockFilter{Status: workshop.StockForSale})
+	if err != nil || len(forSale.Rows) != 1 || forSale.Rows[0].UnitID != units[0] {
+		t.Errorf("cars for sale: %+v, %v", forSale.Rows, err)
+	}
+	both, _ := workshop.StockFiltered(ctx, pool, buyerScope(), workshop.StockFilter{Bucket: "20+", Status: workshop.StockForSale})
+	if len(both.Rows) != 0 {
+		t.Errorf("an old car for sale: %+v", both.Rows)
+	}
+	byOffer, _ := workshop.StockFiltered(ctx, pool, buyerScope(), workshop.StockFilter{SortBy: "days_for_sale"})
+	if len(byOffer.Rows) != 4 || byOffer.Rows[0].UnitID != units[0] || byOffer.Rows[0].DaysForSale == nil || byOffer.Rows[3].DaysForSale != nil {
+		t.Errorf("by days on offer, the car for sale first and the rest after: %+v", byOffer.Rows)
+	}
+	// A salesperson narrows it the same and is handed no figure.
+	seen, err := workshop.StockFiltered(ctx, pool, sales(), workshop.StockFilter{Bucket: "20+"})
+	if err != nil || len(seen.Rows) != 2 || seen.TotalValueMinor != nil || seen.Rows[0].Figures != nil {
+		t.Errorf("the salesperson's narrowed list: %+v, %v", seen, err)
+	}
+}

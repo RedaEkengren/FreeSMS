@@ -30,6 +30,22 @@
 </section>
 {{end}}
 
+<form method="get" action="/cars/stock" class="filters">
+  <label><span>{{.T "Age"}}</span>
+    <select name="bucket"><option value="">{{.T "Any age"}}</option>
+      {{range $d.Buckets}}<option value="{{.}}"{{if eq . $.Dealer.Form.bucket}} selected{{end}}>{{.}} {{$.T "days"}}</option>{{end}}</select></label>
+  <label><span>{{.T "Status"}}</span>
+    <select name="status"><option value="">{{.T "Any status"}}</option>
+      {{range .Dealer.Statuses}}<option value="{{.}}"{{if eq (printf "%s" .) $.Dealer.Form.status}} selected{{end}}>{{$.T .Label}}</option>{{end}}</select></label>
+  <label><span>{{.T "Order by"}}</span>
+    <select name="sort">
+      <option value="">{{.T "Longest in stock"}}</option>
+      <option value="days_for_sale"{{if eq $.Dealer.Form.sort "days_for_sale"}} selected{{end}}>{{.T "Longest for sale"}}</option>
+      <option value="registration"{{if eq $.Dealer.Form.sort "registration"}} selected{{end}}>{{.T "Registration"}}</option></select></label>
+  <button type="submit" class="secondary">{{.T "Show"}}</button>
+  <a href="/cars/stock.csv?bucket={{.Dealer.Form.bucket}}&amp;status={{.Dealer.Form.status}}&amp;sort={{.Dealer.Form.sort}}">{{.T "Download as a spreadsheet"}}</a>
+</form>
+
 {{if $d.Rows}}
 <ul class="lines">
   {{range $d.Rows}}
@@ -54,6 +70,14 @@
 <p class="empty">{{.T "No cars in stock."}}</p>
 {{end}}
 {{if .Session.Scope.Role.RunsTheShop}}
+<section>
+  <h2>{{.T "When a car counts as ageing"}}</h2>
+  <form method="post" action="/cars/stock/ageing">
+    <label><span>{{.T "Days at which a car moves to the next age group, lowest first"}}</span>
+      <input name="lines" value="{{.Dealer.Lines}}" maxlength="40" required></label>
+    <button type="submit" class="secondary">{{.T "Save the lines"}}</button>
+  </form>
+</section>
 <section>
   <h2>{{.T "Your website's feed"}}</h2>
   <p class="waiting">{{.T "Your website can read the cars for sale from /feed/v1/stock.json: price, description, equipment and photographs, and never what a car cost."}}</p>

@@ -533,3 +533,59 @@ func TestTheStockFeedIsServedOnceItIsPublished(t *testing.T) {
 		t.Errorf("the same feed asked for with its ETag: %v, %v", again, err)
 	}
 }
+
+// The stock list as a spreadsheet (#168) carries the columns the page shows
+// to that role and no others: the salesperson's file has no purchase price
+// column, empty or not, and a typed make that looks like a formula is not
+// one. The ageing lines are the owner's to set; a list narrowed by bucket
+// is narrowed in the file too.
+func TestTheStockListAsASpreadsheetHoldsOnlyWhatTheRoleMaySee(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	seller, err := workshop.CreateParty(ctx, pool, owner, workshop.NewParty{Kind: "private", Name: "Sam Säljare", Role: workshop.PartySeller})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordPurchase(ctx, pool, owner, workshop.NewPurchase{VehicleID: vehicleA, Reason: workshop.StockFromPurchase,
+		SellerPartyID: seller, PurchasedOn: time.Now(), PriceMinor: 8_543_210, SellerType: workshop.SellerPrivate}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE vehicles SET make = '=HYPERLINK("http://x")' WHERE id = $1`, vehicleA); err != nil {
+		t.Fatal(err)
+	}
+	buyer := get(t, signIn(t, ts, buyerEmail), ts.URL+"/cars/stock.csv", http.StatusOK)
+	if !strings.Contains(buyer, "purchase_price,costs,stock_value") || !strings.Contains(buyer, "8543210") {
+		t.Errorf("the buyer's file:\n%s", buyer)
+	}
+	if strings.Contains(buyer, `"=HYPERLINK`) || !strings.Contains(buyer, `'=HYPERLINK`) {
+		t.Errorf("a typed make went into the file as a formula:\n%s", buyer)
+	}
+	seen := get(t, signIn(t, ts, salesEmail), ts.URL+"/cars/stock.csv", http.StatusOK)
+	if strings.Contains(seen, "purchase") || strings.Contains(seen, "8543210") || strings.Contains(seen, "stock_value") {
+		t.Errorf("the salesperson's file holds a figure:\n%s", seen)
+	}
+	if status, _ := getBody(t, signIn(t, ts, techEmail), ts.URL+"/cars/stock.csv"); status != http.StatusForbidden {
+		t.Errorf("a technician's file answered %d, want 403", status)
+	}
+	if narrowed := get(t, signIn(t, ts, buyerEmail), ts.URL+"/cars/stock.csv?bucket=31-60", http.StatusOK); strings.Count(narrowed, "\n") != 1 {
+		t.Errorf("a car 0 days in stock in the 31-60 file:\n%s", narrowed)
+	}
+
+	form := url.Values{"lines": {"5, 10"}}
+	if status := postStatus(t, signIn(t, ts, salesEmail), ts.URL+"/cars/stock/ageing", form); status != http.StatusForbidden {
+		t.Errorf("a salesperson set the ageing lines: %d", status)
+	}
+	if status := postStatus(t, signIn(t, ts, buyerEmail), ts.URL+"/cars/stock/ageing", form); status != http.StatusForbidden {
+		t.Errorf("a buyer set the ageing lines: %d", status)
+	}
+	if status := postStatus(t, signIn(t, ts, ownerEmail), ts.URL+"/cars/stock/ageing", url.Values{"lines": {"10, ten"}}); status != http.StatusBadRequest {
+		t.Errorf("lines that are not numbers: %d", status)
+	}
+	if status := postStatus(t, signIn(t, ts, ownerEmail), ts.URL+"/cars/stock/ageing", form); status != http.StatusSeeOther {
+		t.Errorf("the owner setting the lines: %d", status)
+	}
+	if page := get(t, signIn(t, ts, buyerEmail), ts.URL+"/cars/stock", http.StatusOK); !strings.Contains(page, `value="6-10"`) {
+		t.Errorf("the page after the lines were set:\n%.600s", page)
+	}
+}
