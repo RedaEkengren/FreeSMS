@@ -267,3 +267,45 @@ func TestTheOwnersHomePageSaysHowLongTheCarsHaveBeenInStockOnAverage(t *testing.
 		}
 	}
 }
+
+// A card whose query fails is the only one left out (#157). The cards share
+// a transaction, and a failed statement aborts it; the page then asks for
+// each card on its own, so one broken query is one missing card and a note
+// that something could not be read, not an empty home page.
+func TestOneCardThatCannotBeReadIsTheOnlyOneMissing(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := boughtCar(t, pool)
+	moveStock(t, pool, p.StockUnitID, workshop.StockForSale, workshop.StockSold)
+	q := boughtCar(t, pool)
+	if _, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = clock_timestamp() - make_interval(days => 12) WHERE id IN ($1, $2)`, p.StockUnitID, q.StockUnitID); err != nil {
+		t.Fatal(err)
+	}
+	titles := func() (map[string]bool, []error) {
+		h, failed := workshop.HomeFor(ctx, pool, everything(owner()))
+		out := map[string]bool{}
+		for _, c := range append(h.Actions, h.Information...) {
+			out[c.Title] = true
+		}
+		return out, failed
+	}
+	const sold, running, waiting = "%d sold car to deliver", "%d day in stock on average", "%d car waiting to be made ready"
+	if got, failed := titles(); !got[sold] || !got[running] || !got[waiting] || len(failed) != 0 {
+		t.Fatalf("before anything broke: %v, %v", got, failed)
+	}
+	// The shop's time zone is what the days in stock are counted in: a card
+	// that reads it breaks, a card that counts statuses does not.
+	if _, err := pool.Exec(ctx, `ALTER TABLE shops RENAME COLUMN timezone TO timezone_gone`); err != nil {
+		t.Fatal(err)
+	}
+	got, failed := titles()
+	if len(failed) == 0 {
+		t.Error("nothing said that a card could not be read")
+	}
+	if !got[sold] || !got[waiting] {
+		t.Errorf("a card that could be read was left out with the one that could not: %v", got)
+	}
+	if got[running] {
+		t.Errorf("the card that cannot be read is shown: %v", got)
+	}
+}
