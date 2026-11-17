@@ -71,6 +71,8 @@
     <label><span>{{.T "Kind"}}</span><select name="kind">{{range $d.KeyKinds}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
     <label><span>{{.T "Label"}}</span><input name="label" maxlength="100"></label>
     <button type="submit" class="secondary">{{.T "Add a key"}}</button></form>{{end}}
+  {{with $c.Documents}}<h2>{{$.T "Documents"}}</h2>
+  {{range .}}<div class="waiting"><a href="/contracts/{{.ID}}">{{.Title}}</a> &middot; {{$.Date .CreatedAt "2 Jan 2006"}}</div>{{end}}{{end}}
   <h2>{{.T "Service book"}}</h2>
   {{range $c.Service}}<div class="waiting">{{$.Date .DoneOn "2 Jan 2006"}}{{with .OdometerKm}} &middot; {{$.Num (print .)}} km{{end}} &middot; {{.DoneBy}} &middot; {{.What}}</div>{{end}}
   {{if not $u.Status.Ended}}<form method="post" action="/cars/stock/{{$u.ID}}/card/service">
