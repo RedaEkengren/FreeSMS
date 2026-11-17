@@ -8455,6 +8455,8 @@
     "Address to call when your stock changes (https)": {"other": "Adress att anropa när ert lager ändras (https)"},
     "The call says only that something changed. Ask the feed, with changes since, for what. Leave it empty to stop the calls.": {"other": "Anropet säger bara att något ändrats. Fråga flödet, med ändringar sedan, vad. Lämna tomt för att stänga av anropen."},
     "Save the address": {"other": "Spara adressen"},
+    "a trade-in is received and credited at the terms the buyer has signed: the terms were revised, and a new contract is to be signed first": {"other": "ett inbyte tas emot och krediteras enligt de villkor köparen har skrivit under: villkoren har ändrats, och ett nytt avtal ska skrivas under först"},
+    "a trade-in that has been received is settled at what it was credited and what is owed on it: the terms cannot change that": {"other": "ett inbyte som har tagits emot regleras till det belopp det krediterades och det som är skuld på det: villkoren kan inte ändra det"},
     "the shop has no webhook address now": {"other": "butiken har ingen webhook-adress nu"},
     "the webhook address cannot be called": {"other": "webhook-adressen går inte att anropa"},
     "the webhook address is not a public one": {"other": "webhook-adressen är inte en publik adress"},

@@ -193,3 +193,77 @@ func TestATradeInFromABusinessChargingVATIsNotEligible(t *testing.T) {
 		t.Errorf("the trade-in's eligibility: %+v, %v; want not eligible as a company charging VAT, with no other reason", e, err)
 	}
 }
+
+// The buyer's car is looked at when it is handed over and is worth less than
+// the contract says (#165). The dealer revises the terms with the lower
+// credit; that is a new version the buyer must sign, and until it is, the
+// car is not received at the new figure -- never a silent change. What is
+// held for the buyer is what the signed terms say, and the first contract
+// stays as it was.
+func TestAReValuedTradeInIsANewContractTheBuyerSignsBeforeAnythingIsCredited(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	kim := driver(t, pool)
+	d := contractWith(t, pool, eligibleCar(t, pool), kim, tradeIn(2_000_000, 0))
+	firstContract := d.ContractedDocumentID
+
+	terms := d.Terms
+	terms.TradeIns = []workshop.TradeIn{tradeIn(1_500_000, 0)}
+	revised, err := workshop.ReviseDeal(ctx, pool, sales(), d.ID, d.Version, terms)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revised.Completed() {
+		t.Fatal("revised terms stand as a completed contract without the buyer's signature")
+	}
+	if _, err := workshop.ReceiveTradeIn(ctx, pool, buyerScope(), d.ID, "TRD123", time.Now()); err == nil {
+		t.Error("the car was received at a figure the buyer has not signed")
+	}
+	if held := heldForSale(t, pool, d.ID); held != 0 {
+		t.Errorf("held before the new contract is signed: %d", held)
+	}
+
+	doc, _, err := workshop.ProduceSalesContract(ctx, pool, sales(), d.ID, "", revised.ContractID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signAll(t, pool, doc)
+	again, err := workshop.CompleteDeal(ctx, pool, sales(), d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.ContractedDocumentID == firstContract || again.Terms.TradeIns[0].CreditMinor != 1_500_000 {
+		t.Errorf("the new contract: %s (first %s), credit %d", again.ContractedDocumentID, firstContract, again.Terms.TradeIns[0].CreditMinor)
+	}
+	if _, err := workshop.ReceiveTradeIn(ctx, pool, buyerScope(), d.ID, "TRD123", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	clearChecks(t, pool, d.ID, "TRD123")
+	if held := heldForSale(t, pool, d.ID); held != 1_500_000 {
+		t.Errorf("held for the buyer: %d, want the 15 000 kr the buyer signed for", held)
+	}
+	var price int64
+	if err := pool.QueryRow(ctx, `SELECT p.tax_purchase_price_minor FROM vehicle_sale_trade_in_receipts r JOIN vehicle_purchases p ON p.id = r.purchase_id WHERE r.sale_id = $1`, d.ID).Scan(&price); err != nil || price != 1_500_000 {
+		t.Errorf("the trade-in's purchase price: %d, %v", price, err)
+	}
+}
+
+// Once the car is received and credited, its value is settled; a revision of
+// the terms that would change what was credited is what the shop cannot
+// quietly do.
+func TestATradeInAlreadyCreditedCannotBeRevaluedByRevisingTheTerms(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	kim := driver(t, pool)
+	d := contractWith(t, pool, eligibleCar(t, pool), kim, tradeIn(2_000_000, 0))
+	if _, err := workshop.ReceiveTradeIn(ctx, pool, buyerScope(), d.ID, "TRD123", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	clearChecks(t, pool, d.ID, "TRD123")
+	terms := d.Terms
+	terms.TradeIns = []workshop.TradeIn{tradeIn(1_500_000, 0)}
+	_, err := workshop.ReviseDeal(ctx, pool, sales(), d.ID, d.Version, terms)
+	if err == nil {
+		t.Errorf("the terms were revised under a trade-in already credited at another figure; held %d", heldForSale(t, pool, d.ID))
+	}
+}

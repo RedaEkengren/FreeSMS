@@ -67,6 +67,8 @@ var (
 	errTradeInEquity = fmt.Errorf("%w: a loan larger than the trade-in's credit is not handled yet: the difference is a charge whose VAT the accountant has to settle first", ErrInvalid)
 	errTradeInNone   = fmt.Errorf("%w: the deal's terms have no such trade-in", ErrInvalid)
 	errTradeInDeal   = fmt.Errorf("%w: a trade-in is received once the deal is contracted", ErrInvalid)
+	errTradeInSigned = fmt.Errorf("%w: a trade-in is received and credited at the terms the buyer has signed: the terms were revised, and a new contract is to be signed first", ErrInvalid)
+	errTradeInTaken  = fmt.Errorf("%w: a trade-in that has been received is settled at what it was credited and what is owed on it: the terms cannot change that", ErrInvalid)
 )
 
 // tradeInKey is the key a trade-in is found by across versions of the
@@ -219,6 +221,11 @@ func ReceiveTradeIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 		if d.State != DealContracted {
 			return errTradeInDeal
 		}
+		// The terms in force are the ones the buyer signed: a revision
+		// (a re-valuation at handover, say) is a new contract first.
+		if !d.Completed() {
+			return errTradeInSigned
+		}
 		ts, err := tradeInsTx(ctx, tx, saleID, d.TermsID)
 		if err != nil {
 			return err
@@ -285,6 +292,9 @@ func CreditTradeIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 		d, err := dealTx(ctx, tx, scope, saleID)
 		if err != nil {
 			return err
+		}
+		if d.State == DealContracted && !d.Completed() {
+			return errTradeInSigned
 		}
 		ts, err := tradeInsTx(ctx, tx, saleID, d.TermsID)
 		if err != nil {
@@ -454,4 +464,36 @@ func ExpectedTradeIns(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 		return nil
 	})
 	return out, err
+}
+
+// receivedTradeInsKeptTx refuses new terms that would change a trade-in
+// already received: it was bought at its credit and the loan on it settled
+// with the lender, and neither is a thing a revision can reach back and
+// change. Its other details (the note, the lender's name) may be corrected;
+// it may not be dropped, nor credited at another figure. A re-valuation
+// after the car is received is a purchase of its own, not new terms.
+func receivedTradeInsKeptTx(ctx context.Context, tx pgx.Tx, saleID string, next []TradeIn) error {
+	rows, err := tx.Query(ctx, `
+		SELECT r.key, t.credit_minor, t.loan_minor
+		FROM vehicle_sale_trade_in_receipts r
+		JOIN vehicle_sale_trade_ins t ON t.key = r.key
+		JOIN vehicle_sale_terms s ON s.id = t.terms_id AND s.sale_id = r.sale_id
+		WHERE r.sale_id = $1
+		  AND s.version = (SELECT max(version) FROM vehicle_sale_terms WHERE sale_id = $1)`, saleID)
+	if err != nil {
+		return fmt.Errorf("read the trade-ins received: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key string
+		var credit, loan int64
+		if err := rows.Scan(&key, &credit, &loan); err != nil {
+			return err
+		}
+		i := slices.IndexFunc(next, func(x TradeIn) bool { return x.Key == key })
+		if i < 0 || next[i].CreditMinor != credit || next[i].LoanMinor != loan {
+			return errTradeInTaken
+		}
+	}
+	return rows.Err()
 }

@@ -545,6 +545,9 @@ func ReviseDeal(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sal
 		if d.Version != fromVersion {
 			return ErrDealMoved
 		}
+		if err := receivedTradeInsKeptTx(ctx, tx, saleID, t.TradeIns); err != nil {
+			return err
+		}
 		if err := insertTermsTx(ctx, tx, scope, saleID, d.StockUnitID, d.Version+1, t); err != nil {
 			return err
 		}
