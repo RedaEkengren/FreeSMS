@@ -73,3 +73,42 @@ func TestACarsCardKeepsItsDamageKeysAndServiceAsRows(t *testing.T) {
 		t.Errorf("the card after the car left: %+v", after)
 	}
 }
+
+// The card lists the documents made about the car from the document records
+// (#167, #150): the purchase agreement made when it was bought, for the roles
+// that may see what was paid, and the sales contract, for whoever buys or
+// sells cars. The documents themselves are read where documents are.
+func TestTheCardListsTheDocumentsMadeAboutTheCar(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	d := contractWith(t, pool, eligibleCar(t, pool), driver(t, pool))
+	unit, err := workshop.StockUnitByID(ctx, pool, buyerScope(), d.StockUnitID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := func(s access.Scope) []string {
+		t.Helper()
+		card, err := workshop.CardOf(ctx, pool, s, unit.VehicleID)
+		if err != nil {
+			t.Fatalf("%s: %v", s.Role, err)
+		}
+		var out []string
+		for _, doc := range card.Documents {
+			if doc.ID == "" || doc.Title == "" {
+				t.Errorf("%s: a document with no id or title: %+v", s.Role, doc)
+			}
+			out = append(out, doc.Kind)
+		}
+		return out
+	}
+	if got := kinds(buyerScope()); len(got) != 2 || got[0] != "purchase_agreement" || got[1] != "sales_contract" {
+		t.Errorf("the buyer's documents: %v", got)
+	}
+	// What was paid is in the purchase agreement: not for the salesperson.
+	if got := kinds(sales()); len(got) != 1 || got[0] != "sales_contract" {
+		t.Errorf("the salesperson's documents: %v", got)
+	}
+	if _, err := workshop.CardOf(ctx, pool, everything(technician()), unit.VehicleID); !errors.Is(err, access.ErrForbidden) {
+		t.Errorf("a technician read the card: %v", err)
+	}
+}

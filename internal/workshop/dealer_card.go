@@ -58,11 +58,22 @@ type ServiceEntry struct {
 	What       string
 }
 
-// VehicleCard is a car's damage, keys and service book.
+// CardDocument is a document made about the car, as the card lists it: what
+// it is, its title and when it was made. The document itself is read where
+// documents are.
+type CardDocument struct {
+	ID        string
+	Kind      string
+	Title     string
+	CreatedAt time.Time
+}
+
+// VehicleCard is a car's damage, keys, service book and documents.
 type VehicleCard struct {
-	Damages []Damage
-	Keys    []Key
-	Service []ServiceEntry
+	Damages   []Damage
+	Keys      []Key
+	Service   []ServiceEntry
+	Documents []CardDocument
 }
 
 var (
@@ -303,13 +314,38 @@ func CardOf(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, vehicle
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
 		for rows.Next() {
 			var e ServiceEntry
 			if err := rows.Scan(&e.DoneOn, &e.OdometerKm, &e.DoneBy, &e.What); err != nil {
+				rows.Close()
 				return err
 			}
 			out.Service = append(out.Service, e)
+		}
+		rows.Close()
+		// The documents made about the car, from the document records
+		// (#150): a sale's, and a purchase's only for the roles that may see
+		// what was paid, since the contract says it. Erased ones are not
+		// listed. A list of titles: the document is read where documents are.
+		rows, err = tx.Query(ctx, `
+			SELECT r.id, r.kind, r.title, r.created_at
+			FROM document_records r
+			WHERE r.erased_at IS NULL AND (
+			      (r.subject_kind = 'sale' AND r.subject_id IN
+			         (SELECT s.id FROM vehicle_sales s JOIN stock_units u ON u.id = s.stock_unit_id WHERE u.vehicle_id = vehicle_now($1)))
+			   OR ($2 AND r.subject_kind = 'purchase' AND r.subject_id IN
+			         (SELECT p.id FROM vehicle_purchases p JOIN stock_units u ON u.id = p.stock_unit_id WHERE u.vehicle_id = vehicle_now($1))))
+			ORDER BY r.created_at, r.id`, vehicleID, scope.Role.SeesPurchasePrice())
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var d CardDocument
+			if err := rows.Scan(&d.ID, &d.Kind, &d.Title, &d.CreatedAt); err != nil {
+				return err
+			}
+			out.Documents = append(out.Documents, d)
 		}
 		return rows.Err()
 	})

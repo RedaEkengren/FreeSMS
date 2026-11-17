@@ -129,28 +129,49 @@ func AttachStockPhoto(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 	if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
 		return StockPhoto{}, access.ErrForbidden
 	}
+	p, _, err := AttachStockPhotoOnce(ctx, pool, scope, unitID, key, contentType, size, name, nil)
+	return p, err
+}
+
+// AttachStockPhotoOnce is AttachStockPhoto for a photograph whose content is
+// known by its SHA-256: the same content on the same car is the photograph
+// already there, which is returned with duplicate true -- the caller then
+// removes the file it has just stored. Two uploads at once are one, the
+// database's index deciding which. A nil sum is never compared.
+func AttachStockPhotoOnce(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, unitID, key, contentType string, size int64, name string, sum []byte) (StockPhoto, bool, error) {
+	if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+		return StockPhoto{}, false, access.ErrForbidden
+	}
 	if err := scope.Require(access.Dealer); err != nil {
-		return StockPhoto{}, err
+		return StockPhoto{}, false, err
 	}
 	if !looksLikeUUID(unitID) {
-		return StockPhoto{}, ErrNotFound
+		return StockPhoto{}, false, ErrNotFound
 	}
 	var out StockPhoto
+	var duplicate bool
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		if _, err := unitOpenTx(ctx, tx, unitID); err != nil {
 			return err
 		}
 		out.Key = key
-		if err := tx.QueryRow(ctx, `
-			INSERT INTO attachments (shop_id, stock_unit_id, position, storage_key, content_type, byte_size, original_name, uploaded_by)
+		err := tx.QueryRow(ctx, `
+			INSERT INTO attachments (shop_id, stock_unit_id, position, storage_key, content_type, byte_size, original_name, uploaded_by, content_sha256)
 			VALUES ($1, $2, coalesce((SELECT max(position) FROM attachments WHERE stock_unit_id = $2), 0) + 1, $3, $4, $5, nullif($6, ''),
-			        NULLIF($7, '')::uuid)
-			RETURNING id, position`, scope.ShopID, unitID, key, contentType, size, name, scope.UserID).Scan(&out.ID, &out.Position); err != nil {
+			        NULLIF($7, '')::uuid, $8)
+			ON CONFLICT (stock_unit_id, content_sha256) WHERE stock_unit_id IS NOT NULL AND content_sha256 IS NOT NULL DO NOTHING
+			RETURNING id, position`, scope.ShopID, unitID, key, contentType, size, name, scope.UserID, sum).Scan(&out.ID, &out.Position)
+		if errors.Is(err, pgx.ErrNoRows) {
+			duplicate = true
+			return tx.QueryRow(ctx, `SELECT id, position, storage_key FROM attachments WHERE stock_unit_id = $1 AND content_sha256 = $2`,
+				unitID, sum).Scan(&out.ID, &out.Position, &out.Key)
+		}
+		if err != nil {
 			return err
 		}
 		return stockChangedTx(ctx, tx, scope)
 	})
-	return out, err
+	return out, duplicate, err
 }
 
 // StockPhotos is a stock car's photographs in order, the cover first. For

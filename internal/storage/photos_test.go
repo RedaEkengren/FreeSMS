@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"image"
 	"image/color"
@@ -201,4 +202,38 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// The same photograph uploaded twice is the same bytes once re-encoded, and
+// says so by its hash; another image does not (#167).
+func TestTheSameImageHasTheSameHashAndAnotherDoesNot(t *testing.T) {
+	s := newStore(t)
+	a, err := s.SavePhoto(bytes.NewReader(testJPEG(t, 400, 300)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := s.SavePhoto(bytes.NewReader(testJPEG(t, 400, 300)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := s.SavePhoto(bytes.NewReader(testJPEG(t, 300, 400)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Key == b.Key || len(a.SHA256) != 32 || !bytes.Equal(a.SHA256, b.SHA256) || bytes.Equal(a.SHA256, c.SHA256) {
+		t.Errorf("hashes: %x %x %x, keys %s %s", a.SHA256, b.SHA256, c.SHA256, a.Key, b.Key)
+	}
+	// The hash is of what is stored.
+	f, err := s.Open(a.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(h.Sum(nil), a.SHA256) {
+		t.Error("the hash is not of the stored file")
+	}
 }

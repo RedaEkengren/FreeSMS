@@ -173,8 +173,16 @@ func (s *Server) handleCarPhoto(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusInternalServerError, "Could not store it", "Try again.")
 		return
 	}
-	if _, err := workshop.AttachStockPhoto(r.Context(), s.pool, session.Scope, r.PathValue("id"), saved.Key, saved.ContentType,
-		saved.ByteSize, header.Filename); err != nil {
+	_, duplicate, err := workshop.AttachStockPhotoOnce(r.Context(), s.pool, session.Scope, r.PathValue("id"), saved.Key, saved.ContentType,
+		saved.ByteSize, header.Filename, saved.SHA256)
+	if err == nil && duplicate {
+		// The same photograph is already on the car: the one just stored is
+		// not needed.
+		if rmErr := s.photos.Remove(saved.Key); rmErr != nil {
+			s.log.Error("remove duplicate photo", "key", saved.Key, "error", rmErr)
+		}
+	}
+	if err != nil {
 		if rmErr := s.photos.Remove(saved.Key); rmErr != nil {
 			s.log.Error("remove orphaned photo", "key", saved.Key, "error", rmErr)
 		}
