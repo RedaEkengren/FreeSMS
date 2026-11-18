@@ -102,13 +102,6 @@ var (
 	errReconNote     = fmt.Errorf("%w: a note is at most 300 characters", ErrInvalid)
 )
 
-func reconRole(scope access.Scope) error {
-	if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
-		return access.ErrForbidden
-	}
-	return scope.Require(access.Dealer)
-}
-
 // SetReconTemplate replaces what new plans are made from; plans already made
 // are left as they are. Whoever runs the shop, in a shop that sells cars.
 func SetReconTemplate(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, steps []ReconTemplateStep) error {
@@ -147,7 +140,10 @@ func SetReconTemplate(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 // template, or the steps the application starts with. For whoever buys or
 // sells cars.
 func ReconTemplateOf(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]ReconTemplateStep, error) {
-	if err := reconRole(scope); err != nil {
+	if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+		return nil, access.ErrForbidden
+	}
+	if err := scope.Require(access.Dealer); err != nil {
 		return nil, err
 	}
 	var out []ReconTemplateStep
@@ -188,7 +184,10 @@ func reconTemplateTx(ctx context.Context, tx pgx.Tx) ([]ReconTemplateStep, error
 // StartReconPlan makes a car's plan from the shop's template. A car has one
 // plan; asked again it is refused, and more steps are added to it.
 func StartReconPlan(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, unitID string) error {
-	if err := reconRole(scope); err != nil {
+	if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+		return access.ErrForbidden
+	}
+	if err := scope.Require(access.Dealer); err != nil {
 		return err
 	}
 	if !looksLikeUUID(unitID) {
@@ -231,7 +230,10 @@ type NewReconStep struct {
 // AddReconStep adds a step to a car's plan. An agreed price is a cost, so
 // only whoever may see what cars cost may state one.
 func AddReconStep(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, unitID string, n NewReconStep) (string, error) {
-	if err := reconRole(scope); err != nil {
+	if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+		return "", access.ErrForbidden
+	}
+	if err := scope.Require(access.Dealer); err != nil {
 		return "", err
 	}
 	if !looksLikeUUID(unitID) {
@@ -277,7 +279,10 @@ func reconNext(from, move string) string {
 // MoveReconStep records a move of a step: started, finished, skipped or
 // reopened to be done again. Every move is a row; none is written over.
 func MoveReconStep(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, stepID, move, note string) error {
-	if err := reconRole(scope); err != nil {
+	if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+		return access.ErrForbidden
+	}
+	if err := scope.Require(access.Dealer); err != nil {
 		return err
 	}
 	if !looksLikeUUID(stepID) {
@@ -397,7 +402,10 @@ func (r PipelineRow) Stalled() bool { return r.DaysInStep > reconStallDays }
 // the ones that have stood longest first. A car with a finished plan is not
 // on it, and nor is one with no plan. For whoever buys or sells cars.
 func ReconPipeline(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]PipelineRow, error) {
-	if err := reconRole(scope); err != nil {
+	if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+		return nil, access.ErrForbidden
+	}
+	if err := scope.Require(access.Dealer); err != nil {
 		return nil, err
 	}
 	var out []PipelineRow
