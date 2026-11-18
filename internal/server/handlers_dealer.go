@@ -24,6 +24,8 @@ type dealerData struct {
 	// The statuses to filter the stock list by, and the lines it is aged by.
 	Statuses []workshop.StockStatus
 	Lines    string
+	// The cars being made ready, by the step each stands in (#236).
+	Pipeline []workshop.PipelineRow
 	// Trade-ins waiting to be received or credited, for whoever buys cars.
 	TradeIns []workshop.ExpectedTradeIn
 	// What the cars sold in a period earned (#182), and the period.
@@ -644,4 +646,16 @@ func typedVehicle(vin, make, model string) vehicledata.Vehicle {
 		v.VIN = vehicledata.Of(vin)
 	}
 	return v
+}
+
+// handleCarPipeline is the cars being made ready, each in the step it
+// stands in and for how long, the ones that have stood longest first
+// (#236).
+func (s *Server) handleCarPipeline(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	rows, err := workshop.ReconPipeline(r.Context(), s.pool, session.Scope)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "carpipeline", pageData{Title: "Cars being made ready", Session: session, Dealer: &dealerData{Pipeline: rows}})
 }

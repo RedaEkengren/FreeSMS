@@ -49,6 +49,44 @@
 </section>
 {{end}}
 
+{{if $d.ShowListing}}{{$r := $d.Recon}}
+<section>
+  <h2>{{.T "Getting it ready"}}</h2>
+  {{if $r.Steps}}
+  <ul class="lines">
+    {{range $r.Steps}}
+    <li><div class="row"><span>{{.Position}}. {{.Name}}</span>
+        <span class="tag{{if eq .State "done"}} ok{{end}}">{{$.T .Label}}</span></div>
+      <div class="waiting">{{if eq .Kind "outside"}}{{$.T "At a supplier"}}{{else}}{{$.T "In the shop"}}{{end}}{{if .Owner}} &middot; {{.Owner}}{{end}}
+        {{with .DueOn}}&middot; {{$.T "Due %s" ($.Date . "2 Jan")}}{{end}}
+        {{with .AgreedPriceMinor}}&middot; {{$.T "Agreed %s" ($.MoneyOrBlank .)}}{{end}}
+        &middot; {{$.N "%d day in this state" .DaysInState}}</div>
+      {{if not $u.Status.Ended}}
+      <form method="post" action="/cars/stock/{{$u.ID}}/recon/move"><input type="hidden" name="step" value="{{.ID}}">
+        {{if eq .State "waiting"}}<button type="submit" name="move" value="started">{{$.T "Start"}}</button>
+          <button type="submit" name="move" value="skipped" class="secondary">{{$.T "Skip"}}</button>
+        {{else if eq .State "in_progress"}}<button type="submit" name="move" value="done">{{$.T "Done"}}</button>
+          <button type="submit" name="move" value="skipped" class="secondary">{{$.T "Skip"}}</button>
+        {{else}}<button type="submit" name="move" value="reopened" class="secondary">{{$.T "Do it again"}}</button>{{end}}
+      </form>{{end}}
+    </li>
+    {{end}}
+  </ul>
+  {{else if not $u.Status.Ended}}
+  <form method="post" action="/cars/stock/{{$u.ID}}/recon/start"><button type="submit">{{.T "Start a plan"}}</button></form>
+  {{end}}
+  {{if and $r.Steps (not $u.Status.Ended)}}
+  <form method="post" action="/cars/stock/{{$u.ID}}/recon/add">
+    <label><span>{{.T "Step"}}</span><input name="step_name" maxlength="100" required></label>
+    <label><span>{{.T "Done by"}}</span><select name="kind"><option value="in_house">{{.T "In the shop"}}</option><option value="outside">{{.T "At a supplier"}}</option></select></label>
+    <label><span>{{.T "Owner or supplier"}}</span><input name="owner" maxlength="200"></label>
+    <label><span>{{.T "Due"}}</span><input type="date" name="due"></label>
+    {{if .Session.Scope.Role.SeesPurchasePrice}}<label><span>{{.T "Agreed price"}}</span><input name="price" inputmode="decimal"></label>{{end}}
+    <button type="submit" class="secondary">{{.T "Add a step"}}</button></form>
+  {{end}}
+</section>
+{{end}}
+
 {{if $d.ShowListing}}{{$c := $d.Card}}
 <section>
   <h2>{{.T "Damage"}}</h2>
