@@ -259,7 +259,7 @@ var swept = map[string]string{
 	"POST /checklists/{id}/subjects":              "sweep",
 
 	// Dealer
-	"GET /cars/stock": "", "GET /cars/stock.csv": "", "POST /cars/stock/ageing": "", "GET /cars/stock/new": "", "GET /cars/consign": "", "GET /cars/results": "", "POST /cars/feed": "", "POST /cars/feed/webhook": "", "GET /feed/v1/stock.json": "", "POST /cars/consign": "", "POST /cars/stock": "",
+	"GET /cars/stock": "", "GET /cars/stock.csv": "", "GET /cars/pipeline": "", "POST /cars/stock/ageing": "", "GET /cars/stock/new": "", "GET /cars/consign": "", "GET /cars/results": "", "POST /cars/feed": "", "POST /cars/feed/webhook": "", "GET /feed/v1/stock.json": "", "POST /cars/consign": "", "POST /cars/stock": "",
 	"GET /cars/stock/{id}": "sweep", "POST /cars/stock/{id}/move": "sweep", "POST /cars/stock/{id}/checks": "sweep",
 	"POST /cars/stock/{id}/checks/override": "sweep", "POST /cars/stock/{id}/costs": "sweep",
 	"POST /cars/stock/{id}/costs/{cost}/reverse": "sweep",
@@ -277,6 +277,7 @@ var swept = map[string]string{
 	"POST /cars/trade-ins/{sale}/receive": "sweep", "POST /cars/trade-ins/{sale}/credit": "sweep",
 	"POST /cars/stock/{id}/consignment/{agreement}/end": "sweep",
 	"POST /cars/stock/{id}/card/{what}":                 "sweep",
+	"POST /cars/stock/{id}/recon/{what}":                "sweep",
 	"POST /cars/stock/{id}/listing":                     "sweep", "POST /cars/stock/{id}/photos": "sweep", "GET /cars/stock/{id}/photos/{photo}": "sweep",
 	"POST /cars/stock/{id}/photos/{photo}/cover": "sweep", "POST /cars/stock/{id}/photos/{photo}/remove": "sweep",
 	"GET /feed/v1/photos/{photo}": "sweep",

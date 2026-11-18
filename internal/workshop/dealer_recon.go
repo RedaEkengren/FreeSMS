@@ -77,6 +77,19 @@ type ReconStep struct {
 	DaysInState int
 }
 
+// Label is the step's state in words, a catalogue key.
+func (s ReconStep) Label() string {
+	switch s.State {
+	case ReconInProgress:
+		return "In progress"
+	case ReconDone:
+		return "Done"
+	case ReconSkipped:
+		return "Skipped"
+	}
+	return "Waiting"
+}
+
 // ReconPlan is a car's steps in order.
 type ReconPlan struct {
 	UnitID string

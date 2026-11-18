@@ -589,3 +589,73 @@ func TestTheStockListAsASpreadsheetHoldsOnlyWhatTheRoleMaySee(t *testing.T) {
 		t.Errorf("the page after the lines were set:\n%.600s", page)
 	}
 }
+
+// A car's reconditioning plan on its page and the pipeline (#236): started
+// with a button, a step moved from the car's page, the car in the pipeline
+// in the step it stands in. The price agreed for a step is on the page for
+// the buyer and nowhere in what the salesperson is sent.
+func TestACarIsGotReadyFromItsPageAndShowsInThePipeline(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	seller, err := workshop.CreateParty(ctx, pool, owner, workshop.NewParty{Kind: "private", Name: "Sam Säljare", Role: workshop.PartySeller})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := workshop.RecordPurchase(ctx, pool, owner, workshop.NewPurchase{VehicleID: vehicleA, Reason: workshop.StockFromPurchase,
+		SellerPartyID: seller, PurchasedOn: time.Now(), PriceMinor: 8_000_000, SellerType: workshop.SellerPrivate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := ts.URL + "/cars/stock/" + p.StockUnitID
+	sales, buyer := signIn(t, ts, salesEmail), signIn(t, ts, buyerEmail)
+	if page := get(t, sales, base, http.StatusOK); !strings.Contains(page, "Start a plan") {
+		t.Fatalf("the car's page offers no plan:\n%s", visibleText(page))
+	}
+	if body := get(t, sales, ts.URL+"/cars/pipeline", http.StatusOK); strings.Contains(body, "Intake check") {
+		t.Errorf("a car with no plan in the pipeline:\n%s", visibleText(body))
+	}
+	if status := postStatus(t, sales, base+"/recon/start", url.Values{}); status != http.StatusSeeOther {
+		t.Fatalf("starting the plan answered %d", status)
+	}
+	if status := postStatus(t, sales, base+"/recon/start", url.Values{}); status != http.StatusBadRequest {
+		t.Errorf("a second plan answered %d", status)
+	}
+	plan, _ := workshop.ReconPlanOf(ctx, pool, owner, p.StockUnitID)
+	if len(plan.Steps) != 5 {
+		t.Fatalf("the plan: %+v", plan.Steps)
+	}
+	if status := postStatus(t, sales, base+"/recon/move", url.Values{"step": {plan.Steps[0].ID}, "move": {"started"}}); status != http.StatusSeeOther {
+		t.Errorf("starting a step answered %d", status)
+	}
+	if status := postStatus(t, sales, base+"/recon/move", url.Values{"step": {plan.Steps[0].ID}, "move": {"reopened"}}); status != http.StatusBadRequest {
+		t.Errorf("a move that does not follow answered %d", status)
+	}
+	// A price: the buyer may state one, the salesperson may not.
+	step := url.Values{"step_name": {"Lackering"}, "kind": {"outside"}, "owner": {"Lackaren AB"}, "price": {"4 500,50"}}
+	if status := postStatus(t, sales, base+"/recon/add", step); status != http.StatusForbidden {
+		t.Errorf("a salesperson stating a price answered %d", status)
+	}
+	if status := postStatus(t, buyer, base+"/recon/add", step); status != http.StatusSeeOther {
+		t.Errorf("the buyer adding a step answered %d", status)
+	}
+	if page := visibleText(get(t, buyer, base, http.StatusOK)); !strings.Contains(page, "Lackering") || !strings.Contains(page, "Lackaren AB") || !strings.Contains(page, "4,500.50") {
+		t.Errorf("the buyer's plan:\n%s", page)
+	}
+	seen := get(t, sales, base, http.StatusOK)
+	if !strings.Contains(seen, "Lackering") || strings.Contains(seen, "4,500") || strings.Contains(seen, "Agreed") {
+		t.Errorf("the salesperson's plan:\n%s", visibleText(seen))
+	}
+	pipe := visibleText(get(t, sales, ts.URL+"/cars/pipeline", http.StatusOK))
+	if !strings.Contains(pipe, "Intake check") || !strings.Contains(pipe, "0 of 6 steps done") {
+		t.Errorf("the pipeline:\n%s", pipe)
+	}
+	for _, path := range []string{"/cars/pipeline"} {
+		if status, _ := getBody(t, signIn(t, ts, techEmail), ts.URL+path); status != http.StatusForbidden {
+			t.Errorf("a technician's %s answered %d", path, status)
+		}
+	}
+	if status := postStatus(t, signIn(t, ts, techEmail), base+"/recon/start", url.Values{}); status != http.StatusForbidden {
+		t.Errorf("a technician starting a plan answered %d", status)
+	}
+}

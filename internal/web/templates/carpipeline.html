@@ -1,0 +1,20 @@
+{{define "content"}}
+{{$rows := .Dealer.Pipeline}}
+<h1>{{.T "Cars being made ready"}}</h1>
+<p class="waiting">{{.T "Each car in the step it stands in, the ones that have stood longest first."}}</p>
+{{if $rows}}
+<ul class="lines">
+  {{range $rows}}
+  <li>
+    <div class="row"><a href="/cars/stock/{{.UnitID}}">{{.Car}}</a>
+      <span class="tag{{if .Stalled}} late{{end}}">{{$.N "%d day in this step" .DaysInStep}}</span></div>
+    <div class="waiting">{{.StepName}}{{if .StepOwner}} &middot; {{.StepOwner}}{{end}}
+      {{if eq .StepKind "outside"}}&middot; <span class="tag">{{$.T "At a supplier"}}</span>{{end}}
+      &middot; {{$.T "%d of %d steps done" .StepsDone .StepsTotal}} &middot; {{$.N "%d day since it was bought" .DaysSinceBuy}}</div>
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p class="empty">{{.T "No car is being made ready."}}</p>
+{{end}}
+{{end}}

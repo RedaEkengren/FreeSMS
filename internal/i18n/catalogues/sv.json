@@ -630,6 +630,18 @@
       "one": "%d bil har stått för länge i ett steg av iordningställandet",
       "other": "%d bilar har stått för länge i ett steg av iordningställandet"
     },
+    "%d day in this step": {
+      "one": "%d dag i det här steget",
+      "other": "%d dagar i det här steget"
+    },
+    "%d day since it was bought": {
+      "one": "%d dag sedan den köptes",
+      "other": "%d dagar sedan den köptes"
+    },
+    "%d day in this state": {
+      "one": "%d dag i det här läget",
+      "other": "%d dagar i det här läget"
+    },
     "Uncollected for %d day": {
       "one": "Ohämtad i %d dag",
       "other": "Ohämtad i %d dagar"
@@ -8480,6 +8492,24 @@
     "Address to call when your stock changes (https)": {"other": "Adress att anropa när ert lager ändras (https)"},
     "The call says only that something changed. Ask the feed, with changes since, for what. Leave it empty to stop the calls.": {"other": "Anropet säger bara att något ändrats. Fråga flödet, med ändringar sedan, vad. Lämna tomt för att stänga av anropen."},
     "Save the address": {"other": "Spara adressen"},
+    "Getting cars ready": {"other": "Iordningställande"},
+    "Cars being made ready": {"other": "Bilar som görs i ordning"},
+    "Each car in the step it stands in, the ones that have stood longest first.": {"other": "Varje bil i det steg den står i, de som stått längst först."},
+    "At a supplier": {"other": "Hos en leverantör"},
+    "%d of %d steps done": {"other": "%d av %d steg klara"},
+    "No car is being made ready.": {"other": "Ingen bil görs i ordning."},
+    "Getting it ready": {"other": "Iordningställande"},
+    "In progress": {"other": "Pågår"},
+    "Skipped": {"other": "Överhoppat"},
+    "Waiting": {"other": "Väntar"},
+    "Agreed %s": {"other": "Överenskommet %s"},
+    "Skip": {"other": "Hoppa över"},
+    "Do it again": {"other": "Gör om"},
+    "Start a plan": {"other": "Starta en plan"},
+    "Step": {"other": "Steg"},
+    "Owner or supplier": {"other": "Ansvarig eller leverantör"},
+    "Agreed price": {"other": "Överenskommet pris"},
+    "Add a step": {"other": "Lägg till ett steg"},
     "a note is at most 300 characters": {"other": "en anteckning är högst 300 tecken"},
     "a step has a name of 100 characters or fewer, is done in the shop or by a supplier, and has an owner of 200 characters or fewer and a price of up to a hundred million kronor": {"other": "ett steg har ett namn på högst 100 tecken, görs i verkstaden eller av en leverantör, och har en ansvarig på högst 200 tecken och ett pris på upp till hundra miljoner kronor"},
     "a step is started or skipped while it waits, finished or skipped while it is under way, and reopened once it is finished or skipped": {"other": "ett steg startas eller hoppas över medan det väntar, avslutas eller hoppas över medan det pågår, och öppnas igen när det är avslutat eller överhoppat"},

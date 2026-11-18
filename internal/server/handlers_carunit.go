@@ -42,6 +42,8 @@ type carUnitData struct {
 	Photos      []workshop.StockPhoto
 	// The car's damage, keys and service book (#167).
 	Card workshop.VehicleCard
+	// Its reconditioning plan (#236), and what a step may be moved to.
+	Recon workshop.ReconPlan
 	// The purchase's change of ownership, for whoever buys cars (#180).
 	Filing *workshop.OwnershipFiling
 	// A consigned car's agreement, every version, newest first.
@@ -140,6 +142,9 @@ func (s *Server) carUnitPage(w http.ResponseWriter, r *http.Request, status int,
 	d.ShowListing = true
 	if d.Card, err = workshop.CardOf(r.Context(), s.pool, scope, unit.VehicleID); err != nil {
 		s.log.Error("read the card", "error", err)
+	}
+	if d.Recon, err = workshop.ReconPlanOf(r.Context(), s.pool, scope, unit.ID); err != nil {
+		s.log.Error("read the reconditioning plan", "error", err)
 	}
 	if d.Listing, err = workshop.ListingOf(r.Context(), s.pool, scope, unit.ID); err != nil {
 		s.log.Error("read the listing", "error", err)
@@ -404,6 +409,45 @@ func (s *Server) handleCarCard(w http.ResponseWriter, r *http.Request) {
 	s.carUnitDone(w, r)
 }
 
+// handleCarRecon starts a car's reconditioning plan, adds a step to it or
+// moves one (#236).
+func (s *Server) handleCarRecon(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	var err error
+	switch r.PathValue("what") {
+	case "start":
+		err = workshop.StartReconPlan(r.Context(), s.pool, session.Scope, r.PathValue("id"))
+	case "add":
+		n := workshop.NewReconStep{Name: r.FormValue("step_name"), Kind: r.FormValue("kind"), Owner: r.FormValue("owner")}
+		if v := strings.TrimSpace(r.FormValue("due")); v != "" {
+			t, perr := time.ParseInLocation(time.DateOnly, v, s.shopLocation(r))
+			if perr != nil {
+				s.carUnitPage(w, r, http.StatusBadRequest, nil, "That date did not parse")
+				return
+			}
+			n.DueOn = &t
+		}
+		if v := strings.TrimSpace(r.FormValue("price")); v != "" {
+			minor, perr := parseMinorUnits(v)
+			if perr != nil {
+				s.carUnitPage(w, r, http.StatusBadRequest, nil, "Amounts are numbers, with up to two decimals.")
+				return
+			}
+			n.AgreedPriceMinor = &minor
+		}
+		_, err = workshop.AddReconStep(r.Context(), s.pool, session.Scope, r.PathValue("id"), n)
+	case "move":
+		err = workshop.MoveReconStep(r.Context(), s.pool, session.Scope, r.FormValue("step"), r.FormValue("move"), r.FormValue("note"))
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	if s.carUnitRefused(w, r, err, nil) {
+		return
+	}
+	s.carUnitDone(w, r)
+}
+
 // carUnitRoutes registers the pages of one car in stock.
 func (s *Server) carUnitRoutes(m routeMux) {
 	m.HandleFunc("GET /cars/stock/{id}", s.requireSession(s.handleCarUnit))
@@ -419,4 +463,5 @@ func (s *Server) carUnitRoutes(m routeMux) {
 	m.HandleFunc("POST /cars/stock/{id}/reservations/{res}/terms", s.requireSession(s.handleReservationTerms))
 	m.HandleFunc("POST /cars/stock/{id}/consignment/{agreement}/end", s.requireSession(s.handleEndConsignment))
 	m.HandleFunc("POST /cars/stock/{id}/card/{what}", s.requireSession(s.handleCarCard))
+	m.HandleFunc("POST /cars/stock/{id}/recon/{what}", s.requireSession(s.handleCarRecon))
 }

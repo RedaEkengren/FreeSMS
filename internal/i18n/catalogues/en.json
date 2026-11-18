@@ -122,6 +122,18 @@
       "one": "%d car has stood in one step of getting ready for too long",
       "other": "%d cars have stood in one step of getting ready for too long"
     },
+    "%d day in this step": {
+      "one": "%d day in this step",
+      "other": "%d days in this step"
+    },
+    "%d day since it was bought": {
+      "one": "%d day since it was bought",
+      "other": "%d days since it was bought"
+    },
+    "%d day in this state": {
+      "one": "%d day in this state",
+      "other": "%d days in this state"
+    },
     "Uncollected for %d day": {
       "one": "Uncollected for %d day",
       "other": "Uncollected for %d days"
