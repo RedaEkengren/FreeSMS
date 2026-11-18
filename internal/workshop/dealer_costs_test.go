@@ -647,3 +647,30 @@ func unitOf(t *testing.T, pool *pgxpool.Pool, job string) string {
 // parallel, another test's waits counted here let a step go before the one
 // it waits for was queued, and the order the test sets up was luck.
 const waitingForALock = `SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`
+
+// A job opened before the car was bought -- the inspection a buyer had done
+// to decide -- is no cost of the car, whether or not the purchase then
+// happens (#164): the workshop's job is the customer's or the shop's, and
+// posting it is refused even after the car is in stock. What it cost to find
+// out is entered by hand, as a cost, if the shop wants it counted.
+func TestAJobOpenedBeforeTheCarWasBoughtIsNoCostOfTheCar(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	inspection := newJob(t, pool)
+	// Done, so that what refuses it is when it was opened and not that it
+	// is still open.
+	move(t, pool, inspection, workshop.StateEstimated, workshop.StateAwaitingApproval, workshop.StateApproved, workshop.StateInProgress, workshop.StateReady)
+	p := buy(t, pool, workshop.StockFromPurchase)
+	if _, err := workshop.PostJobCost(ctx, pool, buyerScope(), inspection); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("the inspection before the purchase posted to the car: %v", err)
+	}
+	costs, err := workshop.CostsOfUnit(ctx, pool, buyerScope(), p.StockUnitID)
+	if err != nil || len(costs.Entries) != 0 {
+		t.Errorf("the car's costs after a refused posting: %+v, %v", costs, err)
+	}
+	// By hand it is a cost like any other.
+	if _, err := workshop.RecordStockCost(ctx, pool, buyerScope(), p.StockUnitID, workshop.NewStockCost{Kind: workshop.CostInspection,
+		NetMinor: 80_000, VATRateBasis: 2500, IncurredOn: time.Now(), Note: "Besiktning före köpet"}); err != nil {
+		t.Errorf("the inspection entered by hand: %v", err)
+	}
+}
