@@ -118,6 +118,10 @@
       "one": "%d day in stock on average",
       "other": "%d days in stock on average"
     },
+    "%d car has stood in one step of getting ready for too long": {
+      "one": "%d car has stood in one step of getting ready for too long",
+      "other": "%d cars have stood in one step of getting ready for too long"
+    },
     "Uncollected for %d day": {
       "one": "Uncollected for %d day",
       "other": "Uncollected for %d days"

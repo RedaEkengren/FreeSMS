@@ -155,6 +155,7 @@ var waitingSays = map[string]string{
 	"complaint_stalled":     "A complaint has had nothing done for a week: %s",
 	"ownership_unconfirmed": "A change of ownership is not confirmed two days on: %s",
 	"stock_ageing":          "%d car has been in stock longer than your oldest age line",
+	"recon_stalled":         "%d car has stood in one step of getting ready for too long",
 	// Rental
 	"rental_handover": "To hand over today: %s",
 	"rental_return":   "Due back today: %s",
@@ -180,7 +181,7 @@ func (w ActionItem) Says() string { return waitingSays[w.Kind] }
 // Plural reports whether the key counts, for the page to pick N or T.
 func (w ActionItem) Plural() bool {
 	switch w.Kind {
-	case "finding", "answer", "uncollected", "outbox_given_up", "outbox_manual", "payments_unmatched", "stock_ageing":
+	case "finding", "answer", "uncollected", "outbox_given_up", "outbox_manual", "payments_unmatched", "stock_ageing", "recon_stalled":
 		return true
 	}
 	return false
@@ -207,6 +208,8 @@ func (w ActionItem) Link() string {
 		return "/cars/leads/" + w.SubjectID
 	case w.SubjectKind == "test_drive":
 		return "/cars/test-drives/" + w.SubjectID
+	case w.SubjectKind == "pipeline":
+		return "/cars/pipeline"
 	case w.SubjectKind == "stock_list":
 		return "/cars/stock?sort=days"
 	case w.SubjectKind == "stock_unit":
