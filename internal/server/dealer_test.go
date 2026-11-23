@@ -847,3 +847,31 @@ func TestWhatAStepCostIsEnteredFromTheCarsPage(t *testing.T) {
 		t.Errorf("the salesperson's statistics:\n%s", seen)
 	}
 }
+
+// The owner says how many days a car may stand in one step, from the
+// pipeline's page; nobody else is offered the form or may send it.
+func TestTheOwnerSetsHowLongACarMayStandInAStepFromThePipeline(t *testing.T) {
+	ts, pool := testServer(t)
+	dealerShop(t, pool)
+	owner, sales := signIn(t, ts, ownerEmail), signIn(t, ts, salesEmail)
+	if page := get(t, owner, ts.URL+"/cars/pipeline", http.StatusOK); !strings.Contains(page, "Days a car may stand in one step") || !strings.Contains(page, `value="5"`) {
+		t.Errorf("the owner's pipeline has no form with the default:\n%s", visibleText(page))
+	}
+	if page := get(t, sales, ts.URL+"/cars/pipeline", http.StatusOK); strings.Contains(page, "Days a car may stand in one step") {
+		t.Error("a salesperson is offered the form")
+	}
+	if status := postStatus(t, sales, ts.URL+"/cars/pipeline/stall", url.Values{"days": {"2"}}); status != http.StatusForbidden {
+		t.Errorf("a salesperson setting the days answered %d", status)
+	}
+	for _, bad := range []string{"0", "x", "400"} {
+		if status := postStatus(t, owner, ts.URL+"/cars/pipeline/stall", url.Values{"days": {bad}}); status != http.StatusBadRequest {
+			t.Errorf("%q days answered %d", bad, status)
+		}
+	}
+	if status := postStatus(t, owner, ts.URL+"/cars/pipeline/stall", url.Values{"days": {"2"}}); status != http.StatusSeeOther {
+		t.Fatalf("setting the days answered %d", status)
+	}
+	if page := get(t, owner, ts.URL+"/cars/pipeline", http.StatusOK); !strings.Contains(page, `value="2"`) {
+		t.Errorf("the form does not show the days in force:\n%s", visibleText(page))
+	}
+}

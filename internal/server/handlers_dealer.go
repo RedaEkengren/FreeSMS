@@ -27,6 +27,7 @@ type dealerData struct {
 	// The cars being made ready, by the step each stands in (#236).
 	Pipeline  []workshop.PipelineRow
 	StepStats []workshop.StepStat
+	StallDays int
 	// Trade-ins waiting to be received or credited, for whoever buys cars.
 	TradeIns []workshop.ExpectedTradeIn
 	// What the cars sold in a period earned (#182), and the period.
@@ -662,5 +663,29 @@ func (s *Server) handleCarPipeline(w http.ResponseWriter, r *http.Request) {
 	if s.handoverError(w, r, err) {
 		return
 	}
-	s.render(w, r, http.StatusOK, "carpipeline", pageData{Title: "Cars being made ready", Session: session, Dealer: &dealerData{Pipeline: rows, StepStats: stats}})
+	stall, err := workshop.ReconStallDaysOf(r.Context(), s.pool, session.Scope)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "carpipeline", pageData{Title: "Cars being made ready", Session: session, Dealer: &dealerData{Pipeline: rows, StepStats: stats, StallDays: stall}})
+}
+
+// handleReconStall sets how many days a car may stand in one step.
+func (s *Server) handleReconStall(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	days, err := strconv.Atoi(strings.TrimSpace(r.FormValue("days")))
+	if err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "Not saved", "The days are a whole number, from one to a year.")
+		return
+	}
+	err = workshop.SetReconStallDays(r.Context(), s.pool, session.Scope, days)
+	if errors.Is(err, workshop.ErrInvalid) {
+		s.renderError(w, r, http.StatusBadRequest, "Not saved", trimInvalid(err))
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/cars/pipeline", http.StatusSeeOther)
 }

@@ -613,6 +613,7 @@ func (s *Server) routes() (http.Handler, error) {
 	supplierLinks := dealerMux.customerLinks(s.handleServiceGone)
 	supplierLinks.HandleFunc("GET /s/{token}", s.handleSupplierStep)
 	supplierLinks.HandleFunc("POST /s/{token}/done", s.handleSupplierDone)
+	dealerMux.HandleFunc("POST /cars/pipeline/stall", s.requireSession(s.handleReconStall))
 	dealerMux.HandleFunc("POST /cars/stock/ageing", s.requireSession(s.handleStockAgeing))
 	dealerMux.HandleFunc("GET /cars/results", s.requireSession(s.handleCarResults))
 	dealerMux.HandleFunc("GET /cars/stock/new", s.requireSession(s.handleBuyCarForm))

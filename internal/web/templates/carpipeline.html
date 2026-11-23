@@ -30,4 +30,14 @@
   {{end}}
 </ul>
 {{end}}
+{{if .Session.Scope.Role.RunsTheShop}}
+<section>
+  <h2>{{.T "When a car has stood too long"}}</h2>
+  <form method="post" action="/cars/pipeline/stall">
+    <label><span>{{.T "Days a car may stand in one step before it is on the list"}}</span>
+      <input name="days" value="{{.Dealer.StallDays}}" inputmode="numeric" maxlength="3" required></label>
+    <button type="submit" class="secondary">{{.T "Save the days"}}</button>
+  </form>
+</section>
+{{end}}
 {{end}}

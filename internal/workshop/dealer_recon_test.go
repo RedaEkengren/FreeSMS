@@ -444,3 +444,77 @@ func TestTheStepsThatAreFinishedAreSummedBySupplier(t *testing.T) {
 		t.Errorf("the statistics with Dealer off: %v", err)
 	}
 }
+
+// How long a car may stand in one step is the shop's to say: five days until
+// it does, the newest answer after, and it moves both the pipeline's mark and
+// the queue's count. Whoever runs the shop says it; those who buy and sell
+// read it.
+func TestAShopSaysHowLongACarMayStandInAStep(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := boughtCar(t, pool)
+	if err := workshop.StartReconPlan(ctx, pool, sales(), p.StockUnitID); err != nil {
+		t.Fatal(err)
+	}
+	plan, _ := workshop.ReconPlanOf(ctx, pool, sales(), p.StockUnitID)
+	step := stepNamed(t, plan, "Intake check").ID
+	if err := workshop.MoveReconStep(ctx, pool, sales(), step, workshop.ReconStart, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE recon_step_events SET at = clock_timestamp() - make_interval(days => 3) WHERE step_id = $1`, step); err != nil {
+		t.Fatal(err)
+	}
+	stalled := func() (marked bool, queued int) {
+		t.Helper()
+		rows, err := workshop.ReconPipeline(ctx, pool, sales())
+		if err != nil || len(rows) != 1 {
+			t.Fatalf("the pipeline: %+v, %v", rows, err)
+		}
+		items, err := workshop.WaitingFor(ctx, pool, sales())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, it := range items {
+			if it.Kind == "recon_stalled" {
+				queued += it.Count
+			}
+		}
+		return rows[0].Stalled(), queued
+	}
+	if d, err := workshop.ReconStallDaysOf(ctx, pool, sales()); err != nil || d != 5 {
+		t.Fatalf("the default: %d, %v", d, err)
+	}
+	if marked, queued := stalled(); marked || queued != 0 {
+		t.Errorf("three days in a step with five allowed: %v, %d", marked, queued)
+	}
+	for _, s := range []access.Scope{sales(), buyerScope()} {
+		if err := workshop.SetReconStallDays(ctx, pool, s, 2); !errors.Is(err, access.ErrForbidden) {
+			t.Errorf("%s set the days: %v", s.Role, err)
+		}
+	}
+	for _, bad := range []int{0, -1, 366} {
+		if err := workshop.SetReconStallDays(ctx, pool, everything(owner()), bad); !errors.Is(err, workshop.ErrInvalid) {
+			t.Errorf("%d days: %v", bad, err)
+		}
+	}
+	if err := workshop.SetReconStallDays(ctx, pool, everything(owner()), 2); err != nil {
+		t.Fatal(err)
+	}
+	if marked, queued := stalled(); !marked || queued != 1 {
+		t.Errorf("three days in a step with two allowed: %v, %d", marked, queued)
+	}
+	if err := workshop.SetReconStallDays(ctx, pool, everything(owner()), 10); err != nil {
+		t.Fatal(err)
+	}
+	if d, _ := workshop.ReconStallDaysOf(ctx, pool, sales()); d != 10 {
+		t.Errorf("the newest answer: %d", d)
+	}
+	if marked, queued := stalled(); marked || queued != 0 {
+		t.Errorf("three days in a step with ten allowed: %v, %d", marked, queued)
+	}
+	for _, s := range []access.Scope{everything(technician()), everything(advisor()), rentalDesk()} {
+		if _, err := workshop.ReconStallDaysOf(ctx, pool, s); !errors.Is(err, access.ErrForbidden) {
+			t.Errorf("%s read the days: %v", s.Role, err)
+		}
+	}
+}
