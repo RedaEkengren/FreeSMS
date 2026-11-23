@@ -238,3 +238,150 @@ func TestASetThatIsNotOneIsRefused(t *testing.T) {
 		t.Errorf("sets written by refusals: %d, %v", n, err)
 	}
 }
+
+// A set's wear over three seasons is its measurements, each a row; a tyre never
+// measured says so rather than zero; one below the limit is told apart from one
+// below the law; a wrong figure is corrected by another row, and the first stays.
+func TestASetsWearOverSeasonsIsItsMeasurementsAndNoneIsOverwritten(t *testing.T) {
+	pool := setup(t)
+	addTechnician(t, pool)
+	ctx := context.Background()
+	id, err := workshop.CreateTyreSet(ctx, pool, advisor(), summerSet(customerA, vehicleA))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, _ := workshop.TyreSetByID(ctx, pool, technician(), id)
+	if s.TreadWarning != workshop.DefaultTreadWarningTenths {
+		t.Errorf("the default limit: %d", s.TreadWarning)
+	}
+	for _, ty := range s.Tyres {
+		if ty.TreadTenths != nil || ty.TreadStatus != workshop.TreadNotMeasured {
+			t.Errorf("a tyre never measured: %+v", ty)
+		}
+	}
+	front := s.Tyres[0]
+	depths := []int{82, 61, 38}
+	for i, d := range depths {
+		mid, err := workshop.RecordTreadDepth(ctx, pool, technician(), front.ID, d, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Each season a year on.
+		if _, err := pool.Exec(ctx, `UPDATE tyre_measurements SET measured_at = clock_timestamp() - make_interval(years => $2) WHERE id = $1`, mid, len(depths)-1-i); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s, _ = workshop.TyreSetByID(ctx, pool, technician(), id)
+	got := s.Tyres[0]
+	if got.TreadTenths == nil || *got.TreadTenths != 38 || got.TreadStatus != workshop.TreadOK || len(got.Readings) != 3 ||
+		got.Readings[0].Tenths != 82 || got.Readings[2].Tenths != 38 {
+		t.Fatalf("the front tyre: %+v", got)
+	}
+	if s.Tyres[1].TreadStatus != workshop.TreadNotMeasured {
+		t.Errorf("a tyre never measured after another was: %+v", s.Tyres[1])
+	}
+
+	// One at the shop's limit, one below the law.
+	if _, err := workshop.RecordTreadDepth(ctx, pool, technician(), s.Tyres[1].ID, 30, "slitage på innerkanten"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordTreadDepth(ctx, pool, technician(), s.Tyres[2].ID, 14, ""); err != nil {
+		t.Fatal(err)
+	}
+	s, _ = workshop.TyreSetByID(ctx, pool, technician(), id)
+	if s.Tyres[1].TreadStatus != workshop.TreadWarning || s.Tyres[2].TreadStatus != workshop.TreadBelowLegal || s.Tyres[1].Readings[0].Note != "slitage på innerkanten" {
+		t.Errorf("the statuses: %+v / %+v", s.Tyres[1], s.Tyres[2])
+	}
+	if err := workshop.SetTreadWarning(ctx, pool, owner(), 40); err != nil {
+		t.Fatal(err)
+	}
+	if s, _ = workshop.TyreSetByID(ctx, pool, technician(), id); s.Tyres[0].TreadStatus != workshop.TreadWarning || s.TreadWarning != 40 {
+		t.Errorf("the front tyre under a limit of 4.0: %+v", s.Tyres[0])
+	}
+
+	// An older figure corrected after a newer one was taken: the newer still
+	// stands, for the correction keeps the time of what it corrects.
+	{
+		tyre := s.Tyres[0]
+		first := tyre.Readings[0]
+		if _, err := workshop.CorrectTreadDepth(ctx, pool, technician(), first.ID, 80, "Avläst på fel ställe"); err != nil {
+			t.Fatal(err)
+		}
+		again, _ := workshop.TyreSetByID(ctx, pool, technician(), id)
+		now := again.Tyres[0]
+		if now.TreadTenths == nil || *now.TreadTenths != 38 || len(now.Readings) != 4 || now.Readings[1].Tenths != 80 || now.Readings[1].CorrectsID != first.ID {
+			t.Errorf("the front tyre after an old figure was corrected: %+v", now)
+		}
+	}
+
+	// A figure entered wrongly is corrected, not edited.
+	wrong, _ := workshop.RecordTreadDepth(ctx, pool, technician(), s.Tyres[3].ID, 5, "")
+	if _, err := workshop.CorrectTreadDepth(ctx, pool, technician(), wrong, 50, ""); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a correction with no reason: %v", err)
+	}
+	if _, err := workshop.CorrectTreadDepth(ctx, pool, technician(), wrong, 50, "Läste av fel däck"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.CorrectTreadDepth(ctx, pool, technician(), wrong, 60, "En gång till"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a measurement corrected twice: %v", err)
+	}
+	s, _ = workshop.TyreSetByID(ctx, pool, technician(), id)
+	last := s.Tyres[3]
+	if last.TreadTenths == nil || *last.TreadTenths != 50 || last.TreadStatus != workshop.TreadWarning && last.TreadStatus != workshop.TreadOK || len(last.Readings) != 2 ||
+		last.Readings[0].Tenths != 5 || last.Readings[1].CorrectsID != wrong || last.Readings[1].Reason != "Läste av fel däck" {
+		t.Errorf("the corrected tyre: %+v", last)
+	}
+	// The row that was wrong is still there.
+	var rows int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM tyre_measurements WHERE tyre_id = $1`, last.ID).Scan(&rows); err != nil || rows != 2 {
+		t.Errorf("rows kept: %d, %v", rows, err)
+	}
+}
+
+// What is refused: a depth that cannot be, a tyre that has been replaced, a
+// role outside the workshop, the shop's limit set by anyone but who runs it.
+func TestATreadDepthThatCannotBeIsRefused(t *testing.T) {
+	pool := setup(t)
+	addTechnician(t, pool)
+	ctx := context.Background()
+	id, _ := workshop.CreateTyreSet(ctx, pool, advisor(), summerSet(customerA, vehicleA))
+	s, _ := workshop.TyreSetByID(ctx, pool, advisor(), id)
+	tyre := s.Tyres[0]
+	for _, bad := range []int{-1, 251} {
+		if _, err := workshop.RecordTreadDepth(ctx, pool, technician(), tyre.ID, bad, ""); !errors.Is(err, workshop.ErrInvalid) {
+			t.Errorf("%d tenths: %v", bad, err)
+		}
+	}
+	if _, err := workshop.RecordTreadDepth(ctx, pool, technician(), tyre.ID, 50, strings.Repeat("x", 301)); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a long note: %v", err)
+	}
+	if _, err := workshop.RecordTreadDepth(ctx, pool, technician(), "nope", 50, ""); !errors.Is(err, workshop.ErrNotFound) {
+		t.Errorf("a tyre that is not an id: %v", err)
+	}
+	if err := workshop.ReplaceTyre(ctx, pool, advisor(), tyre.ID, workshop.NewTyre{Position: tyre.Position, Dimension: "205/55R16"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.RecordTreadDepth(ctx, pool, technician(), tyre.ID, 50, ""); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a tyre that has been replaced: %v", err)
+	}
+	for _, sc := range []access.Scope{everything(rentalDesk()), everything(sales())} {
+		if _, err := workshop.RecordTreadDepth(ctx, pool, sc, tyre.ID, 50, ""); !errors.Is(err, access.ErrForbidden) {
+			t.Errorf("%s measured: %v", sc.Role, err)
+		}
+	}
+	for _, sc := range []access.Scope{advisor(), technician()} {
+		if err := workshop.SetTreadWarning(ctx, pool, sc, 35); !errors.Is(err, access.ErrForbidden) {
+			t.Errorf("%s set the limit: %v", sc.Role, err)
+		}
+	}
+	for _, bad := range []int{15, 101} {
+		if err := workshop.SetTreadWarning(ctx, pool, owner(), bad); !errors.Is(err, workshop.ErrInvalid) {
+			t.Errorf("a limit of %d: %v", bad, err)
+		}
+	}
+	off := technician()
+	off.Modules = []access.Module{access.Dealer}
+	if _, err := workshop.RecordTreadDepth(ctx, pool, off, s.Tyres[1].ID, 50, ""); !errors.Is(err, access.ErrModuleOff) {
+		t.Errorf("a measurement with the workshop off: %v", err)
+	}
+}

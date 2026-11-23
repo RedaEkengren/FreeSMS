@@ -144,6 +144,7 @@ type pageData struct {
 	Tyres                      []workshop.TyreSet
 	TyreSet                    workshop.TyreSet
 	Places                     []workshop.StorageLocation
+	TreadLimit                 int
 	StorageLabels              []storageLabel
 	SetLabels                  []storageLabel
 	VehicleChanges             []workshop.Change
@@ -515,6 +516,21 @@ func (d pageData) Num(v any) string {
 
 // Date formats a time with month and weekday names in the reader's
 // language. An instant goes through Local first: $.Date ($.Local .At) "...".
+// Tenths writes a depth kept in tenths of a millimetre, such as 35 as 3.5.
+func (d pageData) Tenths(v any) string {
+	var n int
+	switch x := v.(type) {
+	case int:
+		n = x
+	case *int:
+		if x == nil {
+			return ""
+		}
+		n = *x
+	}
+	return fmt.Sprintf("%d.%d", n/10, n%10)
+}
+
 func (d pageData) Date(t time.Time, layout string) string {
 	if d.printer == nil {
 		return t.Format(layout)

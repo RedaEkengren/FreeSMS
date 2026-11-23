@@ -229,3 +229,92 @@ func TestAStoredSetIsPlacedByScanningItsLabelAndThenThePlaces(t *testing.T) {
 		t.Errorf("the set after the scans:\n%s", page)
 	}
 }
+
+// A technician records depths from the set's page, a wrong one is corrected
+// with a reason, the page says which tyres are at the shop's limit or below the
+// law, and the owner moves the limit.
+func TestATechnicianRecordsTreadDepthAndTheOwnerSetsTheLimit(t *testing.T) {
+	ts, pool := testServer(t)
+	const customer = "aaaaaaaa-0000-0000-0000-000000000004"
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx, `INSERT INTO vehicle_ownership (shop_id, vehicle_id, customer_id) VALUES ($1, $2, $3)`, shopA, vehicleA, customer); err != nil {
+		t.Fatal(err)
+	}
+	owner, advisor, tech := signIn(t, ts, ownerEmail), signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/customers/"+customer+"/tyres", strings.NewReader(url.Values{
+		"season": {"summer"}, "brand": {"Michelin"}, "front": {"205/55R16"}, "rims": {"alloy"}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", ts.URL)
+	c := *advisor
+	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	set := resp.Header.Get("Location")
+	var tyres []string
+	rows, err := pool.Query(ctx, `SELECT id FROM tyres WHERE shop_id = $1 ORDER BY position`, shopA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var id string
+		_ = rows.Scan(&id)
+		tyres = append(tyres, id)
+	}
+	rows.Close()
+
+	if page := visibleText(get(t, tech, ts.URL+set, http.StatusOK)); strings.Count(page, "not measured") != 4 {
+		t.Errorf("a set never measured:\n%s", page)
+	}
+	for _, bad := range []string{"", "x", "26", "-1"} {
+		if status := postStatus(t, tech, ts.URL+set+"/tread", url.Values{"tyre": {tyres[0]}, "depth": {bad}}); status != http.StatusBadRequest {
+			t.Errorf("a depth of %q answered %d", bad, status)
+		}
+	}
+	if status := postStatus(t, tech, ts.URL+set+"/tread", url.Values{"tyre": {tyres[0]}, "depth": {"3,5"}}); status != http.StatusSeeOther {
+		t.Fatalf("recording 3,5 answered %d", status)
+	}
+	postStatus(t, tech, ts.URL+set+"/tread", url.Values{"tyre": {tyres[1]}, "depth": {"1.2"}, "note": {"kordblottad"}})
+	page := visibleText(get(t, tech, ts.URL+set, http.StatusOK))
+	for _, want := range []string{"Tread 3.5 mm", "Tread 1.2 mm", "Below the legal minimum of 1.6 mm.", "kordblottad", "not measured"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the page lacks %q:\n%s", want, page)
+		}
+	}
+	if strings.Contains(page, "limit of 3.0") {
+		t.Errorf("3.5 mm is above the default limit of 3.0:\n%s", page)
+	}
+	if status := postStatus(t, tech, ts.URL+"/tyres/limit", url.Values{"limit": {"4"}}); status != http.StatusForbidden {
+		t.Errorf("a technician setting the limit answered %d", status)
+	}
+	if status := postStatus(t, owner, ts.URL+"/tyres/limit", url.Values{"limit": {"4,0"}}); status != http.StatusSeeOther {
+		t.Fatalf("the owner setting the limit answered %d", status)
+	}
+	if status := postStatus(t, owner, ts.URL+"/tyres/limit", url.Values{"limit": {"0,5"}}); status != http.StatusBadRequest {
+		t.Errorf("a limit below the law answered %d", status)
+	}
+	if page := visibleText(get(t, tech, ts.URL+set, http.StatusOK)); !strings.Contains(page, "limit of 4.0 mm.") {
+		t.Errorf("under a limit of 4.0:\n%s", page)
+	}
+	var wrong string
+	if err := pool.QueryRow(ctx, `SELECT id FROM tyre_measurements WHERE tenths = 12`).Scan(&wrong); err != nil {
+		t.Fatal(err)
+	}
+	if status := postStatus(t, tech, ts.URL+set+"/tread/correct", url.Values{"measurement": {wrong}, "depth": {"6.1"}}); status != http.StatusBadRequest {
+		t.Errorf("a correction with no reason answered %d", status)
+	}
+	if status := postStatus(t, tech, ts.URL+set+"/tread/correct", url.Values{"measurement": {wrong}, "depth": {"6.1"}, "reason": {"Fel däck"}}); status != http.StatusSeeOther {
+		t.Fatalf("a correction answered %d", status)
+	}
+	if page := visibleText(get(t, tech, ts.URL+set, http.StatusOK)); !strings.Contains(page, "Tread 6.1 mm") || !strings.Contains(page, "Corrected: Fel däck") {
+		t.Errorf("after the correction:\n%s", page)
+	}
+	if list := visibleText(get(t, owner, ts.URL+"/tyres", http.StatusOK)); !strings.Contains(list, "tread limit") {
+		t.Errorf("the owner's list lacks the limit form:\n%s", list)
+	}
+	if list := visibleText(get(t, tech, ts.URL+"/tyres", http.StatusOK)); strings.Contains(list, "tread limit") {
+		t.Errorf("a technician is offered the limit form")
+	}
+}

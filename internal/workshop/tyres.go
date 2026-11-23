@@ -76,6 +76,14 @@ type Tyre struct {
 	DotWeek    int
 	DotYear    int
 	ReplacesID string
+	// The depth that stands, in tenths of a millimetre; nil when the tyre has
+	// never been measured, which is not the same as zero.
+	TreadTenths *int
+	TreadAt     *time.Time
+	TreadStatus string
+	// Every measurement, oldest first, with the ones since corrected. Only on a
+	// set read alone.
+	Readings []TreadReading
 }
 
 // TyreMove is where a set has been: a car, or off any car.
@@ -106,6 +114,8 @@ type TyreSet struct {
 	StoredIn   string
 	StoredAtID string
 	Tyres      []Tyre
+	// The shop's tread limit in tenths of a millimetre, as it stands now.
+	TreadWarning int
 	// Where it has been, oldest first. Only on a set read alone.
 	Moves []TyreMove
 }
@@ -301,7 +311,7 @@ func scanTyreSet(row pgx.Row) (TyreSet, error) {
 }
 
 // currentTyresTx reads the tyres now on the sets, the ones not replaced.
-func currentTyresTx(ctx context.Context, tx pgx.Tx, sets []TyreSet) error {
+func currentTyresTx(ctx context.Context, tx pgx.Tx, sets []TyreSet, history bool) error {
 	if len(sets) == 0 {
 		return nil
 	}
@@ -327,7 +337,40 @@ func currentTyresTx(ctx context.Context, tx pgx.Tx, sets []TyreSet) error {
 		}
 		sets[at[set]].Tyres = append(sets[at[set]].Tyres, t)
 	}
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	rows.Close()
+	var tyreIDs []string
+	for _, s := range sets {
+		for _, t := range s.Tyres {
+			tyreIDs = append(tyreIDs, t.ID)
+		}
+	}
+	readings, err := treadReadingsTx(ctx, tx, tyreIDs)
+	if err != nil {
+		return err
+	}
+	warning, err := treadWarningTx(ctx, tx)
+	if err != nil {
+		return err
+	}
+	for i := range sets {
+		sets[i].TreadWarning = warning
+		for j := range sets[i].Tyres {
+			t := &sets[i].Tyres[j]
+			rs := readings[t.ID]
+			if r := standing(rs); r != nil {
+				n, at := r.Tenths, r.At
+				t.TreadTenths, t.TreadAt = &n, &at
+			}
+			t.TreadStatus = TreadStatusOf(t.TreadTenths, warning)
+			if history {
+				t.Readings = rs
+			}
+		}
+	}
+	return nil
 }
 
 // TyreSetsOf lists the sets, the newest first. Whoever works in the
@@ -360,7 +403,7 @@ func TyreSetsOf(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, f T
 			return err
 		}
 		rows.Close()
-		return currentTyresTx(ctx, tx, out)
+		return currentTyresTx(ctx, tx, out, false)
 	})
 	return out, err
 }
@@ -383,7 +426,7 @@ func TyreSetByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 			return fmt.Errorf("read the set: %w", err)
 		}
 		sets := []TyreSet{s}
-		if err := currentTyresTx(ctx, tx, sets); err != nil {
+		if err := currentTyresTx(ctx, tx, sets, true); err != nil {
 			return err
 		}
 		s = sets[0]

@@ -300,6 +300,7 @@ func TestEveryAuditSubjectKindIsOneVerifyCanFind(t *testing.T) {
 		             VALUES ('` + id + `08', '` + shopID + `', gen_random_uuid(), '` + userID + `') RETURNING id`,
 		"damage_case": `INSERT INTO damage_cases (id, shop_id, resource_id, found_in, item_id, description)
 		             VALUES ('` + id + `10', '` + shopID + `', gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 'x') RETURNING id`,
+		"tyre_set": `INSERT INTO tyre_sets (id, shop_id, customer_id, season, rims) VALUES ('` + id + `11', '` + shopID + `', gen_random_uuid(), 'summer', 'none') RETURNING id`,
 		"ownership_filing": `INSERT INTO ownership_filings (id, shop_id, subject_kind, subject_id, vehicle_id, to_party_id, passes_on)
 		             VALUES ('` + id + `09', '` + shopID + `', 'sale', gen_random_uuid(), '` + vehicleID + `', gen_random_uuid(), current_date) RETURNING id`,
 	}

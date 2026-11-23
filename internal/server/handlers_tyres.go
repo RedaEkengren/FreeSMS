@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"html/template"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -21,7 +22,11 @@ func (s *Server) handleTyres(w http.ResponseWriter, r *http.Request) {
 	if s.handoverError(w, r, err) {
 		return
 	}
-	s.render(w, r, http.StatusOK, "tyres", pageData{Title: "Tyre sets", Session: session, Tyres: sets})
+	pd := pageData{Title: "Tyre sets", Session: session, Tyres: sets}
+	if limit, err := workshop.TreadWarningOf(r.Context(), s.pool, session.Scope); err == nil {
+		pd.TreadLimit = limit
+	}
+	s.render(w, r, http.StatusOK, "tyres", pd)
 }
 
 func (s *Server) handleTyreSet(w http.ResponseWriter, r *http.Request) {
@@ -247,4 +252,61 @@ func (s *Server) handleStorageScanPost(w http.ResponseWriter, r *http.Request) {
 		s.submitted(w, r)
 		http.Redirect(w, r, "/storage/scan?done="+id, http.StatusSeeOther)
 	}
+}
+
+// parseMillimetres reads a depth such as "3,5" or "3.5" as tenths of a
+// millimetre. It is a measurement, never money, so a float is fine for the
+// reading; what is kept is a whole number.
+func parseMillimetres(v string) (int, bool) {
+	v = strings.ReplaceAll(strings.TrimSpace(v), ",", ".")
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil || f < 0 || f > 25 {
+		return 0, false
+	}
+	return int(math.Round(f * 10)), true
+}
+
+func (s *Server) handleTreadDepth(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	tenths, ok := parseMillimetres(r.FormValue("depth"))
+	if !ok {
+		s.renderError(w, r, http.StatusBadRequest, "Not saved", "A depth is a number of millimetres, from 0 to 25.")
+		return
+	}
+	_, err := workshop.RecordTreadDepth(r.Context(), s.pool, session.Scope, r.FormValue("tyre"), tenths, r.FormValue("note"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/tyres/"+r.PathValue("id"), http.StatusSeeOther)
+}
+
+func (s *Server) handleCorrectTreadDepth(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	tenths, ok := parseMillimetres(r.FormValue("depth"))
+	if !ok {
+		s.renderError(w, r, http.StatusBadRequest, "Not saved", "A depth is a number of millimetres, from 0 to 25.")
+		return
+	}
+	_, err := workshop.CorrectTreadDepth(r.Context(), s.pool, session.Scope, r.FormValue("measurement"), tenths, r.FormValue("reason"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/tyres/"+r.PathValue("id"), http.StatusSeeOther)
+}
+
+func (s *Server) handleTreadLimit(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	tenths, ok := parseMillimetres(r.FormValue("limit"))
+	if !ok {
+		s.renderError(w, r, http.StatusBadRequest, "Not saved", "A depth is a number of millimetres, from 0 to 25.")
+		return
+	}
+	err := workshop.SetTreadWarning(r.Context(), s.pool, session.Scope, tenths)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/tyres", http.StatusSeeOther)
 }
