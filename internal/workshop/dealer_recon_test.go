@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
@@ -281,5 +282,69 @@ func TestThePipelineShowsWhereEachCarStandsAndHowLong(t *testing.T) {
 	}
 	if err := workshop.MoveReconStep(ctx, pool, sales(), stepOf(b.StockUnitID, "Workshop"), workshop.ReconStart, ""); err == nil {
 		t.Error("a step of a car already out of stock was started")
+	}
+}
+
+// What a finished step came to is entered against the car as a cost of its
+// own kind and tied to the step, so the plan sets it beside what was agreed.
+// A step not finished takes none; a salesperson enters none and is never
+// handed the figure; a cost reversed leaves the step's total.
+func TestWhatAStepCostIsEnteredOnTheCarAndSetBesideWhatWasAgreed(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	p := boughtCar(t, pool)
+	price := int64(450_000)
+	id, err := workshop.AddReconStep(ctx, pool, buyerScope(), p.StockUnitID, workshop.NewReconStep{
+		Name: "Lackering", Kind: workshop.ReconOutside, Owner: "Lackaren AB", AgreedPriceMinor: &price})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cost := workshop.NewStockCost{NetMinor: 480_000, VATRateBasis: 2500, IncurredOn: time.Now(), ExternalRef: "F-17", FromInvoice: true}
+	if _, err := workshop.PostReconStepCost(ctx, pool, buyerScope(), id, cost); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a cost on a step not finished: %v", err)
+	}
+	for _, how := range []string{workshop.ReconStart, workshop.ReconFinish} {
+		if err := workshop.MoveReconStep(ctx, pool, buyerScope(), id, how, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := workshop.PostReconStepCost(ctx, pool, sales(), id, cost); !errors.Is(err, access.ErrForbidden) {
+		t.Errorf("a salesperson entering a cost: %v", err)
+	}
+	entry, err := workshop.PostReconStepCost(ctx, pool, buyerScope(), id, cost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry.Kind != workshop.CostReconditioning || entry.Source != workshop.CostFromSupplierInvoice || entry.NetMinor != 480_000 {
+		t.Errorf("the entry: %+v", entry)
+	}
+	costs, err := workshop.CostsOfUnit(ctx, pool, buyerScope(), p.StockUnitID)
+	if err != nil || costs.TotalMinor() != 480_000 {
+		t.Errorf("the car's costs: %+v, %v", costs, err)
+	}
+	read := func(s access.Scope) workshop.ReconStep {
+		plan, err := workshop.ReconPlanOf(ctx, pool, s, p.StockUnitID)
+		if err != nil || len(plan.Steps) != 1 {
+			t.Fatalf("the plan: %+v, %v", plan, err)
+		}
+		return plan.Steps[0]
+	}
+	if got := read(buyerScope()); got.CostedMinor == nil || *got.CostedMinor != 480_000 || *got.AgreedPriceMinor != price {
+		t.Errorf("the buyer's step: %+v", got)
+	}
+	if got := read(sales()); got.CostedMinor != nil {
+		t.Errorf("the salesperson was handed what it cost: %d", *got.CostedMinor)
+	}
+	if _, err := workshop.ReverseStockCost(ctx, pool, buyerScope(), entry.ID, "Wrong amount"); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(buyerScope()); got.CostedMinor != nil {
+		t.Errorf("a reversed cost still counts: %d", *got.CostedMinor)
+	}
+	if _, err := workshop.PostReconStepCost(ctx, pool, buyerScope(), "not-an-id", cost); !errors.Is(err, workshop.ErrNotFound) {
+		t.Errorf("a step that is not there: %v", err)
+	}
+	if _, err := workshop.PostReconStepCost(ctx, pool, buyerScope(), id, workshop.NewStockCost{NetMinor: 1, IncurredOn: time.Now(), Kind: "nonsense"}); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a kind that is not one: %v", err)
 	}
 }

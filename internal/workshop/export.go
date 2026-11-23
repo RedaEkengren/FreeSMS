@@ -95,6 +95,7 @@ var exportQueries = map[string]string{
 	"invoice_links":        `SELECT id, shop_id, invoice_id, created_by, created_at, expires_at, revoked_at, revoked_by, first_opened_at, last_opened_at, opens FROM invoice_links`,
 	"job_links":            `SELECT id, shop_id, work_order_id, enquiry_id, created_by, created_at, expires_at, revoked_at FROM job_links`,
 	"recon_supplier_links": `SELECT id, shop_id, step_id, created_by, created_at, expires_at, revoked_at FROM recon_supplier_links`,
+	"recon_step_costs":     `SELECT id, shop_id, step_id, cost_entry_id, created_at FROM recon_step_costs`,
 	// A period as its two ends and a buffer in seconds, which a spreadsheet
 	// reads; a range and an interval have no common written form (#149).
 	"resource_blocks": `SELECT id, shop_id, resource_id, kind, status, lower(period) AS starts_at, upper(period) AS ends_at,

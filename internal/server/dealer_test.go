@@ -797,3 +797,46 @@ func stateOf(t *testing.T, pool *pgxpool.Pool, scope access.Scope, unit, step st
 	t.Fatalf("no step %s", step)
 	return ""
 }
+
+// The buyer enters what a finished step cost from the car's page, and the plan
+// shows it beside what was agreed; the salesperson sees neither figure.
+func TestWhatAStepCostIsEnteredFromTheCarsPage(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	seller, _ := workshop.CreateParty(ctx, pool, owner, workshop.NewParty{Kind: "private", Name: "Sam Säljare", Role: workshop.PartySeller})
+	p, err := workshop.RecordPurchase(ctx, pool, owner, workshop.NewPurchase{VehicleID: vehicleA, Reason: workshop.StockFromPurchase,
+		SellerPartyID: seller, PurchasedOn: time.Now(), PriceMinor: 8_000_000, SellerType: workshop.SellerPrivate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	price := int64(450_050)
+	step, err := workshop.AddReconStep(ctx, pool, owner, p.StockUnitID, workshop.NewReconStep{Name: "Lackering", Kind: workshop.ReconOutside, AgreedPriceMinor: &price})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, how := range []string{workshop.ReconStart, workshop.ReconFinish} {
+		if err := workshop.MoveReconStep(ctx, pool, owner, step, how, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	base := ts.URL + "/cars/stock/" + p.StockUnitID
+	buyer, sales := signIn(t, ts, buyerEmail), signIn(t, ts, salesEmail)
+	form := url.Values{"step": {step}, "net": {"4 800,00"}, "rate": {"25"}, "incurred_on": {time.Now().Format(time.DateOnly)}, "ref": {"F-17"}}
+	if status := postStatus(t, sales, base+"/recon/cost", form); status != http.StatusForbidden {
+		t.Errorf("a salesperson entering a cost answered %d", status)
+	}
+	if status := postStatus(t, buyer, base+"/recon/cost", url.Values{"step": {step}, "net": {"x"}}); status != http.StatusBadRequest {
+		t.Errorf("a cost that is not a number answered %d", status)
+	}
+	if status := postStatus(t, buyer, base+"/recon/cost", form); status != http.StatusSeeOther {
+		t.Fatalf("entering the cost answered %d", status)
+	}
+	page := visibleText(get(t, buyer, base, http.StatusOK))
+	if !strings.Contains(page, "Agreed") || !strings.Contains(page, "Cost SEK\u00a04,800.00") {
+		t.Errorf("the buyer's plan:\n%s", page)
+	}
+	if seen := visibleText(get(t, sales, base, http.StatusOK)); strings.Contains(seen, "4,800") || strings.Contains(seen, "Cost 4") {
+		t.Errorf("the salesperson sees what it cost:\n%s", seen)
+	}
+}

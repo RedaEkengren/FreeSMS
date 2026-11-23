@@ -436,6 +436,28 @@ func (s *Server) handleCarRecon(w http.ResponseWriter, r *http.Request) {
 			n.AgreedPriceMinor = &minor
 		}
 		_, err = workshop.AddReconStep(r.Context(), s.pool, session.Scope, r.PathValue("id"), n)
+	case "cost":
+		form := map[string]string{}
+		for _, k := range []string{"net", "rate", "incurred_on", "ref"} {
+			form[k] = strings.TrimSpace(r.FormValue(k))
+		}
+		net, perr := parseMinorSigned(form["net"])
+		if perr != nil || form["net"] == "" {
+			s.carUnitPage(w, r, http.StatusBadRequest, form, "Say what it cost before VAT, as a number.")
+			return
+		}
+		rate, perr := strconv.Atoi(strings.TrimSuffix(form["rate"], "%"))
+		if perr != nil {
+			s.carUnitPage(w, r, http.StatusBadRequest, form, "The VAT rate is a whole number of per cent.")
+			return
+		}
+		day, perr := time.ParseInLocation(time.DateOnly, form["incurred_on"], s.shopLocation(r))
+		if perr != nil {
+			s.carUnitPage(w, r, http.StatusBadRequest, form, "Say the day it was spent.")
+			return
+		}
+		_, err = workshop.PostReconStepCost(r.Context(), s.pool, session.Scope, r.FormValue("step"), workshop.NewStockCost{
+			NetMinor: net, VATRateBasis: rate * 100, IncurredOn: day, ExternalRef: form["ref"], FromInvoice: r.FormValue("invoice") != ""})
 	case "link":
 		// Shown once, on the car's page: only its hash is kept.
 		token, lerr := workshop.CreateReconSupplierLink(r.Context(), s.pool, session.Scope, r.FormValue("step"))

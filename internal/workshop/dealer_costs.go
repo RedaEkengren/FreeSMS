@@ -111,31 +111,31 @@ var (
 	ErrCostNoReason = fmt.Errorf("%w: say why the cost is reversed, in 300 characters or fewer", ErrInvalid)
 )
 
-// RecordStockCost records a cost spent on a stock car. One dated after the
-// sale that stands is after it (stock_cost_post_sale, 0099): it changes
-// the margin, never the VAT. For whoever buys cars, in a shop that sells them.
-func RecordStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, unitID string, n NewStockCost) (StockCost, error) {
-	if !scope.Role.BuysVehicles() {
-		return StockCost{}, access.ErrForbidden
-	}
-	if err := scope.Require(access.Dealer); err != nil {
-		return StockCost{}, err
-	}
+// preparedCost is a cost that has been checked and had its VAT worked out.
+type preparedCost struct {
+	NewStockCost
+	vat    int64
+	source string
+}
+
+// prepareStockCost checks a cost before it is written: the same checks for a
+// cost entered alone and for one that belongs to a reconditioning step.
+func prepareStockCost(unitID string, n NewStockCost) (preparedCost, error) {
 	if !looksLikeUUID(unitID) || (n.SupplierPartyID != "" && !looksLikeUUID(n.SupplierPartyID)) {
-		return StockCost{}, ErrNotFound
+		return preparedCost{}, ErrNotFound
 	}
 	if !slices.Contains(CostKinds, n.Kind) {
-		return StockCost{}, errCostKind
+		return preparedCost{}, errCostKind
 	}
 	if n.VATRateBasis < 0 || n.VATRateBasis > 10000 {
-		return StockCost{}, errCostRate
+		return preparedCost{}, errCostRate
 	}
 	if n.IncurredOn.IsZero() || n.IncurredOn.After(time.Now().Add(24*time.Hour)) {
-		return StockCost{}, errCostDate
+		return preparedCost{}, errCostDate
 	}
 	n.ExternalRef, n.Note = strings.TrimSpace(n.ExternalRef), strings.TrimSpace(n.Note)
 	if utf8.RuneCountInString(n.ExternalRef) > 100 || utf8.RuneCountInString(n.Note) > 500 {
-		return StockCost{}, errCostText
+		return preparedCost{}, errCostText
 	}
 	n.Currency = strings.ToUpper(strings.TrimSpace(n.Currency))
 	if n.Currency == "SEK" {
@@ -145,11 +145,11 @@ func RecordStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 		if len(n.Currency) != 3 || strings.Trim(n.Currency, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") != "" || n.NetMinor != 0 ||
 			n.OriginalMinor < -maxOriginalMinor || n.OriginalMinor > maxOriginalMinor || n.RateMicro < 1 || n.RateMicro > maxRateMicro ||
 			strings.TrimSpace(n.RateSource) == "" || utf8.RuneCountInString(n.RateSource) > 200 {
-			return StockCost{}, errCostCurrency
+			return preparedCost{}, errCostCurrency
 		}
 		n.NetMinor = money.Scale(n.OriginalMinor, n.RateMicro, 1_000_000)
 	} else if n.OriginalMinor != 0 || n.RateMicro != 0 || strings.TrimSpace(n.RateSource) != "" {
-		return StockCost{}, errCostCurrency
+		return preparedCost{}, errCostCurrency
 	}
 	vat := money.VAT(n.NetMinor, n.VATRateBasis)
 	if n.InputVATMinor != nil {
@@ -162,46 +162,69 @@ func RecordStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 		return x
 	}
 	if abs(n.NetMinor) > 10_000_000_000 || abs(vat) > abs(n.NetMinor) || (vat != 0 && (vat < 0) != (n.NetMinor < 0)) {
-		return StockCost{}, errCostAmount
+		return preparedCost{}, errCostAmount
 	}
 	source := CostFromManual
 	if n.FromInvoice {
 		source = CostFromSupplierInvoice
 	}
+	return preparedCost{NewStockCost: n, vat: vat, source: source}, nil
+}
+
+// RecordStockCost records a cost spent on a stock car. One dated after the
+// sale that stands is after it (stock_cost_post_sale, 0099): it changes
+// the margin, never the VAT. For whoever buys cars, in a shop that sells them.
+func RecordStockCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, unitID string, n NewStockCost) (StockCost, error) {
+	if !scope.Role.BuysVehicles() {
+		return StockCost{}, access.ErrForbidden
+	}
+	if err := scope.Require(access.Dealer); err != nil {
+		return StockCost{}, err
+	}
+	p, err := prepareStockCost(unitID, n)
+	if err != nil {
+		return StockCost{}, err
+	}
 	var out StockCost
-	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		var exists bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM stock_units WHERE id = $1)`, unitID).Scan(&exists); err != nil {
-			return fmt.Errorf("read stock unit: %w", err)
-		}
-		if !exists {
-			return ErrNotFound
-		}
-		if n.SupplierPartyID != "" {
-			if err := partySeenTx(ctx, tx, scope, n.SupplierPartyID); err != nil {
-				return err
-			}
-		}
-		var id string
-		if err := tx.QueryRow(ctx, `
-			INSERT INTO stock_cost_entries (shop_id, stock_unit_id, kind, net_minor, input_vat_minor, vat_rate_basis,
-			       supplier_party_id, external_ref, incurred_on, source, happened_at, currency, original_net_minor, rate_micro,
-			       rate_source, note, recorded_by)
-			VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $7 <> '' THEN party_now($7::uuid) END, nullif($8, ''), $9, $10,
-			        stock_cost_dated($1, $9::date),
-			        nullif($11, ''), CASE WHEN $11 <> '' THEN $12::bigint END, CASE WHEN $11 <> '' THEN $13::bigint END,
-			        nullif(btrim($14), ''), nullif($15, ''), NULLIF($16, '')::uuid)
-			RETURNING id`,
-			scope.ShopID, unitID, n.Kind, n.NetMinor, vat, n.VATRateBasis, n.SupplierPartyID, n.ExternalRef,
-			n.IncurredOn.Format(time.DateOnly), source, n.Currency, n.OriginalMinor, n.RateMicro, n.RateSource,
-			n.Note, scope.UserID).Scan(&id); err != nil {
-			return fmt.Errorf("record the cost: %w", err)
-		}
+	err = database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var err error
-		out, err = stockCostTx(ctx, tx, id)
+		out, err = insertStockCostTx(ctx, tx, scope, unitID, p)
 		return err
 	})
 	return out, err
+}
+
+// insertStockCostTx writes a prepared cost against a unit that is there.
+func insertStockCostTx(ctx context.Context, tx pgx.Tx, scope access.Scope, unitID string, p preparedCost) (StockCost, error) {
+	n, vat, source := p.NewStockCost, p.vat, p.source
+	var exists bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM stock_units WHERE id = $1)`, unitID).Scan(&exists); err != nil {
+		return StockCost{}, fmt.Errorf("read stock unit: %w", err)
+	}
+	if !exists {
+		return StockCost{}, ErrNotFound
+	}
+	if n.SupplierPartyID != "" {
+		if err := partySeenTx(ctx, tx, scope, n.SupplierPartyID); err != nil {
+			return StockCost{}, err
+		}
+	}
+	var id string
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO stock_cost_entries (shop_id, stock_unit_id, kind, net_minor, input_vat_minor, vat_rate_basis,
+		       supplier_party_id, external_ref, incurred_on, source, happened_at, currency, original_net_minor, rate_micro,
+		       rate_source, note, recorded_by)
+		VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $7 <> '' THEN party_now($7::uuid) END, nullif($8, ''), $9, $10,
+		        stock_cost_dated($1, $9::date),
+		        nullif($11, ''), CASE WHEN $11 <> '' THEN $12::bigint END, CASE WHEN $11 <> '' THEN $13::bigint END,
+		        nullif(btrim($14), ''), nullif($15, ''), NULLIF($16, '')::uuid)
+		RETURNING id`,
+		scope.ShopID, unitID, n.Kind, n.NetMinor, vat, n.VATRateBasis, n.SupplierPartyID, n.ExternalRef,
+		n.IncurredOn.Format(time.DateOnly), source, n.Currency, n.OriginalMinor, n.RateMicro, n.RateSource,
+		n.Note, scope.UserID).Scan(&id); err != nil {
+		return StockCost{}, fmt.Errorf("record the cost: %w", err)
+	}
+	return stockCostTx(ctx, tx, id)
 }
 
 const stockCostColumns = `

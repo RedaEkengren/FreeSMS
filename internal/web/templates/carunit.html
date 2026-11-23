@@ -62,6 +62,7 @@
       <div class="waiting">{{if eq .Kind "outside"}}{{$.T "At a supplier"}}{{else}}{{$.T "In the shop"}}{{end}}{{if .Owner}} &middot; {{.Owner}}{{end}}
         {{with .DueOn}}&middot; {{$.T "Due %s" ($.Date . "2 Jan")}}{{end}}
         {{with .AgreedPriceMinor}}&middot; {{$.T "Agreed %s" ($.MoneyOrBlank .)}}{{end}}
+        {{with .CostedMinor}}&middot; {{$.T "Cost %s" ($.MoneyOrBlank .)}}{{end}}
         &middot; {{$.N "%d day in this state" .DaysInState}}</div>
       {{if not $u.Status.Ended}}
       <form method="post" action="/cars/stock/{{$u.ID}}/recon/move"><input type="hidden" name="step" value="{{.ID}}">
@@ -71,6 +72,14 @@
           <button type="submit" name="move" value="skipped" class="secondary">{{$.T "Skip"}}</button>
         {{else}}<button type="submit" name="move" value="reopened" class="secondary">{{$.T "Do it again"}}</button>{{end}}
       </form>
+      {{if and (eq .State "done") $.Session.Scope.Role.BuysVehicles}}
+      <form method="post" action="/cars/stock/{{$u.ID}}/recon/cost"><input type="hidden" name="step" value="{{.ID}}">
+        <label><span>{{$.T "Cost before VAT"}}</span><input name="net" inputmode="decimal" required></label>
+        <label><span>{{$.T "VAT rate, per cent"}}</span><input name="rate" value="25" inputmode="numeric" required></label>
+        <label><span>{{$.T "Day it was spent"}}</span><input type="date" name="incurred_on" required></label>
+        <label><span>{{$.T "Invoice number"}}</span><input name="ref" maxlength="100"></label>
+        <label><input type="checkbox" name="invoice" value="1"> {{$.T "From the supplier's invoice"}}</label>
+        <button type="submit" class="secondary">{{$.T "Enter the cost"}}</button></form>{{end}}
       {{if and (eq .Kind "outside") (ne .State "done") (ne .State "skipped")}}
       <form method="post" action="/cars/stock/{{$u.ID}}/recon/link"><input type="hidden" name="step" value="{{.ID}}"><button type="submit" class="secondary">{{$.T "Make a link for the supplier"}}</button></form>{{end}}{{end}}
     </li>

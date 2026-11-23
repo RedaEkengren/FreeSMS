@@ -69,7 +69,11 @@ type ReconStep struct {
 	// The price agreed for it: a cost, so nil for a role that may not see
 	// what a car cost, and never read for one.
 	AgreedPriceMinor *int64
-	State            string
+	// What the costs entered against it come to, before VAT, with any
+	// reversed left out: nil when none is entered, and for a role that may
+	// not see what a car cost.
+	CostedMinor *int64
+	State       string
 	// Since when it has been in its state: its newest move, or when it was
 	// planned.
 	Since time.Time
@@ -112,6 +116,7 @@ var (
 	errReconTemplate = fmt.Errorf("%w: a template is one to thirty steps, each with a name and whether it is done in the shop or outside", ErrInvalid)
 	errReconHasPlan  = fmt.Errorf("%w: the car already has a plan; add steps to it", ErrInvalid)
 	errReconMove     = fmt.Errorf("%w: a step is started or skipped while it waits, finished or skipped while it is under way, and reopened once it is finished or skipped", ErrInvalid)
+	errReconNotDone  = fmt.Errorf("%w: a cost is entered against a step once it is finished", ErrInvalid)
 	errReconNote     = fmt.Errorf("%w: a note is at most 300 characters", ErrInvalid)
 )
 
@@ -348,6 +353,8 @@ func reconStateOf(last *string) string {
 const reconStepColumns = `
 	SELECT s.id, s.position, s.name, s.kind, coalesce(s.owner, ''), s.due_on,
 	       CASE WHEN $1 THEN s.agreed_price_minor END,
+	       CASE WHEN $1 THEN (SELECT sum(c.net_minor) FROM recon_step_costs l JOIN stock_cost_entries c ON c.id = l.cost_entry_id
+	                          WHERE l.step_id = s.id AND NOT EXISTS (SELECT 1 FROM stock_cost_entries r WHERE r.reverses_id = c.id)) END,
 	       e.kind, coalesce(e.at, s.created_at),
 	       (clock_timestamp() AT TIME ZONE z.timezone)::date - (coalesce(e.at, s.created_at) AT TIME ZONE z.timezone)::date
 	FROM recon_steps s CROSS JOIN shops z
@@ -356,7 +363,7 @@ const reconStepColumns = `
 func scanReconStep(row pgx.Row) (ReconStep, error) {
 	var s ReconStep
 	var last *string
-	if err := row.Scan(&s.ID, &s.Position, &s.Name, &s.Kind, &s.Owner, &s.DueOn, &s.AgreedPriceMinor, &last, &s.Since, &s.DaysInState); err != nil {
+	if err := row.Scan(&s.ID, &s.Position, &s.Name, &s.Kind, &s.Owner, &s.DueOn, &s.AgreedPriceMinor, &s.CostedMinor, &last, &s.Since, &s.DaysInState); err != nil {
 		return ReconStep{}, err
 	}
 	s.State = reconStateOf(last)
@@ -478,3 +485,53 @@ var reconStalledSQL = fmt.Sprintf(`(
 	WHERE u.closed_at IS NULL AND u.status IN ('in_preparation', 'for_sale', 'reserved')
 	  AND (clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops))::date - (c.since AT TIME ZONE (SELECT timezone FROM shops))::date > %d
 )`, reconStallDays)
+
+// PostReconStepCost enters what a finished step cost against the car, as a
+// reconditioning cost like any other (#164) and tied to the step, so the plan
+// can set it beside the price agreed. A step may have several. For whoever
+// buys cars, in a shop that sells them.
+func PostReconStepCost(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, stepID string, n NewStockCost) (StockCost, error) {
+	if !scope.Role.BuysVehicles() {
+		return StockCost{}, access.ErrForbidden
+	}
+	if err := scope.Require(access.Dealer); err != nil {
+		return StockCost{}, err
+	}
+	if !looksLikeUUID(stepID) {
+		return StockCost{}, ErrNotFound
+	}
+	if n.Kind == "" {
+		n.Kind = CostReconditioning
+	}
+	var out StockCost
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var unit string
+		if err := tx.QueryRow(ctx, `SELECT stock_unit_id FROM recon_steps WHERE id = $1`, stepID).Scan(&unit); errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		} else if err != nil {
+			return err
+		}
+		p, err := prepareStockCost(unit, n)
+		if err != nil {
+			return err
+		}
+		// The car's cycle is locked, so a step finished and a cost entered
+		// at the same moment are told apart.
+		if _, err := unitOpenTx(ctx, tx, unit); err != nil {
+			return err
+		}
+		var last *string
+		if err := tx.QueryRow(ctx, `SELECT kind FROM recon_step_events WHERE step_id = $1 ORDER BY seq DESC LIMIT 1`, stepID).Scan(&last); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		if reconStateOf(last) != ReconDone {
+			return errReconNotDone
+		}
+		if out, err = insertStockCostTx(ctx, tx, scope, unit, p); err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `INSERT INTO recon_step_costs (shop_id, step_id, cost_entry_id) VALUES ($1, $2, $3)`, scope.ShopID, stepID, out.ID)
+		return err
+	})
+	return out, err
+}
