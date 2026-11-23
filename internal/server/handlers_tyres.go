@@ -1,10 +1,13 @@
 package server
 
 import (
+	"errors"
+	"html/template"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/RedaEkengren/FreeSMS/internal/barcode"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
@@ -158,4 +161,90 @@ func (s *Server) handlePlaceTyreSet(w http.ResponseWriter, r *http.Request) {
 	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/tyres/"+r.PathValue("id"), http.StatusSeeOther)
+}
+
+// storageLabel is one label to print: what it names and its code as a
+// barcode.
+type storageLabel struct {
+	Name string
+	Code string
+	SVG  template.HTML
+}
+
+func (s *Server) barcodeLabel(name, code string) storageLabel {
+	l := storageLabel{Name: name, Code: code}
+	if svg, err := barcode.SVG(code, 240, 60); err == nil {
+		l.SVG = template.HTML(svg)
+	} else {
+		s.log.Warn("storage label", "code", code, "error", err)
+	}
+	return l
+}
+
+// handleStorageLabels is the labels of every place and every set, for print.
+func (s *Server) handleStorageLabels(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	places, err := workshop.StorageLocations(r.Context(), s.pool, session.Scope)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	sets, err := workshop.TyreSetsOf(r.Context(), s.pool, session.Scope, workshop.TyreFilter{})
+	if s.handoverError(w, r, err) {
+		return
+	}
+	var pd pageData
+	pd.Title, pd.Session = "Storage labels", session
+	for _, p := range places {
+		pd.StorageLabels = append(pd.StorageLabels, s.barcodeLabel(p.Name, workshop.StorageLabel(p.ID)))
+	}
+	for _, t := range sets {
+		name := strings.TrimSpace(t.Brand + " " + t.Model)
+		if t.Vehicle != "" {
+			name += " · " + t.Vehicle
+		}
+		pd.SetLabels = append(pd.SetLabels, s.barcodeLabel(name, workshop.TyreSetLabel(t.ID)))
+	}
+	s.render(w, r, http.StatusOK, "storagelabels", pd)
+}
+
+// handleStorageScan is the quick way to put a set in a place: scan the set's
+// label, then the place's. The set being worked on is carried in the address,
+// so nothing is kept between the two scans.
+func (s *Server) handleStorageScan(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	pd := pageData{Title: "Scan to place", Session: session}
+	if id := r.URL.Query().Get("set"); id != "" {
+		set, err := workshop.TyreSetByID(r.Context(), s.pool, session.Scope, id)
+		if s.handoverError(w, r, err) {
+			return
+		}
+		pd.TyreSet = set
+	}
+	pd.ShareToken = r.URL.Query().Get("done")
+	s.render(w, r, http.StatusOK, "storagescan", pd)
+}
+
+func (s *Server) handleStorageScanPost(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	kind, id, err := workshop.ResolveStorageLabel(r.Context(), s.pool, session.Scope, r.FormValue("code"))
+	if errors.Is(err, workshop.ErrNotFound) {
+		s.renderError(w, r, http.StatusNotFound, "Not found", "Nothing in this shop has that label.")
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	set := r.FormValue("set")
+	switch {
+	case kind == "set":
+		http.Redirect(w, r, "/storage/scan?set="+id, http.StatusSeeOther)
+	case set == "":
+		http.Redirect(w, r, "/storage", http.StatusSeeOther)
+	default:
+		if err := workshop.PlaceTyreSet(r.Context(), s.pool, session.Scope, set, id); s.handoverError(w, r, err) {
+			return
+		}
+		s.submitted(w, r)
+		http.Redirect(w, r, "/storage/scan?done="+id, http.StatusSeeOther)
+	}
 }

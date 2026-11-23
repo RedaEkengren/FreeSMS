@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // A set is taken in from its owner's page, listed, and moved to another car of
@@ -161,5 +163,69 @@ func TestAStoragePlaceIsMadeByTheOwnerAndFilledByTheTechnician(t *testing.T) {
 	}
 	if status := postStatus(t, tech, ts.URL+second+"/place", url.Values{"place": {"bbbbbbbb-0000-0000-0000-000000000019"}}); status != http.StatusNotFound {
 		t.Errorf("another shop's place answered %d", status)
+	}
+}
+
+// Scan-scan: the set's label, then the place's; the labels page prints both;
+// a label nobody has refuses.
+func TestAStoredSetIsPlacedByScanningItsLabelAndThenThePlaces(t *testing.T) {
+	ts, pool := testServer(t)
+	const customer = "aaaaaaaa-0000-0000-0000-000000000004"
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx, `INSERT INTO vehicle_ownership (shop_id, vehicle_id, customer_id) VALUES ($1, $2, $3)`, shopA, vehicleA, customer); err != nil {
+		t.Fatal(err)
+	}
+	owner, advisor, tech := signIn(t, ts, ownerEmail), signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	postStatus(t, owner, ts.URL+"/storage", url.Values{"name": {"Rack 7"}, "capacity": {"2"}})
+	var place string
+	if err := pool.QueryRow(ctx, `SELECT id FROM storage_locations WHERE name = 'Rack 7'`).Scan(&place); err != nil {
+		t.Fatal(err)
+	}
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/customers/"+customer+"/tyres", strings.NewReader(url.Values{
+		"season": {"summer"}, "brand": {"Michelin"}, "front": {"205/55R16"}, "rims": {"alloy"}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", ts.URL)
+	c := *advisor
+	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	set := strings.TrimPrefix(resp.Header.Get("Location"), "/tyres/")
+
+	labels := get(t, tech, ts.URL+"/storage/labels", http.StatusOK)
+	for _, code := range []string{workshop.TyreSetLabel(set), workshop.StorageLabel(place)} {
+		if !strings.Contains(labels, code) || !strings.Contains(labels, "<svg") {
+			t.Errorf("the labels page lacks %s", code)
+		}
+	}
+	scan := func(form url.Values) (int, string) {
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/storage/scan", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", ts.URL)
+		cl := *tech
+		cl.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		resp, err := cl.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode, resp.Header.Get("Location")
+	}
+	if status, _ := scan(url.Values{"code": {"TS-000000000000"}}); status != http.StatusNotFound {
+		t.Errorf("a label nobody has answered %d", status)
+	}
+	if status, loc := scan(url.Values{"code": {workshop.TyreSetLabel(set)}}); status != http.StatusSeeOther || loc != "/storage/scan?set="+set {
+		t.Fatalf("the set's label answered %d to %q", status, loc)
+	}
+	if page := visibleText(get(t, tech, ts.URL+"/storage/scan?set="+set, http.StatusOK)); !strings.Contains(page, "Now scan the place for Michelin") {
+		t.Errorf("the second scan's page:\n%s", page)
+	}
+	if status, loc := scan(url.Values{"code": {workshop.StorageLabel(place)}, "set": {set}}); status != http.StatusSeeOther || !strings.HasPrefix(loc, "/storage/scan?done=") {
+		t.Fatalf("the place's label answered %d to %q", status, loc)
+	}
+	if page := visibleText(get(t, tech, ts.URL+"/tyres/"+set, http.StatusOK)); !strings.Contains(page, "Stored in Rack 7") {
+		t.Errorf("the set after the scans:\n%s", page)
 	}
 }

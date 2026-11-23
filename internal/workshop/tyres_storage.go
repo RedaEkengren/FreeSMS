@@ -286,3 +286,74 @@ func StorageLocations(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 	})
 	return out, err
 }
+
+// A label carries a short code the shop's scanners read as keyboard input:
+// two letters for what it is and the first twelve hexadecimal digits of its
+// identifier. Twelve digits of a random identifier do not clash inside one
+// shop, and a code that matched two rows is refused rather than guessed.
+const (
+	labelSet   = "TS"
+	labelPlace = "SL"
+)
+
+func labelCode(prefix, id string) string {
+	h := strings.ToUpper(strings.ReplaceAll(id, "-", ""))
+	if len(h) < 12 {
+		return ""
+	}
+	return prefix + "-" + h[:12]
+}
+
+// TyreSetLabel is the code on a set's label.
+func TyreSetLabel(id string) string { return labelCode(labelSet, id) }
+
+// StorageLabel is the code on a place's label.
+func StorageLabel(id string) string { return labelCode(labelPlace, id) }
+
+// ResolveStorageLabel says what a scanned code is: "set" or "place", and its
+// identifier. A code that is neither, or that matches more than one row, is
+// not found. Whoever works in the workshop.
+func ResolveStorageLabel(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, code string) (kind, id string, err error) {
+	if !scope.Role.WorksInTheWorkshop() {
+		return "", "", access.ErrForbidden
+	}
+	prefix, hex, ok := strings.Cut(strings.ToUpper(strings.TrimSpace(code)), "-")
+	if !ok || len(hex) != 12 || strings.Trim(hex, "0123456789ABCDEF") != "" {
+		return "", "", ErrNotFound
+	}
+	table, kind := "tyre_sets", "set"
+	switch prefix {
+	case labelSet:
+	case labelPlace:
+		table, kind = "storage_locations", "place"
+	default:
+		return "", "", ErrNotFound
+	}
+	err = inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `SELECT id FROM `+table+` WHERE upper(replace(id::text, '-', '')) LIKE $1 || '%' LIMIT 2`, hex)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		var found []string
+		for rows.Next() {
+			var x string
+			if err := rows.Scan(&x); err != nil {
+				return err
+			}
+			found = append(found, x)
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		if len(found) != 1 {
+			return ErrNotFound
+		}
+		id = found[0]
+		return nil
+	})
+	if err != nil {
+		return "", "", err
+	}
+	return kind, id, nil
+}

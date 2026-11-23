@@ -1,0 +1,8 @@
+{{define "content"}}
+<h1>{{.T "Storage labels"}}</h1>
+<p class="waiting">{{.T "One label for each place and each set, read by the scanner as keyboard input."}}</p>
+<h2>{{.T "Places"}}</h2>
+{{range .StorageLabels}}<div class="label"><strong>{{.Name}}</strong><div>{{.SVG}}</div><div>{{.Code}}</div></div>{{else}}<p class="empty">{{$.T "No storage places yet."}}</p>{{end}}
+<h2>{{.T "Sets"}}</h2>
+{{range .SetLabels}}<div class="label"><strong>{{.Name}}</strong><div>{{.SVG}}</div><div>{{.Code}}</div></div>{{else}}<p class="empty">{{$.T "No tyre sets yet."}}</p>{{end}}
+{{end}}

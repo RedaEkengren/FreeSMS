@@ -1,6 +1,7 @@
 {{define "content"}}
 <h1>{{.T "Storage places"}}</h1>
 <p class="waiting">{{.T "Where each stored set stands, and how much room is left in each place."}}</p>
+<p><a href="/storage/scan">{{.T "Scan to place"}}</a> &middot; <a href="/storage/labels">{{.T "Print the labels"}}</a></p>
 {{if .Places}}
 <ul class="lines">
   {{range .Places}}

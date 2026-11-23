@@ -1,0 +1,15 @@
+{{define "content"}}
+<h1>{{.T "Scan to place"}}</h1>
+{{if .ShareToken}}<p class="waiting"><span class="tag pass">{{.T "placed"}}</span></p>{{end}}
+{{with .TyreSet}}
+<p>{{$.T "Now scan the place for %s." (printf "%s %s" .Brand .Model)}}</p>
+<form method="post" action="/storage/scan"><input type="hidden" name="set" value="{{.ID}}">
+  <label><span>{{$.T "The place's label"}}</span><input name="code" autofocus autocomplete="off" required></label>
+  <button type="submit">{{$.T "Place it"}}</button></form>
+{{else}}
+<p>{{.T "Scan the set's label."}}</p>
+<form method="post" action="/storage/scan">
+  <label><span>{{.T "The set's label"}}</span><input name="code" autofocus autocomplete="off" required></label>
+  <button type="submit">{{.T "Find it"}}</button></form>
+{{end}}
+{{end}}

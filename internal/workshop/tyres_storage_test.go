@@ -3,6 +3,7 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 
@@ -197,5 +198,36 @@ func TestWhoMayMakeAndFillAPlaceAndWhoSeesWhoseTheSetsAre(t *testing.T) {
 	}
 	if err := workshop.PlaceTyreSet(ctx, pool, off, id, place); !errors.Is(err, access.ErrModuleOff) {
 		t.Errorf("a set placed with the workshop off: %v", err)
+	}
+}
+
+// A label's code finds the set or the place it was printed for, whatever the
+// case it is typed in, and a code that is not one, or is another shop's, finds
+// nothing.
+func TestALabelCodeFindsTheSetOrThePlaceItWasPrintedFor(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	place, _ := workshop.CreateStorageLocation(ctx, pool, owner(), "Rack", 2)
+	set, _ := workshop.CreateTyreSet(ctx, pool, advisor(), summerSet(customerA, vehicleA))
+	if c := workshop.TyreSetLabel(set); len(c) != 15 || c[:3] != "TS-" {
+		t.Fatalf("the set's code: %q", c)
+	}
+	for code, want := range map[string][2]string{
+		workshop.TyreSetLabel(set):                              {"set", set},
+		" " + strings.ToLower(workshop.TyreSetLabel(set)) + " ": {"set", set},
+		workshop.StorageLabel(place):                            {"place", place},
+	} {
+		kind, id, err := workshop.ResolveStorageLabel(ctx, pool, technician(), code)
+		if err != nil || kind != want[0] || id != want[1] {
+			t.Errorf("%q: %s %s, %v", code, kind, id, err)
+		}
+	}
+	for _, bad := range []string{"", "TS-", "XX-0123456789AB", "TS-0123456789AB", "TS-ZZZZZZZZZZZZ", workshop.StorageLabel(set), "TS-" + strings.Repeat("0", 11)} {
+		if _, _, err := workshop.ResolveStorageLabel(ctx, pool, technician(), bad); !errors.Is(err, workshop.ErrNotFound) {
+			t.Errorf("%q: %v", bad, err)
+		}
+	}
+	if _, _, err := workshop.ResolveStorageLabel(ctx, pool, everything(rentalDesk()), workshop.TyreSetLabel(set)); !errors.Is(err, access.ErrForbidden) {
+		t.Errorf("the rental desk scanned a set: %v", err)
 	}
 }
