@@ -79,8 +79,18 @@ func TestAnIdentityNumberIsSealedAndEveryReadIsLogged(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT to_jsonb(r)::text || encode(sealed, 'escape') FROM identity_records r WHERE id = $1`, id).Scan(&dump); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(dump, seededNumber) || strings.Contains(dump, "4321") {
+	if strings.Contains(dump, seededNumber) {
 		t.Errorf("the database holds the value: %s", dump)
+	}
+	// The last four digits are looked for only in what is not random: the
+	// sealed bytes and the identifiers are hex that holds "4321" by chance now
+	// and then, which once failed this test for no reason.
+	var plain string
+	if err := pool.QueryRow(ctx, `SELECT (to_jsonb(r) - 'sealed' - 'id' - 'shop_id' - 'party_id')::text FROM identity_records r WHERE id = $1`, id).Scan(&plain); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(plain, "4321") {
+		t.Errorf("the database holds the end of the value: %s", plain)
 	}
 
 	masked, err := workshop.ReadIdentityValue(ctx, pool, sales(), keys, id, false)
