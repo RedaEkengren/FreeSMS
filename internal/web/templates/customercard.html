@@ -4,6 +4,7 @@
   <h1>{{.Name}}</h1>
   <span class="tag">{{if .Private}}{{$.T "person"}}{{else}}{{$.T "company"}}{{end}}</span>
 </div>
+{{if and ($.Runs "workshop") (not .MergedInto)}}<p><a href="/customers/{{.ID}}/tyres">{{$.T "Tyre sets"}}</a></p>{{end}}
 {{if and $.PartyID (not .MergedInto) (not .Erased)}}<p><a href="/parties/{{$.PartyID}}/identity">{{$.T "Identity checks"}}</a></p>{{end}}
 
 {{if .MergedInto}}
