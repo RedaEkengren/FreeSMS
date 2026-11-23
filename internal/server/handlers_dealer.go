@@ -25,7 +25,8 @@ type dealerData struct {
 	Statuses []workshop.StockStatus
 	Lines    string
 	// The cars being made ready, by the step each stands in (#236).
-	Pipeline []workshop.PipelineRow
+	Pipeline  []workshop.PipelineRow
+	StepStats []workshop.StepStat
 	// Trade-ins waiting to be received or credited, for whoever buys cars.
 	TradeIns []workshop.ExpectedTradeIn
 	// What the cars sold in a period earned (#182), and the period.
@@ -657,5 +658,9 @@ func (s *Server) handleCarPipeline(w http.ResponseWriter, r *http.Request) {
 	if s.handoverError(w, r, err) {
 		return
 	}
-	s.render(w, r, http.StatusOK, "carpipeline", pageData{Title: "Cars being made ready", Session: session, Dealer: &dealerData{Pipeline: rows}})
+	stats, err := workshop.ReconStats(r.Context(), s.pool, session.Scope)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "carpipeline", pageData{Title: "Cars being made ready", Session: session, Dealer: &dealerData{Pipeline: rows, StepStats: stats}})
 }

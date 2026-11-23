@@ -642,6 +642,10 @@
       "one": "%d dag i det här läget",
       "other": "%d dagar i det här läget"
     },
+    "%d time": {
+      "one": "%d gång",
+      "other": "%d gånger"
+    },
     "Uncollected for %d day": {
       "one": "Ohämtad i %d dag",
       "other": "Ohämtad i %d dagar"
@@ -8492,6 +8496,16 @@
     "Address to call when your stock changes (https)": {"other": "Adress att anropa när ert lager ändras (https)"},
     "The call says only that something changed. Ask the feed, with changes since, for what. Leave it empty to stop the calls.": {"other": "Anropet säger bara att något ändrats. Fråga flödet, med ändringar sedan, vad. Lämna tomt för att stänga av anropen."},
     "Save the address": {"other": "Spara adressen"},
+    "How long the steps take": {"other": "Hur lång tid stegen tar"},
+    "The steps that are finished, by name and by who did them, from being started to being finished.": {"other": "De steg som är klara, per namn och per utförare, från start till klart."},
+    "%.1f days on average": {"other": "%.1f dagar i snitt"},
+    "Cost %s": {"other": "Kostnad %s"},
+    "Cost before VAT": {"other": "Kostnad före moms"},
+    "Day it was spent": {"other": "Dag då det kostade"},
+    "Invoice number": {"other": "Fakturanummer"},
+    "From the supplier's invoice": {"other": "Från leverantörens faktura"},
+    "Enter the cost": {"other": "Lägg in kostnaden"},
+    "a cost is entered against a step once it is finished": {"other": "en kostnad läggs in mot ett steg när det är klart"},
     "A car with you": {"other": "En bil hos dig"},
     "This step is finished. Thank you.": {"other": "Det här steget är klart. Tack."},
     "The workshop no longer needs this step.": {"other": "Verkstaden behöver inte längre det här steget."},

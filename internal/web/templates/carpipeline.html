@@ -17,4 +17,17 @@
 {{else}}
 <p class="empty">{{.T "No car is being made ready."}}</p>
 {{end}}
+{{with .Dealer.StepStats}}
+<h2>{{$.T "How long the steps take"}}</h2>
+<p class="waiting">{{$.T "The steps that are finished, by name and by who did them, from being started to being finished."}}</p>
+<ul class="lines">
+  {{range .}}
+  <li><div class="row"><span>{{.Name}}{{if .Owner}} &middot; {{.Owner}}{{end}}</span>
+      <span class="tag">{{$.T "%.1f days on average" .MeanDays}}</span></div>
+    <div class="waiting">{{$.N "%d time" .Count}}
+      {{with .AgreedMinor}}&middot; {{$.T "Agreed %s" ($.MoneyOrBlank .)}}{{end}}
+      {{with .CostedMinor}}&middot; {{$.T "Cost %s" ($.MoneyOrBlank .)}}{{end}}</div></li>
+  {{end}}
+</ul>
+{{end}}
 {{end}}

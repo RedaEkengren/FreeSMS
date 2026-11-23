@@ -134,6 +134,10 @@
       "one": "%d day in this state",
       "other": "%d days in this state"
     },
+    "%d time": {
+      "one": "%d time",
+      "other": "%d times"
+    },
     "Uncollected for %d day": {
       "one": "Uncollected for %d day",
       "other": "Uncollected for %d days"
