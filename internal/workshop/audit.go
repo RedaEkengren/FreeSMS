@@ -62,6 +62,10 @@ var AuditedTransitions = []AuditTransition{
 	{"technician_view.changed", "shop", "technician_view_changes", true},
 	{"technician_view.granted", "user", "technician_view_exceptions", true},
 	{"technician_view.ended", "user", "technician_view_exceptions", true},
+	// A set of tyres put in a place, moved between places, and taken out
+	// (#228).
+	{"tyre_set.placed", "tyre_set", "audit_events", false},
+	{"tyre_set.taken_out", "tyre_set", "audit_events", false},
 	// Dealer
 	// A car's cycle through stock (#160): opened, and every move of its
 	// deal; ending one without a sale says why (MoveStockUnit).
@@ -232,6 +236,10 @@ func AuditTrail(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, sub
 	case "document", "deposit", "payout":
 	case "stock_unit":
 		if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+			return nil, access.ErrForbidden
+		}
+	case "tyre_set":
+		if !scope.Role.WorksInTheWorkshop() {
 			return nil, access.ErrForbidden
 		}
 	case "damage_case":

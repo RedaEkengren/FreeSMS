@@ -6,6 +6,13 @@
 {{if .Note}}<p>{{.Note}}</p>{{end}}
 <p>{{if .Vehicle}}{{$.T "On %s" .Vehicle}}{{else}}{{$.T "On no car"}}{{end}}</p>
 
+<p>{{if .StoredIn}}{{$.T "Stored in %s" .StoredIn}}{{else}}{{$.T "Not in storage"}}{{end}}</p>
+<form method="post" action="/tyres/{{.ID}}/place">
+  <label><span>{{$.T "Place in storage"}}</span><select name="place"><option value="">{{$.T "Not in storage"}}</option>
+    {{range $.Places}}{{if or .Active (eq .ID $.TyreSet.StoredAtID)}}<option value="{{.ID}}"{{if eq .ID $.TyreSet.StoredAtID}} selected{{end}}>{{.Name}}{{if not .Active}} ({{$.T "not in use"}}){{end}}</option>{{end}}{{end}}</select></label>
+  <button type="submit" class="secondary">{{$.T "Save the place"}}</button>
+</form>
+
 <h2>{{$.T "The tyres"}}</h2>
 <ul class="lines">
   {{range .Tyres}}

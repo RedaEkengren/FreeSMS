@@ -90,3 +90,76 @@ func TestASetOfTyresIsTakenInFromTheOwnersPageAndAtechnicianDoesNotSeeTheOwner(t
 		t.Errorf("the advisor's list does not name the owner:\n%s", list)
 	}
 }
+
+// The owner makes a storage place, a technician puts sets in it until it is
+// full and sees whose they are never; a full place and a place that is not in
+// use refuse, and the pages say how much room is left.
+func TestAStoragePlaceIsMadeByTheOwnerAndFilledByTheTechnician(t *testing.T) {
+	ts, pool := testServer(t)
+	const customer = "aaaaaaaa-0000-0000-0000-000000000004"
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx, `INSERT INTO vehicle_ownership (shop_id, vehicle_id, customer_id) VALUES ($1, $2, $3)`, shopA, vehicleA, customer); err != nil {
+		t.Fatal(err)
+	}
+	owner, advisor, tech := signIn(t, ts, ownerEmail), signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	if status := postStatus(t, advisor, ts.URL+"/storage", url.Values{"name": {"Hall A"}, "capacity": {"1"}}); status != http.StatusForbidden {
+		t.Errorf("an advisor making a place answered %d", status)
+	}
+	if status := postStatus(t, owner, ts.URL+"/storage", url.Values{"name": {"Hall A"}, "capacity": {"0"}}); status != http.StatusBadRequest {
+		t.Errorf("a place with no room answered %d", status)
+	}
+	if status := postStatus(t, owner, ts.URL+"/storage", url.Values{"name": {"Hall A"}, "capacity": {"1"}}); status != http.StatusSeeOther {
+		t.Fatalf("making a place answered %d", status)
+	}
+	var place string
+	if err := pool.QueryRow(ctx, `SELECT id FROM storage_locations WHERE name = 'Hall A'`).Scan(&place); err != nil {
+		t.Fatal(err)
+	}
+	makeSet := func() string {
+		form := url.Values{"season": {"summer"}, "vehicle": {vehicleA}, "brand": {"Michelin"}, "front": {"205/55R16"}, "rims": {"alloy"}}
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/customers/"+customer+"/tyres", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", ts.URL)
+		c := *advisor
+		c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		resp, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.Header.Get("Location")
+	}
+	first, second := makeSet(), makeSet()
+	if status := postStatus(t, tech, ts.URL+first+"/place", url.Values{"place": {place}}); status != http.StatusSeeOther {
+		t.Fatalf("a technician placing a set answered %d", status)
+	}
+	if status := postStatus(t, tech, ts.URL+second+"/place", url.Values{"place": {place}}); status != http.StatusBadRequest {
+		t.Errorf("a set in a full place answered %d", status)
+	}
+	if status := postStatus(t, tech, ts.URL+"/storage/"+place+"/use", url.Values{"use": {"0"}}); status != http.StatusForbidden {
+		t.Errorf("a technician taking a place out of use answered %d", status)
+	}
+	if status := postStatus(t, owner, ts.URL+"/storage/"+place+"/use", url.Values{"use": {"0"}}); status != http.StatusBadRequest {
+		t.Errorf("a place with a set in it taken out of use answered %d", status)
+	}
+	seen := get(t, tech, ts.URL+"/storage", http.StatusOK)
+	text := visibleText(seen)
+	if !strings.Contains(text, "Hall A") || !strings.Contains(text, "0 of 1 places free") || !strings.Contains(text, "Michelin") || strings.Contains(seen, customerName) {
+		t.Errorf("the technician's storage page:\n%s", text)
+	}
+	if page := visibleText(get(t, owner, ts.URL+"/storage", http.StatusOK)); !strings.Contains(page, customerName) || !strings.Contains(page, "Take out of use") {
+		t.Errorf("the owner's storage page:\n%s", page)
+	}
+	if page := visibleText(get(t, tech, ts.URL+first, http.StatusOK)); !strings.Contains(page, "Stored in Hall A") {
+		t.Errorf("the set's page:\n%s", page)
+	}
+	if status := postStatus(t, tech, ts.URL+first+"/place", url.Values{"place": {""}}); status != http.StatusSeeOther {
+		t.Errorf("taking a set out answered %d", status)
+	}
+	if status := postStatus(t, tech, ts.URL+second+"/place", url.Values{"place": {place}}); status != http.StatusSeeOther {
+		t.Errorf("the room it left answered %d", status)
+	}
+	if status := postStatus(t, tech, ts.URL+second+"/place", url.Values{"place": {"bbbbbbbb-0000-0000-0000-000000000019"}}); status != http.StatusNotFound {
+		t.Errorf("another shop's place answered %d", status)
+	}
+}

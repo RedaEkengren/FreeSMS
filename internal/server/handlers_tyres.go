@@ -28,6 +28,9 @@ func (s *Server) handleTyreSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pd := pageData{Title: "A set of tyres", Session: session, TyreSet: set}
+	if places, err := workshop.StorageLocations(r.Context(), s.pool, session.Scope); err == nil {
+		pd.Places = places
+	}
 	// The owner's other cars, for moving the set to one of them.
 	if set.CustomerID != "" {
 		if card, err := workshop.CustomerByID(r.Context(), s.pool, session.Scope, set.CustomerID); err == nil {
@@ -107,4 +110,52 @@ func (s *Server) handleCreateTyreSet(w http.ResponseWriter, r *http.Request) {
 	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/tyres/"+id, http.StatusSeeOther)
+}
+
+// handleStorage is the places with what is in each, and for whoever runs the
+// shop the form that makes a new one.
+func (s *Server) handleStorage(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	places, err := workshop.StorageLocations(r.Context(), s.pool, session.Scope)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "storage", pageData{Title: "Storage places", Session: session, Places: places})
+}
+
+func (s *Server) handleCreateStorage(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	_, err := workshop.CreateStorageLocation(r.Context(), s.pool, session.Scope, r.FormValue("name"), formInt(r, "capacity"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/storage", http.StatusSeeOther)
+}
+
+func (s *Server) handleStorageUse(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	err := workshop.SetStorageLocationInUse(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("use") == "1")
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/storage", http.StatusSeeOther)
+}
+
+// handlePlaceTyreSet puts a set in a place, or takes it out of storage when no
+// place is given.
+func (s *Server) handlePlaceTyreSet(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	var err error
+	if place := r.FormValue("place"); place == "" {
+		err = workshop.TakeTyreSetOutOfStorage(r.Context(), s.pool, session.Scope, r.PathValue("id"))
+	} else {
+		err = workshop.PlaceTyreSet(r.Context(), s.pool, session.Scope, r.PathValue("id"), place)
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/tyres/"+r.PathValue("id"), http.StatusSeeOther)
 }

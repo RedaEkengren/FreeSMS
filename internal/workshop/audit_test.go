@@ -179,6 +179,25 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 	}
 	made["technician_view.granted"], made["technician_view.ended"] = subject{"user", staff}, subject{"user", staff}
 
+	// A set of tyres put in a place, then taken out (#228).
+	{
+		place, err := workshop.CreateStorageLocation(ctx, pool, owner(), "Audit shelf", 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		set, err := workshop.CreateTyreSet(ctx, pool, advisor(), summerSet(customerA, vehicleA))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := workshop.PlaceTyreSet(ctx, pool, advisor(), set, place); err != nil {
+			t.Fatal(err)
+		}
+		if err := workshop.TakeTyreSetOutOfStorage(ctx, pool, advisor(), set); err != nil {
+			t.Fatal(err)
+		}
+		made["tyre_set.placed"], made["tyre_set.taken_out"] = subject{"tyre_set", set}, subject{"tyre_set", set}
+	}
+
 	// Dealer
 	// A car's cycle through stock (#160).
 	unit := takeIn(t, pool, workshop.StockFromDefleet)
