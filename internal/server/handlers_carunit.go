@@ -436,6 +436,14 @@ func (s *Server) handleCarRecon(w http.ResponseWriter, r *http.Request) {
 			n.AgreedPriceMinor = &minor
 		}
 		_, err = workshop.AddReconStep(r.Context(), s.pool, session.Scope, r.PathValue("id"), n)
+	case "link":
+		// Shown once, on the car's page: only its hash is kept.
+		token, lerr := workshop.CreateReconSupplierLink(r.Context(), s.pool, session.Scope, r.FormValue("step"))
+		if s.carUnitRefused(w, r, lerr, nil) {
+			return
+		}
+		s.carUnitPage(w, r, http.StatusOK, map[string]string{"supplier_link": s.baseURL + "/s/" + token}, "")
+		return
 	case "move":
 		err = workshop.MoveReconStep(r.Context(), s.pool, session.Scope, r.FormValue("step"), r.FormValue("move"), r.FormValue("note"))
 	default:
@@ -464,4 +472,49 @@ func (s *Server) carUnitRoutes(m routeMux) {
 	m.HandleFunc("POST /cars/stock/{id}/consignment/{agreement}/end", s.requireSession(s.handleEndConsignment))
 	m.HandleFunc("POST /cars/stock/{id}/card/{what}", s.requireSession(s.handleCarCard))
 	m.HandleFunc("POST /cars/stock/{id}/recon/{what}", s.requireSession(s.handleCarRecon))
+}
+
+// handleSupplierStep is the page a supplier is sent: the car, the step and
+// where it stands. No account; the link is the key.
+func (s *Server) handleSupplierStep(w http.ResponseWriter, r *http.Request) {
+	v, err := workshop.SupplierStep(r.Context(), s.pool, s.shop(), r.PathValue("token"))
+	if s.supplierRefused(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "carsupplier", pageData{
+		Locale: s.shopLocale(r), Title: "A car with you", Supplier: v, ShareToken: r.PathValue("token"),
+	})
+}
+
+// handleSupplierDone is the supplier saying the step is finished.
+func (s *Server) handleSupplierDone(w http.ResponseWriter, r *http.Request) {
+	err := workshop.SupplierFinishStep(r.Context(), s.pool, s.shop(), r.PathValue("token"))
+	if errors.Is(err, workshop.ErrInvalid) {
+		// Already finished, or not started: look again rather than a dead end.
+		http.Redirect(w, r, "/s/"+r.PathValue("token"), http.StatusSeeOther)
+		return
+	}
+	if s.supplierRefused(w, r, err) {
+		return
+	}
+	http.Redirect(w, r, "/s/"+r.PathValue("token"), http.StatusSeeOther)
+}
+
+// supplierRefused answers a link that does not work, in one way for wrong,
+// expired and closed alike.
+func (s *Server) supplierRefused(w http.ResponseWriter, r *http.Request, err error) bool {
+	switch {
+	case err == nil:
+		return false
+	case errors.Is(err, workshop.ErrShareNotUsable):
+		s.render(w, r, http.StatusNotFound, "status", pageData{
+			Locale: s.shopLocale(r), Title: "This link is no longer open", Error: "Ask the workshop for a new one.",
+		})
+	default:
+		s.log.Error("supplier link", "error", err)
+		s.render(w, r, http.StatusInternalServerError, "status", pageData{
+			Locale: s.shopLocale(r), Title: "Something went wrong", Error: "Try again shortly.",
+		})
+	}
+	return true
 }

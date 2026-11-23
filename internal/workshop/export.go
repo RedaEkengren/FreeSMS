@@ -90,10 +90,11 @@ var ExportTables = []string{
 // exportQueries are tables exported with chosen columns, because one of
 // theirs must never leave: a password's hash, a link's token.
 var exportQueries = map[string]string{
-	"users":             `SELECT id, shop_id, person_id, role, active, deactivated_at, locale, created_at FROM users`,
-	"inspection_shares": `SELECT id, shop_id, inspection_id, created_by, created_at, expires_at, revoked_at FROM inspection_shares`,
-	"invoice_links":     `SELECT id, shop_id, invoice_id, created_by, created_at, expires_at, revoked_at, revoked_by, first_opened_at, last_opened_at, opens FROM invoice_links`,
-	"job_links":         `SELECT id, shop_id, work_order_id, enquiry_id, created_by, created_at, expires_at, revoked_at FROM job_links`,
+	"users":                `SELECT id, shop_id, person_id, role, active, deactivated_at, locale, created_at FROM users`,
+	"inspection_shares":    `SELECT id, shop_id, inspection_id, created_by, created_at, expires_at, revoked_at FROM inspection_shares`,
+	"invoice_links":        `SELECT id, shop_id, invoice_id, created_by, created_at, expires_at, revoked_at, revoked_by, first_opened_at, last_opened_at, opens FROM invoice_links`,
+	"job_links":            `SELECT id, shop_id, work_order_id, enquiry_id, created_by, created_at, expires_at, revoked_at FROM job_links`,
+	"recon_supplier_links": `SELECT id, shop_id, step_id, created_by, created_at, expires_at, revoked_at FROM recon_supplier_links`,
 	// A period as its two ends and a buffer in seconds, which a spreadsheet
 	// reads; a range and an interval have no common written form (#149).
 	"resource_blocks": `SELECT id, shop_id, resource_id, kind, status, lower(period) AS starts_at, upper(period) AS ends_at,

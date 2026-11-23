@@ -118,6 +118,8 @@ var swept = map[string]string{
 	"GET /k/{token}":                  "token, not an identifier",
 	"POST /k/{token}/quote/{quoteID}": "token, not an identifier",
 	"GET /o/{token}":                  "token, not an identifier",
+	"GET /s/{token}":                  "token, not an identifier",
+	"POST /s/{token}/done":            "token, not an identifier",
 	"POST /o/{token}/quote/{quoteID}": "token, not an identifier",
 	"POST /i/{token}/items/{itemID}":  "token, not an identifier",
 	"GET /i/{token}/photos/{key}":     "token, not an identifier",

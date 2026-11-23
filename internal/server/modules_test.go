@@ -350,7 +350,17 @@ func TestSwitchedOffCarSalesAndRentalAreNotThere(t *testing.T) {
 		}
 		method, path := fill(r.Pattern)
 		for who, client := range map[string]*http.Client{"owner": owner, "technician": tech, "nobody": anonymous} {
-			if status, body := missing(client, method, path); status != http.StatusNotFound || body != nothing {
+			status, body := missing(client, method, path)
+			if r.CustomerLink {
+				// A link somebody outside the shop was sent, such as a
+				// supplier's: the neutral page, nothing to press (#143).
+				if status != http.StatusGone || !strings.Contains(body, "This service is no longer available") ||
+					strings.Contains(body, "<form") {
+					t.Errorf("%s %s as %s, %s off: %d; want the neutral page with no actions", method, path, who, r.Module, status)
+				}
+				continue
+			}
+			if status != http.StatusNotFound || body != nothing {
 				t.Errorf("%s %s as %s, %s off: %d %q; want the answer a path that does not exist gets",
 					method, path, who, r.Module, status, body)
 			}
