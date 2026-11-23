@@ -535,3 +535,66 @@ func PostReconStepCost(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 	})
 	return out, err
 }
+
+// StepStat is what the finished steps of one name, by one owner, add up to:
+// how many, how long each took from being started to being finished, and what
+// was agreed for them against what they cost.
+type StepStat struct {
+	Name  string
+	Kind  string
+	Owner string
+	Count int
+	// The mean of whole and part days from started to finished.
+	MeanDays float64
+	// Nil for a role that may not see what a car cost, and when none of the
+	// finished steps had a price agreed or a cost entered.
+	AgreedMinor *int64
+	CostedMinor *int64
+}
+
+// ReconStats sums up the steps that have been finished, by name and owner,
+// the most often done first: where the days go and with which supplier. A step
+// is timed from the move that last started it to the one that finished it, so
+// a step done again counts its second time. For whoever buys or sells cars;
+// the sums of money only for whoever may see what a car cost.
+func ReconStats(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]StepStat, error) {
+	if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+		return nil, access.ErrForbidden
+	}
+	if err := scope.Require(access.Dealer); err != nil {
+		return nil, err
+	}
+	var out []StepStat
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `
+			WITH finished AS (
+			  SELECT s.id, s.name, s.kind, coalesce(s.owner, '') AS owner, s.agreed_price_minor,
+			         e.at AS done_at, e.seq,
+			         (SELECT x.at FROM recon_step_events x WHERE x.step_id = s.id AND x.kind IN ('started', 'reopened') AND x.seq < e.seq
+			          ORDER BY x.seq DESC LIMIT 1) AS started_at
+			  FROM recon_steps s
+			  JOIN LATERAL (SELECT x.kind, x.at, x.seq FROM recon_step_events x WHERE x.step_id = s.id ORDER BY x.seq DESC LIMIT 1) e ON e.kind = 'done'
+			)
+			SELECT f.name, f.kind, f.owner, count(*),
+			       coalesce(avg(extract(epoch FROM f.done_at - f.started_at) / 86400.0) FILTER (WHERE f.started_at IS NOT NULL), 0)::float8,
+			       CASE WHEN $1 THEN sum(f.agreed_price_minor) END,
+			       CASE WHEN $1 THEN sum((SELECT sum(c.net_minor) FROM recon_step_costs l JOIN stock_cost_entries c ON c.id = l.cost_entry_id
+			                              WHERE l.step_id = f.id AND NOT EXISTS (SELECT 1 FROM stock_cost_entries r WHERE r.reverses_id = c.id))) END
+			FROM finished f
+			GROUP BY f.name, f.kind, f.owner
+			ORDER BY count(*) DESC, f.name, f.owner`, scope.Role.SeesPurchasePrice())
+		if err != nil {
+			return fmt.Errorf("read the step statistics: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var r StepStat
+			if err := rows.Scan(&r.Name, &r.Kind, &r.Owner, &r.Count, &r.MeanDays, &r.AgreedMinor, &r.CostedMinor); err != nil {
+				return err
+			}
+			out = append(out, r)
+		}
+		return rows.Err()
+	})
+	return out, err
+}

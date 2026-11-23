@@ -348,3 +348,99 @@ func TestWhatAStepCostIsEnteredOnTheCarAndSetBesideWhatWasAgreed(t *testing.T) {
 		t.Errorf("a kind that is not one: %v", err)
 	}
 }
+
+// The statistics are the finished steps summed by name and owner: how many,
+// the mean days from being started to being finished (a step done again
+// counts its last go), and what was agreed against what it cost, the sums of
+// money only for whoever may see what a car cost. A step not finished is not
+// in them.
+func TestTheStepsThatAreFinishedAreSummedBySupplier(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	ago := func(step string, days ...int) {
+		t.Helper()
+		rows, err := pool.Query(ctx, `SELECT id FROM recon_step_events WHERE step_id = $1 ORDER BY seq`, step)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var ids []string
+		for rows.Next() {
+			var id string
+			_ = rows.Scan(&id)
+			ids = append(ids, id)
+		}
+		rows.Close()
+		if len(ids) != len(days) {
+			t.Fatalf("%d events for %d times", len(ids), len(days))
+		}
+		for i, id := range ids {
+			if _, err := pool.Exec(ctx, `UPDATE recon_step_events SET at = clock_timestamp() - make_interval(days => $2) WHERE id = $1`, id, days[i]); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	paint := func(supplier string, agreed int64, moves ...string) (unit, step string) {
+		t.Helper()
+		p := boughtCar(t, pool)
+		id, err := workshop.AddReconStep(ctx, pool, buyerScope(), p.StockUnitID, workshop.NewReconStep{
+			Name: "Lackering", Kind: workshop.ReconOutside, Owner: supplier, AgreedPriceMinor: &agreed})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, how := range moves {
+			if err := workshop.MoveReconStep(ctx, pool, buyerScope(), id, how, ""); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return p.StockUnitID, id
+	}
+	_, a := paint("Lackaren AB", 450_000, workshop.ReconStart, workshop.ReconFinish)
+	ago(a, 4, 0)
+	_, b := paint("Lackaren AB", 300_000, workshop.ReconStart, workshop.ReconFinish)
+	ago(b, 2, 0)
+	// Done, reopened and done again: the last go took one day.
+	_, c := paint("Lackaren AB", 100_000, workshop.ReconStart, workshop.ReconFinish, workshop.ReconReopen, workshop.ReconFinish)
+	ago(c, 20, 18, 3, 2)
+	_, d := paint("Snabblack AB", 200_000, workshop.ReconStart, workshop.ReconFinish)
+	ago(d, 1, 0)
+	paint("Lackaren AB", 999_999, workshop.ReconStart) // not finished
+
+	cost := workshop.NewStockCost{NetMinor: 500_000, VATRateBasis: 2500, IncurredOn: time.Now()}
+	if _, err := workshop.PostReconStepCost(ctx, pool, buyerScope(), a, cost); err != nil {
+		t.Fatal(err)
+	}
+
+	stats, err := workshop.ReconStats(ctx, pool, buyerScope())
+	if err != nil || len(stats) != 2 {
+		t.Fatalf("the statistics: %+v, %v", stats, err)
+	}
+	l, s := stats[0], stats[1]
+	if l.Owner != "Lackaren AB" || l.Count != 3 || l.MeanDays < 2.32 || l.MeanDays > 2.34 {
+		t.Errorf("the supplier that did most: %+v", l)
+	}
+	if l.AgreedMinor == nil || *l.AgreedMinor != 850_000 || l.CostedMinor == nil || *l.CostedMinor != 500_000 {
+		t.Errorf("the money of the buyer's figures: %+v", l)
+	}
+	if s.Owner != "Snabblack AB" || s.Count != 1 || s.MeanDays < 0.99 || s.MeanDays > 1.01 {
+		t.Errorf("the other supplier: %+v", s)
+	}
+	seen, err := workshop.ReconStats(ctx, pool, sales())
+	if err != nil || len(seen) != 2 || seen[0].Count != 3 {
+		t.Fatalf("the salesperson's statistics: %+v, %v", seen, err)
+	}
+	for _, r := range seen {
+		if r.AgreedMinor != nil || r.CostedMinor != nil {
+			t.Errorf("the salesperson was handed money: %+v", r)
+		}
+	}
+	for _, sc := range []access.Scope{everything(technician()), everything(advisor()), rentalDesk()} {
+		if _, err := workshop.ReconStats(ctx, pool, sc); !errors.Is(err, access.ErrForbidden) {
+			t.Errorf("%s read the statistics: %v", sc.Role, err)
+		}
+	}
+	off := buyerScope()
+	off.Modules = []access.Module{access.Workshop}
+	if _, err := workshop.ReconStats(ctx, pool, off); !errors.Is(err, access.ErrModuleOff) {
+		t.Errorf("the statistics with Dealer off: %v", err)
+	}
+}

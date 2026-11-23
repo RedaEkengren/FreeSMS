@@ -839,4 +839,11 @@ func TestWhatAStepCostIsEnteredFromTheCarsPage(t *testing.T) {
 	if seen := visibleText(get(t, sales, base, http.StatusOK)); strings.Contains(seen, "4,800") || strings.Contains(seen, "Cost 4") {
 		t.Errorf("the salesperson sees what it cost:\n%s", seen)
 	}
+	stats := visibleText(get(t, buyer, ts.URL+"/cars/pipeline", http.StatusOK))
+	if !strings.Contains(stats, "How long the steps take") || !strings.Contains(stats, "Lackering") || !strings.Contains(stats, "Cost SEK\u00a04,800.00") {
+		t.Errorf("the buyer's statistics:\n%s", stats)
+	}
+	if seen := visibleText(get(t, sales, ts.URL+"/cars/pipeline", http.StatusOK)); !strings.Contains(seen, "How long the steps take") || strings.Contains(seen, "4,800") || strings.Contains(seen, "4,500") {
+		t.Errorf("the salesperson's statistics:\n%s", seen)
+	}
 }
