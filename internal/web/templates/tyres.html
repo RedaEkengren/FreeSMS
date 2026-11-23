@@ -1,0 +1,14 @@
+{{define "content"}}
+<h1>{{.T "Tyre sets"}}</h1>
+<p class="waiting">{{.T "Every set the shop keeps or has fitted, the newest first. A set is taken in from its owner's page."}}</p>
+{{if .Tyres}}
+<ul class="lines">
+  {{range .Tyres}}
+  <li><div class="row"><a href="/tyres/{{.ID}}">{{$.T .Season}} &middot; {{.Brand}} {{.Model}}</a>
+      <span class="tag">{{$.T .Rims}}</span></div>
+    <div class="waiting">{{if .Owner}}{{.Owner}} &middot; {{end}}{{if .Vehicle}}{{.Vehicle}}{{else}}{{$.T "On no car"}}{{end}}
+      {{range .Tyres}}{{if eq .Position "front_left"}}&middot; {{.Dimension}}{{end}}{{end}}</div></li>
+  {{end}}
+</ul>
+{{else}}<p class="empty">{{.T "No tyre sets yet."}}</p>{{end}}
+{{end}}

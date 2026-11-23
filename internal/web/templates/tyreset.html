@@ -1,0 +1,37 @@
+{{define "content"}}
+{{with .TyreSet}}
+<h1>{{$.T .Season}} &middot; {{.Brand}} {{.Model}}</h1>
+<p class="waiting">{{if .Owner}}<a href="/customers/{{.CustomerID}}/tyres">{{.Owner}}</a> &middot; {{end}}{{$.T .Rims}}
+  {{if .TPMS}}&middot; {{$.T "Pressure sensors"}}{{end}} {{if .Fasteners}}&middot; {{$.T "Bolts or nuts come with it"}}{{end}}</p>
+{{if .Note}}<p>{{.Note}}</p>{{end}}
+<p>{{if .Vehicle}}{{$.T "On %s" .Vehicle}}{{else}}{{$.T "On no car"}}{{end}}</p>
+
+<h2>{{$.T "The tyres"}}</h2>
+<ul class="lines">
+  {{range .Tyres}}
+  <li><div class="row"><span>{{$.T .Position}} &middot; {{.Dimension}}{{if .DotYear}} &middot; {{$.T "Made week %d, %d" .DotWeek .DotYear}}{{end}}</span></div>
+    {{if $.Session.Scope.Role.SeesCustomerPersonalData}}
+    <form method="post" action="/tyres/{{$.TyreSet.ID}}/replace"><input type="hidden" name="tyre" value="{{.ID}}"><input type="hidden" name="position" value="{{.Position}}">
+      <label><span>{{$.T "New tyre, dimension"}}</span><input name="dimension" value="{{.Dimension}}" maxlength="40" required></label>
+      <div class="pair"><label><span>{{$.T "Week made"}}</span><input name="dot_week" inputmode="numeric" maxlength="2"></label>
+        <label><span>{{$.T "Year made"}}</span><input name="dot_year" inputmode="numeric" maxlength="4"></label></div>
+      <button type="submit" class="secondary">{{$.T "Replace this tyre"}}</button></form>{{end}}
+  </li>
+  {{end}}
+</ul>
+
+{{if $.Session.Scope.Role.SeesCustomerPersonalData}}
+<h2>{{$.T "Move the set"}}</h2>
+<form method="post" action="/tyres/{{.ID}}/move">
+  <label><span>{{$.T "To which car"}}</span><select name="vehicle"><option value="">{{$.T "On no car"}}</option>
+    {{range $.CustomerCard.Vehicles}}{{if .Current}}<option value="{{.VehicleID}}">{{.Registration}} {{.Make}} {{.Model}}</option>{{end}}{{end}}</select></label>
+  <button type="submit" class="secondary">{{$.T "Move it"}}</button>
+</form>
+{{end}}
+
+<h2>{{$.T "Where it has been"}}</h2>
+<ul class="lines">
+  {{range .Moves}}<li class="waiting">{{$.Date .At "2 Jan 2006"}} &middot; {{if .Registration}}{{.Registration}}{{else}}{{$.T "On no car"}}{{end}}</li>{{end}}
+</ul>
+{{end}}
+{{end}}

@@ -200,6 +200,30 @@
     "contact_corrected": {
       "other": "contact details corrected"
     },
+    "front_left": {
+      "other": "front left"
+    },
+    "front_right": {
+      "other": "front right"
+    },
+    "rear_left": {
+      "other": "rear left"
+    },
+    "rear_right": {
+      "other": "rear right"
+    },
+    "summer": {
+      "other": "summer"
+    },
+    "winter_friction": {
+      "other": "winter, friction"
+    },
+    "winter_studded": {
+      "other": "winter, studded"
+    },
+    "all_season": {
+      "other": "all season"
+    },
     "no_show": {
       "other": "did not come"
     },

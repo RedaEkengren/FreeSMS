@@ -43,8 +43,48 @@ const (
 )
 
 // reconStallDays is how many days a car may stand in one step before it is
-// on the queue.
+// on the queue, until the shop says otherwise.
 const reconStallDays = 5
+
+// reconStallSQL is the days a car may stand in one step in this shop: the
+// newest setting, or the default.
+var reconStallSQL = fmt.Sprintf(`coalesce((SELECT days FROM recon_stall_settings ORDER BY changed_at DESC, id DESC LIMIT 1), %d)`, reconStallDays)
+
+var errReconStall = fmt.Errorf("%w: a car may stand in a step for from one day to a year before it is on the queue", ErrInvalid)
+
+// SetReconStallDays says how many days a car may stand in one step before it
+// is on the queue. Whoever runs the shop, in a shop that sells cars.
+func SetReconStallDays(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, days int) error {
+	if !scope.Role.RunsTheShop() {
+		return access.ErrForbidden
+	}
+	if err := scope.Require(access.Dealer); err != nil {
+		return err
+	}
+	if days < 1 || days > 365 {
+		return errReconStall
+	}
+	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `INSERT INTO recon_stall_settings (shop_id, days, changed_by) VALUES ($1, $2, NULLIF($3, '')::uuid)`,
+			scope.ShopID, days, scope.UserID)
+		return err
+	})
+}
+
+// ReconStallDaysOf reads the days in force. For whoever buys or sells cars.
+func ReconStallDaysOf(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (int, error) {
+	if !scope.Role.BuysVehicles() && !scope.Role.SellsVehicles() {
+		return 0, access.ErrForbidden
+	}
+	if err := scope.Require(access.Dealer); err != nil {
+		return 0, err
+	}
+	var days int
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT `+reconStallSQL).Scan(&days)
+	})
+	return days, err
+}
 
 // ReconTemplateStep is one step of what a new plan is made from.
 type ReconTemplateStep struct {
@@ -410,13 +450,15 @@ type PipelineRow struct {
 	StepState    string
 	DaysInStep   int
 	DaysSinceBuy int
-	StepsDone    int
-	StepsTotal   int
+	// The days a car may stand in one step in this shop.
+	StallDays  int
+	StepsDone  int
+	StepsTotal int
 }
 
 // Stalled reports whether the car has stood in its step longer than the
 // shop lets a car.
-func (r PipelineRow) Stalled() bool { return r.DaysInStep > reconStallDays }
+func (r PipelineRow) Stalled() bool { return r.DaysInStep > r.StallDays }
 
 // ReconPipeline lists the cars being made ready, by the step each stands in,
 // the ones that have stood longest first. A car with a finished plan is not
@@ -443,7 +485,8 @@ func ReconPipeline(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 			       (clock_timestamp() AT TIME ZONE z.timezone)::date - (c.since AT TIME ZONE z.timezone)::date,
 			       (clock_timestamp() AT TIME ZONE z.timezone)::date - (u.opened_at AT TIME ZONE z.timezone)::date,
 			       (SELECT count(*) FROM steps t WHERE t.stock_unit_id = u.id AND t.last IN ('done', 'skipped')),
-			       (SELECT count(*) FROM steps t WHERE t.stock_unit_id = u.id)
+			       (SELECT count(*) FROM steps t WHERE t.stock_unit_id = u.id),
+			       `+reconStallSQL+`
 			FROM cur c JOIN stock_units u ON u.id = c.stock_unit_id CROSS JOIN shops z
 			JOIN vehicles v ON v.id = u.vehicle_id
 			LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = v.id AND reg.valid_to IS NULL
@@ -457,7 +500,7 @@ func ReconPipeline(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 			var r PipelineRow
 			var last, status string
 			if err := rows.Scan(&r.UnitID, &r.Car, &status, &r.StepName, &r.StepKind, &r.StepOwner, &last, &r.DaysInStep, &r.DaysSinceBuy,
-				&r.StepsDone, &r.StepsTotal); err != nil {
+				&r.StepsDone, &r.StepsTotal, &r.StallDays); err != nil {
 				return err
 			}
 			r.Status = StockStatus(status)
@@ -472,7 +515,7 @@ func ReconPipeline(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 // reconStalledSQL counts the cars that have stood in one step longer than
 // reconStallDays, as a scalar for a statement to carry beside another
 // count: the queue reads both in one. A count, never a car's cost.
-var reconStalledSQL = fmt.Sprintf(`(
+var reconStalledSQL = `(
 	WITH steps AS (
 	  SELECT s.stock_unit_id, s.position,
 	         coalesce(e.kind, 'waiting') AS last, coalesce(e.at, s.created_at) AS since
@@ -483,8 +526,8 @@ var reconStalledSQL = fmt.Sprintf(`(
 	)
 	SELECT count(*) FROM cur c JOIN stock_units u ON u.id = c.stock_unit_id
 	WHERE u.closed_at IS NULL AND u.status IN ('in_preparation', 'for_sale', 'reserved')
-	  AND (clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops))::date - (c.since AT TIME ZONE (SELECT timezone FROM shops))::date > %d
-)`, reconStallDays)
+	  AND (clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops))::date - (c.since AT TIME ZONE (SELECT timezone FROM shops))::date > ` + reconStallSQL + `
+)`
 
 // PostReconStepCost enters what a finished step cost against the car, as a
 // reconditioning cost like any other (#164) and tied to the step, so the plan

@@ -261,7 +261,7 @@ var swept = map[string]string{
 	"POST /checklists/{id}/subjects":              "sweep",
 
 	// Dealer
-	"GET /cars/stock": "", "GET /cars/stock.csv": "", "GET /cars/pipeline": "", "POST /cars/stock/ageing": "", "GET /cars/stock/new": "", "GET /cars/consign": "", "GET /cars/results": "", "POST /cars/feed": "", "POST /cars/feed/webhook": "", "GET /feed/v1/stock.json": "", "POST /cars/consign": "", "POST /cars/stock": "",
+	"GET /cars/stock": "", "GET /cars/stock.csv": "", "GET /cars/pipeline": "", "POST /cars/stock/ageing": "", "POST /cars/pipeline/stall": "", "GET /cars/stock/new": "", "GET /cars/consign": "", "GET /cars/results": "", "POST /cars/feed": "", "POST /cars/feed/webhook": "", "GET /feed/v1/stock.json": "", "POST /cars/consign": "", "POST /cars/stock": "",
 	"GET /cars/stock/{id}": "sweep", "POST /cars/stock/{id}/move": "sweep", "POST /cars/stock/{id}/checks": "sweep",
 	"POST /cars/stock/{id}/checks/override": "sweep", "POST /cars/stock/{id}/costs": "sweep",
 	"POST /cars/stock/{id}/costs/{cost}/reverse": "sweep",
@@ -293,7 +293,9 @@ var swept = map[string]string{
 	"POST /cars/test-drives/{id}/agreement": "sweep", "POST /cars/test-drives/{id}/signed": "sweep",
 	"POST /cars/test-drives/{id}/start": "sweep", "POST /cars/test-drives/{id}/return": "sweep",
 	"POST /cars/test-drives/{id}/cancel": "sweep",
-	"GET /cars/deals":                    "", "POST /cars/deals": "",
+	"GET /tyres":                         "", "GET /tyres/{id}": "sweep", "POST /tyres/{id}/move": "sweep", "POST /tyres/{id}/replace": "sweep",
+	"GET /customers/{id}/tyres": "sweep", "POST /customers/{id}/tyres": "sweep",
+	"GET /cars/deals": "", "POST /cars/deals": "",
 	"GET /cars/deals/{id}": "sweep", "POST /cars/deals/{id}/terms": "sweep", "POST /cars/deals/{id}/defects": "sweep",
 	"POST /cars/deals/{id}/defects/{defect}/answer": "sweep", "POST /cars/deals/{id}/contract": "sweep",
 	"POST /cars/deals/{id}/signed": "sweep", "POST /cars/deals/{id}/complete": "sweep", "POST /cars/deals/{id}/cancel": "sweep",
@@ -315,6 +317,7 @@ func fill(pattern string) (method, path string) {
 		"/people/{id}":        "/people/" + personB,
 		"/vehicles/{id}":      "/vehicles/" + vehicleB,
 		"/customers/{id}":     "/customers/" + customerB,
+		"/tyres/{id}":         "/tyres/" + tyreSetB,
 		"/checklists/{id}":    "/checklists/" + checklistB,
 		"/stock/parts/{id}":   "/stock/parts/" + partB,
 		"/staff/{id}":         "/staff/bbbbbbbb-0000-0000-0000-0000000000bb",
