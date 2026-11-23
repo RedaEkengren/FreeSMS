@@ -1,0 +1,37 @@
+{{define "content"}}
+<h1>{{.T "Tyres on the job"}}</h1>
+<p><a href="/jobs/{{.Job.ID}}">{{.T "Back to the job"}}</a></p>
+{{if .JobTyreMoves}}
+<ul class="lines">
+  {{range .JobTyreMoves}}<li class="waiting">{{$.Date .At "2 Jan 15:04"}} &middot; {{$.T .Kind}} &middot; <a href="/tyres/{{.SetID}}">{{.Set}}</a>{{if .Location}} &middot; {{.Location}}{{end}}{{if .Why}} &middot; {{.Why}}{{end}}{{if .By}} &middot; {{.By}}{{end}}</li>{{end}}
+</ul>
+{{else}}<p class="empty">{{.T "Nothing done with tyres on this job yet."}}</p>{{end}}
+
+<h2>{{.T "Take a set out of storage"}}</h2>
+<form method="post" action="/jobs/{{.Job.ID}}/tyres/check-out">
+  <label><span>{{.T "Set"}}</span><select name="set">{{range .Tyres}}{{if .StoredIn}}<option value="{{.ID}}">{{$.T .Season}} {{.Brand}} {{.Model}} &middot; {{.StoredIn}}</option>{{end}}{{end}}</select></label>
+  <button type="submit">{{.T "Take it out for this job"}}</button>
+</form>
+
+<h2>{{.T "Fit a set"}}</h2>
+<form method="post" action="/jobs/{{.Job.ID}}/tyres/fit">
+  <label><span>{{.T "Set"}}</span><select name="set">{{range .Tyres}}<option value="{{.ID}}">{{$.T .Season}} {{.Brand}} {{.Model}}</option>{{end}}</select></label>
+  <button type="submit">{{.T "Fit it to this car"}}</button>
+</form>
+
+<h2>{{.T "Put a set back"}}</h2>
+<form method="post" action="/jobs/{{.Job.ID}}/tyres/return">
+  <label><span>{{.T "Set"}}</span><select name="set">{{range .Tyres}}<option value="{{.ID}}">{{$.T .Season}} {{.Brand}} {{.Model}}</option>{{end}}</select></label>
+  <label><span>{{.T "Place"}}</span><select name="place">{{range .Places}}{{if .Active}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}</select></label>
+  <button type="submit" class="secondary">{{.T "Put it back"}}</button>
+</form>
+
+<h2>{{.T "Take in the set that came off"}}</h2>
+<form method="post" action="/jobs/{{.Job.ID}}/tyres/check-in">
+  <label><span>{{.T "Set"}}</span><select name="set">{{range .Tyres}}<option value="{{.ID}}">{{$.T .Season}} {{.Brand}} {{.Model}}{{if .Vehicle}} &middot; {{.Vehicle}}{{end}}</option>{{end}}</select></label>
+  <label><span>{{.T "Place"}}</span><select name="place"><option value="">{{.T "No place"}}</option>{{range .Places}}{{if .Active}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}</select></label>
+  <label><input type="checkbox" name="home" value="1"> {{.T "The customer takes it home"}}</label>
+  <label><span>{{.T "Why, if there is no place or a tyre was not measured"}}</span><input name="why" maxlength="300"></label>
+  <button type="submit">{{.T "Take it in"}}</button>
+</form>
+{{end}}

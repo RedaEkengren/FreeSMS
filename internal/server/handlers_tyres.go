@@ -310,3 +310,52 @@ func (s *Server) handleTreadLimit(w http.ResponseWriter, r *http.Request) {
 	s.submitted(w, r)
 	http.Redirect(w, r, "/tyres", http.StatusSeeOther)
 }
+
+// handleJobTyres is a job's tyre changes: what has been done with which set,
+// and the forms for the next step.
+func (s *Server) handleJobTyres(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	job, _, err := workshop.JobByID(r.Context(), s.pool, session.Scope, r.PathValue("id"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	moves, err := workshop.JobTyreMoves(r.Context(), s.pool, session.Scope, job.ID)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	sets, err := workshop.TyreSetsOf(r.Context(), s.pool, session.Scope, workshop.TyreFilter{})
+	if s.handoverError(w, r, err) {
+		return
+	}
+	places, err := workshop.StorageLocations(r.Context(), s.pool, session.Scope)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	pd := pageData{Title: "Tyres on the job", Session: session, Job: job, JobTyreMoves: moves, Tyres: sets, Places: places}
+	s.render(w, r, http.StatusOK, "jobtyres", pd)
+}
+
+func (s *Server) handleJobTyreMove(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	job, set := r.PathValue("id"), r.FormValue("set")
+	var err error
+	switch r.PathValue("what") {
+	case "check-out":
+		err = workshop.CheckOutTyreSet(r.Context(), s.pool, session.Scope, job, set)
+	case "fit":
+		err = workshop.FitTyreSet(r.Context(), s.pool, session.Scope, job, set)
+	case "return":
+		err = workshop.ReturnTyreSet(r.Context(), s.pool, session.Scope, job, set, r.FormValue("place"))
+	case "check-in":
+		err = workshop.CheckInTyreSet(r.Context(), s.pool, session.Scope, job, set, workshop.CheckIn{
+			LocationID: r.FormValue("place"), TakenHome: r.FormValue("home") != "", Why: r.FormValue("why")})
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/jobs/"+job+"/tyres", http.StatusSeeOther)
+}

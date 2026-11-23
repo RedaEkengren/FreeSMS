@@ -394,6 +394,8 @@ func (s *Server) routes() (http.Handler, error) {
 	workshopMux.HandleFunc("GET /calendar", s.requireSession(s.handleCalendar))
 	workshopMux.HandleFunc("POST /calendar", s.requireSession(s.handleCreateBooking))
 	workshopMux.HandleFunc("POST /calendar/capacity", s.requireSession(s.handleCapacity))
+	workshopMux.HandleFunc("GET /jobs/{id}/tyres", s.requireSession(s.handleJobTyres))
+	workshopMux.HandleFunc("POST /jobs/{id}/tyres/{what}", s.requireSession(s.handleJobTyreMove))
 	workshopMux.HandleFunc("GET /storage", s.requireSession(s.handleStorage))
 	workshopMux.HandleFunc("POST /storage", s.requireSession(s.handleCreateStorage))
 	workshopMux.HandleFunc("GET /storage/labels", s.requireSession(s.handleStorageLabels))
