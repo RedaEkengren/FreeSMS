@@ -1,0 +1,16 @@
+{{define "content"}}
+{{/* What a supplier is sent: the car and the one step, and a button to say it
+     is done. No price, no customer, nothing of the shop's other work. */}}
+{{with .Supplier}}
+  <h1>{{.Car}}</h1>
+  <p class="vehicle">{{.StepName}} &middot; {{.ShopName}}{{if .ShopPhone}} &middot; {{.ShopPhone}}{{end}}</p>
+  <div class="card">
+  {{if eq .State "done"}}<p class="status-big">{{$.T "This step is finished. Thank you."}}</p>
+  {{else if eq .State "skipped"}}<p class="status-big">{{$.T "The workshop no longer needs this step."}}</p>
+  {{else if eq .State "in_progress"}}<p class="status-big">{{$.T "The car is with you."}}</p>
+  {{else}}<p class="status-big">{{$.T "The workshop has not started this step yet."}}</p>{{end}}
+  {{with .DueOn}}<p class="waiting">{{$.T "Due %s" ($.Date . "2 Jan")}}</p>{{end}}
+  {{if .CanFinish}}<form method="post" action="/s/{{$.ShareToken}}/done"><button type="submit">{{$.T "It is done"}}</button></form>{{end}}
+  </div>
+{{end}}
+{{end}}

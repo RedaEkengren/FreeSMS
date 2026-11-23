@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -658,4 +659,141 @@ func TestACarIsGotReadyFromItsPageAndShowsInThePipeline(t *testing.T) {
 	if status := postStatus(t, signIn(t, ts, techEmail), base+"/recon/start", url.Values{}); status != http.StatusForbidden {
 		t.Errorf("a technician starting a plan answered %d", status)
 	}
+}
+
+// A supplier the car is with gets a link to the one step: they see the car and
+// the step, nothing the shop pays or knows, and can say it is done. A link
+// that is wrong, closed by a newer one or for a step done in the shop opens
+// nothing, and answers the same way for each.
+func TestASupplierSaysAStepIsDoneOnItsLink(t *testing.T) {
+	ts, pool := testServer(t)
+	owner := dealerShop(t, pool)
+	ctx := context.Background()
+	seller, err := workshop.CreateParty(ctx, pool, owner, workshop.NewParty{Kind: "private", Name: "Sam Säljare", Role: workshop.PartySeller})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := workshop.RecordPurchase(ctx, pool, owner, workshop.NewPurchase{VehicleID: vehicleA, Reason: workshop.StockFromPurchase,
+		SellerPartyID: seller, PurchasedOn: time.Now(), PriceMinor: 8_000_000, SellerType: workshop.SellerPrivate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.StartReconPlan(ctx, pool, owner, p.StockUnitID); err != nil {
+		t.Fatal(err)
+	}
+	price := int64(450_050)
+	outside, err := workshop.AddReconStep(ctx, pool, owner, p.StockUnitID, workshop.NewReconStep{
+		Name: "Lackering", Kind: workshop.ReconOutside, Owner: "Lackaren AB", AgreedPriceMinor: &price})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, _ := workshop.ReconPlanOf(ctx, pool, owner, p.StockUnitID)
+	inHouse := plan.Steps[0].ID
+
+	base := ts.URL + "/cars/stock/" + p.StockUnitID
+	buyer := signIn(t, ts, buyerEmail)
+	makeLink := func(c *http.Client, step string) (int, string) {
+		req, _ := http.NewRequest(http.MethodPost, base+"/recon/link", strings.NewReader(url.Values{"step": {step}}.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", ts.URL)
+		resp, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(b)
+	}
+	if status, _ := makeLink(signIn(t, ts, techEmail), outside); status != http.StatusForbidden {
+		t.Errorf("a technician making a link answered %d", status)
+	}
+	if status, _ := makeLink(buyer, inHouse); status != http.StatusBadRequest {
+		t.Errorf("a link for a step done in the shop answered %d", status)
+	}
+	status, page := makeLink(buyer, outside)
+	if status != http.StatusOK {
+		t.Fatalf("making the link answered %d:\n%s", status, visibleText(page))
+	}
+	m := regexp.MustCompile(`/s/([A-Za-z0-9_-]{43})`).FindStringSubmatch(page)
+	if m == nil {
+		t.Fatalf("the page shows no link:\n%s", page)
+	}
+	token := m[1]
+	if again := get(t, buyer, base, http.StatusOK); strings.Contains(again, token) {
+		t.Error("the link is shown again after it was made")
+	}
+
+	stranger := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	seen := visibleText(get(t, stranger, ts.URL+"/s/"+token, http.StatusOK))
+	if !strings.Contains(seen, "Lackering") || !strings.Contains(seen, "The workshop has not started this step yet.") {
+		t.Errorf("the supplier's page:\n%s", seen)
+	}
+	for _, leak := range []string{"4,500", "450050", "Sam Säljare", "80,000", "Agreed"} {
+		if strings.Contains(seen, leak) {
+			t.Errorf("the supplier is shown %q:\n%s", leak, seen)
+		}
+	}
+	done := func(tok string) int { return postStatus(t, stranger, ts.URL+"/s/"+tok+"/done", url.Values{}) }
+	// Not started: nothing to finish, and the shop's plan is untouched.
+	done(token)
+	if st := stateOf(t, pool, owner, p.StockUnitID, outside); st != workshop.ReconWaiting {
+		t.Fatalf("a step not started was moved to %s", st)
+	}
+	if err := workshop.MoveReconStep(ctx, pool, owner, outside, workshop.ReconStart, ""); err != nil {
+		t.Fatal(err)
+	}
+	if page := visibleText(get(t, stranger, ts.URL+"/s/"+token, http.StatusOK)); !strings.Contains(page, "It is done") {
+		t.Errorf("no button while the car is with them:\n%s", page)
+	}
+	if got := done("not-a-token-" + token[12:]); got != http.StatusNotFound {
+		t.Errorf("a wrong token answered %d", got)
+	}
+	if got := done(token); got != http.StatusSeeOther {
+		t.Fatalf("saying it is done answered %d", got)
+	}
+	if st := stateOf(t, pool, owner, p.StockUnitID, outside); st != workshop.ReconDone {
+		t.Errorf("the step is %s", st)
+	}
+	var byNobody int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM recon_step_events WHERE step_id = $1 AND kind = 'done' AND by_user IS NULL`, outside).Scan(&byNobody); err != nil || byNobody != 1 {
+		t.Errorf("events by the supplier: %d, %v", byNobody, err)
+	}
+	// Twice: refused, not a second row.
+	done(token)
+	_ = pool.QueryRow(ctx, `SELECT count(*) FROM recon_step_events WHERE step_id = $1 AND kind = 'done'`, outside).Scan(&byNobody)
+	if byNobody != 1 {
+		t.Errorf("%d done events after a double click", byNobody)
+	}
+
+	// A newer link closes the older.
+	_ = workshop.MoveReconStep(ctx, pool, owner, outside, workshop.ReconReopen, "")
+	_, page2 := makeLink(buyer, outside)
+	m2 := regexp.MustCompile(`/s/([A-Za-z0-9_-]{43})`).FindStringSubmatch(page2)
+	if m2 == nil || m2[1] == token {
+		t.Fatal("no new link")
+	}
+	if status, _ := getBody(t, stranger, ts.URL+"/s/"+token); status != http.StatusNotFound {
+		t.Errorf("a closed link answered %d", status)
+	}
+	if status, _ := getBody(t, stranger, ts.URL+"/s/"+m2[1]); status != http.StatusOK {
+		t.Errorf("the new link answered %d", status)
+	}
+	if got := done(token); got != http.StatusNotFound {
+		t.Errorf("a closed link accepted a move: %d", got)
+	}
+}
+
+func stateOf(t *testing.T, pool *pgxpool.Pool, scope access.Scope, unit, step string) string {
+	t.Helper()
+	plan, err := workshop.ReconPlanOf(context.Background(), pool, scope, unit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range plan.Steps {
+		if s.ID == step {
+			return s.State
+		}
+	}
+	t.Fatalf("no step %s", step)
+	return ""
 }

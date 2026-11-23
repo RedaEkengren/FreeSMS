@@ -52,6 +52,8 @@
 {{if $d.ShowListing}}{{$r := $d.Recon}}
 <section>
   <h2>{{.T "Getting it ready"}}</h2>
+  {{with index $d.Form "supplier_link"}}<p class="notice">{{$.T "Send the supplier this link. It is shown only now, and it opens this one step."}}</p>
+  <p><input readonly value="{{.}}" onfocus="this.select()"></p>{{end}}
   {{if $r.Steps}}
   <ul class="lines">
     {{range $r.Steps}}
@@ -68,7 +70,9 @@
         {{else if eq .State "in_progress"}}<button type="submit" name="move" value="done">{{$.T "Done"}}</button>
           <button type="submit" name="move" value="skipped" class="secondary">{{$.T "Skip"}}</button>
         {{else}}<button type="submit" name="move" value="reopened" class="secondary">{{$.T "Do it again"}}</button>{{end}}
-      </form>{{end}}
+      </form>
+      {{if and (eq .Kind "outside") (ne .State "done") (ne .State "skipped")}}
+      <form method="post" action="/cars/stock/{{$u.ID}}/recon/link"><input type="hidden" name="step" value="{{.ID}}"><button type="submit" class="secondary">{{$.T "Make a link for the supplier"}}</button></form>{{end}}{{end}}
     </li>
     {{end}}
   </ul>
