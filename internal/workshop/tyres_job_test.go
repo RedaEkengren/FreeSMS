@@ -81,8 +81,14 @@ func TestASeasonalChangeMovesBothSetsAndLeavesTheirTrail(t *testing.T) {
 	if err := workshop.CheckInTyreSet(ctx, pool, technician(), job, summer, workshop.CheckIn{LocationID: shelf}); err != nil {
 		t.Fatal(err)
 	}
+	if d, err := workshop.DeliveryDraft(ctx, pool, advisor(), job); err != nil || d.WheelsFitted {
+		t.Errorf("a summary before any set is fitted already reminds about the bolts: %v, %v", d.WheelsFitted, err)
+	}
 	if err := workshop.FitTyreSet(ctx, pool, technician(), job, winter); err != nil {
 		t.Fatal(err)
+	}
+	if d, err := workshop.DeliveryDraft(ctx, pool, advisor(), job); err != nil || !d.WheelsFitted || d.Empty() {
+		t.Errorf("a summary after a set is fitted does not remind about the bolts: %v, %v", d.WheelsFitted, err)
 	}
 
 	w, _ := workshop.TyreSetByID(ctx, pool, technician(), winter)

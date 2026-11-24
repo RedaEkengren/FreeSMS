@@ -58,6 +58,10 @@
 <ul class="lines">{{range .Recommendations}}<li><div class="row"><span>{{.Text}}</span>{{if .Why}}<span class="waiting">{{.Why}}</span>{{end}}</div></li>{{end}}</ul>
 <p class="waiting">{{$.T "These are suggestions. Nothing has been ordered or agreed."}}</p>
 {{end}}
+{{if .WheelsFitted}}
+<h2>{{$.T "Wheels"}}</h2>
+<p>{{$.T "Wheels were fitted on this visit. Have the wheel bolts tightened again after about 50 km."}}</p>
+{{end}}
 {{if .Empty}}<p class="empty">{{$.T "Nothing was recorded as done on this visit."}}</p>{{end}}
 {{end}}
 
