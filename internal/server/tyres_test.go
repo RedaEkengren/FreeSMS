@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
 // A set is taken in from its owner's page, listed, and moved to another car of
@@ -88,5 +90,231 @@ func TestASetOfTyresIsTakenInFromTheOwnersPageAndAtechnicianDoesNotSeeTheOwner(t
 	}
 	if list := visibleText(get(t, advisor, ts.URL+"/tyres", http.StatusOK)); !strings.Contains(list, customerName) {
 		t.Errorf("the advisor's list does not name the owner:\n%s", list)
+	}
+}
+
+// The owner makes a storage place, a technician puts sets in it until it is
+// full and sees whose they are never; a full place and a place that is not in
+// use refuse, and the pages say how much room is left.
+func TestAStoragePlaceIsMadeByTheOwnerAndFilledByTheTechnician(t *testing.T) {
+	ts, pool := testServer(t)
+	const customer = "aaaaaaaa-0000-0000-0000-000000000004"
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx, `INSERT INTO vehicle_ownership (shop_id, vehicle_id, customer_id) VALUES ($1, $2, $3)`, shopA, vehicleA, customer); err != nil {
+		t.Fatal(err)
+	}
+	owner, advisor, tech := signIn(t, ts, ownerEmail), signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	if status := postStatus(t, advisor, ts.URL+"/storage", url.Values{"name": {"Hall A"}, "capacity": {"1"}}); status != http.StatusForbidden {
+		t.Errorf("an advisor making a place answered %d", status)
+	}
+	if status := postStatus(t, owner, ts.URL+"/storage", url.Values{"name": {"Hall A"}, "capacity": {"0"}}); status != http.StatusBadRequest {
+		t.Errorf("a place with no room answered %d", status)
+	}
+	if status := postStatus(t, owner, ts.URL+"/storage", url.Values{"name": {"Hall A"}, "capacity": {"1"}}); status != http.StatusSeeOther {
+		t.Fatalf("making a place answered %d", status)
+	}
+	var place string
+	if err := pool.QueryRow(ctx, `SELECT id FROM storage_locations WHERE name = 'Hall A'`).Scan(&place); err != nil {
+		t.Fatal(err)
+	}
+	makeSet := func() string {
+		form := url.Values{"season": {"summer"}, "vehicle": {vehicleA}, "brand": {"Michelin"}, "front": {"205/55R16"}, "rims": {"alloy"}}
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/customers/"+customer+"/tyres", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", ts.URL)
+		c := *advisor
+		c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		resp, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.Header.Get("Location")
+	}
+	first, second := makeSet(), makeSet()
+	if status := postStatus(t, tech, ts.URL+first+"/place", url.Values{"place": {place}}); status != http.StatusSeeOther {
+		t.Fatalf("a technician placing a set answered %d", status)
+	}
+	if status := postStatus(t, tech, ts.URL+second+"/place", url.Values{"place": {place}}); status != http.StatusBadRequest {
+		t.Errorf("a set in a full place answered %d", status)
+	}
+	if status := postStatus(t, tech, ts.URL+"/storage/"+place+"/use", url.Values{"use": {"0"}}); status != http.StatusForbidden {
+		t.Errorf("a technician taking a place out of use answered %d", status)
+	}
+	if status := postStatus(t, owner, ts.URL+"/storage/"+place+"/use", url.Values{"use": {"0"}}); status != http.StatusBadRequest {
+		t.Errorf("a place with a set in it taken out of use answered %d", status)
+	}
+	seen := get(t, tech, ts.URL+"/storage", http.StatusOK)
+	text := visibleText(seen)
+	if !strings.Contains(text, "Hall A") || !strings.Contains(text, "0 of 1 places free") || !strings.Contains(text, "Michelin") || strings.Contains(seen, customerName) {
+		t.Errorf("the technician's storage page:\n%s", text)
+	}
+	if page := visibleText(get(t, owner, ts.URL+"/storage", http.StatusOK)); !strings.Contains(page, customerName) || !strings.Contains(page, "Take out of use") {
+		t.Errorf("the owner's storage page:\n%s", page)
+	}
+	if page := visibleText(get(t, tech, ts.URL+first, http.StatusOK)); !strings.Contains(page, "Stored in Hall A") {
+		t.Errorf("the set's page:\n%s", page)
+	}
+	if status := postStatus(t, tech, ts.URL+first+"/place", url.Values{"place": {""}}); status != http.StatusSeeOther {
+		t.Errorf("taking a set out answered %d", status)
+	}
+	if status := postStatus(t, tech, ts.URL+second+"/place", url.Values{"place": {place}}); status != http.StatusSeeOther {
+		t.Errorf("the room it left answered %d", status)
+	}
+	if status := postStatus(t, tech, ts.URL+second+"/place", url.Values{"place": {"bbbbbbbb-0000-0000-0000-000000000019"}}); status != http.StatusNotFound {
+		t.Errorf("another shop's place answered %d", status)
+	}
+}
+
+// Scan-scan: the set's label, then the place's; the labels page prints both;
+// a label nobody has refuses.
+func TestAStoredSetIsPlacedByScanningItsLabelAndThenThePlaces(t *testing.T) {
+	ts, pool := testServer(t)
+	const customer = "aaaaaaaa-0000-0000-0000-000000000004"
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx, `INSERT INTO vehicle_ownership (shop_id, vehicle_id, customer_id) VALUES ($1, $2, $3)`, shopA, vehicleA, customer); err != nil {
+		t.Fatal(err)
+	}
+	owner, advisor, tech := signIn(t, ts, ownerEmail), signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	postStatus(t, owner, ts.URL+"/storage", url.Values{"name": {"Rack 7"}, "capacity": {"2"}})
+	var place string
+	if err := pool.QueryRow(ctx, `SELECT id FROM storage_locations WHERE name = 'Rack 7'`).Scan(&place); err != nil {
+		t.Fatal(err)
+	}
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/customers/"+customer+"/tyres", strings.NewReader(url.Values{
+		"season": {"summer"}, "brand": {"Michelin"}, "front": {"205/55R16"}, "rims": {"alloy"}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", ts.URL)
+	c := *advisor
+	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	set := strings.TrimPrefix(resp.Header.Get("Location"), "/tyres/")
+
+	labels := get(t, tech, ts.URL+"/storage/labels", http.StatusOK)
+	for _, code := range []string{workshop.TyreSetLabel(set), workshop.StorageLabel(place)} {
+		if !strings.Contains(labels, code) || !strings.Contains(labels, "<svg") {
+			t.Errorf("the labels page lacks %s", code)
+		}
+	}
+	scan := func(form url.Values) (int, string) {
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/storage/scan", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", ts.URL)
+		cl := *tech
+		cl.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		resp, err := cl.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode, resp.Header.Get("Location")
+	}
+	if status, _ := scan(url.Values{"code": {"TS-000000000000"}}); status != http.StatusNotFound {
+		t.Errorf("a label nobody has answered %d", status)
+	}
+	if status, loc := scan(url.Values{"code": {workshop.TyreSetLabel(set)}}); status != http.StatusSeeOther || loc != "/storage/scan?set="+set {
+		t.Fatalf("the set's label answered %d to %q", status, loc)
+	}
+	if page := visibleText(get(t, tech, ts.URL+"/storage/scan?set="+set, http.StatusOK)); !strings.Contains(page, "Now scan the place for Michelin") {
+		t.Errorf("the second scan's page:\n%s", page)
+	}
+	if status, loc := scan(url.Values{"code": {workshop.StorageLabel(place)}, "set": {set}}); status != http.StatusSeeOther || !strings.HasPrefix(loc, "/storage/scan?done=") {
+		t.Fatalf("the place's label answered %d to %q", status, loc)
+	}
+	if page := visibleText(get(t, tech, ts.URL+"/tyres/"+set, http.StatusOK)); !strings.Contains(page, "Stored in Rack 7") {
+		t.Errorf("the set after the scans:\n%s", page)
+	}
+}
+
+// A technician records depths from the set's page, a wrong one is corrected
+// with a reason, the page says which tyres are at the shop's limit or below the
+// law, and the owner moves the limit.
+func TestATechnicianRecordsTreadDepthAndTheOwnerSetsTheLimit(t *testing.T) {
+	ts, pool := testServer(t)
+	const customer = "aaaaaaaa-0000-0000-0000-000000000004"
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx, `INSERT INTO vehicle_ownership (shop_id, vehicle_id, customer_id) VALUES ($1, $2, $3)`, shopA, vehicleA, customer); err != nil {
+		t.Fatal(err)
+	}
+	owner, advisor, tech := signIn(t, ts, ownerEmail), signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/customers/"+customer+"/tyres", strings.NewReader(url.Values{
+		"season": {"summer"}, "brand": {"Michelin"}, "front": {"205/55R16"}, "rims": {"alloy"}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", ts.URL)
+	c := *advisor
+	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	set := resp.Header.Get("Location")
+	var tyres []string
+	rows, err := pool.Query(ctx, `SELECT id FROM tyres WHERE shop_id = $1 ORDER BY position`, shopA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var id string
+		_ = rows.Scan(&id)
+		tyres = append(tyres, id)
+	}
+	rows.Close()
+
+	if page := visibleText(get(t, tech, ts.URL+set, http.StatusOK)); strings.Count(page, "not measured") != 4 {
+		t.Errorf("a set never measured:\n%s", page)
+	}
+	for _, bad := range []string{"", "x", "26", "-1"} {
+		if status := postStatus(t, tech, ts.URL+set+"/tread", url.Values{"tyre": {tyres[0]}, "depth": {bad}}); status != http.StatusBadRequest {
+			t.Errorf("a depth of %q answered %d", bad, status)
+		}
+	}
+	if status := postStatus(t, tech, ts.URL+set+"/tread", url.Values{"tyre": {tyres[0]}, "depth": {"3,5"}}); status != http.StatusSeeOther {
+		t.Fatalf("recording 3,5 answered %d", status)
+	}
+	postStatus(t, tech, ts.URL+set+"/tread", url.Values{"tyre": {tyres[1]}, "depth": {"1.2"}, "note": {"kordblottad"}})
+	page := visibleText(get(t, tech, ts.URL+set, http.StatusOK))
+	for _, want := range []string{"Tread 3.5 mm", "Tread 1.2 mm", "Below the legal minimum of 1.6 mm.", "kordblottad", "not measured"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the page lacks %q:\n%s", want, page)
+		}
+	}
+	if strings.Contains(page, "limit of 3.0") {
+		t.Errorf("3.5 mm is above the default limit of 3.0:\n%s", page)
+	}
+	if status := postStatus(t, tech, ts.URL+"/tyres/limit", url.Values{"limit": {"4"}}); status != http.StatusForbidden {
+		t.Errorf("a technician setting the limit answered %d", status)
+	}
+	if status := postStatus(t, owner, ts.URL+"/tyres/limit", url.Values{"limit": {"4,0"}}); status != http.StatusSeeOther {
+		t.Fatalf("the owner setting the limit answered %d", status)
+	}
+	if status := postStatus(t, owner, ts.URL+"/tyres/limit", url.Values{"limit": {"0,5"}}); status != http.StatusBadRequest {
+		t.Errorf("a limit below the law answered %d", status)
+	}
+	if page := visibleText(get(t, tech, ts.URL+set, http.StatusOK)); !strings.Contains(page, "limit of 4.0 mm.") {
+		t.Errorf("under a limit of 4.0:\n%s", page)
+	}
+	var wrong string
+	if err := pool.QueryRow(ctx, `SELECT id FROM tyre_measurements WHERE tenths = 12`).Scan(&wrong); err != nil {
+		t.Fatal(err)
+	}
+	if status := postStatus(t, tech, ts.URL+set+"/tread/correct", url.Values{"measurement": {wrong}, "depth": {"6.1"}}); status != http.StatusBadRequest {
+		t.Errorf("a correction with no reason answered %d", status)
+	}
+	if status := postStatus(t, tech, ts.URL+set+"/tread/correct", url.Values{"measurement": {wrong}, "depth": {"6.1"}, "reason": {"Fel däck"}}); status != http.StatusSeeOther {
+		t.Fatalf("a correction answered %d", status)
+	}
+	if page := visibleText(get(t, tech, ts.URL+set, http.StatusOK)); !strings.Contains(page, "Tread 6.1 mm") || !strings.Contains(page, "Corrected: Fel däck") {
+		t.Errorf("after the correction:\n%s", page)
+	}
+	if list := visibleText(get(t, owner, ts.URL+"/tyres", http.StatusOK)); !strings.Contains(list, "tread limit") {
+		t.Errorf("the owner's list lacks the limit form:\n%s", list)
+	}
+	if list := visibleText(get(t, tech, ts.URL+"/tyres", http.StatusOK)); strings.Contains(list, "tread limit") {
+		t.Errorf("a technician is offered the limit form")
 	}
 }

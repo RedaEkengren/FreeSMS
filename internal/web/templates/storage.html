@@ -1,0 +1,28 @@
+{{define "content"}}
+<h1>{{.T "Storage places"}}</h1>
+<p class="waiting">{{.T "Where each stored set stands, and how much room is left in each place."}}</p>
+<p><a href="/storage/scan">{{.T "Scan to place"}}</a> &middot; <a href="/storage/labels">{{.T "Print the labels"}}</a></p>
+{{if .Places}}
+<ul class="lines">
+  {{range .Places}}
+  <li><div class="row"><span>{{.Name}}{{if not .Active}} <span class="tag">{{$.T "not in use"}}</span>{{end}}</span>
+      <span class="tag">{{$.T "%d of %d places free" .Free .Capacity}}</span></div>
+    {{range .Sets}}<div class="waiting"><a href="/tyres/{{.SetID}}">{{$.T .Season}} &middot; {{.Brand}} {{.Model}}</a>{{if .Owner}} &middot; {{.Owner}}{{end}}{{if .Vehicle}} &middot; {{.Vehicle}}{{end}} &middot; {{$.Date .Since "2 Jan 2006"}}</div>{{end}}
+    {{if $.Session.Scope.Role.RunsTheShop}}
+    <form method="post" action="/storage/{{.ID}}/use">
+      {{if .Active}}<button type="submit" name="use" value="0" class="secondary">{{$.T "Take out of use"}}</button>
+      {{else}}<button type="submit" name="use" value="1" class="secondary">{{$.T "Use again"}}</button>{{end}}
+    </form>{{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}<p class="empty">{{.T "No storage places yet."}}</p>{{end}}
+{{if .Session.Scope.Role.RunsTheShop}}
+<h2>{{.T "Make a place"}}</h2>
+<form method="post" action="/storage">
+  <label><span>{{.T "Name, such as hall, rack and shelf"}}</span><input name="name" maxlength="100" required></label>
+  <label><span>{{.T "How many sets it holds"}}</span><input name="capacity" inputmode="numeric" maxlength="4" required></label>
+  <button type="submit">{{.T "Make the place"}}</button>
+</form>
+{{end}}
+{{end}}

@@ -143,6 +143,10 @@ type pageData struct {
 	CustomerCard               workshop.CustomerCard
 	Tyres                      []workshop.TyreSet
 	TyreSet                    workshop.TyreSet
+	Places                     []workshop.StorageLocation
+	TreadLimit                 int
+	StorageLabels              []storageLabel
+	SetLabels                  []storageLabel
 	VehicleChanges             []workshop.Change
 	Saved                      bool
 	Comeback                   workshop.Comeback
@@ -512,6 +516,21 @@ func (d pageData) Num(v any) string {
 
 // Date formats a time with month and weekday names in the reader's
 // language. An instant goes through Local first: $.Date ($.Local .At) "...".
+// Tenths writes a depth kept in tenths of a millimetre, such as 35 as 3.5.
+func (d pageData) Tenths(v any) string {
+	var n int
+	switch x := v.(type) {
+	case int:
+		n = x
+	case *int:
+		if x == nil {
+			return ""
+		}
+		n = *x
+	}
+	return fmt.Sprintf("%d.%d", n/10, n%10)
+}
+
 func (d pageData) Date(t time.Time, layout string) string {
 	if d.printer == nil {
 		return t.Format(layout)
@@ -540,7 +559,7 @@ func (d pageData) Plural(key string, count int) string {
 // last one parsed would win and every page would render the same body. Pairing
 // each page with the layout keeps the definitions from colliding.
 func parseTemplates() (map[string]*template.Template, error) {
-	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "planclash", "lineedit", "enquiries", "enquiry", "proposal", "offer", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "einvoice", "shop", "customer", "day", "followup", "comeback", "outsourced", "outsourcedlist", "import", "importbatch", "start", "invoiceexample", "help", "credit", "rebill", "docview", "summary", "summarydoc", "supply", "order", "timeline", "duplicates", "merge", "customers", "customercard", "tyres", "tyreset", "customertyres", "sell", "checklists", "part", "staff", "account", "mine", "rota", "schedule", "receivables", "setup", "contract", "outbox", "paymentflows", "reconcile", "identity", "technicians", "home", "error"}
+	pages := []string{"login", "jobs", "job", "board", "newjob", "parts", "inspect", "shared", "status", "planclash", "lineedit", "enquiries", "enquiry", "proposal", "offer", "calendar", "booking", "search", "vehicle", "time", "labour", "dashboard", "privacy", "stock", "scan", "labels", "accounting", "invoice", "einvoice", "shop", "customer", "day", "followup", "comeback", "outsourced", "outsourcedlist", "import", "importbatch", "start", "invoiceexample", "help", "credit", "rebill", "docview", "summary", "summarydoc", "supply", "order", "timeline", "duplicates", "merge", "customers", "customercard", "tyres", "tyreset", "customertyres", "storage", "storagelabels", "storagescan", "sell", "checklists", "part", "staff", "account", "mine", "rota", "schedule", "receivables", "setup", "contract", "outbox", "paymentflows", "reconcile", "identity", "technicians", "home", "error"}
 	// Dealer
 	pages = append(pages, "carcalc", "leads", "lead", "testdrive", "deal", "carstock", "carbuy", "carunit", "carconsign", "carresults", "carpipeline", "carsupplier", "feedtoken")
 	pages = append(pages, rentalPages...)

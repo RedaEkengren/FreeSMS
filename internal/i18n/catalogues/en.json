@@ -224,6 +224,12 @@
     "all_season": {
       "other": "all season"
     },
+    "not_measured": {
+      "other": "not measured"
+    },
+    "below_legal": {
+      "other": "below the legal minimum"
+    },
     "no_show": {
       "other": "did not come"
     },

@@ -1,6 +1,7 @@
 {{define "content"}}
 <h1>{{.T "Tyre sets"}}</h1>
 <p class="waiting">{{.T "Every set the shop keeps or has fitted, the newest first. A set is taken in from its owner's page."}}</p>
+<p><a href="/storage">{{.T "Storage places"}}</a></p>
 {{if .Tyres}}
 <ul class="lines">
   {{range .Tyres}}
@@ -11,4 +12,12 @@
   {{end}}
 </ul>
 {{else}}<p class="empty">{{.T "No tyre sets yet."}}</p>{{end}}
+{{if .Session.Scope.Role.RunsTheShop}}
+<h2>{{.T "The workshop's tread limit"}}</h2>
+<form method="post" action="/tyres/limit">
+  <label><span>{{.T "Tell the customer at or below, mm"}}</span><input name="limit" value="{{.Tenths .TreadLimit}}" inputmode="decimal" maxlength="5" required></label>
+  <button type="submit" class="secondary">{{.T "Save the limit"}}</button>
+</form>
+<p class="waiting">{{.T "The law's minimum of 1.6 mm is always shown. The winter tyre rule is shown as the workshop's own limit until it has been confirmed."}}</p>
+{{end}}
 {{end}}

@@ -76,6 +76,14 @@ type Tyre struct {
 	DotWeek    int
 	DotYear    int
 	ReplacesID string
+	// The depth that stands, in tenths of a millimetre; nil when the tyre has
+	// never been measured, which is not the same as zero.
+	TreadTenths *int
+	TreadAt     *time.Time
+	TreadStatus string
+	// Every measurement, oldest first, with the ones since corrected. Only on a
+	// set read alone.
+	Readings []TreadReading
 }
 
 // TyreMove is where a set has been: a car, or off any car.
@@ -102,7 +110,12 @@ type TyreSet struct {
 	VehicleID  string
 	// The car it is on now, in words.
 	Vehicle string
-	Tyres   []Tyre
+	// The place it is stored in now, if it is in one.
+	StoredIn   string
+	StoredAtID string
+	Tyres      []Tyre
+	// The shop's tread limit in tenths of a millimetre, as it stands now.
+	TreadWarning int
 	// Where it has been, oldest first. Only on a set read alone.
 	Moves []TyreMove
 }
@@ -279,23 +292,26 @@ const tyreSetColumns = `
 	SELECT s.id, s.season, coalesce(s.brand, ''), coalesce(s.model, ''), s.rims, s.tpms, s.fasteners, coalesce(s.note, ''), s.created_at,
 	       CASE WHEN $1 THEN s.customer_id::text ELSE '' END,
 	       CASE WHEN $1 THEN coalesce(CASE WHEN c.kind = 'company' THEN c.company_name END, p.display_name, '') ELSE '' END,
-	       coalesce(m.vehicle_id::text, ''), coalesce(nullif(btrim(concat_ws(' ', r.registration, v.make, v.model)), ''), '')
+	       coalesce(m.vehicle_id::text, ''), coalesce(nullif(btrim(concat_ws(' ', r.registration, v.make, v.model)), ''), ''),
+	       coalesce(sl.name, ''), coalesce(sl.id::text, '')
 	FROM tyre_sets s
 	JOIN customers c ON c.id = s.customer_id
 	LEFT JOIN people p ON p.id = c.person_id
 	LEFT JOIN LATERAL (SELECT e.vehicle_id FROM tyre_set_vehicle_events e WHERE e.tyre_set_id = s.id ORDER BY e.seq DESC LIMIT 1) m ON true
 	LEFT JOIN vehicles v ON v.id = m.vehicle_id
-	LEFT JOIN vehicle_registrations r ON r.vehicle_id = v.id AND r.valid_to IS NULL`
+	LEFT JOIN vehicle_registrations r ON r.vehicle_id = v.id AND r.valid_to IS NULL
+	LEFT JOIN tyre_set_placements pl ON pl.tyre_set_id = s.id AND pl.removed_at IS NULL
+	LEFT JOIN storage_locations sl ON sl.id = pl.location_id`
 
 func scanTyreSet(row pgx.Row) (TyreSet, error) {
 	var s TyreSet
 	err := row.Scan(&s.ID, &s.Season, &s.Brand, &s.Model, &s.Rims, &s.TPMS, &s.Fasteners, &s.Note, &s.CreatedAt,
-		&s.CustomerID, &s.Owner, &s.VehicleID, &s.Vehicle)
+		&s.CustomerID, &s.Owner, &s.VehicleID, &s.Vehicle, &s.StoredIn, &s.StoredAtID)
 	return s, err
 }
 
 // currentTyresTx reads the tyres now on the sets, the ones not replaced.
-func currentTyresTx(ctx context.Context, tx pgx.Tx, sets []TyreSet) error {
+func currentTyresTx(ctx context.Context, tx pgx.Tx, sets []TyreSet, history bool) error {
 	if len(sets) == 0 {
 		return nil
 	}
@@ -321,7 +337,40 @@ func currentTyresTx(ctx context.Context, tx pgx.Tx, sets []TyreSet) error {
 		}
 		sets[at[set]].Tyres = append(sets[at[set]].Tyres, t)
 	}
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	rows.Close()
+	var tyreIDs []string
+	for _, s := range sets {
+		for _, t := range s.Tyres {
+			tyreIDs = append(tyreIDs, t.ID)
+		}
+	}
+	readings, err := treadReadingsTx(ctx, tx, tyreIDs)
+	if err != nil {
+		return err
+	}
+	warning, err := treadWarningTx(ctx, tx)
+	if err != nil {
+		return err
+	}
+	for i := range sets {
+		sets[i].TreadWarning = warning
+		for j := range sets[i].Tyres {
+			t := &sets[i].Tyres[j]
+			rs := readings[t.ID]
+			if r := standing(rs); r != nil {
+				n, at := r.Tenths, r.At
+				t.TreadTenths, t.TreadAt = &n, &at
+			}
+			t.TreadStatus = TreadStatusOf(t.TreadTenths, warning)
+			if history {
+				t.Readings = rs
+			}
+		}
+	}
+	return nil
 }
 
 // TyreSetsOf lists the sets, the newest first. Whoever works in the
@@ -354,7 +403,7 @@ func TyreSetsOf(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, f T
 			return err
 		}
 		rows.Close()
-		return currentTyresTx(ctx, tx, out)
+		return currentTyresTx(ctx, tx, out, false)
 	})
 	return out, err
 }
@@ -377,7 +426,7 @@ func TyreSetByID(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, id
 			return fmt.Errorf("read the set: %w", err)
 		}
 		sets := []TyreSet{s}
-		if err := currentTyresTx(ctx, tx, sets); err != nil {
+		if err := currentTyresTx(ctx, tx, sets, true); err != nil {
 			return err
 		}
 		s = sets[0]
