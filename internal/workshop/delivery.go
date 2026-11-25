@@ -71,6 +71,10 @@ type SummaryContent struct {
 	Recommendations []SummaryItem       `json:"recommendations,omitempty"`
 	// Set when the visit was a return for an earlier repair.
 	Return *SummaryReturn `json:"return,omitempty"`
+	// Set when a tyre set was fitted on this visit: the wheel bolts want
+	// tightening again after a short drive. A fact the page words itself, so
+	// it is read in the reader's language.
+	WheelsFitted bool `json:"wheels_fitted,omitempty"`
 }
 
 // SummaryReturn is what the customer is told about a return visit: what they
@@ -88,7 +92,7 @@ type SummaryReturn struct {
 // Empty reports that nothing was recorded as done, left or noticed.
 func (c SummaryContent) Empty() bool {
 	return len(c.Completed) == 0 && len(c.Parts) == 0 && len(c.Inspections) == 0 && len(c.Declined) == 0 &&
-		len(c.Unfinished) == 0 && len(c.Unresolved) == 0 && len(c.Recommendations) == 0
+		len(c.Unfinished) == 0 && len(c.Unresolved) == 0 && len(c.Recommendations) == 0 && !c.WheelsFitted
 }
 
 // DeliverySummary is an issued version.
@@ -327,6 +331,10 @@ func draftTx(ctx context.Context, tx pgx.Tx, jobID string) (SummaryContent, erro
 		return nil
 	}); err != nil {
 		return c, err
+	}
+
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM tyre_job_moves WHERE work_order_id = $1 AND kind = 'fitted')`, jobID).Scan(&c.WheelsFitted); err != nil {
+		return c, fmt.Errorf("draft wheels: %w", err)
 	}
 
 	var ret SummaryReturn

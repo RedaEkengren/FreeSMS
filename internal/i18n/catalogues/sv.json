@@ -9555,6 +9555,8 @@
     "On what basis": {"other": "På vilken grund"},
     "Read the rental register": {"other": "Läs uthyrningsregistret"},
     "Record the decision": {"other": "Registrera beslutet"},
-    "for the period booked before, which no longer stands": {"other": "för den tidigare bokade perioden, som inte längre gäller"}
+    "for the period booked before, which no longer stands": {"other": "för den tidigare bokade perioden, som inte längre gäller"},
+    "Wheels": {"other": "Hjul"},
+    "Wheels were fitted on this visit. Have the wheel bolts tightened again after about 50 km.": {"other": "Hjul monterades vid det här besöket. Låt dra åt hjulbultarna igen efter cirka 50 km."}
   }
 }
