@@ -3,7 +3,7 @@
 <h1>{{.Label}}</h1>
 <p><span class="tag{{if eq .Status "out_of_fleet" "at_workshop" "blocked"}} late{{end}}">{{$.T ($.Rental.FleetLabel .Status)}}</span>
   {{.Category}} &middot; {{if .Shipped}}{{$.T .ProfileName}}{{else}}{{.ProfileName}}{{end}}
-  {{if .VehicleID}} &middot; <a href="/vehicles/{{.VehicleID}}">{{.Registration}}{{if .Make}} {{.Make}} {{.Model}}{{end}}</a>{{end}}</p>
+  {{if .VehicleID}} &middot; <a href="/vehicles/{{.VehicleID}}">{{.Registration}}{{if .Make}} {{.Make}} {{.Model}}{{end}}</a>{{if $.Runs "workshop"}} &middot; <a href="/vehicles/{{.VehicleID}}/tyres">{{$.T "Tyres"}}</a>{{end}}{{end}}</p>
 
 {{if $.Rental.InTheWay}}
 <div class="error"><p>{{$.T "Rentals are booked on it after that. Move or cancel them first:"}}</p>

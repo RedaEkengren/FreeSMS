@@ -129,11 +129,10 @@ func (s *Server) handleCustomerTyres(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, http.StatusOK, "customertyres", pageData{Title: "Tyre sets", Session: session, CustomerCard: card, Tyres: sets})
 }
 
-// handleCreateTyreSet takes a set in: a dimension for the front and, when the
+// tyreSetForm reads a set from the form: a dimension for the front and, when the
 // rear differs, for the rear, the same date of manufacture on all, and a spare
 // when it has a dimension.
-func (s *Server) handleCreateTyreSet(w http.ResponseWriter, r *http.Request) {
-	session := sessionFrom(r.Context())
+func tyreSetForm(r *http.Request) workshop.NewTyreSet {
 	front := strings.TrimSpace(r.FormValue("front"))
 	rear := strings.TrimSpace(r.FormValue("rear"))
 	if rear == "" {
@@ -144,7 +143,7 @@ func (s *Server) handleCreateTyreSet(w http.ResponseWriter, r *http.Request) {
 		return workshop.NewTyre{Position: pos, Dimension: dim, DotWeek: week, DotYear: year}
 	}
 	n := workshop.NewTyreSet{
-		CustomerID: r.PathValue("id"), VehicleID: r.FormValue("vehicle"), Season: r.FormValue("season"),
+		VehicleID: r.FormValue("vehicle"), Season: r.FormValue("season"),
 		Brand: r.FormValue("brand"), Model: r.FormValue("model"), Rims: r.FormValue("rims"),
 		TPMS: r.FormValue("tpms") != "", Fasteners: r.FormValue("fasteners") != "", Note: r.FormValue("note"),
 		Tyres: []workshop.NewTyre{tyre("front_left", front), tyre("front_right", front), tyre("rear_left", rear), tyre("rear_right", rear)},
@@ -152,6 +151,13 @@ func (s *Server) handleCreateTyreSet(w http.ResponseWriter, r *http.Request) {
 	if spare := strings.TrimSpace(r.FormValue("spare")); spare != "" {
 		n.Tyres = append(n.Tyres, tyre("spare", spare))
 	}
+	return n
+}
+
+func (s *Server) handleCreateTyreSet(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	n := tyreSetForm(r)
+	n.CustomerID = r.PathValue("id")
 	id, err := workshop.CreateTyreSet(r.Context(), s.pool, session.Scope, n)
 	if s.handoverError(w, r, err) {
 		return
@@ -754,4 +760,29 @@ func (s *Server) handleSetAgreementAnswer(w http.ResponseWriter, r *http.Request
 		return
 	}
 	http.Redirect(w, r, "/a/"+r.PathValue("token"), http.StatusSeeOther)
+}
+
+// handleVehicleTyres is the sets the shop itself keeps on one of its own cars:
+// the stock card's tyres and the fleet's.
+func (s *Server) handleVehicleTyres(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	sets, err := workshop.ShopTyreSets(r.Context(), s.pool, session.Scope, r.PathValue("id"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "vehicletyres", pageData{Title: "The shop's tyres on this car", Session: session, Tyres: sets, VehicleRef: r.PathValue("id")})
+}
+
+func (s *Server) handleCreateVehicleTyres(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	n := tyreSetForm(r)
+	// On this car or in storage: nothing else is offered, so nothing else is taken.
+	if n.VehicleID != "" {
+		n.VehicleID = r.PathValue("id")
+	}
+	if _, err := workshop.CreateShopTyreSet(r.Context(), s.pool, session.Scope, n); s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/vehicles/"+r.PathValue("id")+"/tyres", http.StatusSeeOther)
 }

@@ -226,6 +226,7 @@ func StorageDueFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 			FROM tyre_sets ts
 			JOIN tyre_set_placements pl ON pl.tyre_set_id = ts.id AND pl.removed_at IS NULL
 			JOIN customers c ON c.id = ts.customer_id LEFT JOIN people p ON p.id = c.person_id
+			WHERE NOT EXISTS (SELECT 1 FROM shop_own_customers o WHERE o.customer_id = c.id)
 			ORDER BY 2, c.id, ts.created_at, ts.id`)
 		if err != nil {
 			return err
@@ -306,7 +307,8 @@ func InvoiceStorage(ctx context.Context, pool *pgxpool.Pool, scope access.Scope,
 			SELECT ts.id::text, ts.season, coalesce(ts.brand, ''), coalesce(ts.model, '')
 			FROM tyre_sets ts
 			JOIN tyre_set_placements pl ON pl.tyre_set_id = ts.id AND pl.removed_at IS NULL
-			WHERE ts.customer_id = $1 ORDER BY ts.created_at, ts.id`, customerID)
+			WHERE ts.customer_id = $1 AND NOT EXISTS (SELECT 1 FROM shop_own_customers o WHERE o.customer_id = ts.customer_id)
+			ORDER BY ts.created_at, ts.id`, customerID)
 		if err != nil {
 			return err
 		}

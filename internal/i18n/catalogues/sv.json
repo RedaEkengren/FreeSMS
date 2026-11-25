@@ -9700,6 +9700,10 @@
     "%d set in storage may have been left": {
       "one": "%d uppsättning i lager kan ha lämnats kvar",
       "other": "%d uppsättningar i lager kan ha lämnats kvar"
-    }
+    },
+    "The shop's tyres on this car": {"other": "Verkstadens egna däck på den här bilen"},
+    "No, in storage": {"other": "Nej, i lager"},
+    "On this car now": {"other": "På den här bilen nu"},
+    "Sets the shop itself owns, on a car it keeps in stock or in its fleet.": {"other": "Uppsättningar som verkstaden själv äger, på en bil den har i lager eller i sin flotta."}
   }
 }

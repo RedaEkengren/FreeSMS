@@ -162,7 +162,7 @@ func audienceTx(ctx context.Context, tx pgx.Tx, campaignID string) (Campaign, Ca
 		LEFT JOIN people p ON p.id = c.person_id
 		LEFT JOIN LATERAL (SELECT e.vehicle_id FROM tyre_set_vehicle_events e WHERE e.tyre_set_id = ts.id ORDER BY e.seq DESC LIMIT 1) m ON true
 		LEFT JOIN vehicle_registrations r ON r.vehicle_id = m.vehicle_id AND r.valid_to IS NULL
-		WHERE ts.season = ANY($2)
+		WHERE ts.season = ANY($2) AND NOT EXISTS (SELECT 1 FROM shop_own_customers o WHERE o.customer_id = c.id)
 		ORDER BY 2, c.id, ts.created_at, ts.id`, campaignID, campaignSeasons(c.Season))
 	if err != nil {
 		return c, a, err

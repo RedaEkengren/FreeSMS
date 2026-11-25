@@ -717,3 +717,41 @@ func TestASetIsDisposedOfAfterTheOwnerSaysYesOnTheirLink(t *testing.T) {
 		t.Errorf("collecting a disposed set answered %d", status)
 	}
 }
+
+// The shop's own sets are kept on a car it controls, by the roles that look
+// after its cars, and shown on a page that names no owner.
+func TestTheShopsOwnTyresAreKeptOnItsCarsFromThePageOfTheCar(t *testing.T) {
+	ts, pool := testServer(t)
+	ctx := context.Background()
+	owner, advisor, tech := signIn(t, ts, ownerEmail), signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	var car string
+	if err := pool.QueryRow(ctx, `INSERT INTO vehicles (shop_id, make, model) VALUES ($1, 'Volvo', 'XC60') RETURNING id::text`, shopA).Scan(&car); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO resources (shop_id, kind, vehicle_id) VALUES ($1, 'vehicle', $2)`, shopA, car); err != nil {
+		t.Fatal(err)
+	}
+	form := url.Values{"season": {"winter_friction"}, "vehicle": {car}, "brand": {"Nokian"}, "front": {"235/60R18"}, "rims": {"alloy"}}
+	if status := postStatus(t, advisor, ts.URL+"/vehicles/"+car+"/tyres", form); status != http.StatusForbidden {
+		t.Errorf("the front desk taking in the shop's set answered %d", status)
+	}
+	if status := postStatus(t, owner, ts.URL+"/vehicles/"+car+"/tyres", form); status != http.StatusSeeOther {
+		t.Fatalf("the owner taking in the shop's set answered %d", status)
+	}
+	page := visibleText(get(t, tech, ts.URL+"/vehicles/"+car+"/tyres", http.StatusOK))
+	if !strings.Contains(page, "Nokian") || !strings.Contains(page, "235/60R18") {
+		t.Errorf("the car's tyres:\n%s", page)
+	}
+	var owners int
+	_ = pool.QueryRow(ctx, `SELECT count(*) FROM tyre_sets s JOIN shop_own_customers o ON o.customer_id = s.customer_id`).Scan(&owners)
+	if owners != 1 {
+		t.Errorf("%d sets belong to the shop", owners)
+	}
+	stranger := "bbbbbbbb-0000-0000-0000-0000000000f0"
+	_ = stranger
+	var loose string
+	_ = pool.QueryRow(ctx, `INSERT INTO vehicles (shop_id, make, model) VALUES ($1, 'Saab', '9-5') RETURNING id::text`, shopA).Scan(&loose)
+	if status := postStatus(t, owner, ts.URL+"/vehicles/"+loose+"/tyres", form); status != http.StatusBadRequest {
+		t.Errorf("a set on a car the shop does not control answered %d", status)
+	}
+}

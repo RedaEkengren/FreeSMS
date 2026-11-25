@@ -5,7 +5,7 @@
 <p class="waiting">
   {{with $d.Vehicle}}{{if .Make}}{{.Make}} {{.Model}} &middot; {{end}}{{end}}
   <span class="tag">{{.T $u.Status.Label}}</span> &middot; {{.T $u.ReasonLabel}} &middot; {{.T "In stock since %s" (.Date (.Local $u.OpenedAt) "2 Jan 2006")}}
-  &middot; <a href="/vehicles/{{$u.VehicleID}}">{{.T "The vehicle"}}</a>
+  &middot; <a href="/vehicles/{{$u.VehicleID}}">{{.T "The vehicle"}}</a>{{if .Runs "workshop"}} &middot; <a href="/vehicles/{{$u.VehicleID}}/tyres">{{.T "Tyres"}}</a>{{end}}
 </p>
 
 {{if $d.Moves}}

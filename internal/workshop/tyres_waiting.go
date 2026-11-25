@@ -33,12 +33,14 @@ func tyresWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (
 			                          WHERE t2.customer_id = r.customer_id AND b.status = 'booked'
 			                            AND (t2.season = c.season OR (c.season = 'winter' AND t2.season IN ('winter_studded', 'winter_friction'))))),
 			       (SELECT count(*)::int FROM tyre_sets ts
-			        JOIN tyre_set_placements pl ON pl.tyre_set_id = ts.id AND pl.removed_at IS NULL, s
+			        JOIN tyre_set_placements pl ON pl.tyre_set_id = ts.id AND pl.removed_at IS NULL
+			        JOIN customers c ON c.id = ts.customer_id, s
 			        CROSS JOIN LATERAL (SELECT greatest(pl.placed_at,
 			            coalesce((SELECT max(x.charged_at) FROM tyre_storage_charges x WHERE x.tyre_set_id = ts.id), pl.placed_at),
 			            coalesce((SELECT max(m.at) FROM tyre_job_moves m WHERE m.tyre_set_id = ts.id), pl.placed_at),
 			            coalesce((SELECT max(tb.at) FROM tyre_change_bookings tb WHERE tb.tyre_set_id = ts.id), pl.placed_at)) AS last) q
-			        WHERE q.last <= clock_timestamp() - make_interval(days => s.lost))`,
+			        WHERE q.last <= clock_timestamp() - make_interval(days => s.lost)
+			          AND NOT EXISTS (SELECT 1 FROM shop_own_customers o WHERE o.customer_id = c.id))`,
 			defaultFollowUpDays, defaultAbandonDays).Scan(&follow, &abandoned)
 	})
 	if err != nil {
