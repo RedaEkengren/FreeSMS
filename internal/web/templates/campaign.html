@@ -1,0 +1,18 @@
+{{define "content"}}
+<h1>{{.Campaign.Name}}</h1>
+<p><a href="/tyres/campaigns">{{.T "All campaigns"}}</a></p>
+<p class="waiting">{{.T "Today this campaign would reach %d customers. %d opted out, %d have nowhere to send to, and %d have been queued already." (len .Audience.Reached) .Audience.OptedOut .Audience.NoContact .Audience.AlreadyQueued}}</p>
+{{if .Audience.Reached}}
+<ul class="lines">
+  {{range .Audience.Reached}}
+  <li><div class="row"><span>{{.Name}}</span><span class="tag">{{$.T .Channel}}</span></div>
+    <div class="waiting">{{range $i, $s := .Sets}}{{if $i}} &middot; {{end}}{{$s}}{{end}}</div>
+    <div>{{.Message}}</div></li>
+  {{end}}
+</ul>
+{{if .Session.Scope.Role.RunsTheShop}}
+<form method="post" action="/tyres/campaigns/{{.Campaign.ID}}/run">
+  <button type="submit">{{.T "Queue the messages"}}</button>
+</form>{{end}}
+{{else}}<p class="empty">{{.T "Nobody to reach today."}}</p>{{end}}
+{{end}}

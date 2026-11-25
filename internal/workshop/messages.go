@@ -32,6 +32,7 @@ var MessageAbouts = map[string]string{
 	"booking_reminder":  "A reminder about your booking",
 	"booking_moved":     "Your booking has moved",
 	"booking_cancelled": "Your booking is cancelled",
+	"campaign":          "A seasonal message about your tyres",
 }
 
 // SendHours are when a message may go, as whole hours in the shop's zone:
@@ -87,6 +88,9 @@ type NewMessage struct {
 	// For a booking message: the booking, and the time it had when queued.
 	BookingID      string
 	ValidForStarts time.Time
+	// For a campaign message: asked after again as it goes, in case the
+	// customer has opted out.
+	Campaign bool
 }
 
 // SentBefore reports whether this job's customer has been sent anything at
@@ -242,6 +246,9 @@ type DueMessage struct {
 	// queued.
 	BookingID      string
 	ValidForStarts time.Time
+	// For a campaign message: asked after again as it goes, in case the
+	// customer has opted out.
+	Campaign bool
 }
 
 // maxTries is how often a message that cannot be handed over is tried
@@ -257,7 +264,8 @@ func DueMessages(ctx context.Context, pool *pgxpool.Pool, shopID string, now tim
 		rows, err := tx.Query(ctx, `
 			SELECT m.id, coalesce(m.work_order_id::text, ''), m.about, m.channel, m.recipient, m.subject, m.body,
 			       (SELECT count(*) FROM message_events r WHERE r.message_id = m.id AND r.event = 'retry')::int AS tries,
-			       coalesce(m.reminder_for::text, ''), coalesce(m.booking_id::text, ''), coalesce(m.valid_for_starts, 'epoch'::timestamptz)
+			       coalesce(m.reminder_for::text, ''), coalesce(m.booking_id::text, ''), coalesce(m.valid_for_starts, 'epoch'::timestamptz),
+			       m.campaign_id IS NOT NULL
 			FROM outbound_messages m
 			JOIN LATERAL (SELECT event, at FROM message_events WHERE message_id = m.id ORDER BY at DESC LIMIT 1) e ON true
 			WHERE m.not_before <= $1 AND m.recipient <> ''
@@ -271,7 +279,7 @@ func DueMessages(ctx context.Context, pool *pgxpool.Pool, shopID string, now tim
 		defer rows.Close()
 		for rows.Next() {
 			var m DueMessage
-			if err := rows.Scan(&m.ID, &m.JobID, &m.About, &m.Channel, &m.Recipient, &m.Subject, &m.Body, &m.Tries, &m.ReminderFor, &m.BookingID, &m.ValidForStarts); err != nil {
+			if err := rows.Scan(&m.ID, &m.JobID, &m.About, &m.Channel, &m.Recipient, &m.Subject, &m.Body, &m.Tries, &m.ReminderFor, &m.BookingID, &m.ValidForStarts, &m.Campaign); err != nil {
 				return err
 			}
 			out = append(out, m)

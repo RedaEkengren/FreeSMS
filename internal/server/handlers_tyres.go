@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/barcode"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
@@ -434,4 +435,57 @@ func (s *Server) handleJobTyreExtra(w http.ResponseWriter, r *http.Request) {
 	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/jobs/"+r.PathValue("id")+"/tyres", http.StatusSeeOther)
+}
+
+func (s *Server) handleCampaigns(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	list, err := workshop.Campaigns(r.Context(), s.pool, session.Scope)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "campaigns", pageData{Title: "Seasonal campaigns", Session: session, Campaigns: list})
+}
+
+func (s *Server) handleCreateCampaign(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id, err := workshop.CreateCampaign(r.Context(), s.pool, session.Scope, workshop.NewCampaign{
+		Name: r.FormValue("name"), Season: r.FormValue("season"), Subject: r.FormValue("subject"), Body: r.FormValue("body")})
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/tyres/campaigns/"+id, http.StatusSeeOther)
+}
+
+func (s *Server) handleCampaign(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	c, aud, err := workshop.CampaignPreview(r.Context(), s.pool, session.Scope, r.PathValue("id"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "campaign", pageData{Title: "Seasonal campaign", Session: session, Campaign: c, Audience: aud})
+}
+
+// handleRunCampaign queues the campaign's messages for when the shop's hours
+// next allow, to everyone it reaches who has not been queued for it yet.
+func (s *Server) handleRunCampaign(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	_, err := workshop.RunCampaign(r.Context(), s.pool, session.Scope, r.PathValue("id"), s.sendHours.NotBefore(time.Now(), s.zone()))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/tyres/campaigns/"+r.PathValue("id"), http.StatusSeeOther)
+}
+
+// handleMessageChoice records that a customer does not want the shop's seasonal
+// messages, or does again.
+func (s *Server) handleMessageChoice(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	err := workshop.SetMessageOptOut(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("choice") == "out")
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/customers/"+r.PathValue("id"), http.StatusSeeOther)
 }

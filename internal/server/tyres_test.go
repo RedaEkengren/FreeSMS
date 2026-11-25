@@ -453,3 +453,68 @@ func TestTyreExtrasArePricedByTheOwnerAndAddedByTheFrontDesk(t *testing.T) {
 		t.Errorf("the front desk's page lacks the extra:\n%s", page)
 	}
 }
+
+// The owner starts a seasonal campaign, anyone at the counter sees who it would
+// reach, a customer is taken out from their own card, and running it twice
+// queues one message.
+func TestASeasonalCampaignIsPreviewedAndRunOnce(t *testing.T) {
+	ts, pool := testServer(t)
+	const customer = "aaaaaaaa-0000-0000-0000-000000000004"
+	ctx := context.Background()
+	owner, advisor, tech := signIn(t, ts, ownerEmail), signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	if _, err := pool.Exec(ctx, `UPDATE people SET phone = '+46701234567' WHERE id = (SELECT person_id FROM customers WHERE id = $1)`, customer); err != nil {
+		t.Fatal(err)
+	}
+	postStatus(t, owner, ts.URL+"/storage", url.Values{"name": {"Rack"}, "capacity": {"3"}})
+	var rack, set string
+	_ = pool.QueryRow(ctx, `SELECT id FROM storage_locations WHERE name = 'Rack'`).Scan(&rack)
+	if err := pool.QueryRow(ctx, `INSERT INTO tyre_sets (shop_id, customer_id, season, brand, rims) VALUES ($1, $2, 'summer', 'Michelin', 'alloy') RETURNING id::text`, shopA, customer).Scan(&set); err != nil {
+		t.Fatal(err)
+	}
+	postStatus(t, tech, ts.URL+"/tyres/"+set+"/place", url.Values{"place": {rack}})
+
+	form := url.Values{"name": {"Spring"}, "season": {"summer"}, "body": {"Your tyres: {sets}"}}
+	if status := postStatus(t, advisor, ts.URL+"/tyres/campaigns", form); status != http.StatusForbidden {
+		t.Errorf("the front desk making a campaign answered %d", status)
+	}
+	if status := postStatus(t, owner, ts.URL+"/tyres/campaigns", form); status != http.StatusSeeOther {
+		t.Fatalf("the owner making a campaign answered %d", status)
+	}
+	var id string
+	if err := pool.QueryRow(ctx, `SELECT id::text FROM tyre_campaigns WHERE name = 'Spring'`).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	page := visibleText(get(t, advisor, ts.URL+"/tyres/campaigns/"+id, http.StatusOK))
+	if !strings.Contains(page, "would reach 1 customers") || !strings.Contains(page, "Your tyres: Michelin") {
+		t.Errorf("the preview:\n%s", page)
+	}
+	if status := getStatus(t, tech, ts.URL+"/tyres/campaigns/"+id); status != http.StatusForbidden {
+		t.Errorf("a technician previewing a campaign answered %d", status)
+	}
+	if status := postStatus(t, advisor, ts.URL+"/tyres/campaigns/"+id+"/run", url.Values{}); status != http.StatusForbidden {
+		t.Errorf("the front desk running a campaign answered %d", status)
+	}
+	for i := 0; i < 2; i++ {
+		if status := postStatus(t, owner, ts.URL+"/tyres/campaigns/"+id+"/run", url.Values{}); status != http.StatusSeeOther {
+			t.Fatalf("run %d answered %d", i+1, status)
+		}
+	}
+	var n int
+	_ = pool.QueryRow(ctx, `SELECT count(*) FROM outbound_messages WHERE campaign_id = $1`, id).Scan(&n)
+	if n != 1 {
+		t.Errorf("two runs queued %d messages", n)
+	}
+	if page := visibleText(get(t, advisor, ts.URL+"/tyres/campaigns/"+id, http.StatusOK)); !strings.Contains(page, "1 have been queued already") {
+		t.Errorf("after running:\n%s", page)
+	}
+
+	if status := postStatus(t, advisor, ts.URL+"/customers/"+customer+"/message-choice", url.Values{"choice": {"out"}}); status != http.StatusSeeOther {
+		t.Fatalf("opting a customer out answered %d", status)
+	}
+	if page := visibleText(get(t, advisor, ts.URL+"/customers/"+customer, http.StatusOK)); !strings.Contains(page, "This customer has opted out of the shop") {
+		t.Errorf("the customer card:\n%s", page)
+	}
+	if status := postStatus(t, tech, ts.URL+"/customers/"+customer+"/message-choice", url.Values{"choice": {"out"}}); status != http.StatusForbidden {
+		t.Errorf("a technician opting a customer out answered %d", status)
+	}
+}

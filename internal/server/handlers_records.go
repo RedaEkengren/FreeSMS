@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RedaEkengren/FreeSMS/internal/access"
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
 
@@ -34,9 +35,14 @@ func (s *Server) handleCustomerCard(w http.ResponseWriter, r *http.Request) {
 	// The party behind the card, for its identity checks (#153); a card
 	// with none simply has no way there.
 	party, _ := workshop.PartyOfCustomer(r.Context(), s.pool, session.Scope, card.ID)
-	s.render(w, r, http.StatusOK, "customercard", pageData{
+	pd := pageData{
 		Title: card.Name, Session: session, CustomerCard: card, Saved: r.URL.Query().Get("saved") != "", PartyID: party,
-	})
+	}
+	// Only a shop that keeps tyres has seasonal messages to opt out of.
+	if session.Scope.Uses(access.Module("workshop")) {
+		pd.MessageOptOut, _ = workshop.MessageOptedOut(r.Context(), s.pool, session.Scope, card.ID)
+	}
+	s.render(w, r, http.StatusOK, "customercard", pd)
 }
 
 func (s *Server) handleEditCustomer(w http.ResponseWriter, r *http.Request) {

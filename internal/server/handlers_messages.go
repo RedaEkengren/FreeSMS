@@ -92,6 +92,20 @@ func (s *Server) sendDue(ctx context.Context, now time.Time) {
 				continue
 			}
 		}
+		// A campaign message goes only to a customer who still wants it.
+		if m.Campaign {
+			wanted, why, err := workshop.CampaignMessageStillWanted(ctx, s.pool, shop, m.ID)
+			if err != nil {
+				s.log.Error("recheck a campaign message", "message", m.ID, "error", err)
+				continue
+			}
+			if !wanted {
+				if err := workshop.MessageCancelled(ctx, s.pool, shop, m.ID, why); err != nil {
+					s.log.Error("record a cancelled campaign message", "message", m.ID, "error", err)
+				}
+				continue
+			}
+		}
 		sender := s.email
 		if m.Channel == "sms" {
 			sender = s.sms

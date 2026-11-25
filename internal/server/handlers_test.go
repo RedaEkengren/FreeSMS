@@ -55,6 +55,7 @@ const (
 	tyreB       = "bbbbbbbb-0000-0000-0000-000000000018"
 	placeB      = "bbbbbbbb-0000-0000-0000-000000000019"
 	extraB      = "bbbbbbbb-0000-0000-0000-00000000001a"
+	campaignB   = "bbbbbbbb-0000-0000-0000-00000000001b"
 
 	// A string that appears nowhere in shop A. If it reaches a response body,
 	// something leaked, whatever the status code said.
@@ -181,6 +182,7 @@ func testServerOn(t *testing.T, pool *pgxpool.Pool) (*httptest.Server, *pgxpool.
 		 ('` + tyreSetB + `','` + shopB + `','` + customerB + `','summer','` + secretB + `','alloy')`,
 		`INSERT INTO storage_locations (id, shop_id, name, capacity) VALUES ('` + placeB + `','` + shopB + `','` + secretB + `',5)`,
 		`INSERT INTO tyre_extras (id, shop_id, name, per, line_kind) VALUES ('` + extraB + `','` + shopB + `','` + secretB + `','tyre','labour')`,
+		`INSERT INTO tyre_campaigns (id, shop_id, name, season, body) VALUES ('` + campaignB + `','` + shopB + `','` + secretB + `','summer','x')`,
 		`INSERT INTO tyre_extra_events (shop_id, extra_id, kind, unit_price_minor, vat_rate_basis) VALUES ('` + shopB + `','` + extraB + `','priced',1000,2500)`,
 		`INSERT INTO tyres (id, shop_id, tyre_set_id, position, dimension) VALUES
 		 ('` + tyreB + `','` + shopB + `','` + tyreSetB + `','front_left','205/55R16')`,
