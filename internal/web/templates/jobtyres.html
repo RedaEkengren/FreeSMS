@@ -34,4 +34,13 @@
   <label><span>{{.T "Why, if there is no place or a tyre was not measured"}}</span><input name="why" maxlength="300"></label>
   <button type="submit">{{.T "Take it in"}}</button>
 </form>
+
+{{if .TyreExtras}}
+<h2>{{.T "Add an extra"}}</h2>
+<form method="post" action="/jobs/{{.Job.ID}}/tyres/extra">
+  <label><span>{{.T "Extra"}}</span><select name="extra">{{range .TyreExtras}}{{if .Active}}<option value="{{.ID}}">{{.Name}} &middot; {{$.Money .UnitPriceMinor}} {{if eq .Per "tyre"}}{{$.T "per tyre"}}{{else}}{{$.T "per set"}}{{end}}</option>{{end}}{{end}}</select></label>
+  <label><span>{{.T "How many tyres or sets"}}</span><input name="count" inputmode="numeric" value="4" maxlength="3" required></label>
+  <button type="submit">{{.T "Add it to the job"}}</button>
+</form>
+{{end}}
 {{end}}

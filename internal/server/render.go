@@ -146,6 +146,7 @@ type pageData struct {
 	Places                     []workshop.StorageLocation
 	TreadLimit                 int
 	JobTyreMoves               []workshop.JobTyreMove
+	TyreExtras                 []workshop.TyreExtra
 	StorageLabels              []storageLabel
 	SetLabels                  []storageLabel
 	VehicleChanges             []workshop.Change

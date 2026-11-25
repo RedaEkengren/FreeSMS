@@ -9557,6 +9557,27 @@
     "Record the decision": {"other": "Registrera beslutet"},
     "for the period booked before, which no longer stands": {"other": "för den tidigare bokade perioden, som inte längre gäller"},
     "Wheels": {"other": "Hjul"},
-    "Wheels were fitted on this visit. Have the wheel bolts tightened again after about 50 km.": {"other": "Hjul monterades vid det här besöket. Låt dra åt hjulbultarna igen efter cirka 50 km."}
+    "Wheels were fitted on this visit. Have the wheel bolts tightened again after about 50 km.": {"other": "Hjul monterades vid det här besöket. Låt dra åt hjulbultarna igen efter cirka 50 km."},
+    "Tyre extras": {"other": "Däcktillval"},
+    "an extra has a name of 1 to 100 characters, not used by another, charged per tyre or per set, with a price and a VAT rate": {"other": "ett tillval har ett namn på 1 till 100 tecken som inte används av ett annat, debiteras per däck eller per uppsättning och har ett pris och en momssats"},
+    "an extra is added for from 1 to 100 tyres or sets": {"other": "ett tillval läggs till för 1 till 100 däck eller uppsättningar"},
+    "that extra is no longer offered": {"other": "det tillvalet erbjuds inte längre"},
+    "Add it to the job": {"other": "Lägg till på jobbet"},
+    "Extra": {"other": "Tillval"},
+    "How many tyres or sets": {"other": "Hur många däck eller uppsättningar"},
+    "Name, such as balancing or new valves": {"other": "Namn, till exempel balansering eller nya ventiler"},
+    "Offer again": {"other": "Erbjud igen"},
+    "Offer an extra": {"other": "Erbjud ett tillval"},
+    "Offer it": {"other": "Erbjud det"},
+    "Set the price": {"other": "Sätt priset"},
+    "Shown on the invoice as": {"other": "Visas på fakturan som"},
+    "Stop offering": {"other": "Sluta erbjuda"},
+    "VAT in per cent": {"other": "Moms i procent"},
+    "What the shop sells with a tyre change. A price changed here does not reach lines already on a job.": {"other": "Det verkstaden säljer till ett däckbyte. Ett pris som ändras här når inte rader som redan ligger på ett jobb."},
+    "not offered": {"other": "erbjuds inte"},
+    "per set": {"other": "per uppsättning"},
+    "per tyre": {"other": "per däck"},
+    "that price did not parse": {"other": "det priset gick inte att tolka"},
+    "that VAT rate did not parse": {"other": "den momssatsen gick inte att tolka"}
   }
 }

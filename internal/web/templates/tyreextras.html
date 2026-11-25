@@ -1,0 +1,34 @@
+{{define "content"}}
+<h1>{{.T "Tyre extras"}}</h1>
+<p class="waiting">{{.T "What the shop sells with a tyre change. A price changed here does not reach lines already on a job."}}</p>
+{{if .TyreExtras}}
+<ul class="lines">
+  {{range .TyreExtras}}
+  <li><div class="row"><span>{{.Name}}{{if not .Active}} <span class="tag">{{$.T "not offered"}}</span>{{end}}</span>
+      <span class="tag">{{$.Money .UnitPriceMinor}} {{if eq .Per "tyre"}}{{$.T "per tyre"}}{{else}}{{$.T "per set"}}{{end}}</span></div>
+    {{if $.Session.Scope.Role.RunsTheShop}}
+    <form method="post" action="/tyres/extras/{{.ID}}/price">
+      <label><span>{{$.T "Price"}}</span><input name="price" inputmode="decimal" required></label>
+      <label><span>{{$.T "VAT in per cent"}}</span><input name="vat" inputmode="decimal" value="25" required></label>
+      <button type="submit" class="secondary">{{$.T "Set the price"}}</button>
+    </form>
+    <form method="post" action="/tyres/extras/{{.ID}}/use">
+      {{if .Active}}<button type="submit" name="use" value="0" class="secondary">{{$.T "Stop offering"}}</button>
+      {{else}}<button type="submit" name="use" value="1" class="secondary">{{$.T "Offer again"}}</button>{{end}}
+    </form>{{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}<p class="empty">{{.T "No extras yet."}}</p>{{end}}
+{{if .Session.Scope.Role.RunsTheShop}}
+<h2>{{.T "Offer an extra"}}</h2>
+<form method="post" action="/tyres/extras">
+  <label><span>{{.T "Name, such as balancing or new valves"}}</span><input name="name" maxlength="100" required></label>
+  <label><span>{{.T "Charged"}}</span><select name="per"><option value="tyre">{{.T "per tyre"}}</option><option value="set">{{.T "per set"}}</option></select></label>
+  <label><span>{{.T "Shown on the invoice as"}}</span><select name="kind"><option value="labour">{{.T "labour"}}</option><option value="part">{{.T "part"}}</option><option value="fee">{{.T "fee"}}</option></select></label>
+  <label><span>{{.T "Price"}}</span><input name="price" inputmode="decimal" required></label>
+  <label><span>{{.T "VAT in per cent"}}</span><input name="vat" inputmode="decimal" value="25" required></label>
+  <button type="submit">{{.T "Offer it"}}</button>
+</form>
+{{end}}
+{{end}}
