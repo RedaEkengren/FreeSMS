@@ -9712,6 +9712,9 @@
     "Out on a rental": {"other": "Uthyrd"},
     "On a test drive": {"other": "På provkörning"},
     "Being delivered": {"other": "Under leverans"},
-    "At service": {"other": "På service"}
+    "At service": {"other": "På service"},
+    "the case has no car with a registration to open a job on": {"other": "ärendet har ingen bil med registreringsnummer att öppna ett jobb på"},
+    "Job %d": {"other": "Jobb %d"},
+    "Open a workshop job on this car": {"other": "Öppna ett verkstadsjobb på den här bilen"}
   }
 }

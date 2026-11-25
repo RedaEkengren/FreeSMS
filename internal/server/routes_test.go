@@ -270,7 +270,7 @@ var swept = map[string]string{
 	"POST /cars/stock/{id}/reserve":              "sweep", "POST /cars/stock/{id}/reservations/{res}/extend": "sweep",
 	"POST /cars/stock/{id}/reservations/{res}/deposit": "sweep", "POST /cars/stock/{id}/reservations/{res}/end": "sweep",
 	"POST /cars/stock/{id}/reservations/{res}/terms": "sweep",
-	"GET /rental/damage/{id}":                        "sweep", "POST /rental/damage/{id}/steps": "sweep",
+	"GET /rental/damage/{id}":                        "sweep", "POST /rental/damage/{id}/steps": "sweep", "POST /rental/damage/{id}/job": "sweep",
 	"POST /rental/bookings/{id}/deposit/{what}": "sweep",
 	"POST /rental/charge-classes":               "sweep", "POST /rental/bookings/{id}/charges": "sweep",
 	"POST /rental/bookings/{id}/charges/{charge}/{what}": "sweep",

@@ -20,6 +20,21 @@ func (rentalData) DamageChannels() []string    { return workshop.DamageChannels 
 func (rentalData) DamageResponses() []string   { return workshop.DamageResponses }
 func (rentalData) DamageOutcomes() []string    { return workshop.DamageOutcomes }
 
+// handleRentalDamageJob opens a workshop job on the car from the damage case.
+func (s *Server) handleRentalDamageJob(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	job, err := workshop.CreateDamageJob(r.Context(), s.pool, session.Scope, r.PathValue("id"))
+	if errors.Is(err, workshop.ErrInvalid) {
+		s.rentalDamagePage(w, r, http.StatusBadRequest, trimInvalid(err))
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/jobs/"+job, http.StatusSeeOther)
+}
+
 func (s *Server) handleRentalDamage(w http.ResponseWriter, r *http.Request) {
 	s.rentalDamagePage(w, r, http.StatusOK, "")
 }
@@ -30,7 +45,8 @@ func (s *Server) rentalDamagePage(w http.ResponseWriter, r *http.Request, status
 	if s.handoverError(w, r, err) {
 		return
 	}
-	s.render(w, r, status, "rentaldamage", pageData{Title: "Damage case", Session: session, Rental: rentalData{DamageCase: c}, Error: msg})
+	jobs, _ := workshop.DamageJobsOf(r.Context(), s.pool, session.Scope, c.ID)
+	s.render(w, r, status, "rentaldamage", pageData{Title: "Damage case", Session: session, Rental: rentalData{DamageCase: c, DamageJobs: jobs}, Error: msg})
 }
 
 // handleRentalDamageStep records the next step of the case.

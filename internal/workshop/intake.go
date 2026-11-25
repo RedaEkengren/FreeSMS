@@ -363,6 +363,12 @@ func TakeInWalkIn(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, i
 
 // takeInTx opens the job, inside whatever transaction the caller holds.
 func takeInTx(ctx context.Context, tx pgx.Tx, scope access.Scope, registration, complaint string, odometerKm *int64, d Details) (string, error) {
+	return takeInForTx(ctx, tx, scope, registration, complaint, odometerKm, d, "")
+}
+
+// takeInForTx is takeInTx for a job that is for a customer chosen by the
+// caller, not found from the car's owner: the shop's own, for its own cars.
+func takeInForTx(ctx context.Context, tx pgx.Tx, scope access.Scope, registration, complaint string, odometerKm *int64, d Details, customer string) (string, error) {
 	normalised := NormaliseRegistration(registration)
 	var jobID string
 	var vehicleID string
@@ -404,7 +410,9 @@ func takeInTx(ctx context.Context, tx pgx.Tx, scope access.Scope, registration, 
 	err := tx.QueryRow(ctx, `
 		SELECT customer_id FROM vehicle_ownership
 		WHERE vehicle_id = $1 AND owned_to IS NULL`, vehicleID).Scan(&owner)
-	if err == nil {
+	if customer != "" {
+		customerID = &customer
+	} else if err == nil {
 		customerID = &owner
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return "", fmt.Errorf("look up owner: %w", err)

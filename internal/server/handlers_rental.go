@@ -23,6 +23,7 @@ var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "renta
 
 // rentalData is what Rental's pages are given.
 type rentalData struct {
+	DamageJobs []workshop.DamageJob
 	Permits    []workshop.RentalPermit
 	Profiles   []workshop.RentalProfile
 	Checklists []workshop.ChecklistTemplate
@@ -205,6 +206,7 @@ func (rentalData) HasCategory(p workshop.RentalProfile, c string) bool {
 func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("GET /rental/damage/{id}", s.requireSession(s.handleRentalDamage))
 	m.HandleFunc("POST /rental/damage/{id}/steps", s.requireSession(s.handleRentalDamageStep))
+	m.HandleFunc("POST /rental/damage/{id}/job", s.requireSession(s.handleRentalDamageJob))
 	m.HandleFunc("POST /rental/bookings/{id}/deposit/{what}", s.requireSession(s.handleRentalDeposit))
 	m.HandleFunc("GET /rental", s.requireSession(s.handleRentalUnits))
 	m.HandleFunc("GET /rental/units/lookup", s.requireSession(s.handleRentalUnitLookup))
