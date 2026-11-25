@@ -485,12 +485,17 @@ type DamageCase struct {
 	FoundIn string
 }
 
-// openDamageTx is the unit's damage register: every case not yet
-// repaired. (#197 adds repair; until then every case is open.)
+// openDamageTx is the unit's damage register: every case not yet repaired. A
+// case is repaired when a job opened for it (#204) is ready, invoiced or closed;
+// it keeps its row and its history, and a scratch in the same place afterwards
+// is a new damage, not the old one.
 func openDamageTx(ctx context.Context, tx pgx.Tx, resource string) ([]DamageCase, error) {
 	rows, err := tx.Query(ctx, `
 		SELECT id::text, coalesce(item_key, ''), description, state, observed_at, coalesce(booking_id::text, ''), found_in::text
-		FROM damage_cases WHERE resource_id = $1 ORDER BY observed_at, id`, resource)
+		FROM damage_cases d WHERE d.resource_id = $1
+		  AND NOT EXISTS (SELECT 1 FROM damage_case_jobs j JOIN work_orders w ON w.id = j.work_order_id
+		                  WHERE j.case_id = d.id AND w.state IN ('ready', 'invoiced', 'closed'))
+		ORDER BY observed_at, id`, resource)
 	if err != nil {
 		return nil, fmt.Errorf("read the damage register: %w", err)
 	}
