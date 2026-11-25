@@ -13,6 +13,7 @@
   <label><span>{{.T "Minutes per set"}}</span><input name="minutes" inputmode="numeric" value="{{.ChangeSettings.MinutesPerSet}}" maxlength="3" required></label>
   <label><span>{{.T "Sets a day can hold"}}</span><input name="per_day" inputmode="numeric" value="{{.ChangeSettings.SetsPerDay}}" maxlength="3" required></label>
   <label><span>{{.T "Days before a customer who has not booked is followed up"}}</span><input name="follow_up" inputmode="numeric" value="{{.ChangeSettings.FollowUpDays}}" maxlength="2" required></label>
+  <label><span>{{.T "Days with nothing before a set is listed as possibly left"}}</span><input name="abandon" inputmode="numeric" value="{{.ChangeSettings.AbandonDays}}" maxlength="4" required></label>
   <button type="submit">{{.T "Save"}}</button>
 </form>
 {{end}}

@@ -32,14 +32,39 @@ func (s *Server) handleTyres(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleTyreSet(w http.ResponseWriter, r *http.Request) {
+	s.renderTyreSet(w, r, "")
+}
+
+// renderTyreSet draws a set's page. An agreement link just made is shown on it
+// once, as the address to give the owner; it is not kept anywhere readable.
+func (s *Server) renderTyreSet(w http.ResponseWriter, r *http.Request, shareURL string) {
 	session := sessionFrom(r.Context())
 	set, err := workshop.TyreSetByID(r.Context(), s.pool, session.Scope, r.PathValue("id"))
 	if s.handoverError(w, r, err) {
 		return
 	}
-	pd := pageData{Title: "A set of tyres", Session: session, TyreSet: set}
+	pd := pageData{Title: "A set of tyres", Session: session, TyreSet: set, ShareURL: shareURL}
 	if at, err := workshop.TyreChangeOf(r.Context(), s.pool, session.Scope, set.ID); err == nil && at != nil {
 		pd.ChangeBookedAt = *at
+	}
+	if x, err := workshop.TyreSetExitOf(r.Context(), s.pool, session.Scope, set.ID); err == nil {
+		pd.SetExit = x
+	}
+	if session.Scope.Role.SeesCustomerPersonalData() {
+		if rows, err := workshop.SetAgreementsOf(r.Context(), s.pool, session.Scope, set.ID); err == nil {
+			pd.SetAgreements = rows
+		}
+		if extras, err := workshop.TyreExtras(r.Context(), s.pool, session.Scope); err == nil {
+			pd.TyreExtras = extras
+		}
+		// Who a set may be handed to: the customers matching a search.
+		if found, err := workshop.BrowseCustomers(r.Context(), s.pool, session.Scope, r.URL.Query().Get("find")); err == nil {
+			for _, c := range found {
+				if c.ID != set.CustomerID {
+					pd.Customers = append(pd.Customers, c)
+				}
+			}
+		}
 	}
 	if places, err := workshop.StorageLocations(r.Context(), s.pool, session.Scope); err == nil {
 		pd.Places = places
@@ -542,8 +567,15 @@ func (s *Server) handleTyreChanges(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleTyreChangeSettings(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
+	// Left out of the form, the number of days before a set may be called left is kept.
+	abandon := formInt(r, "abandon")
+	if abandon == 0 {
+		if cur, err := workshop.TyreChangeSettingsOf(r.Context(), s.pool, session.Scope); err == nil {
+			abandon = cur.AbandonDays
+		}
+	}
 	err := workshop.SetTyreChangeSettings(r.Context(), s.pool, session.Scope, workshop.TyreChangeSettings{
-		MinutesPerSet: formInt(r, "minutes"), SetsPerDay: formInt(r, "per_day"), FollowUpDays: formInt(r, "follow_up")})
+		MinutesPerSet: formInt(r, "minutes"), SetsPerDay: formInt(r, "per_day"), FollowUpDays: formInt(r, "follow_up"), AbandonDays: abandon})
 	if s.handoverError(w, r, err) {
 		return
 	}
@@ -639,4 +671,87 @@ func (s *Server) handleJobStorageFee(w http.ResponseWriter, r *http.Request) {
 	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/jobs/"+r.PathValue("id")+"/tyres", http.StatusSeeOther)
+}
+
+func (s *Server) handleCollectTyreSet(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	err := workshop.CollectTyreSet(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("by"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/tyres/"+r.PathValue("id"), http.StatusSeeOther)
+}
+
+// handleSetAgreementAsk asks the owner for a yes by a link, shown once, or
+// records one that was given on a signed note.
+func (s *Server) handleSetAgreementAsk(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	id, kind, to := r.PathValue("id"), r.FormValue("kind"), r.FormValue("to")
+	if note := strings.TrimSpace(r.FormValue("note")); note != "" {
+		if _, err := workshop.RecordSetAgreement(r.Context(), s.pool, session.Scope, id, kind, to, note); s.handoverError(w, r, err) {
+			return
+		}
+		s.submitted(w, r)
+		http.Redirect(w, r, "/tyres/"+id, http.StatusSeeOther)
+		return
+	}
+	token, err := workshop.RequestSetAgreement(r.Context(), s.pool, session.Scope, id, kind, to)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.renderTyreSet(w, r, s.baseURL+"/a/"+token)
+}
+
+func (s *Server) handleTransferTyreSet(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	fresh, err := workshop.TransferTyreSet(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("agreement"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/tyres/"+fresh, http.StatusSeeOther)
+}
+
+func (s *Server) handleDisposeTyreSet(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	err := workshop.DisposeTyreSet(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("agreement"), r.FormValue("job"), r.FormValue("fee"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/tyres/"+r.PathValue("id"), http.StatusSeeOther)
+}
+
+func (s *Server) handleAbandoned(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	list, err := workshop.AbandonedSets(r.Context(), s.pool, session.Scope)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "abandoned", pageData{Title: "Sets that may have been left", Session: session, Abandoned: list})
+}
+
+// handleSetAgreementPage is the owner's link: what is asked, and yes or no.
+func (s *Server) handleSetAgreementPage(w http.ResponseWriter, r *http.Request) {
+	v, err := workshop.SetAgreement(r.Context(), s.pool, s.shop(), r.PathValue("token"))
+	if s.supplierRefused(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "agreement", pageData{
+		Locale: s.shopLocale(r), Title: "Your tyres", AgreementView: v, ShareToken: r.PathValue("token"),
+	})
+}
+
+func (s *Server) handleSetAgreementAnswer(w http.ResponseWriter, r *http.Request) {
+	err := workshop.AnswerSetAgreement(r.Context(), s.pool, s.shop(), r.PathValue("token"), r.FormValue("answer") == "yes")
+	if errors.Is(err, workshop.ErrShareNotUsable) {
+		// Answered already, or closed: look again rather than a dead end.
+		http.Redirect(w, r, "/a/"+r.PathValue("token"), http.StatusSeeOther)
+		return
+	}
+	if s.supplierRefused(w, r, err) {
+		return
+	}
+	http.Redirect(w, r, "/a/"+r.PathValue("token"), http.StatusSeeOther)
 }

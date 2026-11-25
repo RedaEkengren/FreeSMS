@@ -76,6 +76,9 @@ func lastHoldTx(ctx context.Context, tx pgx.Tx, setID string) (job string, err e
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "tyreset:"+setID); err != nil {
 		return "", err
 	}
+	if err := setLiveTx(ctx, tx, setID); err != nil {
+		return "", err
+	}
 	var kind, wo string
 	err = tx.QueryRow(ctx, `SELECT kind, work_order_id FROM tyre_job_moves WHERE tyre_set_id = $1 ORDER BY seq DESC LIMIT 1`, setID).Scan(&kind, &wo)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && kind != "checked_out") {

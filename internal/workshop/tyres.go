@@ -210,6 +210,9 @@ func CreateTyreSet(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 }
 
 func putTyreSetTx(ctx context.Context, tx pgx.Tx, scope access.Scope, setID, vehicleID string) error {
+	if err := setLiveTx(ctx, tx, setID); err != nil {
+		return err
+	}
 	_, err := tx.Exec(ctx, `INSERT INTO tyre_set_vehicle_events (shop_id, tyre_set_id, vehicle_id, by_user) VALUES ($1, $2, NULLIF($3, '')::uuid, NULLIF($4, '')::uuid)`,
 		scope.ShopID, setID, vehicleID, scope.UserID)
 	return err
@@ -238,6 +241,9 @@ func ReplaceTyre(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, ty
 		}
 		// The set is locked, so two replacements of one tyre are told apart.
 		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, set); err != nil {
+			return err
+		}
+		if err := setLiveTx(ctx, tx, set); err != nil {
 			return err
 		}
 		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM tyres r WHERE r.replaces_id = $1)`, tyreID).Scan(&replaced); err != nil {

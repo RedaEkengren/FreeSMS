@@ -1,0 +1,19 @@
+{{define "content"}}
+{{/* What the owner of a set is sent: the shop, the set and one question. No
+     price, no other customer's name. */}}
+{{with .AgreementView}}
+  <h1>{{.Set}}</h1>
+  <p class="vehicle">{{.ShopName}}</p>
+  <div class="card">
+  {{if eq .Answered "agreed"}}<p class="status-big">{{$.T "Thank you. You have said yes."}}</p>
+  {{else if eq .Answered "declined"}}<p class="status-big">{{$.T "Thank you. You have said no."}}</p>
+  {{else}}
+    <p class="status-big">{{if eq .Kind "transfer"}}{{$.T "Do you agree that this set of tyres is handed over to another customer?"}}{{else}}{{$.T "Do you agree that this set of tyres is disposed of?"}}{{end}}</p>
+    <form method="post" action="/a/{{$.ShareToken}}/answer">
+      <button type="submit" name="answer" value="yes">{{$.T "Yes, I agree"}}</button>
+      <button type="submit" name="answer" value="no" class="secondary">{{$.T "No"}}</button>
+    </form>
+  {{end}}
+  </div>
+{{end}}
+{{end}}

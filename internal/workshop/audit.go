@@ -66,6 +66,9 @@ var AuditedTransitions = []AuditTransition{
 	// (#228).
 	{"tyre_set.placed", "tyre_set", "audit_events", false},
 	{"tyre_set.taken_out", "tyre_set", "audit_events", false},
+	{"tyre_set.collected", "tyre_set", "audit_events", false},
+	{"tyre_set.transferred", "tyre_set", "audit_events", false},
+	{"tyre_set.disposed", "tyre_set", "audit_events", false},
 	// Dealer
 	// A car's cycle through stock (#160): opened, and every move of its
 	// deal; ending one without a sale says why (MoveStockUnit).

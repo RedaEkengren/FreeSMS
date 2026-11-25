@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -636,4 +637,83 @@ func TestAStorageFeeIsChargedOnAJobOrInvoicedOnceAPeriod(t *testing.T) {
 		t.Errorf("choosing the billing answered %d", status)
 	}
 	_ = winter
+}
+
+// The owner is asked on a link shown once, answers without signing in, and the
+// set is then disposed of with its fee on the job; the technician hands a set
+// out at the counter but cannot ask or dispose.
+func TestASetIsDisposedOfAfterTheOwnerSaysYesOnTheirLink(t *testing.T) {
+	ts, pool := testServer(t)
+	const customer = "aaaaaaaa-0000-0000-0000-000000000004"
+	const job = "aaaaaaaa-0000-0000-0000-00000000000f"
+	ctx := context.Background()
+	owner, advisor, tech := signIn(t, ts, ownerEmail), signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	postStatus(t, owner, ts.URL+"/storage", url.Values{"name": {"Rack"}, "capacity": {"3"}})
+	var rack, set, fee string
+	_ = pool.QueryRow(ctx, `SELECT id FROM storage_locations WHERE name = 'Rack'`).Scan(&rack)
+	if err := pool.QueryRow(ctx, `INSERT INTO tyre_sets (shop_id, customer_id, season, brand, rims) VALUES ($1, $2, 'summer', 'Michelin', 'alloy') RETURNING id::text`, shopA, customer).Scan(&set); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO tyres (shop_id, tyre_set_id, position, dimension) VALUES ($1, $2, 'front_left', '205/55R16')`, shopA, set); err != nil {
+		t.Fatal(err)
+	}
+	postStatus(t, tech, ts.URL+"/tyres/"+set+"/place", url.Values{"place": {rack}})
+	postStatus(t, owner, ts.URL+"/tyres/extras", url.Values{"name": {"Disposal"}, "per": {"tyre"}, "kind": {"fee"}, "price": {"50"}, "vat": {"25"}})
+	_ = pool.QueryRow(ctx, `SELECT id::text FROM tyre_extras WHERE name = 'Disposal'`).Scan(&fee)
+
+	if status := postStatus(t, tech, ts.URL+"/tyres/"+set+"/agreement", url.Values{"kind": {"disposal"}}); status != http.StatusForbidden {
+		t.Errorf("a technician asking for an agreement answered %d", status)
+	}
+	page := get(t, advisor, ts.URL+"/tyres/"+set, http.StatusOK)
+	if strings.Contains(visibleText(page), "Give the owner this address") {
+		t.Error("an address is shown before one was made")
+	}
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/tyres/"+set+"/agreement", strings.NewReader(url.Values{"kind": {"disposal"}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", ts.URL)
+	resp, err := advisor.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	m := regexp.MustCompile(`/a/([A-Za-z0-9_-]{20,})`).FindSubmatch(body)
+	if resp.StatusCode != http.StatusOK || m == nil {
+		t.Fatalf("asking answered %d and showed no address:\n%s", resp.StatusCode, visibleText(string(body)))
+	}
+	token := string(m[1])
+	if again := get(t, advisor, ts.URL+"/tyres/"+set, http.StatusOK); strings.Contains(again, token) {
+		t.Error("the owner's address is shown again after the first time")
+	}
+
+	anon := &http.Client{}
+	if q := visibleText(get(t, anon, ts.URL+"/a/"+token, http.StatusOK)); !strings.Contains(q, "disposed of") || strings.Contains(q, customerName) {
+		t.Errorf("the owner's page:\n%s", q)
+	}
+	get(t, anon, ts.URL+"/a/not-a-token", http.StatusNotFound)
+	var agreement string
+	_ = pool.QueryRow(ctx, `SELECT id::text FROM tyre_set_agreements WHERE tyre_set_id = $1`, set).Scan(&agreement)
+	dispose := url.Values{"agreement": {agreement}, "job": {job}, "fee": {fee}}
+	if status := postStatus(t, advisor, ts.URL+"/tyres/"+set+"/dispose", dispose); status != http.StatusBadRequest {
+		t.Errorf("disposing before the owner answered gave %d", status)
+	}
+	if status := postStatus(t, anon, ts.URL+"/a/"+token+"/answer", url.Values{"answer": {"yes"}}); status != http.StatusSeeOther {
+		t.Fatalf("the owner's yes answered %d", status)
+	}
+	if status := postStatus(t, tech, ts.URL+"/tyres/"+set+"/dispose", dispose); status != http.StatusForbidden {
+		t.Errorf("a technician disposing answered %d", status)
+	}
+	if status := postStatus(t, advisor, ts.URL+"/tyres/"+set+"/dispose", dispose); status != http.StatusSeeOther {
+		t.Fatalf("disposing answered %d", status)
+	}
+	var qty, price int64
+	if err := pool.QueryRow(ctx, `SELECT (quantity * 1000)::bigint, unit_price_minor FROM work_order_lines WHERE work_order_id = $1 AND description = 'Disposal'`, job).Scan(&qty, &price); err != nil || qty != 1000 || price != 5000 {
+		t.Errorf("the fee line: %d at %d, %v", qty, price, err)
+	}
+	if p := visibleText(get(t, tech, ts.URL+"/tyres/"+set, http.StatusOK)); !strings.Contains(p, "Disposed of on") || strings.Contains(p, "Record the collection") {
+		t.Errorf("the set after disposal:\n%s", p)
+	}
+	if status := postStatus(t, tech, ts.URL+"/tyres/"+set+"/collect", url.Values{"by": {"Somebody"}}); status != http.StatusBadRequest {
+		t.Errorf("collecting a disposed set answered %d", status)
+	}
 }
