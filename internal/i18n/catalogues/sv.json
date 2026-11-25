@@ -9578,6 +9578,7 @@
     "per set": {"other": "per uppsättning"},
     "per tyre": {"other": "per däck"},
     "that price did not parse": {"other": "det priset gick inte att tolka"},
-    "that VAT rate did not parse": {"other": "den momssatsen gick inte att tolka"}
+    "that VAT rate did not parse": {"other": "den momssatsen gick inte att tolka"},
+    "a tyre set is not stored and placed yet: a set the job took out is not fitted or put back, or the set that came off the car is not checked in": {"other": "en däckuppsättning är inte lagrad och placerad ännu: en uppsättning som jobbet tog ut är varken monterad eller återlagd, eller så är uppsättningen som kom av bilen inte intagen"}
   }
 }

@@ -310,3 +310,30 @@ func JobTyreMoves(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, j
 	})
 	return out, err
 }
+
+// errTyresLoose is a car that cannot be called ready while a tyre set the job
+// took out is neither on the car nor back in a place, or the set that came off
+// has not been taken in.
+var errTyresLoose = fmt.Errorf("%w: a tyre set is not stored and placed yet: a set the job took out is not fitted or put back, or the set that came off the car is not checked in", ErrInvalid)
+
+// looseTyresTx says whether a tyre change on the job is unfinished. Only a job
+// with tyre moves is asked: a set the job holds and has not fitted or put
+// back, or, once a set is fitted, another set still counted as on the car.
+func looseTyresTx(ctx context.Context, tx pgx.Tx, jobID string) (bool, error) {
+	var loose bool
+	err := tx.QueryRow(ctx, `
+		SELECT EXISTS (
+		    SELECT 1 FROM (SELECT DISTINCT tyre_set_id FROM tyre_job_moves WHERE work_order_id = $1) s
+		    WHERE EXISTS (SELECT 1 FROM (SELECT m.kind, m.work_order_id FROM tyre_job_moves m WHERE m.tyre_set_id = s.tyre_set_id ORDER BY m.seq DESC LIMIT 1) last
+		                  WHERE last.kind = 'checked_out' AND last.work_order_id = $1)
+		) OR (
+		    EXISTS (SELECT 1 FROM tyre_job_moves WHERE work_order_id = $1 AND kind = 'fitted')
+		    AND EXISTS (
+		        SELECT 1 FROM tyre_sets ts
+		        JOIN work_orders w ON w.id = $1
+		        WHERE ts.id NOT IN (SELECT tyre_set_id FROM tyre_job_moves WHERE work_order_id = $1 AND kind = 'fitted')
+		          AND (SELECT e.vehicle_id FROM tyre_set_vehicle_events e WHERE e.tyre_set_id = ts.id ORDER BY e.seq DESC LIMIT 1) = w.vehicle_id
+		    )
+		)`, jobID).Scan(&loose)
+	return loose, err
+}

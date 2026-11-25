@@ -314,3 +314,52 @@ func TestTyreMovesOnAJobAreRefusedWhereTheyShouldBe(t *testing.T) {
 		t.Errorf("a set returned on a finished job: %v", err)
 	}
 }
+
+// A car with a tyre change on it is not ready while a set the job took out is
+// neither on the car nor back in a place, or while the set that came off has
+// not been taken in. A job with no tyre moves is not asked.
+func TestACarIsNotReadyWithATyreSetLoose(t *testing.T) {
+	pool := setup(t)
+	addTechnician(t, pool)
+	ctx := context.Background()
+	rack, shelf := aPlace(t, pool, "Rack", 2), aPlace(t, pool, "Shelf", 2)
+	winter := storedSet(t, pool, rack)
+	summer, err := workshop.CreateTyreSet(ctx, pool, advisor(), summerSet(customerA, vehicleA))
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := working(t, pool)
+	if err := workshop.CheckOutTyreSet(ctx, pool, technician(), job, winter); err != nil {
+		t.Fatal(err)
+	}
+	ready := func() error { return workshop.SetState(ctx, pool, advisor(), job, workshop.StateReady) }
+	if err := ready(); !errors.Is(err, workshop.ErrInvalid) {
+		t.Fatalf("ready with the set only taken out: %v", err)
+	}
+	if err := workshop.FitTyreSet(ctx, pool, technician(), job, winter); err != nil {
+		t.Fatal(err)
+	}
+	if err := ready(); !errors.Is(err, workshop.ErrInvalid) {
+		t.Fatalf("ready with the summer set still counted as on the car: %v", err)
+	}
+	measured(t, pool, summer)
+	if err := workshop.CheckInTyreSet(ctx, pool, technician(), job, summer, workshop.CheckIn{LocationID: shelf}); err != nil {
+		t.Fatal(err)
+	}
+	if err := ready(); err != nil {
+		t.Errorf("ready with every set placed: %v", err)
+	}
+
+	// A set taken out and put back is placed too.
+	other := working(t, pool)
+	spare := storedSet(t, pool, rack)
+	if err := workshop.CheckOutTyreSet(ctx, pool, technician(), other, spare); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ReturnTyreSet(ctx, pool, technician(), other, spare, rack); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.SetState(ctx, pool, advisor(), other, workshop.StateReady); err != nil {
+		t.Errorf("ready with the set put back: %v", err)
+	}
+}
