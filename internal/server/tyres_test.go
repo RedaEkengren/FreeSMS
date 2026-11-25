@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/RedaEkengren/FreeSMS/internal/workshop"
 )
@@ -516,5 +517,60 @@ func TestASeasonalCampaignIsPreviewedAndRunOnce(t *testing.T) {
 	}
 	if status := postStatus(t, tech, ts.URL+"/customers/"+customer+"/message-choice", url.Values{"choice": {"out"}}); status != http.StatusForbidden {
 		t.Errorf("a technician opting a customer out answered %d", status)
+	}
+}
+
+// A change is booked from the set's page, shows on it and on the days page,
+// and the technician sees neither the booking form nor the days.
+func TestAChangeIsBookedFromTheSetsPageAndShowsOnTheDays(t *testing.T) {
+	ts, pool := testServer(t)
+	const customer = "aaaaaaaa-0000-0000-0000-000000000004"
+	ctx := context.Background()
+	owner, advisor, tech := signIn(t, ts, ownerEmail), signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	postStatus(t, owner, ts.URL+"/storage", url.Values{"name": {"Rack"}, "capacity": {"3"}})
+	var rack, set string
+	_ = pool.QueryRow(ctx, `SELECT id FROM storage_locations WHERE name = 'Rack'`).Scan(&rack)
+	if err := pool.QueryRow(ctx, `INSERT INTO tyre_sets (shop_id, customer_id, season, brand, rims) VALUES ($1, $2, 'summer', 'Michelin', 'alloy') RETURNING id::text`, shopA, customer).Scan(&set); err != nil {
+		t.Fatal(err)
+	}
+	postStatus(t, tech, ts.URL+"/tyres/"+set+"/place", url.Values{"place": {rack}})
+
+	page := visibleText(get(t, advisor, ts.URL+"/tyres/"+set, http.StatusOK))
+	if !strings.Contains(page, "Book the change") {
+		t.Errorf("the set's page offers no booking:\n%s", page)
+	}
+	if page := visibleText(get(t, tech, ts.URL+"/tyres/"+set, http.StatusOK)); strings.Contains(page, "Book the change") {
+		t.Errorf("a technician is offered a booking:\n%s", page)
+	}
+	if status := postStatus(t, tech, ts.URL+"/tyres/"+set+"/book", url.Values{"when": {time.Now().AddDate(0, 0, 5).Format("2006-01-02") + "T10:00"}}); status != http.StatusForbidden {
+		t.Errorf("a technician booking answered %d", status)
+	}
+	if status := postStatus(t, advisor, ts.URL+"/tyres/"+set+"/book", url.Values{"when": {"someday"}}); status != http.StatusBadRequest {
+		t.Errorf("a day that is not one answered %d", status)
+	}
+	day := time.Now().AddDate(0, 0, 5)
+	if status := postStatus(t, advisor, ts.URL+"/tyres/"+set+"/book", url.Values{"when": {day.Format("2006-01-02") + "T10:00"}}); status != http.StatusSeeOther {
+		t.Fatalf("booking answered %d", status)
+	}
+	if status := postStatus(t, advisor, ts.URL+"/tyres/"+set+"/book", url.Values{"when": {day.Format("2006-01-02") + "T11:00"}}); status != http.StatusBadRequest {
+		t.Errorf("booking a set twice answered %d", status)
+	}
+	if page := visibleText(get(t, advisor, ts.URL+"/tyres/"+set, http.StatusOK)); !strings.Contains(page, "Booked for a change on") || strings.Contains(page, "Book the change") {
+		t.Errorf("the set's page after booking:\n%s", page)
+	}
+	if page := visibleText(get(t, advisor, ts.URL+"/tyres/changes", http.StatusOK)); !strings.Contains(page, "1 booked, 11 free") {
+		t.Errorf("the days page:\n%s", page)
+	}
+	if status := getStatus(t, tech, ts.URL+"/tyres/changes"); status != http.StatusForbidden {
+		t.Errorf("a technician reading the days answered %d", status)
+	}
+	if status := postStatus(t, advisor, ts.URL+"/tyres/changes/settings", url.Values{"minutes": {"20"}, "per_day": {"5"}, "follow_up": {"7"}}); status != http.StatusForbidden {
+		t.Errorf("the front desk changing the settings answered %d", status)
+	}
+	if status := postStatus(t, owner, ts.URL+"/tyres/changes/settings", url.Values{"minutes": {"20"}, "per_day": {"5"}, "follow_up": {"7"}}); status != http.StatusSeeOther {
+		t.Fatalf("the owner changing the settings answered %d", status)
+	}
+	if page := visibleText(get(t, owner, ts.URL+"/tyres/changes", http.StatusOK)); !strings.Contains(page, "1 booked, 4 free") {
+		t.Errorf("the days page after changing the settings:\n%s", page)
 	}
 }

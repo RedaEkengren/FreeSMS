@@ -9602,6 +9602,25 @@
     "The customer does not want seasonal messages": {"other": "Kunden vill inte ha säsongsmeddelanden"},
     "This customer has opted out of the shop's seasonal messages.": {"other": "Den här kunden har valt bort verkstadens säsongsmeddelanden."},
     "A seasonal message about your tyres": {"other": "Ett säsongsmeddelande om dina däck"},
-    "The customer opted out of messages before this went; nothing was sent.": {"other": "Kunden valde bort meddelanden innan det här gick; inget skickades."}
+    "The customer opted out of messages before this went; nothing was sent.": {"other": "Kunden valde bort meddelanden innan det här gick; inget skickades."},
+    "Tyre change": {"other": "Däckbyte"},
+    "Tyre change days": {"other": "Däckbytesdagar"},
+    "that day and time did not parse": {"other": "den dagen och tiden gick inte att tolka"},
+    "a change is booked for from 1 to 10 sets of one customer": {"other": "ett byte bokas för 1 till 10 uppsättningar som tillhör en kund"},
+    "a set is already booked for a change": {"other": "en uppsättning är redan bokad för byte"},
+    "a set takes from 5 to 240 minutes, a day holds from 1 to 500 sets, and a customer is followed up after from 1 to 90 days": {"other": "en uppsättning tar 5 till 240 minuter, en dag rymmer 1 till 500 uppsättningar och en kund följs upp efter 1 till 90 dagar"},
+    "from 1 to 120 days": {"other": "från 1 till 120 dagar"},
+    "that day cannot take that many more sets": {"other": "den dagen kan inte ta så många fler uppsättningar"},
+    "%d booked, %d free": {"other": "%d bokade, %d lediga"},
+    "Days before a customer who has not booked is followed up": {"other": "Dagar innan en kund som inte har bokat följs upp"},
+    "How a change is planned": {"other": "Hur ett byte planeras"},
+    "Minutes per set": {"other": "Minuter per uppsättning"},
+    "Sets a day can hold": {"other": "Uppsättningar en dag rymmer"},
+    "Sets booked for a change on each of the coming days, and how many more a day can hold.": {"other": "Uppsättningar som är bokade för byte under de kommande dagarna, och hur många fler en dag rymmer."},
+    "To ring: written to and not booked": {"other": "Att ringa: skrivet till och inte bokat"},
+    "Book a change": {"other": "Boka ett byte"},
+    "Book the change": {"other": "Boka bytet"},
+    "Booked for a change on %s": {"other": "Bokad för byte %s"},
+    "Day and time": {"other": "Dag och tid"}
   }
 }

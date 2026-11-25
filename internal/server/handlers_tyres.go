@@ -38,6 +38,9 @@ func (s *Server) handleTyreSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pd := pageData{Title: "A set of tyres", Session: session, TyreSet: set}
+	if at, err := workshop.TyreChangeOf(r.Context(), s.pool, session.Scope, set.ID); err == nil && at != nil {
+		pd.ChangeBookedAt = *at
+	}
 	if places, err := workshop.StorageLocations(r.Context(), s.pool, session.Scope); err == nil {
 		pd.Places = places
 	}
@@ -45,6 +48,16 @@ func (s *Server) handleTyreSet(w http.ResponseWriter, r *http.Request) {
 	if set.CustomerID != "" {
 		if card, err := workshop.CustomerByID(r.Context(), s.pool, session.Scope, set.CustomerID); err == nil {
 			pd.CustomerCard = card
+		}
+		// The owner's other sets in storage, to book for the same visit.
+		if session.Scope.Role.SeesCustomerPersonalData() {
+			if all, err := workshop.TyreSetsOf(r.Context(), s.pool, session.Scope, workshop.TyreFilter{CustomerID: set.CustomerID}); err == nil {
+				for _, o := range all {
+					if o.ID != set.ID && o.StoredIn != "" {
+						pd.OtherSets = append(pd.OtherSets, o)
+					}
+				}
+			}
 		}
 	}
 	s.render(w, r, http.StatusOK, "tyreset", pd)
@@ -488,4 +501,75 @@ func (s *Server) handleMessageChoice(w http.ResponseWriter, r *http.Request) {
 	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/customers/"+r.PathValue("id"), http.StatusSeeOther)
+}
+
+// campaignFollowUp is one campaign with the customers it wrote to who have not
+// booked.
+type campaignFollowUp struct {
+	Campaign workshop.Campaign
+	List     []workshop.ChangeFollowUp
+}
+
+func (s *Server) handleTyreChanges(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	days, err := workshop.TyreChangeDays(r.Context(), s.pool, session.Scope, time.Now(), 28)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	settings, err := workshop.TyreChangeSettingsOf(r.Context(), s.pool, session.Scope)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	pd := pageData{Title: "Tyre change days", Session: session, ChangeDays: days, ChangeSettings: settings}
+	if session.Scope.Role.SeesCustomerPersonalData() {
+		campaigns, err := workshop.Campaigns(r.Context(), s.pool, session.Scope)
+		if s.handoverError(w, r, err) {
+			return
+		}
+		for _, c := range campaigns {
+			list, err := workshop.CampaignFollowUp(r.Context(), s.pool, session.Scope, c.ID)
+			if s.handoverError(w, r, err) {
+				return
+			}
+			if len(list) > 0 {
+				pd.ChangeFollowUps = append(pd.ChangeFollowUps, campaignFollowUp{Campaign: c, List: list})
+			}
+		}
+	}
+	s.render(w, r, http.StatusOK, "tyrechanges", pd)
+}
+
+func (s *Server) handleTyreChangeSettings(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	err := workshop.SetTyreChangeSettings(r.Context(), s.pool, session.Scope, workshop.TyreChangeSettings{
+		MinutesPerSet: formInt(r, "minutes"), SetsPerDay: formInt(r, "per_day"), FollowUpDays: formInt(r, "follow_up")})
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/tyres/changes", http.StatusSeeOther)
+}
+
+// handleBookTyreChange books the set, and any others of the owner's that are
+// ticked, for a change on a day and time. What the calendar says is in the
+// shop's language: it is the shop's own entry.
+func (s *Server) handleBookTyreChange(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	starts, err := time.ParseInLocation("2006-01-02T15:04", strings.TrimSpace(r.FormValue("when")), s.shopLocation(r))
+	if err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "Not booked", "that day and time did not parse")
+		return
+	}
+	locale, _ := workshop.ShopLocale(r.Context(), s.pool, session.Scope.ShopID)
+	if locale == "" {
+		locale = s.locale
+	}
+	ids := append([]string{r.PathValue("id")}, r.Form["also"]...)
+	booking, err := workshop.BookTyreChange(r.Context(), s.pool, session.Scope, workshop.ChangeBooking{
+		SetIDs: ids, Starts: starts, What: s.catalogues.For(locale).T("Tyre change"), ConfirmedPast: r.FormValue("past") != ""})
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/bookings/"+booking, http.StatusSeeOther)
 }

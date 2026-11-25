@@ -1,0 +1,31 @@
+{{define "content"}}
+<h1>{{.T "Tyre change days"}}</h1>
+<p class="waiting">{{.T "Sets booked for a change on each of the coming days, and how many more a day can hold."}}</p>
+<ul class="lines">
+  {{range .ChangeDays}}
+  <li><div class="row"><span>{{$.Date .Date "Mon 2 Jan"}}</span>
+      <span class="tag{{if eq .Free 0}} late{{end}}">{{$.T "%d booked, %d free" .Booked .Free}}</span></div></li>
+  {{end}}
+</ul>
+{{if .Session.Scope.Role.RunsTheShop}}
+<h2>{{.T "How a change is planned"}}</h2>
+<form method="post" action="/tyres/changes/settings">
+  <label><span>{{.T "Minutes per set"}}</span><input name="minutes" inputmode="numeric" value="{{.ChangeSettings.MinutesPerSet}}" maxlength="3" required></label>
+  <label><span>{{.T "Sets a day can hold"}}</span><input name="per_day" inputmode="numeric" value="{{.ChangeSettings.SetsPerDay}}" maxlength="3" required></label>
+  <label><span>{{.T "Days before a customer who has not booked is followed up"}}</span><input name="follow_up" inputmode="numeric" value="{{.ChangeSettings.FollowUpDays}}" maxlength="2" required></label>
+  <button type="submit">{{.T "Save"}}</button>
+</form>
+{{end}}
+{{if .ChangeFollowUps}}
+<h2>{{.T "To ring: written to and not booked"}}</h2>
+{{range .ChangeFollowUps}}
+<h3>{{.Campaign.Name}}</h3>
+<ul class="lines">
+  {{range .List}}
+  <li><div class="row"><a href="/customers/{{.CustomerID}}/tyres">{{.Name}}</a><span class="tag">{{.Phone}}</span></div>
+    <div class="waiting">{{$.Date .WrittenAt "2 Jan 2006"}} &middot; {{range $i, $s := .Sets}}{{if $i}} &middot; {{end}}{{$s}}{{end}}</div></li>
+  {{end}}
+</ul>
+{{end}}
+{{end}}
+{{end}}

@@ -1,7 +1,7 @@
 {{define "content"}}
 <h1>{{.T "Tyre sets"}}</h1>
 <p class="waiting">{{.T "Every set the shop keeps or has fitted, the newest first. A set is taken in from its owner's page."}}</p>
-<p><a href="/storage">{{.T "Storage places"}}</a>{{if or .Session.Scope.Role.RunsTheShop .Session.Scope.Role.SeesCustomerPersonalData}} &middot; <a href="/tyres/extras">{{.T "Tyre extras"}}</a> &middot; <a href="/tyres/campaigns">{{.T "Seasonal campaigns"}}</a>{{end}}</p>
+<p><a href="/storage">{{.T "Storage places"}}</a>{{if or .Session.Scope.Role.RunsTheShop .Session.Scope.Role.SeesCustomerPersonalData}} &middot; <a href="/tyres/extras">{{.T "Tyre extras"}}</a> &middot; <a href="/tyres/campaigns">{{.T "Seasonal campaigns"}}</a> &middot; <a href="/tyres/changes">{{.T "Tyre change days"}}</a>{{end}}</p>
 {{if .Tyres}}
 <ul class="lines">
   {{range .Tyres}}
