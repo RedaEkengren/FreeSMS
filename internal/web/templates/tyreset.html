@@ -13,6 +13,17 @@
   <button type="submit" class="secondary">{{$.T "Save the place"}}</button>
 </form>
 
+{{if $.Session.Scope.Role.SeesCustomerPersonalData}}
+{{if not $.ChangeBookedAt.IsZero}}<p>{{$.T "Booked for a change on %s" ($.Date $.ChangeBookedAt "2 Jan 2006 15:04")}}</p>
+{{else if .StoredIn}}
+<h2>{{$.T "Book a change"}}</h2>
+<form method="post" action="/tyres/{{.ID}}/book">
+  <label><span>{{$.T "Day and time"}}</span><input type="datetime-local" name="when" required></label>
+  {{range $.OtherSets}}<label><input type="checkbox" name="also" value="{{.ID}}"> {{$.T .Season}} {{.Brand}} {{.Model}}</label>{{end}}
+  <button type="submit">{{$.T "Book the change"}}</button>
+</form>{{end}}
+{{end}}
+
 <h2>{{$.T "The tyres"}}</h2>
 <ul class="lines">
   {{range .Tyres}}

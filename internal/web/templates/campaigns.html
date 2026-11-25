@@ -1,0 +1,23 @@
+{{define "content"}}
+<h1>{{.T "Seasonal campaigns"}}</h1>
+<p class="waiting">{{.T "One message to every customer with a set in storage, once however many sets they have. Customers who opted out are left out."}}</p>
+{{if .Campaigns}}
+<ul class="lines">
+  {{range .Campaigns}}
+  <li><div class="row"><a href="/tyres/campaigns/{{.ID}}">{{.Name}}</a>
+      <span class="tag">{{$.T "%d customers reached" .Reached}}</span></div>
+    <div class="waiting">{{$.T .Season}} &middot; {{$.Date .CreatedAt "2 Jan 2006"}}</div></li>
+  {{end}}
+</ul>
+{{else}}<p class="empty">{{.T "No campaigns yet."}}</p>{{end}}
+{{if .Session.Scope.Role.RunsTheShop}}
+<h2>{{.T "Start a campaign"}}</h2>
+<form method="post" action="/tyres/campaigns">
+  <label><span>{{.T "Name"}}</span><input name="name" maxlength="100" required></label>
+  <label><span>{{.T "Sets in storage of"}}</span><select name="season"><option value="summer">{{.T "summer"}}</option><option value="winter">{{.T "winter"}}</option><option value="all_season">{{.T "all_season"}}</option></select></label>
+  <label><span>{{.T "Subject, for an email"}}</span><input name="subject" maxlength="200"></label>
+  <label><span>{{.T "The message. {sets} becomes the customer's own sets."}}</span><textarea name="body" maxlength="1200" rows="5" required></textarea></label>
+  <button type="submit">{{.T "Make the campaign"}}</button>
+</form>
+{{end}}
+{{end}}
