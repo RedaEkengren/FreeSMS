@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -307,5 +308,58 @@ func TestOneCardThatCannotBeReadIsTheOnlyOneMissing(t *testing.T) {
 	}
 	if got[running] {
 		t.Errorf("the card that cannot be read is shown: %v", got)
+	}
+}
+
+// The list shows each car's cover photograph and what holds it now, in the same
+// statement as everything else: a car out on a test drive says so, and a car on
+// the lot says nothing.
+func TestTheStockListShowsTheCoverPhotographAndWhatHoldsTheCar(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	unit := takeIn(t, pool, workshop.StockFromDefleet)
+	moveStock(t, pool, unit.ID, workshop.StockForSale)
+
+	list, err := workshop.Stock(ctx, pool, sales())
+	if err != nil || len(list.Rows) != 1 || list.Rows[0].CoverPhotoID != "" || list.Rows[0].Away != "" || list.Rows[0].AwayLabel() != "" {
+		t.Fatalf("a car with no photograph on the lot: %+v, %v", list.Rows, err)
+	}
+	first, err := workshop.AttachStockPhoto(ctx, pool, sales(), unit.ID, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "image/jpeg", 10, "a.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.AttachStockPhoto(ctx, pool, sales(), unit.ID, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "image/jpeg", 10, "b.jpg"); err != nil {
+		t.Fatal(err)
+	}
+	// A hold in the past or the future is not what holds it now.
+	for _, w := range [][2]time.Duration{{-5 * time.Hour, -3 * time.Hour}, {3 * time.Hour, 5 * time.Hour}} {
+		if _, err := workshop.BookResource(ctx, pool, sales(), workshop.ResourceBooking{
+			ResourceID: unit.ResourceID, Kind: workshop.BlockTestDrive, From: time.Now().Add(w[0]), To: time.Now().Add(w[1])}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	list, _ = workshop.Stock(ctx, pool, sales())
+	if list.Rows[0].CoverPhotoID != first.ID || list.Rows[0].Away != "" {
+		t.Errorf("the cover and nothing holding it: %+v", list.Rows[0])
+	}
+	// One that covers now and was let go holds nothing.
+	let, err := workshop.BookResource(ctx, pool, sales(), workshop.ResourceBooking{
+		ResourceID: unit.ResourceID, Kind: workshop.BlockTestDrive, From: time.Now().Add(-time.Hour), To: time.Now().Add(time.Hour)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ReleaseBlock(ctx, pool, sales(), let); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ = workshop.Stock(ctx, pool, sales()); list.Rows[0].Away != "" {
+		t.Errorf("a released block holds the car: %+v", list.Rows[0])
+	}
+	if _, err := workshop.BookResource(ctx, pool, sales(), workshop.ResourceBooking{
+		ResourceID: unit.ResourceID, Kind: workshop.BlockTestDrive, From: time.Now().Add(-time.Hour), To: time.Now().Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	list, _ = workshop.Stock(ctx, pool, buyerScope())
+	if list.Rows[0].Away != workshop.BlockTestDrive || list.Rows[0].AwayLabel() != "On a test drive" {
+		t.Errorf("out on a test drive: %+v", list.Rows[0])
 	}
 }
