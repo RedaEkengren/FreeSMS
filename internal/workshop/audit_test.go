@@ -196,6 +196,43 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 			t.Fatal(err)
 		}
 		made["tyre_set.placed"], made["tyre_set.taken_out"] = subject{"tyre_set", set}, subject{"tyre_set", set}
+
+		// And the three ways a stored set leaves (#232).
+		shelf, err := workshop.CreateStorageLocation(ctx, pool, owner(), "Audit exits", 3)
+		if err != nil {
+			t.Fatal(err)
+		}
+		buyer := aContact(t, pool, "Audit buyer", "+46709999999", "")
+		leaving := func() string {
+			id, err := workshop.CreateTyreSet(ctx, pool, advisor(), summerSet(customerA, ""))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := workshop.PlaceTyreSet(ctx, pool, advisor(), id, shelf); err != nil {
+				t.Fatal(err)
+			}
+			return id
+		}
+		collected, transferred, disposed := leaving(), leaving(), leaving()
+		if err := workshop.CollectTyreSet(ctx, pool, advisor(), collected, "The owner"); err != nil {
+			t.Fatal(err)
+		}
+		agreed, err := workshop.RecordSetAgreement(ctx, pool, advisor(), transferred, "transfer", buyer, "signed note")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := workshop.TransferTyreSet(ctx, pool, advisor(), transferred, agreed); err != nil {
+			t.Fatal(err)
+		}
+		gone, err := workshop.RecordSetAgreement(ctx, pool, advisor(), disposed, "disposal", "", "signed note")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := workshop.DisposeTyreSet(ctx, pool, advisor(), disposed, gone, "", ""); err != nil {
+			t.Fatal(err)
+		}
+		made["tyre_set.collected"], made["tyre_set.transferred"], made["tyre_set.disposed"] =
+			subject{"tyre_set", collected}, subject{"tyre_set", transferred}, subject{"tyre_set", disposed}
 	}
 
 	// Dealer
