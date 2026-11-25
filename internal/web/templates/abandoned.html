@@ -1,0 +1,12 @@
+{{define "content"}}
+<h1>{{.T "Sets that may have been left"}}</h1>
+<p class="waiting">{{.T "Sets in storage with no charge, no job and no booking for the time the shop has set, with the reminders sent since. Nothing is decided here: a set leaves only by being collected, transferred or disposed of with the owner's yes."}}</p>
+{{if .Abandoned}}
+<ul class="lines">
+  {{range .Abandoned}}
+  <li><div class="row"><a href="/tyres/{{.SetID}}">{{.Label}}</a><span class="tag">{{$.T "%d reminders sent" .Reminders}}</span></div>
+    <div class="waiting">{{.Owner}}{{if .Phone}} &middot; {{.Phone}}{{end}} &middot; {{.Place}} &middot; {{$.T "Nothing since %s" ($.Date .Since "2 Jan 2006")}}</div></li>
+  {{end}}
+</ul>
+{{else}}<p class="empty">{{.T "No set has been left."}}</p>{{end}}
+{{end}}

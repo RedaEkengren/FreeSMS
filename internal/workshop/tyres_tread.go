@@ -135,6 +135,9 @@ func RecordTreadDepth(ctx context.Context, pool *pgxpool.Pool, scope access.Scop
 		if replaced {
 			return errTreadReplaced
 		}
+		if err := tyreSetLiveTx(ctx, tx, tyreID); err != nil {
+			return err
+		}
 		return tx.QueryRow(ctx, `INSERT INTO tyre_measurements (shop_id, tyre_id, tenths, note, measured_by) VALUES ($1, $2, $3, nullif($4, ''), NULLIF($5, '')::uuid) RETURNING id`,
 			scope.ShopID, tyreID, tenths, note, scope.UserID).Scan(&id)
 	})
@@ -166,6 +169,9 @@ func CorrectTreadDepth(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 			return err
 		}
 		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "tread:"+tyre); err != nil {
+			return err
+		}
+		if err := tyreSetLiveTx(ctx, tx, tyre); err != nil {
 			return err
 		}
 		var done bool

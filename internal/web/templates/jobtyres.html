@@ -38,9 +38,18 @@
 {{if .TyreExtras}}
 <h2>{{.T "Add an extra"}}</h2>
 <form method="post" action="/jobs/{{.Job.ID}}/tyres/extra">
-  <label><span>{{.T "Extra"}}</span><select name="extra">{{range .TyreExtras}}{{if .Active}}<option value="{{.ID}}">{{.Name}} &middot; {{$.Money .UnitPriceMinor}} {{if eq .Per "tyre"}}{{$.T "per tyre"}}{{else}}{{$.T "per set"}}{{end}}</option>{{end}}{{end}}</select></label>
+  <label><span>{{.T "Extra"}}</span><select name="extra">{{range .TyreExtras}}{{if and .Active (not .StoragePeriod)}}<option value="{{.ID}}">{{.Name}} &middot; {{$.Money .UnitPriceMinor}} {{if eq .Per "tyre"}}{{$.T "per tyre"}}{{else}}{{$.T "per set"}}{{end}}</option>{{end}}{{end}}</select></label>
   <label><span>{{.T "How many tyres or sets"}}</span><input name="count" inputmode="numeric" value="4" maxlength="3" required></label>
   <button type="submit">{{.T "Add it to the job"}}</button>
+</form>
+{{end}}
+{{if .TyreExtras}}
+<h2>{{.T "Charge for storing a set"}}</h2>
+<form method="post" action="/jobs/{{.Job.ID}}/tyres/storage-fee">
+  <label><span>{{.T "Set"}}</span><select name="set">{{range .Tyres}}{{if .StoredIn}}<option value="{{.ID}}">{{$.T .Season}} {{.Brand}} {{.Model}} &middot; {{.StoredIn}}</option>{{end}}{{end}}</select></label>
+  <label><span>{{.T "Storage fee"}}</span><select name="fee">{{range .TyreExtras}}{{if and .Active .StoragePeriod}}<option value="{{.ID}}">{{.Name}} &middot; {{$.Money .UnitPriceMinor}}</option>{{end}}{{end}}</select></label>
+  <label><span>{{.T "For the year"}}</span><input name="year" inputmode="numeric" value="{{.FeeYear}}" maxlength="4" required></label>
+  <button type="submit">{{.T "Charge it on the job"}}</button>
 </form>
 {{end}}
 {{end}}

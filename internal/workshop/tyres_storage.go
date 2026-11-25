@@ -152,6 +152,9 @@ func placeTx(ctx context.Context, tx pgx.Tx, scope access.Scope, setID, location
 	if !exists {
 		return ErrNotFound
 	}
+	if err := setLiveTx(ctx, tx, setID); err != nil {
+		return err
+	}
 	active, capacity, err := locationActiveTx(ctx, tx, locationID)
 	if err != nil {
 		return err

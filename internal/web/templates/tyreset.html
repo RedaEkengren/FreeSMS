@@ -4,6 +4,7 @@
 <p class="waiting">{{if .Owner}}<a href="/customers/{{.CustomerID}}/tyres">{{.Owner}}</a> &middot; {{end}}{{$.T .Rims}}
   {{if .TPMS}}&middot; {{$.T "Pressure sensors"}}{{end}} {{if .Fasteners}}&middot; {{$.T "Bolts or nuts come with it"}}{{end}}</p>
 {{if .Note}}<p>{{.Note}}</p>{{end}}
+{{if $.SetExit}}<p class="status-big">{{if eq $.SetExit.Kind "collected"}}{{$.T "Collected by %s on %s" $.SetExit.CollectedBy ($.Date $.SetExit.At "2 Jan 2006")}}{{else if eq $.SetExit.Kind "transferred"}}{{$.T "Transferred to another owner on %s" ($.Date $.SetExit.At "2 Jan 2006")}}{{if $.Session.Scope.Role.SeesCustomerPersonalData}} &middot; <a href="/tyres/{{$.SetExit.NewSetID}}">{{$.T "The new owner's set"}}</a>{{end}}{{else}}{{$.T "Disposed of on %s" ($.Date $.SetExit.At "2 Jan 2006")}}{{end}}</p>{{end}}
 <p>{{if .Vehicle}}{{$.T "On %s" .Vehicle}}{{else}}{{$.T "On no car"}}{{end}}</p>
 
 <p>{{if .StoredIn}}{{$.T "Stored in %s" .StoredIn}}{{else}}{{$.T "Not in storage"}}{{end}}</p>
@@ -22,6 +23,36 @@
   {{range $.OtherSets}}<label><input type="checkbox" name="also" value="{{.ID}}"> {{$.T .Season}} {{.Brand}} {{.Model}}</label>{{end}}
   <button type="submit">{{$.T "Book the change"}}</button>
 </form>{{end}}
+{{end}}
+
+{{if and (not $.SetExit) .StoredIn}}
+<h2>{{$.T "Hand it out"}}</h2>
+<form method="post" action="/tyres/{{.ID}}/collect">
+  <label><span>{{$.T "Collected by"}}</span><input name="by" maxlength="200" required></label>
+  <button type="submit">{{$.T "Record the collection"}}</button>
+</form>
+{{if $.Session.Scope.Role.SeesCustomerPersonalData}}
+<h2>{{$.T "Transfer or dispose, with the owner's yes"}}</h2>
+{{if $.ShareURL}}<p class="status-big">{{$.T "Give the owner this address. It is shown once:"}}</p><p><code>{{$.ShareURL}}</code></p>{{end}}
+<form method="get" action="/tyres/{{.ID}}"><label><span>{{$.T "Find the new owner"}}</span><input name="find" maxlength="100"></label><button type="submit" class="secondary">{{$.T "Search"}}</button></form>
+<form method="post" action="/tyres/{{.ID}}/agreement">
+  <label><span>{{$.T "Ask the owner about"}}</span><select name="kind"><option value="disposal">{{$.T "disposing of it"}}</option><option value="transfer">{{$.T "handing it to another customer"}}</option></select></label>
+  <label><span>{{$.T "For a transfer, to whom"}}</span><select name="to"><option value="">{{$.T "Nobody"}}</option>{{range $.Customers}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></label>
+  <label><span>{{$.T "Or where the signed note is kept"}}</span><input name="note" maxlength="500"></label>
+  <button type="submit" class="secondary">{{$.T "Ask, or record the note"}}</button>
+</form>
+{{range $.SetAgreements}}
+<div class="waiting">{{$.T .Kind}} &middot; {{$.T .State}}{{if .Note}} &middot; {{.Note}}{{end}} &middot; {{$.Date .At "2 Jan 2006"}}
+  {{if eq .State "agreed"}}
+  {{if eq .Kind "transfer"}}<form method="post" action="/tyres/{{$.TyreSet.ID}}/transfer"><input type="hidden" name="agreement" value="{{.ID}}"><button type="submit">{{$.T "Hand over the set"}}</button></form>
+  {{else}}<form method="post" action="/tyres/{{$.TyreSet.ID}}/dispose"><input type="hidden" name="agreement" value="{{.ID}}">
+    <label><span>{{$.T "Job to put the disposal fee on, if any"}}</span><input name="job" maxlength="40"></label>
+    <label><span>{{$.T "Fee, if any"}}</span><select name="fee"><option value="">{{$.T "No fee"}}</option>{{range $.TyreExtras}}{{if and .Active (not .StoragePeriod)}}<option value="{{.ID}}">{{.Name}} &middot; {{$.Money .UnitPriceMinor}}</option>{{end}}{{end}}</select></label>
+    <button type="submit">{{$.T "Dispose of the set"}}</button></form>{{end}}
+  {{end}}
+</div>
+{{end}}
+{{end}}
 {{end}}
 
 <h2>{{$.T "The tyres"}}</h2>

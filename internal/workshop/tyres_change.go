@@ -17,7 +17,7 @@ import (
 // many sets.
 
 var (
-	errChangeSettings = fmt.Errorf("%w: a set takes from 5 to 240 minutes, a day holds from 1 to 500 sets, and a customer is followed up after from 1 to 90 days", ErrInvalid)
+	errChangeSettings = fmt.Errorf("%w: a set takes from 5 to 240 minutes, a day holds from 1 to 500 sets, and a customer is followed up after from 1 to 90 days, and a set may be left after from 30 to 3650 days", ErrInvalid)
 	errChangeSets     = fmt.Errorf("%w: a change is booked for from 1 to 10 sets of one customer", ErrInvalid)
 	errChangeBooked   = fmt.Errorf("%w: a set is already booked for a change", ErrInvalid)
 	errChangeDayFull  = fmt.Errorf("%w: that day cannot take that many more sets", ErrInvalid)
@@ -28,18 +28,22 @@ type TyreChangeSettings struct {
 	MinutesPerSet int
 	SetsPerDay    int
 	FollowUpDays  int
+	// How long a set can sit with no charge, no job and no move before it is on
+	// the list of those that may have been left.
+	AbandonDays int
 }
 
 const (
 	defaultChangeMinutes = 30
 	defaultChangePerDay  = 12
 	defaultFollowUpDays  = 14
+	defaultAbandonDays   = 365
 )
 
 func changeSettingsTx(ctx context.Context, tx pgx.Tx) (TyreChangeSettings, error) {
-	s := TyreChangeSettings{MinutesPerSet: defaultChangeMinutes, SetsPerDay: defaultChangePerDay, FollowUpDays: defaultFollowUpDays}
-	err := tx.QueryRow(ctx, `SELECT minutes_per_set, sets_per_day, follow_up_days FROM tyre_change_settings ORDER BY changed_at DESC, id LIMIT 1`).
-		Scan(&s.MinutesPerSet, &s.SetsPerDay, &s.FollowUpDays)
+	s := TyreChangeSettings{MinutesPerSet: defaultChangeMinutes, SetsPerDay: defaultChangePerDay, FollowUpDays: defaultFollowUpDays, AbandonDays: defaultAbandonDays}
+	err := tx.QueryRow(ctx, `SELECT minutes_per_set, sets_per_day, follow_up_days, abandon_days FROM tyre_change_settings ORDER BY changed_at DESC, id LIMIT 1`).
+		Scan(&s.MinutesPerSet, &s.SetsPerDay, &s.FollowUpDays, &s.AbandonDays)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return s, err
 	}
@@ -52,13 +56,13 @@ func SetTyreChangeSettings(ctx context.Context, pool *pgxpool.Pool, scope access
 	if !scope.Role.RunsTheShop() {
 		return access.ErrForbidden
 	}
-	if s.MinutesPerSet < 5 || s.MinutesPerSet > 240 || s.SetsPerDay < 1 || s.SetsPerDay > 500 || s.FollowUpDays < 1 || s.FollowUpDays > 90 {
+	if s.MinutesPerSet < 5 || s.MinutesPerSet > 240 || s.SetsPerDay < 1 || s.SetsPerDay > 500 || s.FollowUpDays < 1 || s.FollowUpDays > 90 || s.AbandonDays < 30 || s.AbandonDays > 3650 {
 		return errChangeSettings
 	}
 	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
-			INSERT INTO tyre_change_settings (shop_id, minutes_per_set, sets_per_day, follow_up_days, changed_by)
-			VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid)`, scope.ShopID, s.MinutesPerSet, s.SetsPerDay, s.FollowUpDays, scope.UserID)
+			INSERT INTO tyre_change_settings (shop_id, minutes_per_set, sets_per_day, follow_up_days, abandon_days, changed_by)
+			VALUES ($1, $2, $3, $4, $5, NULLIF($6, '')::uuid)`, scope.ShopID, s.MinutesPerSet, s.SetsPerDay, s.FollowUpDays, s.AbandonDays, scope.UserID)
 		return err
 	})
 }

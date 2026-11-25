@@ -14,9 +14,10 @@ import (
 )
 
 var (
-	errTyreExtra        = fmt.Errorf("%w: an extra has a name of 1 to 100 characters, not used by another, charged per tyre or per set, with a price and a VAT rate", ErrInvalid)
-	errTyreExtraCount   = fmt.Errorf("%w: an extra is added for from 1 to 100 tyres or sets", ErrInvalid)
-	errTyreExtraRetired = fmt.Errorf("%w: that extra is no longer offered", ErrInvalid)
+	errTyreExtra            = fmt.Errorf("%w: an extra has a name of 1 to 100 characters, not used by another, charged per tyre or per set, with a price and a VAT rate", ErrInvalid)
+	errTyreExtraCount       = fmt.Errorf("%w: an extra is added for from 1 to 100 tyres or sets", ErrInvalid)
+	errStorageFeeNotAnExtra = fmt.Errorf("%w: a storage fee is charged for a period on its own page, not added as an extra", ErrInvalid)
+	errTyreExtraRetired     = fmt.Errorf("%w: that extra is no longer offered", ErrInvalid)
 )
 
 // TyreExtra is one thing the shop sells with a tyre change, at its price now.
@@ -28,6 +29,9 @@ type TyreExtra struct {
 	UnitPriceMinor int64
 	VATRateBasis   int
 	Active         bool
+	// "season" or "year" for a storage fee, which is charged by the period
+	// and not added to a job like the others; empty otherwise.
+	StoragePeriod string
 }
 
 // NewTyreExtra is what the shop types in to offer one.
@@ -37,6 +41,7 @@ type NewTyreExtra struct {
 	LineKind       string
 	UnitPriceMinor int64
 	VATRateBasis   int
+	StoragePeriod  string
 }
 
 func (n NewTyreExtra) valid() bool {
@@ -44,6 +49,7 @@ func (n NewTyreExtra) valid() bool {
 	return utf8.RuneCountInString(name) >= 1 && utf8.RuneCountInString(name) <= 100 &&
 		(n.Per == "tyre" || n.Per == "set") &&
 		(n.LineKind == "labour" || n.LineKind == "part" || n.LineKind == "fee") &&
+		(n.StoragePeriod == "" || n.StoragePeriod == "season" || n.StoragePeriod == "year") &&
 		n.UnitPriceMinor >= 0 && n.UnitPriceMinor <= 100_000_000 && n.VATRateBasis >= 0 && n.VATRateBasis <= 10000
 }
 
@@ -59,9 +65,9 @@ func CreateTyreExtra(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 	var id string
 	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		err := tx.QueryRow(ctx, `
-			INSERT INTO tyre_extras (shop_id, name, per, line_kind, created_by) VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid)
+			INSERT INTO tyre_extras (shop_id, name, per, line_kind, storage_period, created_by) VALUES ($1, $2, $3, $4, NULLIF($6, ''), NULLIF($5, '')::uuid)
 			ON CONFLICT (shop_id, name) DO NOTHING RETURNING id`,
-			scope.ShopID, strings.TrimSpace(n.Name), n.Per, n.LineKind, scope.UserID).Scan(&id)
+			scope.ShopID, strings.TrimSpace(n.Name), n.Per, n.LineKind, scope.UserID, n.StoragePeriod).Scan(&id)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return errTyreExtra
 		}
@@ -134,7 +140,8 @@ func extraEventTx(ctx context.Context, tx pgx.Tx, scope access.Scope, id, kind s
 const tyreExtrasSQL = `
 	SELECT x.id::text, x.name, x.per, x.line_kind,
 	       p.unit_price_minor, p.vat_rate_basis,
-	       coalesce((SELECT e.kind FROM tyre_extra_events e WHERE e.extra_id = x.id AND e.kind IN ('retired', 'reopened') ORDER BY e.seq DESC LIMIT 1), 'reopened') = 'reopened'
+	       coalesce((SELECT e.kind FROM tyre_extra_events e WHERE e.extra_id = x.id AND e.kind IN ('retired', 'reopened') ORDER BY e.seq DESC LIMIT 1), 'reopened') = 'reopened',
+	       coalesce(x.storage_period, '')
 	FROM tyre_extras x
 	JOIN LATERAL (SELECT unit_price_minor, vat_rate_basis FROM tyre_extra_events e WHERE e.extra_id = x.id AND e.kind = 'priced' ORDER BY e.seq DESC LIMIT 1) p ON true`
 
@@ -153,7 +160,7 @@ func TyreExtras(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) ([]
 		defer rows.Close()
 		for rows.Next() {
 			var x TyreExtra
-			if err := rows.Scan(&x.ID, &x.Name, &x.Per, &x.LineKind, &x.UnitPriceMinor, &x.VATRateBasis, &x.Active); err != nil {
+			if err := rows.Scan(&x.ID, &x.Name, &x.Per, &x.LineKind, &x.UnitPriceMinor, &x.VATRateBasis, &x.Active, &x.StoragePeriod); err != nil {
 				return err
 			}
 			out = append(out, x)
@@ -180,7 +187,7 @@ func AddTyreExtraToJob(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
 		var x TyreExtra
 		err := tx.QueryRow(ctx, tyreExtrasSQL+` WHERE x.id = $1`, extraID).
-			Scan(&x.ID, &x.Name, &x.Per, &x.LineKind, &x.UnitPriceMinor, &x.VATRateBasis, &x.Active)
+			Scan(&x.ID, &x.Name, &x.Per, &x.LineKind, &x.UnitPriceMinor, &x.VATRateBasis, &x.Active, &x.StoragePeriod)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
@@ -189,6 +196,9 @@ func AddTyreExtraToJob(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		}
 		if !x.Active {
 			return errTyreExtraRetired
+		}
+		if x.StoragePeriod != "" {
+			return errStorageFeeNotAnExtra
 		}
 		line := NewLine{
 			Kind: x.LineKind, Description: x.Name, QuantityMilli: int64(count) * 1000,

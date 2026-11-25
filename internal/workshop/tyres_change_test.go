@@ -33,7 +33,7 @@ func TestAChangeIsABookingForTheSetsAndFreesThemWhenCancelled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := workshop.SetTyreChangeSettings(ctx, pool, owner(), workshop.TyreChangeSettings{MinutesPerSet: 25, SetsPerDay: 10, FollowUpDays: 14}); err != nil {
+	if err := workshop.SetTyreChangeSettings(ctx, pool, owner(), workshop.TyreChangeSettings{MinutesPerSet: 25, SetsPerDay: 10, FollowUpDays: 14, AbandonDays: 365}); err != nil {
 		t.Fatal(err)
 	}
 	when := inDays(5)
@@ -90,7 +90,7 @@ func TestADayHoldsOnlyTheSetsTheShopSaysEvenWhenBookedTogether(t *testing.T) {
 	addTechnician(t, pool)
 	ctx := context.Background()
 	place := aPlace(t, pool, "Hall", 10)
-	if err := workshop.SetTyreChangeSettings(ctx, pool, owner(), workshop.TyreChangeSettings{MinutesPerSet: 30, SetsPerDay: 2, FollowUpDays: 14}); err != nil {
+	if err := workshop.SetTyreChangeSettings(ctx, pool, owner(), workshop.TyreChangeSettings{MinutesPerSet: 30, SetsPerDay: 2, FollowUpDays: 14, AbandonDays: 365}); err != nil {
 		t.Fatal(err)
 	}
 	var sets []string
@@ -157,7 +157,7 @@ func TestTheFollowUpListIsWhoWasWrittenToAndHasNotBooked(t *testing.T) {
 	if len(list) != 1 || list[0].CustomerID != quiet || list[0].Phone != "+46702222222" || len(list[0].Sets) != 1 {
 		t.Fatalf("the follow-up list: %+v", list)
 	}
-	if err := workshop.SetTyreChangeSettings(ctx, pool, owner(), workshop.TyreChangeSettings{MinutesPerSet: 30, SetsPerDay: 12, FollowUpDays: 30}); err != nil {
+	if err := workshop.SetTyreChangeSettings(ctx, pool, owner(), workshop.TyreChangeSettings{MinutesPerSet: 30, SetsPerDay: 12, FollowUpDays: 30, AbandonDays: 365}); err != nil {
 		t.Fatal(err)
 	}
 	if list, _ := workshop.CampaignFollowUp(ctx, pool, advisor(), id); len(list) != 0 {
@@ -169,11 +169,11 @@ func TestWhoMayPlanAndBookAChange(t *testing.T) {
 	pool := setup(t)
 	addTechnician(t, pool)
 	ctx := context.Background()
-	s := workshop.TyreChangeSettings{MinutesPerSet: 30, SetsPerDay: 12, FollowUpDays: 14}
+	s := workshop.TyreChangeSettings{MinutesPerSet: 30, SetsPerDay: 12, FollowUpDays: 14, AbandonDays: 365}
 	if err := workshop.SetTyreChangeSettings(ctx, pool, advisor(), s); !errors.Is(err, access.ErrForbidden) {
 		t.Errorf("an advisor changed the settings: %v", err)
 	}
-	if err := workshop.SetTyreChangeSettings(ctx, pool, owner(), workshop.TyreChangeSettings{MinutesPerSet: 1, SetsPerDay: 12, FollowUpDays: 14}); !errors.Is(err, workshop.ErrInvalid) {
+	if err := workshop.SetTyreChangeSettings(ctx, pool, owner(), workshop.TyreChangeSettings{MinutesPerSet: 1, SetsPerDay: 12, FollowUpDays: 14, AbandonDays: 365}); !errors.Is(err, workshop.ErrInvalid) {
 		t.Errorf("a set in one minute: %v", err)
 	}
 	if _, err := workshop.BookTyreChange(ctx, pool, technician(), workshop.ChangeBooking{SetIDs: []string{customerA}, Starts: inDays(3), What: "x"}); !errors.Is(err, access.ErrForbidden) {
