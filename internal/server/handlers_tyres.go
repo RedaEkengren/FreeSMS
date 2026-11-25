@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"html/template"
 	"math"
 	"net/http"
@@ -332,6 +333,12 @@ func (s *Server) handleJobTyres(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pd := pageData{Title: "Tyres on the job", Session: session, Job: job, JobTyreMoves: moves, Tyres: sets, Places: places}
+	// The price list is the front desk's; a technician's page has no prices.
+	if session.Scope.Role.SeesCustomerPersonalData() {
+		if pd.TyreExtras, err = workshop.TyreExtras(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+			return
+		}
+	}
 	s.render(w, r, http.StatusOK, "jobtyres", pd)
 }
 
@@ -358,4 +365,73 @@ func (s *Server) handleJobTyreMove(w http.ResponseWriter, r *http.Request) {
 	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/jobs/"+job+"/tyres", http.StatusSeeOther)
+}
+
+func (s *Server) handleTyreExtras(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	extras, err := workshop.TyreExtras(r.Context(), s.pool, session.Scope)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.render(w, r, http.StatusOK, "tyreextras", pageData{Title: "Tyre extras", Session: session, TyreExtras: extras})
+}
+
+// priceFields reads a price and a VAT rate in per cent from a form. A rate is
+// kept in hundredths of a per cent, so 25 is 2500.
+func priceFields(r *http.Request) (price int64, vat int, err error) {
+	if price, err = parseMinorUnits(r.FormValue("price")); err != nil {
+		return 0, 0, fmt.Errorf("%w: that price did not parse", workshop.ErrInvalid)
+	}
+	v, err := parseScaled(r.FormValue("vat"), 2)
+	if err != nil || v < 0 || v > 10000 {
+		return 0, 0, fmt.Errorf("%w: that VAT rate did not parse", workshop.ErrInvalid)
+	}
+	return price, int(v), nil
+}
+
+func (s *Server) handleCreateTyreExtra(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	price, vat, err := priceFields(r)
+	if err == nil {
+		_, err = workshop.CreateTyreExtra(r.Context(), s.pool, session.Scope, workshop.NewTyreExtra{
+			Name: r.FormValue("name"), Per: r.FormValue("per"), LineKind: r.FormValue("kind"), UnitPriceMinor: price, VATRateBasis: vat})
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/tyres/extras", http.StatusSeeOther)
+}
+
+func (s *Server) handlePriceTyreExtra(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	price, vat, err := priceFields(r)
+	if err == nil {
+		err = workshop.PriceTyreExtra(r.Context(), s.pool, session.Scope, r.PathValue("id"), price, vat)
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/tyres/extras", http.StatusSeeOther)
+}
+
+func (s *Server) handleTyreExtraUse(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	err := workshop.SetTyreExtraInUse(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("use") == "1")
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/tyres/extras", http.StatusSeeOther)
+}
+
+func (s *Server) handleJobTyreExtra(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	err := workshop.AddTyreExtraToJob(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("extra"), formInt(r, "count"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/jobs/"+r.PathValue("id")+"/tyres", http.StatusSeeOther)
 }

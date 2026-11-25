@@ -404,3 +404,52 @@ func TestASeasonalChangeIsDoneFromTheJobsPage(t *testing.T) {
 		t.Errorf("the winter set is not on the car:\n%s", set)
 	}
 }
+
+// The owner keeps the price list, the front desk puts an extra on a job, and
+// the technician's page for the same job shows neither the list nor a price.
+func TestTyreExtrasArePricedByTheOwnerAndAddedByTheFrontDesk(t *testing.T) {
+	ts, pool := testServer(t)
+	const job = "aaaaaaaa-0000-0000-0000-00000000000f"
+	owner, advisor, tech := signIn(t, ts, ownerEmail), signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	base := ts.URL + "/tyres/extras"
+
+	if status := postStatus(t, advisor, base, url.Values{"name": {"Balancing"}, "per": {"tyre"}, "kind": {"labour"}, "price": {"150"}, "vat": {"25"}}); status != http.StatusForbidden {
+		t.Errorf("the front desk making an extra answered %d", status)
+	}
+	if status := postStatus(t, owner, base, url.Values{"name": {"Balancing"}, "per": {"tyre"}, "kind": {"labour"}, "price": {"abc"}, "vat": {"25"}}); status != http.StatusBadRequest {
+		t.Errorf("a price that is not a number answered %d", status)
+	}
+	if status := postStatus(t, owner, base, url.Values{"name": {"Balancing"}, "per": {"tyre"}, "kind": {"labour"}, "price": {"150"}, "vat": {"25"}}); status != http.StatusSeeOther {
+		t.Fatalf("the owner making an extra answered %d", status)
+	}
+	var extra string
+	if err := pool.QueryRow(context.Background(), `SELECT id FROM tyre_extras WHERE name = 'Balancing'`).Scan(&extra); err != nil {
+		t.Fatal(err)
+	}
+	if status := postStatus(t, advisor, ts.URL+"/jobs/"+job+"/tyres/extra", url.Values{"extra": {extra}, "count": {"4"}}); status != http.StatusSeeOther {
+		t.Fatalf("the front desk adding it answered %d", status)
+	}
+	var qty, price int64
+	if err := pool.QueryRow(context.Background(),
+		`SELECT (quantity * 1000)::bigint, unit_price_minor FROM work_order_lines WHERE work_order_id = $1 AND description = 'Balancing'`, job).Scan(&qty, &price); err != nil || qty != 4000 || price != 15000 {
+		t.Errorf("the line: %d at %d, %v", qty, price, err)
+	}
+	if page := visibleText(get(t, owner, base, http.StatusOK)); !strings.Contains(page, "Balancing") || !strings.Contains(page, "Offer an extra") {
+		t.Errorf("the owner's price list:\n%s", page)
+	}
+	if page := visibleText(get(t, advisor, base, http.StatusOK)); !strings.Contains(page, "Balancing") || strings.Contains(page, "Offer an extra") {
+		t.Errorf("the front desk's price list:\n%s", page)
+	}
+	if status := postStatus(t, tech, ts.URL+"/jobs/"+job+"/tyres/extra", url.Values{"extra": {extra}, "count": {"4"}}); status != http.StatusForbidden {
+		t.Errorf("a technician adding an extra answered %d", status)
+	}
+	if status := getStatus(t, tech, base); status != http.StatusForbidden {
+		t.Errorf("a technician reading the price list answered %d", status)
+	}
+	if page := visibleText(get(t, tech, ts.URL+"/jobs/"+job+"/tyres", http.StatusOK)); strings.Contains(page, "Balancing") || strings.Contains(page, "Add an extra") {
+		t.Errorf("the technician's page shows the price list:\n%s", page)
+	}
+	if page := visibleText(get(t, advisor, ts.URL+"/jobs/"+job+"/tyres", http.StatusOK)); !strings.Contains(page, "Balancing") {
+		t.Errorf("the front desk's page lacks the extra:\n%s", page)
+	}
+}

@@ -358,6 +358,13 @@ func setStateInScopeTx(ctx context.Context, tx pgx.Tx, scope access.Scope, jobID
 		if len(away) > 0 {
 			return fmt.Errorf("%w: work with a supplier is not back and checked yet: %s", ErrInvalid, strings.Join(away, ", "))
 		}
+		// A tyre change is not done while a set is neither on the car nor in a
+		// place: the next customer would be told it was stored and it is not.
+		if loose, err := looseTyresTx(ctx, tx, jobID); err != nil {
+			return err
+		} else if loose {
+			return errTyresLoose
+		}
 		// Work still on the list is work not done, whatever the final check
 		// says: the check certifies what was done, not what was left.
 		open, err := outstandingTasksTx(ctx, tx, jobID)
