@@ -139,60 +139,65 @@ func PlaceTyreSet(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, s
 		return ErrNotFound
 	}
 	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		var exists bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM tyre_sets WHERE id = $1)`, setID).Scan(&exists); err != nil {
-			return err
-		}
-		if !exists {
-			return ErrNotFound
-		}
-		active, capacity, err := locationActiveTx(ctx, tx, locationID)
-		if err != nil {
-			return err
-		}
-		if !active {
-			return errStorageRetired
-		}
-		// The set's own place, if it has one.
-		var from, fromName *string
-		if err := tx.QueryRow(ctx, `SELECT p.location_id::text, l.name FROM tyre_set_placements p JOIN storage_locations l ON l.id = p.location_id
-			WHERE p.tyre_set_id = $1 AND p.removed_at IS NULL`, setID).Scan(&from, &fromName); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		if from != nil && *from == locationID {
-			return nil
-		}
-		var used int
-		if err := tx.QueryRow(ctx, `SELECT count(*) FROM tyre_set_placements WHERE location_id = $1 AND removed_at IS NULL`, locationID).Scan(&used); err != nil {
-			return err
-		}
-		if used >= capacity {
-			return errStorageFull
-		}
-		var now time.Time
-		if err := tx.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&now); err != nil {
-			return err
-		}
-		if from != nil {
-			if _, err := tx.Exec(ctx, `UPDATE tyre_set_placements SET removed_at = $2, removed_by = NULLIF($3, '')::uuid WHERE tyre_set_id = $1 AND removed_at IS NULL`,
-				setID, now, scope.UserID); err != nil {
-				return fmt.Errorf("close the earlier place: %w", err)
-			}
-		}
-		if _, err := tx.Exec(ctx, `INSERT INTO tyre_set_placements (shop_id, tyre_set_id, location_id, placed_at, placed_by) VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid)`,
-			scope.ShopID, setID, locationID, now, scope.UserID); err != nil {
-			return fmt.Errorf("place the set: %w", err)
-		}
-		var to string
-		if err := tx.QueryRow(ctx, `SELECT name FROM storage_locations WHERE id = $1`, locationID).Scan(&to); err != nil {
-			return err
-		}
-		fromText := ""
-		if fromName != nil {
-			fromText = *fromName
-		}
-		return auditTx(ctx, tx, scope, setID, "tyre_set.placed", fromText, to, "", map[string]any{"location_id": locationID})
+		return placeTx(ctx, tx, scope, setID, locationID)
 	})
+}
+
+// placeTx puts a set in a place within a transaction.
+func placeTx(ctx context.Context, tx pgx.Tx, scope access.Scope, setID, locationID string) error {
+	var exists bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM tyre_sets WHERE id = $1)`, setID).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return ErrNotFound
+	}
+	active, capacity, err := locationActiveTx(ctx, tx, locationID)
+	if err != nil {
+		return err
+	}
+	if !active {
+		return errStorageRetired
+	}
+	// The set's own place, if it has one.
+	var from, fromName *string
+	if err := tx.QueryRow(ctx, `SELECT p.location_id::text, l.name FROM tyre_set_placements p JOIN storage_locations l ON l.id = p.location_id
+		WHERE p.tyre_set_id = $1 AND p.removed_at IS NULL`, setID).Scan(&from, &fromName); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	if from != nil && *from == locationID {
+		return nil
+	}
+	var used int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM tyre_set_placements WHERE location_id = $1 AND removed_at IS NULL`, locationID).Scan(&used); err != nil {
+		return err
+	}
+	if used >= capacity {
+		return errStorageFull
+	}
+	var now time.Time
+	if err := tx.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&now); err != nil {
+		return err
+	}
+	if from != nil {
+		if _, err := tx.Exec(ctx, `UPDATE tyre_set_placements SET removed_at = $2, removed_by = NULLIF($3, '')::uuid WHERE tyre_set_id = $1 AND removed_at IS NULL`,
+			setID, now, scope.UserID); err != nil {
+			return fmt.Errorf("close the earlier place: %w", err)
+		}
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO tyre_set_placements (shop_id, tyre_set_id, location_id, placed_at, placed_by) VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid)`,
+		scope.ShopID, setID, locationID, now, scope.UserID); err != nil {
+		return fmt.Errorf("place the set: %w", err)
+	}
+	var to string
+	if err := tx.QueryRow(ctx, `SELECT name FROM storage_locations WHERE id = $1`, locationID).Scan(&to); err != nil {
+		return err
+	}
+	fromText := ""
+	if fromName != nil {
+		fromText = *fromName
+	}
+	return auditTx(ctx, tx, scope, setID, "tyre_set.placed", fromText, to, "", map[string]any{"location_id": locationID})
 }
 
 // TakeTyreSetOutOfStorage records a set leaving its place. Whoever works in the
@@ -205,26 +210,31 @@ func TakeTyreSetOutOfStorage(ctx context.Context, pool *pgxpool.Pool, scope acce
 		return ErrNotFound
 	}
 	return inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		var name string
-		err := tx.QueryRow(ctx, `
-			UPDATE tyre_set_placements p SET removed_at = clock_timestamp(), removed_by = NULLIF($2, '')::uuid
-			FROM storage_locations l
-			WHERE p.tyre_set_id = $1 AND p.removed_at IS NULL AND l.id = p.location_id RETURNING l.name`, setID, scope.UserID).Scan(&name)
-		if errors.Is(err, pgx.ErrNoRows) {
-			var exists bool
-			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM tyre_sets WHERE id = $1)`, setID).Scan(&exists); err != nil {
-				return err
-			}
-			if !exists {
-				return ErrNotFound
-			}
-			return errNotStored
-		}
-		if err != nil {
+		return takeOutTx(ctx, tx, scope, setID)
+	})
+}
+
+// takeOutTx records a set leaving its place within a transaction.
+func takeOutTx(ctx context.Context, tx pgx.Tx, scope access.Scope, setID string) error {
+	var name string
+	err := tx.QueryRow(ctx, `
+		UPDATE tyre_set_placements p SET removed_at = clock_timestamp(), removed_by = NULLIF($2, '')::uuid
+		FROM storage_locations l
+		WHERE p.tyre_set_id = $1 AND p.removed_at IS NULL AND l.id = p.location_id RETURNING l.name`, setID, scope.UserID).Scan(&name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM tyre_sets WHERE id = $1)`, setID).Scan(&exists); err != nil {
 			return err
 		}
-		return auditTx(ctx, tx, scope, setID, "tyre_set.taken_out", name, "", "", nil)
-	})
+		if !exists {
+			return ErrNotFound
+		}
+		return errNotStored
+	}
+	if err != nil {
+		return err
+	}
+	return auditTx(ctx, tx, scope, setID, "tyre_set.taken_out", name, "", "", nil)
 }
 
 // StorageLocations lists the places by name with the sets in each. For whoever

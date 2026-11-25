@@ -318,3 +318,89 @@ func TestATechnicianRecordsTreadDepthAndTheOwnerSetsTheLimit(t *testing.T) {
 		t.Errorf("a technician is offered the limit form")
 	}
 }
+
+// A seasonal change from the job's page: the winter set out of storage, the
+// summer set taken in with its tyres measured, the winter set fitted; a set a
+// job holds is refused to a second, and the page shows the trail.
+func TestASeasonalChangeIsDoneFromTheJobsPage(t *testing.T) {
+	ts, pool := testServer(t)
+	const customer = "aaaaaaaa-0000-0000-0000-000000000004"
+	const job = "aaaaaaaa-0000-0000-0000-00000000000f"
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx, `INSERT INTO vehicle_ownership (shop_id, vehicle_id, customer_id) VALUES ($1, $2, $3)`, shopA, vehicleA, customer); err != nil {
+		t.Fatal(err)
+	}
+	owner, advisor, tech := signIn(t, ts, ownerEmail), signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	postStatus(t, owner, ts.URL+"/storage", url.Values{"name": {"Rack"}, "capacity": {"3"}})
+	postStatus(t, owner, ts.URL+"/storage", url.Values{"name": {"Shelf"}, "capacity": {"3"}})
+	var rack, shelf string
+	_ = pool.QueryRow(ctx, `SELECT id FROM storage_locations WHERE name = 'Rack'`).Scan(&rack)
+	_ = pool.QueryRow(ctx, `SELECT id FROM storage_locations WHERE name = 'Shelf'`).Scan(&shelf)
+	make := func(season, brand, vehicle string) string {
+		form := url.Values{"season": {season}, "brand": {brand}, "front": {"205/55R16"}, "rims": {"alloy"}, "vehicle": {vehicle}}
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/customers/"+customer+"/tyres", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", ts.URL)
+		c := *advisor
+		c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		resp, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return strings.TrimPrefix(resp.Header.Get("Location"), "/tyres/")
+	}
+	winter, summer := make("winter_friction", "Nokian", ""), make("summer", "Michelin", vehicleA)
+	postStatus(t, tech, ts.URL+"/tyres/"+winter+"/place", url.Values{"place": {rack}})
+	base := ts.URL + "/jobs/" + job + "/tyres"
+
+	if page := visibleText(get(t, tech, base, http.StatusOK)); !strings.Contains(page, "Nothing done with tyres on this job yet.") {
+		t.Errorf("the job's tyre page:\n%s", page)
+	}
+	if status := postStatus(t, tech, base+"/check-out", url.Values{"set": {winter}}); status != http.StatusSeeOther {
+		t.Fatalf("taking the winter set out answered %d", status)
+	}
+	if status := postStatus(t, tech, base+"/check-out", url.Values{"set": {winter}}); status != http.StatusBadRequest {
+		t.Errorf("taking a set a job holds answered %d", status)
+	}
+	if status := postStatus(t, tech, base+"/check-in", url.Values{"set": {summer}, "place": {shelf}}); status != http.StatusBadRequest {
+		t.Errorf("a set with no tyre measured answered %d", status)
+	}
+	rows, _ := pool.Query(ctx, `SELECT t.id FROM tyres t WHERE t.tyre_set_id = $1`, summer)
+	var tyres []string
+	for rows.Next() {
+		var id string
+		_ = rows.Scan(&id)
+		tyres = append(tyres, id)
+	}
+	rows.Close()
+	for _, id := range tyres {
+		if status := postStatus(t, tech, ts.URL+"/tyres/"+summer+"/tread", url.Values{"tyre": {id}, "depth": {"4,2"}}); status != http.StatusSeeOther {
+			t.Fatalf("measuring answered %d", status)
+		}
+	}
+	if status := postStatus(t, tech, base+"/check-in", url.Values{"set": {summer}, "place": {shelf}}); status != http.StatusSeeOther {
+		t.Fatalf("taking the summer set in answered %d", status)
+	}
+	if status := postStatus(t, tech, base+"/fit", url.Values{"set": {winter}}); status != http.StatusSeeOther {
+		t.Fatalf("fitting the winter set answered %d", status)
+	}
+	if status := postStatus(t, tech, base+"/teleport", url.Values{"set": {winter}}); status != http.StatusNotFound {
+		t.Errorf("a move that does not exist answered %d", status)
+	}
+	page := get(t, tech, base, http.StatusOK)
+	text := visibleText(page)
+	for _, want := range []string{"taken out of storage", "checked in", "fitted", "Shelf", "Nokian", "Michelin"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("the trail lacks %q:\n%s", want, text)
+		}
+	}
+	for _, secret := range []string{customerName, customerAddress, customerPhoneDigits} {
+		if strings.Contains(page, secret) {
+			t.Errorf("the technician is shown %q on the job's tyre page", secret)
+		}
+	}
+	if set := visibleText(get(t, tech, ts.URL+"/tyres/"+winter, http.StatusOK)); !strings.Contains(set, "Volvo V70") {
+		t.Errorf("the winter set is not on the car:\n%s", set)
+	}
+}

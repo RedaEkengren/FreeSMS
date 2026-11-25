@@ -230,6 +230,15 @@
     "below_legal": {
       "other": "below the legal minimum"
     },
+    "checked_out": {
+      "other": "taken out of storage"
+    },
+    "taken_home": {
+      "other": "taken home by the customer"
+    },
+    "checked_in": {
+      "other": "checked in"
+    },
     "no_show": {
       "other": "did not come"
     },
