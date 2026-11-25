@@ -37,6 +37,28 @@ type StockRow struct {
 	// What it cost, for a role that may see it; nil for any other, and
 	// never read from the database for one.
 	Figures *StockFigures
+	// The cover photograph, if it has any, and what holds the car now if it is
+	// not on the lot: the kind of block on its resource at this moment.
+	CoverPhotoID string
+	Away         string
+}
+
+// AwayLabel is what holds the car now, as a catalogue key; empty when it is
+// on the lot.
+func (r StockRow) AwayLabel() string {
+	switch r.Away {
+	case BlockRental:
+		return "Out on a rental"
+	case BlockTestDrive:
+		return "On a test drive"
+	case BlockWorkshop:
+		return "In the workshop"
+	case BlockDelivery:
+		return "Being delivered"
+	case BlockService:
+		return "At service"
+	}
+	return ""
 }
 
 // StockFigures is what a car in stock has cost the business so far.
@@ -144,7 +166,10 @@ func StockFiltered(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 			       t.d - (u.first_for_sale_at AT TIME ZONE t.tz)::date,
 			       CASE WHEN $1 THEN p.tax_purchase_price_minor END,
 			       CASE WHEN $1 THEN coalesce((SELECT sum(c.net_minor) FROM stock_cost_entries c
-			                                   WHERE c.stock_unit_id = u.id AND NOT stock_cost_post_sale(u.id, c.happened_at)), 0) END
+			                                   WHERE c.stock_unit_id = u.id AND NOT stock_cost_post_sale(u.id, c.happened_at)), 0) END,
+			       coalesce((SELECT a.id::text FROM attachments a WHERE a.stock_unit_id = u.id ORDER BY a.position, a.created_at LIMIT 1), ''),
+			       coalesce((SELECT b.kind FROM resource_blocks b WHERE b.resource_id = u.resource_id AND b.status IN ('held', 'confirmed')
+			                   AND b.period @> clock_timestamp() ORDER BY lower(b.period) LIMIT 1), '')
 			FROM stock_units u
 			CROSS JOIN today t
 			JOIN vehicles v ON v.id = u.vehicle_id
@@ -162,7 +187,7 @@ func StockFiltered(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 			var purchase, costs *int64
 			var forSale *int32
 			if err := rows.Scan(&row.UnitID, &row.VehicleID, &row.Registration, &row.VIN, &row.Make, &row.Model, &year,
-				&row.OdometerKm, &row.Status, &row.Reason, &row.OpenedAt, &row.DaysInStock, &forSale, &purchase, &costs); err != nil {
+				&row.OdometerKm, &row.Status, &row.Reason, &row.OpenedAt, &row.DaysInStock, &forSale, &purchase, &costs, &row.CoverPhotoID, &row.Away); err != nil {
 				return fmt.Errorf("scan stock: %w", err)
 			}
 			if year != nil {

@@ -9708,6 +9708,10 @@
     "it was a hold, and the hold has run out": {"other": "det var en reservation, och reservationen har gått ut"},
     "say why it is put back, in 300 characters or fewer": {"other": "skriv varför den läggs tillbaka, med högst 300 tecken"},
     "that block has not been replanned, or it was put back already": {"other": "den spärren har inte planerats om, eller så är den redan återställd"},
-    "what was replanned has begun, and what has been stays as it was": {"other": "det som planerades om har redan börjat, och det som varit förblir som det var"}
+    "what was replanned has begun, and what has been stays as it was": {"other": "det som planerades om har redan börjat, och det som varit förblir som det var"},
+    "Out on a rental": {"other": "Uthyrd"},
+    "On a test drive": {"other": "På provkörning"},
+    "Being delivered": {"other": "Under leverans"},
+    "At service": {"other": "På service"}
   }
 }

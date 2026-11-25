@@ -50,12 +50,14 @@
 <ul class="lines">
   {{range $d.Rows}}
   <li>
+    {{if .CoverPhotoID}}<img src="/cars/stock/{{.UnitID}}/photos/{{.CoverPhotoID}}" alt="" loading="lazy" width="96" class="cover">{{end}}
     <div class="row"><a href="/cars/stock/{{.UnitID}}">{{if .Registration}}{{.Registration}}{{else if .VIN}}{{.VIN}}{{else}}{{$.T "No registration"}}{{end}}</a>
       <span class="tag{{if eq .Ageing "90+"}} late{{end}}">{{$.T .StatusLabel}}</span></div>
     <div class="waiting">
       {{if .Make}}{{.Make}} {{.Model}}{{if .ModelYear}} {{.ModelYear}}{{end}} &middot; {{end}}{{if .OdometerKm}}{{$.T "%s km" ($.Num .Km)}} &middot; {{end}}
       {{$.N "%d day in stock" .DaysInStock}}{{with .DaysForSale}} &middot; {{$.N "%d day for sale" .}}{{end}}
       {{if .Consigned}}&middot; <span class="tag">{{$.T "On consignment"}}</span>{{end}}
+      {{if .AwayLabel}}&middot; <span class="tag late">{{$.T .AwayLabel}}</span>{{end}}
     </div>
     {{with .Figures}}
     <div class="waiting">
