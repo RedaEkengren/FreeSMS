@@ -53,6 +53,18 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	made["block.overridden"] = subject{"resource_block", block}
+	// And one replanned, then put back.
+	back, err := rent(pool, rentalDesk(), res, in2031(18, 9), in2031(18, 17))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.OverrideBlock(ctx, pool, everything, back, in2031(19, 9), in2031(19, 17), "Kunden bad om en annan dag"); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.ReverseOverrideBlock(ctx, pool, everything, back, "Det var ett misstag"); err != nil {
+		t.Fatal(err)
+	}
+	made["block.override_reversed"] = subject{"resource_block", back}
 
 	// A contract signed, and corrected.
 	tpl := purchaseTemplate(t, pool)
