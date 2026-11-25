@@ -69,7 +69,10 @@ var queryBudgets = map[string]int{
 	// one statement, and the stock at purchase price in one; and payments
 	// with no line on the bank's statement, one more in the money
 	// provider's transaction (#152).
-	"desk GET /": 17,
+	// 17 to 18, 35 to 36 and 16 to 17 (#230, #232): the tyre hotel's two counts on the
+	// queue -- customers written to who have not booked, sets nobody came for -- are
+	// one statement, the same however much history there is.
+	"desk GET /": 18,
 	// The one search (#159): every provider of a module the shop runs
 	// asks once, as the role it is asked as; 16 with all three modules on,
 	// the same with years of history. 16 to 21: parties found by name for
@@ -83,7 +86,7 @@ var queryBudgets = map[string]int{
 	// one statement in the dealer's own read -- not a provider of its own,
 	// which would have cost two more. 34 to 35: the cars' average days in
 	// stock (#157), one statement for the owner's card.
-	"owner GET /":     35,
+	"owner GET /":     36,
 	"desk GET /board": 21,
 	// 35: the quote the customer was shown and what they answered to it
 	// (two statements), which the counter reads on every live refresh.
@@ -101,8 +104,8 @@ var queryBudgets = map[string]int{
 	// own scope, for the counter and the owner. 16: work due back from a
 	// supplier and supplier invoices nobody handed on (#128), one read in its
 	// own scope; its events are read together, not one job at a time.
-	"desk GET /mine":       16,
-	"desk GET /mine/count": 17,
+	"desk GET /mine":       17,
+	"desk GET /mine/count": 18,
 	// #113: who is on the job and its plan (two statements, plus the clashes
 	// of the plan once there is one) on every job page, and the technicians
 	// to choose from on the desk's. "For me" and the header count read the

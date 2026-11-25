@@ -407,6 +407,8 @@ func (s *Server) routes() (http.Handler, error) {
 	workshopMux.HandleFunc("POST /tyres/{id}/tread/correct", s.requireSession(s.handleCorrectTreadDepth))
 	workshopMux.HandleFunc("POST /tyres/limit", s.requireSession(s.handleTreadLimit))
 	workshopMux.HandleFunc("GET /tyres/abandoned", s.requireSession(s.handleAbandoned))
+	workshopMux.HandleFunc("GET /vehicles/{id}/tyres", s.requireSession(s.handleVehicleTyres))
+	workshopMux.HandleFunc("POST /vehicles/{id}/tyres", s.requireSession(s.handleCreateVehicleTyres))
 	workshopMux.HandleFunc("POST /tyres/{id}/collect", s.requireSession(s.handleCollectTyreSet))
 	workshopMux.HandleFunc("POST /tyres/{id}/agreement", s.requireSession(s.handleSetAgreementAsk))
 	workshopMux.HandleFunc("POST /tyres/{id}/transfer", s.requireSession(s.handleTransferTyreSet))

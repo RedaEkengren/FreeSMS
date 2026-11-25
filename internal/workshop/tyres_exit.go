@@ -490,7 +490,7 @@ func AbandonedSets(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) 
 			        coalesce((SELECT max(x.charged_at) FROM tyre_storage_charges x WHERE x.tyre_set_id = ts.id), pl.placed_at),
 			        coalesce((SELECT max(m.at) FROM tyre_job_moves m WHERE m.tyre_set_id = ts.id), pl.placed_at),
 			        coalesce((SELECT max(tb.at) FROM tyre_change_bookings tb WHERE tb.tyre_set_id = ts.id), pl.placed_at)) AS last) q
-			WHERE q.last <= clock_timestamp() - make_interval(days => $1)
+			WHERE q.last <= clock_timestamp() - make_interval(days => $1) AND NOT EXISTS (SELECT 1 FROM shop_own_customers o WHERE o.customer_id = c.id)
 			ORDER BY q.last, ts.id`, set.AbandonDays)
 		if err != nil {
 			return err

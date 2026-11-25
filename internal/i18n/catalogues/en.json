@@ -320,6 +320,14 @@
     "insurance_claim": {"other": "insurance claim"},
     "closed_not_renter": {"other": "closed, not the renter's"},
     "%d car": {"one": "%d car", "other": "%d cars"},
-    "%d car has no purchase price, and is left out of the totals": {"one": "%d car has no purchase price, and is left out of the totals", "other": "%d cars have no purchase price, and are left out of the totals"}
+    "%d car has no purchase price, and is left out of the totals": {"one": "%d car has no purchase price, and is left out of the totals", "other": "%d cars have no purchase price, and are left out of the totals"},
+    "%d customer was written to about their tyres and has not booked": {
+      "one": "%d customer was written to about their tyres and has not booked",
+      "other": "%d customers were written to about their tyres and have not booked"
+    },
+    "%d set in storage may have been left": {
+      "one": "%d set in storage may have been left",
+      "other": "%d sets in storage may have been left"
+    }
   }
 }

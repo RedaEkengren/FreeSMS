@@ -1,0 +1,34 @@
+{{define "content"}}
+<h1>{{.T "The shop's tyres on this car"}}</h1>
+<p class="waiting">{{.T "Sets the shop itself owns, on a car it keeps in stock or in its fleet."}}</p>
+{{if .Tyres}}
+<ul class="lines">
+  {{range .Tyres}}
+  <li><div class="row">{{if $.Session.Scope.Role.WorksInTheWorkshop}}<a href="/tyres/{{.ID}}">{{$.T .Season}} &middot; {{.Brand}} {{.Model}}</a>{{else}}<span>{{$.T .Season}} &middot; {{.Brand}} {{.Model}}</span>{{end}}<span class="tag">{{$.T .Rims}}</span></div>
+    <div class="waiting">{{range .Tyres}}{{if eq .Position "front_left"}}{{.Dimension}}{{end}}{{end}}{{if .StoredIn}} &middot; {{$.T "Stored in %s" .StoredIn}}{{else if .Vehicle}} &middot; {{$.T "On %s" .Vehicle}}{{end}}</div></li>
+  {{end}}
+</ul>
+{{else}}<p class="empty">{{.T "No tyre sets yet."}}</p>{{end}}
+<h2>{{.T "Take a set in"}}</h2>
+<form method="post" action="/vehicles/{{.VehicleRef}}/tyres">
+  <label><span>{{.T "Season"}}</span><select name="season">
+    <option value="summer">{{.T "summer"}}</option><option value="winter_friction">{{.T "winter_friction"}}</option>
+    <option value="winter_studded">{{.T "winter_studded"}}</option><option value="all_season">{{.T "all_season"}}</option></select></label>
+  <label><span>{{.T "On this car now"}}</span><select name="vehicle"><option value="">{{.T "No, in storage"}}</option><option value="{{.VehicleRef}}">{{.T "Yes"}}</option></select></label>
+  <div class="pair">
+    <label><span>{{.T "Brand"}}</span><input name="brand" maxlength="100"></label>
+    <label><span>{{.T "Model"}}</span><input name="model" maxlength="100"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "Dimension at the front"}}</span><input name="front" maxlength="40" required placeholder="205/55R16 91V"></label>
+    <label><span>{{.T "Dimension at the rear, if it differs"}}</span><input name="rear" maxlength="40"></label>
+  </div>
+  <div class="pair">
+    <label><span>{{.T "Week made"}}</span><input name="dot_week" inputmode="numeric" maxlength="2"></label>
+    <label><span>{{.T "Year made"}}</span><input name="dot_year" inputmode="numeric" maxlength="4"></label>
+  </div>
+  <label><span>{{.T "Rims"}}</span><select name="rims"><option value="none">{{.T "none"}}</option><option value="steel">{{.T "steel"}}</option><option value="alloy">{{.T "alloy"}}</option></select></label>
+  <label><input type="checkbox" name="tpms" value="1"> {{.T "Pressure sensors"}}</label>
+  <button type="submit">{{.T "Take the set in"}}</button>
+</form>
+{{end}}

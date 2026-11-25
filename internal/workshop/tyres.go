@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RedaEkengren/FreeSMS/internal/access"
+	"github.com/RedaEkengren/FreeSMS/internal/database"
 )
 
 // Tyre sets (#226): a set is its own thing with a history, not a note on the
@@ -145,10 +146,15 @@ func insertTyreTx(ctx context.Context, tx pgx.Tx, scope access.Scope, setID, rep
 	return err
 }
 
-// ownsVehicleTx reports whether the customer has the car now.
+// ownsVehicleTx reports whether the customer has the car now. The shop's own
+// customer has the cars the shop controls: one in its stock or its fleet, which
+// is to say one with a resource that has not been retired.
 func ownsVehicleTx(ctx context.Context, tx pgx.Tx, customerID, vehicleID string) (bool, error) {
 	var ok bool
-	err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM vehicle_ownership WHERE vehicle_id = $1 AND customer_id = $2 AND owned_to IS NULL)`,
+	err := tx.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM vehicle_ownership WHERE vehicle_id = $1 AND customer_id = $2 AND owned_to IS NULL)
+		    OR (EXISTS (SELECT 1 FROM shop_own_customers o WHERE o.customer_id = $2)
+		        AND EXISTS (SELECT 1 FROM resources r WHERE r.vehicle_id = $1 AND r.retired_at IS NULL))`,
 		vehicleID, customerID).Scan(&ok)
 	return ok, err
 }
@@ -159,54 +165,69 @@ func CreateTyreSet(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	if !scope.Role.SeesCustomerPersonalData() {
 		return "", access.ErrForbidden
 	}
-	if !looksLikeUUID(n.CustomerID) || (n.VehicleID != "" && !looksLikeUUID(n.VehicleID)) {
-		return "", ErrNotFound
+	if err := checkNewSet(&n); err != nil {
+		return "", err
+	}
+	var id string
+	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		id, err = createTyreSetTx(ctx, tx, scope, n)
+		return err
+	})
+	return id, err
+}
+
+// checkNewSet trims and checks what a set is made of.
+func checkNewSet(n *NewTyreSet) error {
+	if !looksLikeUUID(n.CustomerID) && n.CustomerID != "" || (n.VehicleID != "" && !looksLikeUUID(n.VehicleID)) {
+		return ErrNotFound
 	}
 	n.Brand, n.Model, n.Note = strings.TrimSpace(n.Brand), strings.TrimSpace(n.Model), strings.TrimSpace(n.Note)
 	if !slices.Contains(TyreSeasons, n.Season) || !slices.Contains(TyreRims, n.Rims) || utf8.RuneCountInString(n.Brand) > 100 ||
 		utf8.RuneCountInString(n.Model) > 100 || utf8.RuneCountInString(n.Note) > 500 || len(n.Tyres) < 1 || len(n.Tyres) > 12 {
-		return "", errTyreSet
+		return errTyreSet
 	}
 	for i := range n.Tyres {
 		if err := checkTyre(&n.Tyres[i]); err != nil {
-			return "", err
-		}
-	}
-	var id string
-	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		var exists bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM customers WHERE id = $1)`, n.CustomerID).Scan(&exists); err != nil {
 			return err
 		}
-		if !exists {
-			return ErrNotFound
+	}
+	return nil
+}
+
+func createTyreSetTx(ctx context.Context, tx pgx.Tx, scope access.Scope, n NewTyreSet) (string, error) {
+	var id string
+	var exists bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM customers WHERE id = $1)`, n.CustomerID).Scan(&exists); err != nil {
+		return "", err
+	}
+	if !exists {
+		return "", ErrNotFound
+	}
+	if n.VehicleID != "" {
+		ok, err := ownsVehicleTx(ctx, tx, n.CustomerID, n.VehicleID)
+		if err != nil {
+			return "", err
 		}
-		if n.VehicleID != "" {
-			ok, err := ownsVehicleTx(ctx, tx, n.CustomerID, n.VehicleID)
-			if err != nil {
-				return err
-			}
-			if !ok {
-				return errTyreVehicle
-			}
+		if !ok {
+			return "", errTyreVehicle
 		}
-		if err := tx.QueryRow(ctx, `
-			INSERT INTO tyre_sets (shop_id, customer_id, season, brand, model, rims, tpms, fasteners, note, created_by)
-			VALUES ($1, $2, $3, nullif($4, ''), nullif($5, ''), $6, $7, $8, nullif($9, ''), NULLIF($10, '')::uuid) RETURNING id`,
-			scope.ShopID, n.CustomerID, n.Season, n.Brand, n.Model, n.Rims, n.TPMS, n.Fasteners, n.Note, scope.UserID).Scan(&id); err != nil {
-			return fmt.Errorf("create the set: %w", err)
+	}
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO tyre_sets (shop_id, customer_id, season, brand, model, rims, tpms, fasteners, note, created_by)
+		VALUES ($1, $2, $3, nullif($4, ''), nullif($5, ''), $6, $7, $8, nullif($9, ''), NULLIF($10, '')::uuid) RETURNING id`,
+		scope.ShopID, n.CustomerID, n.Season, n.Brand, n.Model, n.Rims, n.TPMS, n.Fasteners, n.Note, scope.UserID).Scan(&id); err != nil {
+		return "", fmt.Errorf("create the set: %w", err)
+	}
+	for _, t := range n.Tyres {
+		if err := insertTyreTx(ctx, tx, scope, id, "", t); err != nil {
+			return "", fmt.Errorf("add a tyre: %w", err)
 		}
-		for _, t := range n.Tyres {
-			if err := insertTyreTx(ctx, tx, scope, id, "", t); err != nil {
-				return fmt.Errorf("add a tyre: %w", err)
-			}
-		}
-		if n.VehicleID != "" {
-			return putTyreSetTx(ctx, tx, scope, id, n.VehicleID)
-		}
-		return nil
-	})
-	return id, err
+	}
+	if n.VehicleID != "" {
+		return id, putTyreSetTx(ctx, tx, scope, id, n.VehicleID)
+	}
+	return id, nil
 }
 
 func putTyreSetTx(ctx context.Context, tx pgx.Tx, scope access.Scope, setID, vehicleID string) error {
@@ -389,8 +410,25 @@ func TyreSetsOf(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, f T
 	if (f.CustomerID != "" && !looksLikeUUID(f.CustomerID)) || (f.VehicleID != "" && !looksLikeUUID(f.VehicleID)) {
 		return nil, ErrNotFound
 	}
+	return tyreSetsRead(ctx, pool, scope, f)
+}
+
+// tyreSetsRead is the read, for the callers that have checked who may ask.
+func tyreSetsRead(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, f TyreFilter) ([]TyreSet, error) {
+	if err := scope.Require(access.Workshop); err != nil {
+		return nil, err
+	}
 	var out []TyreSet
-	err := inWorkshop(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		// A car that is not this shop's is not found, not an empty list.
+		if f.VehicleID != "" {
+			var one int
+			if err := tx.QueryRow(ctx, `SELECT 1 FROM vehicles WHERE id = $1`, f.VehicleID).Scan(&one); errors.Is(err, pgx.ErrNoRows) {
+				return ErrNotFound
+			} else if err != nil {
+				return err
+			}
+		}
 		rows, err := tx.Query(ctx, tyreSetColumns+`
 			WHERE ($2 = '' OR s.customer_id = NULLIF($2, '')::uuid) AND ($3 = '' OR m.vehicle_id = NULLIF($3, '')::uuid)
 			ORDER BY s.created_at DESC, s.id`, scope.Role.SeesCustomerPersonalData(), f.CustomerID, f.VehicleID)
