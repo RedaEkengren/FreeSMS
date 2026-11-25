@@ -112,7 +112,7 @@ func TestAShopDrawsItsOwnAgeingLinesAndNarrowsTheList(t *testing.T) {
 	for _, d := range ages {
 		p := boughtCar(t, pool)
 		units = append(units, p.StockUnitID)
-		if _, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = clock_timestamp() - make_interval(days => $2) WHERE id = $1`, p.StockUnitID, d); err != nil {
+		if _, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = (date_trunc('day', clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops LIMIT 1)) - make_interval(days => $2) + interval '12 hours') AT TIME ZONE (SELECT timezone FROM shops LIMIT 1) WHERE id = $1`, p.StockUnitID, d); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -204,7 +204,7 @@ func TestCarsOlderThanTheOldestAgeingLineAreOneItemInTheQueue(t *testing.T) {
 	}
 	fresh, old, older := boughtCar(t, pool), boughtCar(t, pool), boughtCar(t, pool)
 	for unit, days := range map[string]int{old.StockUnitID: 100, older.StockUnitID: 200} {
-		if _, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = clock_timestamp() - make_interval(days => $2) WHERE id = $1`, unit, days); err != nil {
+		if _, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = (date_trunc('day', clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops LIMIT 1)) - make_interval(days => $2) + interval '12 hours') AT TIME ZONE (SELECT timezone FROM shops LIMIT 1) WHERE id = $1`, unit, days); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -241,7 +241,7 @@ func TestTheOwnersHomePageSaysHowLongTheCarsHaveBeenInStockOnAverage(t *testing.
 	ctx := context.Background()
 	for _, days := range []int{10, 30} {
 		p := boughtCar(t, pool)
-		if _, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = clock_timestamp() - make_interval(days => $2) WHERE id = $1`, p.StockUnitID, days); err != nil {
+		if _, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = (date_trunc('day', clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops LIMIT 1)) - make_interval(days => $2) + interval '12 hours') AT TIME ZONE (SELECT timezone FROM shops LIMIT 1) WHERE id = $1`, p.StockUnitID, days); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -279,7 +279,7 @@ func TestOneCardThatCannotBeReadIsTheOnlyOneMissing(t *testing.T) {
 	p := boughtCar(t, pool)
 	moveStock(t, pool, p.StockUnitID, workshop.StockForSale, workshop.StockSold)
 	q := boughtCar(t, pool)
-	if _, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = clock_timestamp() - make_interval(days => 12) WHERE id IN ($1, $2)`, p.StockUnitID, q.StockUnitID); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = (date_trunc('day', clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops LIMIT 1)) - make_interval(days => 12) + interval '12 hours') AT TIME ZONE (SELECT timezone FROM shops LIMIT 1) WHERE id IN ($1, $2)`, p.StockUnitID, q.StockUnitID); err != nil {
 		t.Fatal(err)
 	}
 	titles := func() (map[string]bool, []error) {

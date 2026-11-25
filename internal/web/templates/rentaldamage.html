@@ -5,6 +5,10 @@
 <p>{{$c.Description}}</p>
 <p class="waiting">{{.T "Found %s" (.Date (.Local $c.ObservedAt) "2 Jan 2006")}}{{if $c.BookingID}} &middot; <a href="/rental/bookings/{{$c.BookingID}}">{{.T "The rental"}}</a>{{end}}</p>
 <p class="waiting">{{.T "A damage is not a debt: it is owed only once its amount is settled and the customer has been told."}}</p>
+{{with .Rental.DamageJobs}}<ul class="lines">{{range .}}<li><div class="row"><a href="/jobs/{{.WorkOrderID}}">{{$.T "Job %d" .Number}}</a><span class="tag">{{$.T .State}}</span></div></li>{{end}}</ul>{{end}}
+{{if and ($.Runs "workshop") ($.Runs "rental")}}
+<form method="post" action="/rental/damage/{{$c.ID}}/job"><button type="submit" class="secondary">{{.T "Open a workshop job on this car"}}</button></form>
+{{end}}
 {{with $c.Steps}}
 <ul class="lines">
   {{range .}}<li><div class="row"><span>{{$.T .Step}}{{with .Liability}}: {{$.T .}}{{end}}{{with .AmountMinor}}: {{$.MoneyOrBlank .}}{{end}}{{with .Channel}}: {{$.T .}}{{end}}{{with .RespondBy}} &middot; {{$.T "may object until %s" ($.Date . "2 Jan 2006")}}{{end}}{{with .Response}}: {{$.T .}}{{end}}{{with .Outcome}}: {{$.T .}}{{end}}</span>

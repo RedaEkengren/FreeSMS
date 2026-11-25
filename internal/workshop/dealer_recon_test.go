@@ -225,7 +225,7 @@ func TestThePipelineShowsWhereEachCarStandsAndHowLong(t *testing.T) {
 	}
 	back(stepOf(b.StockUnitID, "Intake check"), 9)
 	back(stepOf(a.StockUnitID, "Valet"), 2)
-	if _, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = clock_timestamp() - make_interval(days => 15) WHERE id = $1`, b.StockUnitID); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE stock_units SET opened_at = (date_trunc('day', clock_timestamp() AT TIME ZONE (SELECT timezone FROM shops LIMIT 1)) - make_interval(days => 15) + interval '12 hours') AT TIME ZONE (SELECT timezone FROM shops LIMIT 1) WHERE id = $1`, b.StockUnitID); err != nil {
 		t.Fatal(err)
 	}
 
