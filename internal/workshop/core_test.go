@@ -46,7 +46,7 @@ var core = map[string]string{
 	// The availability ledger (#149): what the business owns, whichever
 	// module books it. Booking checks the module of the use.
 	"CreateResource": "resources, the business's own things", "RetireResource": "resources",
-	"ResourceBlocks": "when a resource is taken, by any module", "OverrideBlock": "replanning across modules", "ReverseOverrideBlock": "putting a replanning back, across modules",
+	"ResourceBlocks": "when a resource is taken, by any module", "OverrideBlock": "replanning across modules", "ReverseOverrideBlock": "putting a replanning back, across modules", "DamageJobsOf": "the jobs a damage case has, which stay readable when the workshop is switched off",
 	// Contracts (#150): the shop's own wording and how long it keeps them.
 	// Producing, reading and signing check the module of the kind.
 	"SaveDocumentTemplate": "the shop's contract templates, for every module", "DocumentRetention": "how long contracts are kept",
