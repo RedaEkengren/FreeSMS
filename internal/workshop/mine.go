@@ -88,6 +88,9 @@ var actionProviders = []ActionProvider{
 	// Calls to the outside world a person has to look at (#154).
 	{Name: "outbox", Items: outboxWaiting},
 	{Module: access.Workshop, Name: "workshop", Items: workshopWaiting},
+	// The tyre hotel (#230, #232): customers written to who have not booked,
+	// and sets nobody has come for.
+	{Module: access.Workshop, Name: "tyre hotel", Items: tyresWaiting},
 	// Dealer: leads (#172).
 	{Module: access.Dealer, Name: "dealer", Items: dealerWaiting},
 	// Dealer: cars in stock longer than the shop's oldest ageing line
@@ -143,6 +146,9 @@ var waitingSays = map[string]string{
 	"payments_unmatched": "%d payment is not on the bank's statement",
 	"outbox_given_up":    "%d call to another service was given up",
 	"outbox_manual":      "%d call to another service is a task to do by hand",
+	// The tyre hotel
+	"tyre_follow_up": "%d customer was written to about their tyres and has not booked",
+	"tyre_abandoned": "%d set in storage may have been left",
 	// Dealer
 	"lead_follow_up":        "A lead's next step is due: %s",
 	"lead_follow_up_any":    "A lead's next step is due",
@@ -181,7 +187,7 @@ func (w ActionItem) Says() string { return waitingSays[w.Kind] }
 // Plural reports whether the key counts, for the page to pick N or T.
 func (w ActionItem) Plural() bool {
 	switch w.Kind {
-	case "finding", "answer", "uncollected", "outbox_given_up", "outbox_manual", "payments_unmatched", "stock_ageing", "recon_stalled":
+	case "finding", "answer", "uncollected", "outbox_given_up", "outbox_manual", "payments_unmatched", "stock_ageing", "recon_stalled", "tyre_follow_up", "tyre_abandoned":
 		return true
 	}
 	return false
@@ -224,6 +230,10 @@ func (w ActionItem) Link() string {
 		return "/rental/settings"
 	case w.SubjectKind == "rental_fines":
 		return "/rental/fines"
+	case w.SubjectKind == "tyre_changes":
+		return "/tyres/changes"
+	case w.SubjectKind == "tyre_abandoned":
+		return "/tyres/abandoned"
 	}
 	return "/jobs/" + w.SubjectID
 }

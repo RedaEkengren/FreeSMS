@@ -9692,6 +9692,14 @@
     "handing it to another customer": {"other": "lämna över den till en annan kund"},
     "For a transfer, to whom": {"other": "Vid överlåtelse, till vem"},
     "transfer": {"other": "överlåtelse"},
-    "disposal": {"other": "kassering"}
+    "disposal": {"other": "kassering"},
+    "%d customer was written to about their tyres and has not booked": {
+      "one": "%d kund har fått ett meddelande om sina däck och har inte bokat",
+      "other": "%d kunder har fått ett meddelande om sina däck och har inte bokat"
+    },
+    "%d set in storage may have been left": {
+      "one": "%d uppsättning i lager kan ha lämnats kvar",
+      "other": "%d uppsättningar i lager kan ha lämnats kvar"
+    }
   }
 }
