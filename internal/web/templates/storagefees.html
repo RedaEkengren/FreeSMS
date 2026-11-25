@@ -1,0 +1,32 @@
+{{define "content"}}
+<h1>{{.T "Storage fees"}}</h1>
+<p class="waiting">{{.T "A set is charged once for each period, on its change job or on one invoice to the customer. A set taken out in the middle of a period stays charged."}}</p>
+<p><a href="/tyres/extras">{{.T "Tyre extras"}}</a></p>
+{{if .TyreExtras}}
+<form method="get" action="/tyres/storage-fees">
+  <label><span>{{.T "Storage fee"}}</span><select name="fee">{{range .TyreExtras}}<option value="{{.ID}}"{{if eq .ID $.FeeID}} selected{{end}}>{{.Name}} &middot; {{$.Money .UnitPriceMinor}}</option>{{end}}</select></label>
+  <label><span>{{.T "For the year"}}</span><input name="year" inputmode="numeric" value="{{.FeeYear}}" maxlength="4" required></label>
+  <button type="submit" class="secondary">{{.T "Who is due"}}</button>
+</form>
+{{else}}<p class="empty">{{.T "No storage fees yet. Make one under tyre extras."}}</p>{{end}}
+{{if .FeeID}}
+{{if .StorageDue}}
+<ul class="lines">
+  {{range .StorageDue}}
+  <li><div class="row"><a href="/customers/{{.CustomerID}}/tyres">{{.Name}}</a><span class="tag">{{$.Money .NetMinor}}</span></div>
+    <div class="waiting">{{range $i, $s := .Sets}}{{if $i}} &middot; {{end}}{{$s}}{{end}}</div>
+    <form method="post" action="/tyres/storage-fees/invoice">
+      <input type="hidden" name="customer" value="{{.CustomerID}}"><input type="hidden" name="fee" value="{{$.FeeID}}"><input type="hidden" name="year" value="{{$.FeeYear}}">
+      <button type="submit">{{$.T "Invoice the storage"}}</button></form></li>
+  {{end}}
+</ul>
+{{else}}<p class="empty">{{.T "Nobody is due for this fee and year."}}</p>{{end}}
+{{end}}
+{{if .Session.Scope.Role.RunsTheShop}}
+<h2>{{.T "How the shop charges"}}</h2>
+<form method="post" action="/tyres/storage-fees/billing">
+  <label><span>{{.T "Usually"}}</span><select name="billing"><option value="job"{{if eq .StorageBilling "job"}} selected{{end}}>{{.T "On the change job"}}</option><option value="invoice"{{if eq .StorageBilling "invoice"}} selected{{end}}>{{.T "On an invoice to the customer"}}</option></select></label>
+  <button type="submit">{{.T "Save"}}</button>
+</form>
+{{else}}<p class="waiting">{{.T "The shop usually charges"}}: {{if eq .StorageBilling "job"}}{{.T "On the change job"}}{{else}}{{.T "On an invoice to the customer"}}{{end}}</p>{{end}}
+{{end}}

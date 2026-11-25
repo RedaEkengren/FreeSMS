@@ -346,7 +346,7 @@ func (s *Server) handleJobTyres(w http.ResponseWriter, r *http.Request) {
 	if s.handoverError(w, r, err) {
 		return
 	}
-	pd := pageData{Title: "Tyres on the job", Session: session, Job: job, JobTyreMoves: moves, Tyres: sets, Places: places}
+	pd := pageData{Title: "Tyres on the job", Session: session, Job: job, JobTyreMoves: moves, Tyres: sets, Places: places, FeeYear: time.Now().Year()}
 	// The price list is the front desk's; a technician's page has no prices.
 	if session.Scope.Role.SeesCustomerPersonalData() {
 		if pd.TyreExtras, err = workshop.TyreExtras(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
@@ -408,7 +408,8 @@ func (s *Server) handleCreateTyreExtra(w http.ResponseWriter, r *http.Request) {
 	price, vat, err := priceFields(r)
 	if err == nil {
 		_, err = workshop.CreateTyreExtra(r.Context(), s.pool, session.Scope, workshop.NewTyreExtra{
-			Name: r.FormValue("name"), Per: r.FormValue("per"), LineKind: r.FormValue("kind"), UnitPriceMinor: price, VATRateBasis: vat})
+			Name: r.FormValue("name"), Per: r.FormValue("per"), LineKind: r.FormValue("kind"), UnitPriceMinor: price, VATRateBasis: vat,
+			StoragePeriod: r.FormValue("storage")})
 	}
 	if s.handoverError(w, r, err) {
 		return
@@ -572,4 +573,70 @@ func (s *Server) handleBookTyreChange(w http.ResponseWriter, r *http.Request) {
 	}
 	s.submitted(w, r)
 	http.Redirect(w, r, "/bookings/"+booking, http.StatusSeeOther)
+}
+
+func (s *Server) handleStorageFees(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	extras, err := workshop.TyreExtras(r.Context(), s.pool, session.Scope)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	pd := pageData{Title: "Storage fees", Session: session, FeeYear: time.Now().Year()}
+	for _, x := range extras {
+		if x.StoragePeriod != "" {
+			pd.TyreExtras = append(pd.TyreExtras, x)
+		}
+	}
+	if pd.StorageBilling, err = workshop.StorageBillingOf(r.Context(), s.pool, session.Scope); s.handoverError(w, r, err) {
+		return
+	}
+	if y := formIntQuery(r, "year"); y != 0 {
+		pd.FeeYear = y
+	}
+	pd.FeeID = r.URL.Query().Get("fee")
+	if pd.FeeID != "" && session.Scope.Role.SeesCustomerPersonalData() {
+		if pd.StorageDue, err = workshop.StorageDueFor(r.Context(), s.pool, session.Scope, pd.FeeID, pd.FeeYear); s.handoverError(w, r, err) {
+			return
+		}
+	}
+	s.render(w, r, http.StatusOK, "storagefees", pd)
+}
+
+func formIntQuery(r *http.Request, key string) int {
+	n, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get(key)))
+	return n
+}
+
+func (s *Server) handleInvoiceStorage(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	inv, err := workshop.InvoiceStorage(r.Context(), s.pool, session.Scope, r.FormValue("customer"), r.FormValue("fee"), formInt(r, "year"))
+	if errors.Is(err, workshop.ErrNothingToInvoice) {
+		s.renderError(w, r, http.StatusBadRequest, "Nothing to invoice", "Every set of this customer is charged for that period already.")
+		return
+	}
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/invoices/"+inv.ID, http.StatusSeeOther)
+}
+
+func (s *Server) handleStorageBilling(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	err := workshop.SetStorageBilling(r.Context(), s.pool, session.Scope, r.FormValue("billing"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/tyres/storage-fees", http.StatusSeeOther)
+}
+
+func (s *Server) handleJobStorageFee(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	err := workshop.ChargeStorageOnJob(r.Context(), s.pool, session.Scope, r.PathValue("id"), r.FormValue("set"), r.FormValue("fee"), formInt(r, "year"))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/jobs/"+r.PathValue("id")+"/tyres", http.StatusSeeOther)
 }

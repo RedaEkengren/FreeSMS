@@ -574,3 +574,66 @@ func TestAChangeIsBookedFromTheSetsPageAndShowsOnTheDays(t *testing.T) {
 		t.Errorf("the days page after changing the settings:\n%s", page)
 	}
 }
+
+// A storage fee is made by the owner, charged on a job or on an invoice from the
+// fees page, once for each period, and no technician reaches any of it.
+func TestAStorageFeeIsChargedOnAJobOrInvoicedOnceAPeriod(t *testing.T) {
+	ts, pool := testServer(t)
+	const customer = "aaaaaaaa-0000-0000-0000-000000000004"
+	const job = "aaaaaaaa-0000-0000-0000-00000000000f"
+	ctx := context.Background()
+	owner, advisor, tech := signIn(t, ts, ownerEmail), signIn(t, ts, advisorEmail), signIn(t, ts, techEmail)
+	postStatus(t, owner, ts.URL+"/storage", url.Values{"name": {"Rack"}, "capacity": {"3"}})
+	var rack, summer, winter, fee string
+	_ = pool.QueryRow(ctx, `SELECT id FROM storage_locations WHERE name = 'Rack'`).Scan(&rack)
+	for season, dst := range map[string]*string{"summer": &summer, "winter_friction": &winter} {
+		if err := pool.QueryRow(ctx, `INSERT INTO tyre_sets (shop_id, customer_id, season, brand, rims) VALUES ($1, $2, $3, 'Brand', 'alloy') RETURNING id::text`, shopA, customer, season).Scan(dst); err != nil {
+			t.Fatal(err)
+		}
+		postStatus(t, tech, ts.URL+"/tyres/"+*dst+"/place", url.Values{"place": {rack}})
+	}
+
+	form := url.Values{"name": {"Storage"}, "per": {"set"}, "kind": {"fee"}, "price": {"400"}, "vat": {"25"}, "storage": {"year"}}
+	if status := postStatus(t, advisor, ts.URL+"/tyres/extras", form); status != http.StatusForbidden {
+		t.Errorf("the front desk making a fee answered %d", status)
+	}
+	if status := postStatus(t, owner, ts.URL+"/tyres/extras", form); status != http.StatusSeeOther {
+		t.Fatalf("the owner making a fee answered %d", status)
+	}
+	_ = pool.QueryRow(ctx, `SELECT id::text FROM tyre_extras WHERE name = 'Storage'`).Scan(&fee)
+
+	if status := postStatus(t, tech, ts.URL+"/jobs/"+job+"/tyres/storage-fee", url.Values{"set": {summer}, "fee": {fee}, "year": {"2027"}}); status != http.StatusForbidden {
+		t.Errorf("a technician charging storage answered %d", status)
+	}
+	if status := postStatus(t, advisor, ts.URL+"/jobs/"+job+"/tyres/storage-fee", url.Values{"set": {summer}, "fee": {fee}, "year": {"2027"}}); status != http.StatusSeeOther {
+		t.Fatalf("charging the summer set answered %d", status)
+	}
+	if status := postStatus(t, advisor, ts.URL+"/jobs/"+job+"/tyres/storage-fee", url.Values{"set": {summer}, "fee": {fee}, "year": {"2027"}}); status != http.StatusBadRequest {
+		t.Errorf("charging the same period twice answered %d", status)
+	}
+	page := visibleText(get(t, advisor, ts.URL+"/tyres/storage-fees?fee="+fee+"&year=2027", http.StatusOK))
+	if !strings.Contains(page, "Invoice the storage") {
+		t.Errorf("the winter set is still due:\n%s", page)
+	}
+	if status := getStatus(t, tech, ts.URL+"/tyres/storage-fees"); status != http.StatusForbidden {
+		t.Errorf("a technician reading the fees page answered %d", status)
+	}
+	if status := postStatus(t, tech, ts.URL+"/tyres/storage-fees/invoice", url.Values{"customer": {customer}, "fee": {fee}, "year": {"2027"}}); status != http.StatusForbidden {
+		t.Errorf("a technician invoicing storage answered %d", status)
+	}
+	if status := postStatus(t, advisor, ts.URL+"/tyres/storage-fees/invoice", url.Values{"customer": {customer}, "fee": {fee}, "year": {"2027"}}); status != http.StatusSeeOther {
+		t.Fatalf("invoicing the storage answered %d", status)
+	}
+	var lines int
+	_ = pool.QueryRow(ctx, `SELECT count(*) FROM invoice_lines l JOIN invoices i ON i.id = l.invoice_id WHERE i.customer_id = $1 AND l.description LIKE 'Storage%'`, customer).Scan(&lines)
+	if lines != 1 {
+		t.Errorf("the invoice has %d lines; the job already charged the other set", lines)
+	}
+	if status := postStatus(t, advisor, ts.URL+"/tyres/storage-fees/invoice", url.Values{"customer": {customer}, "fee": {fee}, "year": {"2027"}}); status != http.StatusBadRequest {
+		t.Errorf("invoicing with nothing left answered %d", status)
+	}
+	if status := postStatus(t, owner, ts.URL+"/tyres/storage-fees/billing", url.Values{"billing": {"invoice"}}); status != http.StatusSeeOther {
+		t.Errorf("choosing the billing answered %d", status)
+	}
+	_ = winter
+}
