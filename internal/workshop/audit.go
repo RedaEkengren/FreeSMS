@@ -44,6 +44,7 @@ var AuditedTransitions = []AuditTransition{
 	{"roles.changed", "user", "audit_events", false},
 	{"block.overridden", "resource_block", "audit_events", true},
 	{"block.override_reversed", "resource_block", "audit_events", true},
+	{"block.service_crossed", "resource_block", "audit_events", true},
 	{"document.signed", "document", "document_signatures", false},
 	{"document.superseded", "document", "document_records", false},
 	{"payment.recorded", "invoice", "invoice_payments", false},

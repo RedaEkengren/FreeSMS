@@ -3,6 +3,7 @@ package workshop_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -222,5 +223,57 @@ func TestAServiceFallingDueIsGivenTimeBeforeItsDateAndNeverOverABooking(t *testi
 	items, _ = workshop.WaitingFor(ctx, pool, rentalDesk())
 	if waitingKinds(t, items)["service_due"] != 1 {
 		t.Errorf("the queue asks about the one with no time: %v", waitingKinds(t, items))
+	}
+}
+
+// A booking that would run past the day a service falls due, with no time set
+// aside for it, is refused with the services named; with a reason it is made and
+// the reason is kept in the block's trail. A service with time set aside does not
+// ask.
+func TestABookingPastADueServiceAsksForAReasonAndKeepsIt(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	unit := v.unit
+	if err := workshop.SetServicePlan(ctx, pool, rentalDesk(), unit, workshop.ServicePlan{Kind: "service", IntervalMonths: 12, DurationMinutes: 240, InUse: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.RecordServiceDone(ctx, pool, rentalDesk(), unit, "service", time.Now().AddDate(-1, 0, 5), nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	book := func(from, to time.Time, why string) (string, error) {
+		return workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{UnitID: unit, RenterID: v.renter, From: from, To: to, ServiceWhy: why})
+	}
+	// Ends before the service is due: no question.
+	if _, err := book(time.Now().Add(24*time.Hour), time.Now().Add(48*time.Hour), ""); err != nil {
+		t.Fatalf("a rental ending before it is due: %v", err)
+	}
+	// Runs past it: refused, naming the kind.
+	from, to := time.Now().AddDate(0, 0, 10), time.Now().AddDate(0, 0, 14)
+	_, err := book(from, to, "")
+	var crossing *workshop.ServiceCrossing
+	if !errors.As(err, &crossing) || len(crossing.Kinds) != 1 || crossing.Kinds[0] != "service" || !errors.Is(err, workshop.ErrInvalid) {
+		t.Fatalf("a rental past the due day: %v", err)
+	}
+	if _, err := book(from, to, strings.Repeat("x", 301)); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a reason too long: %v", err)
+	}
+	id, err := book(from, to, "The renter needs it, and the car goes in on the day after")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var events int
+	if err := pool.QueryRow(ctx, `
+		SELECT count(*) FROM audit_events e JOIN rental_bookings b ON b.block_id = e.subject_id
+		WHERE b.id = $1 AND e.event = 'block.service_crossed' AND e.reason LIKE 'The renter needs it%'`, id).Scan(&events); err != nil || events != 1 {
+		t.Errorf("%d events kept the reason, %v", events, err)
+	}
+	// With time set aside before the due date it does not ask.
+	n, left, err := workshop.PlanDueServices(ctx, pool, rentalDesk(), 30)
+	if err != nil || n != 1 || len(left) != 0 {
+		t.Fatalf("planned %d, left %d, %v", n, len(left), err)
+	}
+	if _, err := book(time.Now().AddDate(0, 0, 20), time.Now().AddDate(0, 0, 24), ""); err != nil {
+		t.Errorf("a rental past the due day when time is set aside for it: %v", err)
 	}
 }

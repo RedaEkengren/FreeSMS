@@ -1,0 +1,21 @@
+{{define "content"}}
+<h1>{{.T "Fleet services"}}</h1>
+<p class="waiting">{{.T "What falls due within thirty days, and whether time is set aside for it. Time is held, never taken from a booking."}}</p>
+{{if .Rental.ServiceRan}}
+<p class="status-big">{{.T "Time was set aside for %d." .Rental.ServicePlanned}}</p>
+{{if .Rental.ServiceLeft}}
+<div class="error"><p>{{.T "No free time before the due date, so nothing was moved or cancelled. Decide on these:"}}</p>
+<ul>{{range .Rental.ServiceLeft}}<li><a href="/rental/units/{{.UnitID}}">{{.Label}}</a> &middot; {{$.T .Kind}}</li>{{end}}</ul></div>
+{{end}}
+{{end}}
+{{if .Rental.ServiceRows}}
+<ul class="lines">
+  {{range .Rental.ServiceRows}}
+  <li><div class="row"><a href="/rental/units/{{.UnitID}}">{{.Label}}</a>
+      <span class="tag{{if .Overdue}} late{{end}}">{{$.T .Kind}} &middot; {{if .DueOn}}{{$.Date .DueOn "2 Jan 2006"}}{{end}}</span></div>
+    <div class="waiting">{{if .Planned}}{{$.T "Time is set aside: %s" ($.Date ($.Local .BlockFrom) "Mon 2 Jan 15:04")}}{{else}}{{$.T "No time set aside"}}{{end}}{{if .DueKm}} &middot; {{$.T "%s km" ($.Num .DueKm)}}{{end}}</div></li>
+  {{end}}
+</ul>
+<form method="post" action="/rental/service/plan"><button type="submit">{{.T "Set time aside"}}</button></form>
+{{else}}<p class="empty">{{.T "Nothing falls due within thirty days."}}</p>{{end}}
+{{end}}

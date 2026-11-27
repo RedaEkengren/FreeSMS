@@ -92,6 +92,33 @@
     <div class="waiting">{{$.Date ($.Local .Starts) "Mon 2 Jan 15:04"}} &ndash; {{$.Date ($.Local .Ends) "Mon 2 Jan 15:04"}}</div></li>
   {{end}}{{end}}
 </ul>
+<h2>{{$.T "Service"}}</h2>
+{{if $.Rental.ServiceDue}}<ul class="lines">{{range $.Rental.ServiceDue}}<li><div class="row"><span>{{$.T .Kind}}</span><span class="tag{{if .Overdue}} late{{end}}">{{if .DueOn}}{{$.Date .DueOn "2 Jan 2006"}}{{else}}{{$.T "No date yet"}}{{end}}</span></div>
+  <div class="waiting">{{with .LastDone}}{{$.T "Last done %s" ($.Date . "2 Jan 2006")}}{{else}}{{$.T "Never done"}}{{end}}{{with .DueKm}} &middot; {{$.T "limit %s km" ($.Num .)}}{{end}}</div></li>{{end}}</ul>
+{{else}}<p class="empty">{{$.T "No service plan yet."}}</p>{{end}}
+<details><summary>{{$.T "Plan a service"}}</summary>
+<form method="post" action="/rental/units/{{.ID}}/service-plan">
+  <label><span>{{$.T "Kind"}}</span><select name="kind">{{range $.Rental.ServiceKinds}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+  <div class="pair">
+    <label><span>{{$.T "Every how many months"}}</span><input name="months" inputmode="numeric" maxlength="3"></label>
+    <label><span>{{$.T "Every how many kilometres"}}</span><input name="km" inputmode="numeric" maxlength="7"></label>
+  </div>
+  <label><span>{{$.T "Hours it takes"}}</span><input name="hours" inputmode="numeric" value="4" maxlength="3" required></label>
+  <label class="check"><input type="checkbox" name="end" value="1"> {{$.T "End this plan"}}</label>
+  <button type="submit">{{$.T "Save the plan"}}</button>
+</form>
+</details>
+<details><summary>{{$.T "Record that it was done"}}</summary>
+<form method="post" action="/rental/units/{{.ID}}/service-done">
+  <label><span>{{$.T "Kind"}}</span><select name="kind">{{range $.Rental.ServiceKinds}}<option value="{{.}}">{{$.T .}}</option>{{end}}</select></label>
+  <div class="pair">
+    <label><span>{{$.T "Done on"}}</span><input type="date" name="done_on" required></label>
+    <label><span>{{$.T "Kilometres, if known"}}</span><input name="km" inputmode="numeric" maxlength="7"></label>
+  </div>
+  <button type="submit">{{$.T "Record it"}}</button>
+</form>
+</details>
+
 <details open><summary>{{$.T "Book it"}}</summary>
 <form method="post" action="/rental/bookings">
   <input type="hidden" name="unit" value="{{.ID}}">
@@ -113,6 +140,7 @@
     <label><span>{{$.T "Why"}}</span><input name="rent_reason" maxlength="300"></label>
   </div>
   <label><span>{{$.T "Hold only, until (waiting for a deposit or an answer)"}}</span><input type="datetime-local" name="hold_until"></label>
+  <label><span>{{$.T "Why it is booked although a service falls due before it ends, if you are asked"}}</span><input name="service_why" maxlength="300"></label>
   <button type="submit">{{$.T "Book"}}</button>
 </form>
 </details>
