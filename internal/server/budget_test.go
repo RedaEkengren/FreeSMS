@@ -86,7 +86,10 @@ var queryBudgets = map[string]int{
 	// one statement in the dealer's own read -- not a provider of its own,
 	// which would have cost two more. 34 to 35: the cars' average days in
 	// stock (#157), one statement for the owner's card.
-	"owner GET /":     36,
+	// 36 to 37 (#205): the fleet services that fall due, one statement in a shop with
+	// no plan and four -- plans, readings, blocks set aside -- with any, however many
+	// units.
+	"owner GET /":     37,
 	"desk GET /board": 21,
 	// 35: the quote the customer was shown and what they answered to it
 	// (two statements), which the counter reads on every live refresh.

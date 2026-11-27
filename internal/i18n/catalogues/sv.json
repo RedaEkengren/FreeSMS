@@ -9715,6 +9715,15 @@
     "At service": {"other": "På service"},
     "the case has no car with a registration to open a job on": {"other": "ärendet har ingen bil med registreringsnummer att öppna ett jobb på"},
     "Job %d": {"other": "Jobb %d"},
-    "Open a workshop job on this car": {"other": "Öppna ett verkstadsjobb på den här bilen"}
+    "Open a workshop job on this car": {"other": "Öppna ett verkstadsjobb på den här bilen"},
+    "a plan is by months, by kilometres or both, and takes from 15 minutes to two weeks": {"other": "en plan gäller månader, kilometer eller båda, och tar från 15 minuter till två veckor"},
+    "a service, an inspection, a tyre change or something else": {"other": "en service, en besiktning, ett däckbyte eller något annat"},
+    "it cannot have been done in the future": {"other": "det kan inte ha gjorts i framtiden"},
+    "when it was done, and its kilometres if they are known": {"other": "när det gjordes, och dess kilometer om de är kända"},
+    "%d fleet service falls due soon and has no time set aside": {
+      "one": "%d flottservice förfaller snart och har ingen tid avsatt",
+      "other": "%d flottservicer förfaller snart och har ingen tid avsatt"
+    },
+    "from 1 to 365 days ahead": {"other": "från 1 till 365 dagar framåt"}
   }
 }

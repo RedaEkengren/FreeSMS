@@ -103,6 +103,8 @@ var actionProviders = []ActionProvider{
 	// is the day's handovers, and this failing does not take them with it.
 	{Module: access.Rental, Name: "damage", Items: damageWaiting},
 	{Module: access.Rental, Name: "rental paperwork", Items: rentalPaperworkWaiting},
+	// A fleet service that falls due with no time set aside for it (#205).
+	{Module: access.Rental, Name: "fleet service", Items: serviceWaiting},
 }
 
 // IncompleteError is WaitingFor's when a provider failed: the items of the
@@ -179,6 +181,7 @@ var waitingSays = map[string]string{
 	"deposit_hold_open":      "A rental is over and the hold on the card is not released: %s",
 	"fine_due":               "A charge the shop owes the authority is due: %s",
 	"fine_undecided":         "A charge for a vehicle nobody has decided on: %s",
+	"service_due":            "%d fleet service falls due soon and has no time set aside",
 }
 
 // Says is the item's catalogue key.
@@ -187,7 +190,7 @@ func (w ActionItem) Says() string { return waitingSays[w.Kind] }
 // Plural reports whether the key counts, for the page to pick N or T.
 func (w ActionItem) Plural() bool {
 	switch w.Kind {
-	case "finding", "answer", "uncollected", "outbox_given_up", "outbox_manual", "payments_unmatched", "stock_ageing", "recon_stalled", "tyre_follow_up", "tyre_abandoned":
+	case "finding", "answer", "uncollected", "outbox_given_up", "outbox_manual", "payments_unmatched", "stock_ageing", "recon_stalled", "tyre_follow_up", "tyre_abandoned", "service_due":
 		return true
 	}
 	return false
@@ -230,6 +233,8 @@ func (w ActionItem) Link() string {
 		return "/rental/settings"
 	case w.SubjectKind == "rental_fines":
 		return "/rental/fines"
+	case w.SubjectKind == "rental_service":
+		return "/rental/service"
 	case w.SubjectKind == "tyre_changes":
 		return "/tyres/changes"
 	case w.SubjectKind == "tyre_abandoned":
