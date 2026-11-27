@@ -277,3 +277,159 @@ func TestABookingPastADueServiceAsksForAReasonAndKeepsIt(t *testing.T) {
 		t.Errorf("a rental past the due day when time is set aside for it: %v", err)
 	}
 }
+
+// The time set aside for a service is confirmed, becomes the workshop job's own
+// when the job is opened (in one transaction, so a refused job leaves the time
+// where it was), and is let go when the service is recorded done; the next one
+// is counted from that.
+func TestTheTimeSetAsideForAServiceIsConfirmedTakenOverByAJobAndLetGoWhenDone(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	if err := workshop.SetServicePlan(ctx, pool, rentalDesk(), v.unit, workshop.ServicePlan{Kind: "service", IntervalMonths: 12, DurationMinutes: 240, InUse: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.RecordServiceDone(ctx, pool, rentalDesk(), v.unit, "service", time.Now().AddDate(-1, 0, 5), nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	if n, _, err := workshop.PlanDueServices(ctx, pool, rentalDesk(), 30); err != nil || n != 1 {
+		t.Fatalf("planned %d, %v", n, err)
+	}
+	soon, _ := workshop.ServicesDueSoon(ctx, pool, rentalDesk(), 30)
+	block := soon[0].BlockID
+	status := func() string {
+		var s string
+		if err := pool.QueryRow(ctx, `SELECT status FROM resource_blocks WHERE id = $1`, block).Scan(&s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	if err := workshop.ConfirmServiceBlock(ctx, pool, technician(), block); !errors.Is(err, access.ErrForbidden) {
+		t.Errorf("a technician confirmed it: %v", err)
+	}
+	if err := workshop.ConfirmServiceBlock(ctx, pool, rentalDesk(), "11111111-1111-1111-1111-111111111111"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a block that is not a service's: %v", err)
+	}
+	if err := workshop.ConfirmServiceBlock(ctx, pool, rentalDesk(), block); err != nil || status() != workshop.BlockConfirmed {
+		t.Fatalf("confirming: %v, %s", err, status())
+	}
+
+	job, err := workshop.StartServiceJob(ctx, pool, rentalDesk(), v.unit, "service", "Service")
+	if err != nil {
+		t.Fatalf("opening the job: %v", err)
+	}
+	var customer, own string
+	if err := pool.QueryRow(ctx, `SELECT coalesce(customer_id::text, '') FROM work_orders WHERE id = $1`, job).Scan(&customer); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT customer_id::text FROM shop_own_customers`).Scan(&own); err != nil || customer != own {
+		t.Errorf("the job is for %q, the shop is %q, %v", customer, own, err)
+	}
+	if status() != workshop.BlockReleased {
+		t.Errorf("the time set aside is %q once the job has its own", status())
+	}
+	var jobBlocks int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM resource_blocks WHERE resource_id = $1 AND kind = 'workshop' AND status = 'confirmed'`, v.resource).Scan(&jobBlocks); err != nil || jobBlocks != 1 {
+		t.Errorf("the job's own block: %d, %v", jobBlocks, err)
+	}
+	if _, err := workshop.StartServiceJob(ctx, pool, technician(), v.unit, "service", "Service"); !errors.Is(err, access.ErrForbidden) {
+		t.Errorf("a technician opened a service job: %v", err)
+	}
+	if _, err := workshop.StartServiceJob(ctx, pool, rentalDesk(), v.unit, "wash", "Service"); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a kind that does not exist: %v", err)
+	}
+
+	// Done: recorded for the job, the next one counts from it.
+	km := int64(50000)
+	if err := workshop.RecordServiceDone(ctx, pool, rentalDesk(), v.unit, "service", time.Now(), &km, job); err != nil {
+		t.Fatal(err)
+	}
+	due, _ := workshop.ServiceDueFor(ctx, pool, rentalDesk(), v.unit)
+	if len(due) != 1 || due[0].DueOn == nil || !due[0].DueOn.After(time.Now().AddDate(0, 11, 0)) {
+		t.Errorf("after it was done: %+v", due)
+	}
+}
+
+// A service block recorded done is let go, and a refused job leaves the time set
+// aside where it was.
+func TestARefusedServiceJobLeavesTheTimeSetAsideAndDoneLetsItGo(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	if err := workshop.SetServicePlan(ctx, pool, rentalDesk(), v.unit, workshop.ServicePlan{Kind: "service", IntervalMonths: 12, DurationMinutes: 240, InUse: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.RecordServiceDone(ctx, pool, rentalDesk(), v.unit, "service", time.Now().AddDate(-1, 0, 5), nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	if n, _, err := workshop.PlanDueServices(ctx, pool, rentalDesk(), 30); err != nil || n != 1 {
+		t.Fatalf("planned %d, %v", n, err)
+	}
+	soon, _ := workshop.ServicesDueSoon(ctx, pool, rentalDesk(), 30)
+	block := soon[0].BlockID
+	// The car is rented out for a long time from the end of the time set aside:
+	// a job opened now has an open end and cannot have the car.
+	if _, err := rent(pool, rentalDesk(), v.resource, soon[0].BlockTo.Add(time.Hour), soon[0].BlockTo.AddDate(0, 0, 30)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.StartServiceJob(ctx, pool, rentalDesk(), v.unit, "service", "Service"); !errors.Is(err, workshop.ErrResourceTaken) {
+		t.Fatalf("a job that cannot have the car: %v", err)
+	}
+	var status string
+	if err := pool.QueryRow(ctx, `SELECT status FROM resource_blocks WHERE id = $1`, block).Scan(&status); err != nil || status == workshop.BlockReleased {
+		t.Errorf("a refused job let the time go: %q, %v", status, err)
+	}
+	var jobs int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM work_orders`).Scan(&jobs); err != nil || jobs != 0 {
+		t.Errorf("a refused job left %d work orders, %v", jobs, err)
+	}
+	// Recorded done without a job: the time is let go.
+	if err := workshop.RecordServiceDone(ctx, pool, rentalDesk(), v.unit, "service", time.Now(), nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT status FROM resource_blocks WHERE id = $1`, block).Scan(&status); err != nil || status != workshop.BlockReleased {
+		t.Errorf("done, and the time is %q, %v", status, err)
+	}
+}
+
+// The shop says how far ahead services are set aside time for, and the queue
+// follows it; only whoever runs the shop says it.
+func TestTheHorizonIsTheShopsAndTheQueueFollowsIt(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	if err := workshop.SetServicePlan(ctx, pool, rentalDesk(), v.unit, workshop.ServicePlan{Kind: "service", IntervalMonths: 12, DurationMinutes: 240, InUse: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.RecordServiceDone(ctx, pool, rentalDesk(), v.unit, "service", time.Now().AddDate(-1, 0, 20), nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	asked := func() int {
+		items, _ := workshop.WaitingFor(ctx, pool, rentalDesk())
+		return waitingKinds(t, items)["service_due"]
+	}
+	if h, err := workshop.ServiceHorizonOf(ctx, pool, rentalDesk()); err != nil || h != workshop.ServiceHorizonDays {
+		t.Fatalf("the default: %d, %v", h, err)
+	}
+	if asked() != 1 {
+		t.Fatal("a service due in twenty days is not asked about with thirty ahead")
+	}
+	if err := workshop.SetServiceHorizon(ctx, pool, rentalDesk(), 7); !errors.Is(err, access.ErrForbidden) {
+		t.Errorf("the rental desk set the horizon: %v", err)
+	}
+	if err := workshop.SetServiceHorizon(ctx, pool, rentalOwner(), 0); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a horizon of nothing: %v", err)
+	}
+	if err := workshop.SetServiceHorizon(ctx, pool, rentalOwner(), 7); err != nil {
+		t.Fatal(err)
+	}
+	if asked() != 0 {
+		t.Error("a service due in twenty days is asked about with seven ahead")
+	}
+	if err := workshop.SetServiceHorizon(ctx, pool, rentalOwner(), 60); err != nil {
+		t.Fatal(err)
+	}
+	if asked() != 1 {
+		t.Error("with sixty ahead it is asked about again")
+	}
+}

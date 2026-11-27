@@ -55,11 +55,15 @@ func (s *Server) handleRentalService(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) renderRentalService(w http.ResponseWriter, r *http.Request, d rentalData) {
 	session := sessionFrom(r.Context())
-	rows, err := workshop.ServicesDueSoon(r.Context(), s.pool, session.Scope, workshop.ServiceHorizonDays)
+	horizon, err := workshop.ServiceHorizonOf(r.Context(), s.pool, session.Scope)
 	if s.handoverError(w, r, err) {
 		return
 	}
-	d.ServiceRows = rows
+	rows, err := workshop.ServicesDueSoon(r.Context(), s.pool, session.Scope, horizon)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	d.ServiceRows, d.ServiceHorizon = rows, horizon
 	s.render(w, r, http.StatusOK, "rentalservice", pageData{Title: "Fleet services", Session: session, Rental: d})
 }
 
@@ -67,9 +71,51 @@ func (s *Server) renderRentalService(w http.ResponseWriter, r *http.Request, d r
 // have none, and says which could not be given any.
 func (s *Server) handleRentalServicePlan(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
-	n, left, err := workshop.PlanDueServices(r.Context(), s.pool, session.Scope, workshop.ServiceHorizonDays)
+	horizon, err := workshop.ServiceHorizonOf(r.Context(), s.pool, session.Scope)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	n, left, err := workshop.PlanDueServices(r.Context(), s.pool, session.Scope, horizon)
 	if s.handoverError(w, r, err) {
 		return
 	}
 	s.renderRentalService(w, r, rentalData{ServicePlanned: n, ServiceLeft: left, ServiceRan: true})
+}
+
+// handleServiceJob opens a workshop job on the unit's car for a service, the job's
+// own time replacing what was set aside. The complaint is the shop's own words,
+// in the shop's language.
+func (s *Server) handleServiceJob(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	locale, _ := workshop.ShopLocale(r.Context(), s.pool, session.Scope.ShopID)
+	if locale == "" {
+		locale = s.locale
+	}
+	kind := r.FormValue("kind")
+	job, err := workshop.StartServiceJob(r.Context(), s.pool, session.Scope, r.PathValue("id"), kind, s.catalogues.For(locale).T(kind))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/jobs/"+job, http.StatusSeeOther)
+}
+
+// handleServiceConfirm makes the time set aside for a service a booking.
+func (s *Server) handleServiceConfirm(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	if err := workshop.ConfirmServiceBlock(r.Context(), s.pool, session.Scope, r.PathValue("id")); s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/rental/service", http.StatusSeeOther)
+}
+
+// handleServiceHorizon sets how far ahead services that fall due are set aside time for.
+func (s *Server) handleServiceHorizon(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	if err := workshop.SetServiceHorizon(r.Context(), s.pool, session.Scope, formInt(r, "days")); s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/rental/service", http.StatusSeeOther)
 }
