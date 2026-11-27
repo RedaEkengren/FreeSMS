@@ -469,3 +469,35 @@ func serviceDueTx(ctx context.Context, tx pgx.Tx, unitID string, now time.Time) 
 	}
 	return out, err
 }
+
+var errServiceWhy = fmt.Errorf("%w: say why it is booked although a service falls due, in 300 characters or fewer", ErrInvalid)
+
+// ServiceCrossing is a booking that would run past the day a service falls due
+// with no time set aside for it: refused with the kinds named, to be booked
+// again with a reason, or planned around.
+type ServiceCrossing struct{ Kinds []string }
+
+func (e *ServiceCrossing) Error() string {
+	return "workshop: invalid: a service falls due before the rental ends and has no time set aside; say why it is booked anyway, or plan the service first"
+}
+
+func (e *ServiceCrossing) Unwrap() error { return ErrInvalid }
+
+// serviceCrossingTx names the kinds of service that fall due on or before the
+// day the rental ends, and have no time set aside: an overdue one included. The
+// kilometres count as the unit's pace says.
+func serviceCrossingTx(ctx context.Context, tx pgx.Tx, unitID string, to, now time.Time) ([]string, error) {
+	rows, loc, err := serviceRowsTx(ctx, tx, unitID, now)
+	if err != nil || len(rows) == 0 {
+		return nil, err
+	}
+	end := to.In(loc)
+	last := time.Date(end.Year(), end.Month(), end.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, 1)
+	var kinds []string
+	for _, r := range rows {
+		if r.DueOn != nil && r.DueOn.Before(last) && !r.Planned() {
+			kinds = append(kinds, r.Kind)
+		}
+	}
+	return kinds, nil
+}

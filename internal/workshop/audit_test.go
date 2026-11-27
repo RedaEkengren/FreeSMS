@@ -65,6 +65,33 @@ func TestEveryAuditedTransitionLeavesAnEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	made["block.override_reversed"] = subject{"resource_block", back}
+	// And one booked past a service that falls due, with a reason.
+	audUnit := addUnit(t, pool, workshop.NewRentalUnit{Registration: "AUD 123", FleetNumber: "AUD1", Category: "Small van"})
+	if _, err := workshop.StartFleetMembership(ctx, pool, rentalDesk(), audUnit, time.Now().AddDate(-1, 0, 0), "bought", ""); err != nil {
+		t.Fatal(err)
+	}
+	audRenter, err := workshop.CreateParty(ctx, pool, rentalDesk(), workshop.NewParty{Kind: "private", Name: "Audit Hyrare", Role: workshop.PartyRenter})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dayPlan(t, pool, "Small van", 40000, "at_start")
+	van := rentable{unit: audUnit, renter: audRenter}
+	if err := workshop.SetServicePlan(ctx, pool, rentalDesk(), van.unit, workshop.ServicePlan{Kind: "service", IntervalMonths: 12, DurationMinutes: 240, InUse: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.RecordServiceDone(ctx, pool, rentalDesk(), van.unit, "service", time.Now().AddDate(-1, 0, 5), nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	crossed, err := workshop.BookRental(ctx, pool, rentalDesk(), workshop.NewRentalBooking{
+		UnitID: van.unit, RenterID: van.renter, From: time.Now().AddDate(0, 0, 10), To: time.Now().AddDate(0, 0, 14), ServiceWhy: "Kunden behöver bilen"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var crossedBlock string
+	if err := pool.QueryRow(ctx, `SELECT block_id::text FROM rental_bookings WHERE id = $1`, crossed).Scan(&crossedBlock); err != nil {
+		t.Fatal(err)
+	}
+	made["block.service_crossed"] = subject{"resource_block", crossedBlock}
 
 	// A contract signed, and corrected.
 	tpl := purchaseTemplate(t, pool)

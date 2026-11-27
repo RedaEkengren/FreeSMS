@@ -9746,6 +9746,9 @@
     "Plan a service": {"other": "Planera en service"},
     "Record that it was done": {"other": "Registrera att det är gjort"},
     "Service": {"other": "Service"},
-    "limit %s km": {"other": "gräns %s km"}
+    "limit %s km": {"other": "gräns %s km"},
+    "Why it is booked although a service falls due before it ends, if you are asked": {"other": "Varför den bokas trots att en service förfaller innan den slutar, om du blir tillfrågad"},
+    "say why it is booked although a service falls due, in 300 characters or fewer": {"other": "skriv varför den bokas trots att en service förfaller, med högst 300 tecken"},
+    "a service falls due before the rental ends and has no time set aside; say why it is booked anyway, or plan the service first": {"other": "en service förfaller innan uthyrningen slutar och har ingen tid avsatt; skriv varför den bokas ändå, eller planera servicen först"}
   }
 }

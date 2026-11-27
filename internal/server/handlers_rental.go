@@ -645,6 +645,7 @@ func (s *Server) handleRentalBook(w http.ResponseWriter, r *http.Request) {
 		n.NewRenter = &workshop.NewParty{Kind: "private", Name: r.FormValue("renter_name"),
 			Phone: r.FormValue("renter_phone"), Email: r.FormValue("renter_email")}
 	}
+	n.ServiceWhy = r.FormValue("service_why")
 	id, err := workshop.BookRental(r.Context(), s.pool, session.Scope, n)
 	if s.handoverError(w, r, err) {
 		return

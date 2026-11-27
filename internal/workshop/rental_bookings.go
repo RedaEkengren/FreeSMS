@@ -147,6 +147,11 @@ type NewRentalBooking struct {
 	HoldUntil *time.Time
 	Key       string
 	Overrides []PriceOverride
+	// Why it is booked although a service falls due before it ends, when one
+	// does; empty otherwise. Without it such a booking is refused with the
+	// services named, and with it the booking is made and the reason is kept in
+	// the block's trail.
+	ServiceWhy string
 }
 
 var (
@@ -392,6 +397,18 @@ func bookRentalTx(ctx context.Context, tx pgx.Tx, scope access.Scope, n NewRenta
 		return "", err
 	}
 
+	crossing, err := serviceCrossingTx(ctx, tx, n.UnitID, n.To, time.Now())
+	if err != nil {
+		return "", err
+	}
+	why := strings.TrimSpace(n.ServiceWhy)
+	if len(crossing) > 0 && why == "" {
+		return "", &ServiceCrossing{Kinds: crossing}
+	}
+	if len(why) > 300 {
+		return "", errServiceWhy
+	}
+
 	var id string
 	if err := tx.QueryRow(ctx, `SELECT gen_random_uuid()::text`).Scan(&id); err != nil {
 		return "", err
@@ -403,6 +420,11 @@ func bookRentalTx(ctx context.Context, tx pgx.Tx, scope access.Scope, n NewRenta
 	block, err := insertRentalBlockTx(ctx, tx, scope, u.resource, id, status, n.From, n.To, u.buffer, n.HoldUntil)
 	if err != nil {
 		return "", err
+	}
+	if len(crossing) > 0 {
+		if err := auditTx(ctx, tx, scope, block, "block.service_crossed", "", status, why, map[string]any{"kinds": crossing}); err != nil {
+			return "", err
+		}
 	}
 	// One number at a time.
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('rental_numbers:' || $1::text, 0))`, scope.ShopID); err != nil {
