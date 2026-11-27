@@ -1,0 +1,26 @@
+{{define "content"}}
+<h1>{{.T "The fleet's tyres"}}</h1>
+<p class="waiting">{{.T "Which cars stand on the wrong season's tyres. A job for a car blocks it in the calendar; a car a rental holds is left for you to decide on."}}</p>
+<form method="get" action="/rental/tyres">
+  <label><span>{{.T "Season"}}</span><select name="season"><option value="winter"{{if eq .Rental.FleetSeason "winter"}} selected{{end}}>{{.T "winter"}}</option><option value="summer"{{if eq .Rental.FleetSeason "summer"}} selected{{end}}>{{.T "summer"}}</option></select></label>
+  <label><span>{{.T "To be done by"}}</span><input type="date" name="by" value="{{.Rental.FleetBy}}"></label>
+  <button type="submit" class="secondary">{{.T "Show"}}</button>
+</form>
+{{if .Rental.FleetRan}}
+<p class="status-big">{{.T "Jobs opened: %d." .Rental.FleetOpened}}</p>
+{{if .Rental.FleetRefused}}<div class="error"><p>{{.T "A rental holds these cars then, so nothing was moved or cancelled. Decide on them:"}}</p>
+<ul>{{range .Rental.FleetRefused}}<li><a href="/rental/units/{{.}}">{{.}}</a></li>{{end}}</ul></div>{{end}}
+{{end}}
+{{if .Rental.FleetTyres}}
+<form method="post" action="/rental/tyres/jobs">
+  <input type="hidden" name="season" value="{{.Rental.FleetSeason}}">
+  <ul class="lines">
+    {{range .Rental.FleetTyres}}
+    <li><label class="check">{{if .NeedsChange}}<input type="checkbox" name="unit" value="{{.UnitID}}" checked>{{end}} <a href="/rental/units/{{.UnitID}}">{{.Label}}</a></label>
+      <div class="waiting">{{if .OnSeason}}{{$.T .OnSeason}}{{else}}{{$.T "No set on record"}}{{end}}{{if .NeedsChange}} &middot; <span class="tag late">{{$.T "Needs a change"}}</span>{{if .StoredRight}} &middot; {{$.T "%d sets of the right season in storage" .StoredRight}}{{end}}{{end}}</div></li>
+    {{end}}
+  </ul>
+  <button type="submit">{{.T "Open a job for each picked"}}</button>
+</form>
+{{else}}<p class="empty">{{.T "No cars in the fleet."}}</p>{{end}}
+{{end}}

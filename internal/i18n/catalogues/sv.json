@@ -9757,6 +9757,23 @@
     "a unit that is not a car with a registration has no workshop job": {"other": "en enhet som inte är en bil med registreringsnummer har inget verkstadsjobb"},
     "How many days ahead time is set aside": {"other": "Hur många dagar framåt tid sätts av"},
     "What falls due soon, and whether time is set aside for it. Time is held, never taken from a booking.": {"other": "Vad som förfaller snart, och om tid är avsatt för det. Tiden reserveras och tas aldrig från en bokning."},
-    "Nothing falls due in the time ahead.": {"other": "Inget förfaller den närmaste tiden."}
+    "Nothing falls due in the time ahead.": {"other": "Inget förfaller den närmaste tiden."},
+    "The fleet's tyres": {"other": "Flottans däck"},
+    "pick from 1 to 100 units": {"other": "välj mellan 1 och 100 enheter"},
+    "summer or winter": {"other": "sommar eller vinter"},
+    "%d sets of the right season in storage": {"other": "%d uppsättningar av rätt säsong i lager"},
+    "A rental holds these cars then, so nothing was moved or cancelled. Decide on them:": {"other": "En uthyrning håller de här bilarna då, så inget flyttades eller avbokades. Avgör dem:"},
+    "Jobs opened: %d.": {"other": "Jobb öppnade: %d."},
+    "Needs a change": {"other": "Behöver bytas"},
+    "No cars in the fleet.": {"other": "Inga bilar i flottan."},
+    "No set on record": {"other": "Ingen uppsättning registrerad"},
+    "Open a job for each picked": {"other": "Öppna ett jobb för varje vald"},
+    "To be done by": {"other": "Ska vara klart senast"},
+    "Which cars stand on the wrong season's tyres. A job for a car blocks it in the calendar; a car a rental holds is left for you to decide on.": {"other": "Vilka bilar som står på fel säsongs däck. Ett jobb för en bil spärrar den i kalendern; en bil som en uthyrning håller lämnas åt dig att avgöra."},
+    "Change to winter tyres": {"other": "Byte till vinterdäck"},
+    "Change to summer tyres": {"other": "Byte till sommardäck"},
+    "tyre_change": {"other": "däckbyte"},
+    "service": {"other": "service"},
+    "inspection": {"other": "besiktning"}
   }
 }

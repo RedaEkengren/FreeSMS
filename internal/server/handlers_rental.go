@@ -32,6 +32,12 @@ type rentalData struct {
 	ServicePlanned int
 	ServiceRan     bool
 	ServiceHorizon int
+	FleetTyres     []workshop.FleetTyreRow
+	FleetSeason    string
+	FleetBy        string
+	FleetOpened    int
+	FleetRefused   []string
+	FleetRan       bool
 	DamageJobs     []workshop.DamageJob
 	Permits        []workshop.RentalPermit
 	Profiles       []workshop.RentalProfile
@@ -239,6 +245,8 @@ func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("POST /rental/units/{id}/service-job", s.requireSession(s.handleServiceJob))
 	m.HandleFunc("POST /rental/service/blocks/{id}/confirm", s.requireSession(s.handleServiceConfirm))
 	m.HandleFunc("GET /rental/service", s.requireSession(s.handleRentalService))
+	m.HandleFunc("GET /rental/tyres", s.requireSession(s.handleFleetTyres))
+	m.HandleFunc("POST /rental/tyres/jobs", s.requireSession(s.handleFleetTyreJobs))
 	m.HandleFunc("POST /rental/service/horizon", s.requireSession(s.handleServiceHorizon))
 	m.HandleFunc("POST /rental/service/plan", s.requireSession(s.handleRentalServicePlan))
 	m.HandleFunc("POST /rental/memberships/{id}/end", s.requireSession(s.handleFleetLeave))
