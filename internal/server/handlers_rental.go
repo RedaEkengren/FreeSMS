@@ -23,12 +23,20 @@ var rentalPages = []string{"rentalsettings", "rentalunits", "rentalunit", "renta
 
 // rentalData is what Rental's pages are given.
 type rentalData struct {
-	DamageJobs []workshop.DamageJob
-	Permits    []workshop.RentalPermit
-	Profiles   []workshop.RentalProfile
-	Checklists []workshop.ChecklistTemplate
-	Units      []workshop.RentalUnit
-	Unit       workshop.RentalUnit
+	// The unit's service plans and what falls due, and the fleet's services
+	// that fall due soon with what a run to set time aside did.
+	ServicePlans   []workshop.ServicePlan
+	ServiceDue     []workshop.ServiceDue
+	ServiceRows    []workshop.ServiceRow
+	ServiceLeft    []workshop.ServiceRow
+	ServicePlanned int
+	ServiceRan     bool
+	DamageJobs     []workshop.DamageJob
+	Permits        []workshop.RentalPermit
+	Profiles       []workshop.RentalProfile
+	Checklists     []workshop.ChecklistTemplate
+	Units          []workshop.RentalUnit
+	Unit           workshop.RentalUnit
 	// Rentals booked after the end asked for, refused.
 	InTheWay   []workshop.Block
 	Plans      []workshop.RatePlan
@@ -225,6 +233,10 @@ func (s *Server) rentalRoutes(m routeMux) {
 	m.HandleFunc("POST /rental/units", s.requireSession(s.handleRentalUnitAdd))
 	m.HandleFunc("GET /rental/units/{id}", s.requireSession(s.handleRentalUnit))
 	m.HandleFunc("POST /rental/units/{id}/fleet", s.requireSession(s.handleFleetJoin))
+	m.HandleFunc("POST /rental/units/{id}/service-plan", s.requireSession(s.handleServicePlan))
+	m.HandleFunc("POST /rental/units/{id}/service-done", s.requireSession(s.handleServiceDone))
+	m.HandleFunc("GET /rental/service", s.requireSession(s.handleRentalService))
+	m.HandleFunc("POST /rental/service/plan", s.requireSession(s.handleRentalServicePlan))
 	m.HandleFunc("POST /rental/memberships/{id}/end", s.requireSession(s.handleFleetLeave))
 	m.HandleFunc("POST /rental/memberships/{id}/report", s.requireSession(s.handleFleetReport))
 	m.HandleFunc("POST /rental/memberships/{id}/insurance", s.requireSession(s.handleFleetInsurance))
@@ -408,6 +420,12 @@ func (s *Server) renderRentalUnit(w http.ResponseWriter, r *http.Request, id str
 		return
 	}
 	if d.Bookings, err = workshop.RentalBookings(r.Context(), s.pool, session.Scope, time.Now(), time.Now().AddDate(1, 0, 0)); s.handoverError(w, r, err) {
+		return
+	}
+	if d.ServicePlans, err = workshop.ServicePlansOf(r.Context(), s.pool, session.Scope, u.ID); s.handoverError(w, r, err) {
+		return
+	}
+	if d.ServiceDue, err = workshop.ServiceDueFor(r.Context(), s.pool, session.Scope, u.ID); s.handoverError(w, r, err) {
 		return
 	}
 	if len(u.Memberships) > 0 {

@@ -9724,6 +9724,28 @@
       "one": "%d flottservice förfaller snart och har ingen tid avsatt",
       "other": "%d flottservicer förfaller snart och har ingen tid avsatt"
     },
-    "from 1 to 365 days ahead": {"other": "från 1 till 365 dagar framåt"}
+    "from 1 to 365 days ahead": {"other": "från 1 till 365 dagar framåt"},
+    "Fleet services": {"other": "Flottans servicer"},
+    "Write the kilometres as a whole number.": {"other": "Skriv kilometerna som ett heltal."},
+    "No free time before the due date, so nothing was moved or cancelled. Decide on these:": {"other": "Ingen ledig tid före förfallodagen, så inget flyttades eller avbokades. Avgör dessa:"},
+    "No time set aside": {"other": "Ingen tid avsatt"},
+    "Nothing falls due within thirty days.": {"other": "Inget förfaller inom trettio dagar."},
+    "Set time aside": {"other": "Sätt av tid"},
+    "Time is set aside: %s": {"other": "Tid är avsatt: %s"},
+    "Time was set aside for %d.": {"other": "Tid sattes av för %d."},
+    "What falls due within thirty days, and whether time is set aside for it. Time is held, never taken from a booking.": {"other": "Vad som förfaller inom trettio dagar, och om tid är avsatt för det. Tiden reserveras och tas aldrig från en bokning."},
+    "End this plan": {"other": "Avsluta den här planen"},
+    "Every how many kilometres": {"other": "Var hur många kilometer"},
+    "Every how many months": {"other": "Var hur många månader"},
+    "Hours it takes": {"other": "Timmar det tar"},
+    "Kilometres, if known": {"other": "Kilometer, om de är kända"},
+    "Last done %s": {"other": "Senast gjort %s"},
+    "Never done": {"other": "Aldrig gjort"},
+    "No date yet": {"other": "Inget datum än"},
+    "No service plan yet.": {"other": "Ingen serviceplan än."},
+    "Plan a service": {"other": "Planera en service"},
+    "Record that it was done": {"other": "Registrera att det är gjort"},
+    "Service": {"other": "Service"},
+    "limit %s km": {"other": "gräns %s km"}
   }
 }
