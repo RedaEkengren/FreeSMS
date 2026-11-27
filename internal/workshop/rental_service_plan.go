@@ -177,6 +177,10 @@ func RecordServiceDone(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		}
 		if km != nil && vehicle != nil {
 			at := time.Date(day.Year(), day.Month(), day.Day(), 12, 0, 0, 0, loc)
+			// A reading is never from later than now: done today, before noon, it is now.
+			if now := time.Now(); at.After(now) {
+				at = now
+			}
 			if _, err := tx.Exec(ctx, `
 				INSERT INTO odometer_readings (shop_id, vehicle_id, km, read_at, source, decreasing)
 				VALUES ($1, $2, $3, $4, 'service',
