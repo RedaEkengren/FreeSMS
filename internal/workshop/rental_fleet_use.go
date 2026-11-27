@@ -27,6 +27,7 @@ import (
 const (
 	GapNotReported = "not_reported"
 	GapInsurance   = "insurance"
+	GapWinterTyres = "winter_tyres"
 )
 
 // Directions a report goes in.
@@ -49,7 +50,7 @@ var (
 	errInsuranceWho    = fmt.Errorf("%w: give the insurer and the policy number", ErrInvalid)
 	errInsuranceDates  = fmt.Errorf("%w: an insurance runs from a day, and to the same day or later", ErrInvalid)
 	errInsuranceCovers = fmt.Errorf("%w: say whether the insurance covers rental use", ErrInvalid)
-	errOverrideGap     = fmt.Errorf("%w: only a missing report or insurance can be let go, and only while it is missing", ErrInvalid)
+	errOverrideGap     = fmt.Errorf("%w: only a missing report, insurance or winter tyres can be let go, and only while it is missing", ErrInvalid)
 	errGapOverrideWhy  = fmt.Errorf("%w: say why it is let go, in 300 characters or fewer", ErrInvalid)
 )
 
@@ -303,7 +304,7 @@ func OverrideHandoverGap(ctx context.Context, pool *pgxpool.Pool, scope access.S
 	if err != nil {
 		return err
 	}
-	if code != GapNotReported && code != GapInsurance {
+	if code != GapNotReported && code != GapInsurance && code != GapWinterTyres {
 		return errOverrideGap
 	}
 	return inRental(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {

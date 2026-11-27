@@ -9774,6 +9774,9 @@
     "Change to summer tyres": {"other": "Byte till sommardäck"},
     "tyre_change": {"other": "däckbyte"},
     "service": {"other": "service"},
-    "inspection": {"other": "besiktning"}
+    "inspection": {"other": "besiktning"},
+    "On winter or all-season tyres for a rental from 1 December to 31 March": {"other": "På vinter- eller helårsdäck för en uthyrning från 1 december till 31 mars"},
+    "The car does not stand on winter or all-season tyres, and the rental falls between 1 December and 31 March.": {"other": "Bilen står inte på vinter- eller helårsdäck, och uthyrningen ligger mellan 1 december och 31 mars."},
+    "only a missing report, insurance or winter tyres can be let go, and only while it is missing": {"other": "bara en saknad anmälan, försäkring eller vinterdäck kan släppas igenom, och bara medan den saknas"}
   }
 }
