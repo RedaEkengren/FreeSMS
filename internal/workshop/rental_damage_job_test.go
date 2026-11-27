@@ -61,6 +61,39 @@ func TestADamageBecomesAJobOnTheSameCarForTheShopItself(t *testing.T) {
 	if d.Settled() != nil || d.Chargeable() {
 		t.Errorf("the case was settled by opening a job: %+v", d.Steps)
 	}
+	// Repaired once the job is ready: the register no longer carries the damage,
+	// and the case with its history is still there.
+	var booking string
+	if err := pool.QueryRow(ctx, `SELECT booking_id::text FROM damage_cases WHERE id = $1`, c).Scan(&booking); err != nil {
+		t.Fatal(err)
+	}
+	open := func() int {
+		v, err := workshop.RentalHandovers(ctx, pool, rentalDesk(), booking)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(v.Damage)
+	}
+	rows := func() int {
+		var n int
+		_ = pool.QueryRow(ctx, `SELECT count(*) FROM damage_cases WHERE id = $1`, c).Scan(&n)
+		return n
+	}
+	if open() != 1 {
+		t.Errorf("before the repair the register holds %d", open())
+	}
+	if _, err := pool.Exec(ctx, `ALTER TABLE work_orders DISABLE TRIGGER USER`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE work_orders SET state = 'ready' WHERE id = $1`, job); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `ALTER TABLE work_orders ENABLE TRIGGER USER`); err != nil {
+		t.Fatal(err)
+	}
+	if open() != 0 || rows() != 1 {
+		t.Errorf("after the repair the register holds %d and the case rows are %d", open(), rows())
+	}
 	// With the workshop switched off the action is not there.
 	off := rentalDesk()
 	off.Modules = []access.Module{access.Rental}
