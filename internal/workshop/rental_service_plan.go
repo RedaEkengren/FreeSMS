@@ -302,70 +302,143 @@ func ServiceDueFor(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, 
 	return out, err
 }
 
-func serviceDueTx(ctx context.Context, tx pgx.Tx, unitID string, now time.Time) ([]ServiceDue, error) {
-	var vehicle *string
-	if err := tx.QueryRow(ctx, `SELECT r.vehicle_id::text FROM rental_units u JOIN resources r ON r.id = u.resource_id WHERE u.id = $1`, unitID).Scan(&vehicle); errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
+// ServiceRow is one plan's standing for one unit: what is due, and the time set
+// aside for it if there is some.
+type ServiceRow struct {
+	UnitID     string
+	ResourceID string
+	Label      string
+	ServiceDue
+	// The held or confirmed block set aside for this due date, if there is one.
+	BlockID   string
+	BlockFrom time.Time
+	BlockTo   time.Time
+}
+
+// Planned reports whether time is set aside for this due date.
+func (r ServiceRow) Planned() bool { return r.BlockID != "" }
+
+// serviceRowsTx works out what is due for every unit with a plan in use -- one
+// unit when unitID is given -- in four statements however many units there are:
+// the plans with what was last done, the readings, and the blocks set aside.
+func serviceRowsTx(ctx context.Context, tx pgx.Tx, unitID string, now time.Time) ([]ServiceRow, error) {
 	loc, err := shopLocationTx(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-	plans, err := servicePlansTx(ctx, tx, unitID)
+	rows, err := tx.Query(ctx, `
+		SELECT p.id::text, u.id::text, u.resource_id::text, coalesce(r.vehicle_id::text, ''),
+		       u.fleet_number || coalesce(' · ' || reg.registration, ' · ' || r.name, ''),
+		       p.kind, coalesce(p.interval_months, 0), coalesce(p.interval_km, 0), p.duration_minutes, p.created_at,
+		       d.done_on::timestamptz, d.km,
+		       (SELECT o.km FROM odometer_readings o WHERE o.vehicle_id = r.vehicle_id AND NOT o.decreasing AND o.read_at >= p.created_at ORDER BY o.read_at LIMIT 1)
+		FROM fleet_service_plans p
+		JOIN rental_units u ON u.id = p.unit_id
+		JOIN resources r ON r.id = u.resource_id AND r.retired_at IS NULL
+		LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = r.vehicle_id AND reg.valid_to IS NULL
+		LEFT JOIN LATERAL (SELECT f.done_on, f.km FROM fleet_service_done f WHERE f.unit_id = p.unit_id AND f.kind = p.kind
+		                   ORDER BY f.done_on DESC, f.created_at DESC LIMIT 1) d ON true
+		WHERE p.in_use AND NOT EXISTS (SELECT 1 FROM fleet_service_plans n WHERE n.replaces_id = p.id)
+		  AND ($1 = '' OR u.id = NULLIF($1, '')::uuid)
+		ORDER BY u.fleet_number, p.kind`, unitID)
 	if err != nil {
+		return nil, fmt.Errorf("read the service plans: %w", err)
+	}
+	type planRow struct {
+		plan             ServicePlan
+		unit, res, label string
+		vehicle          string
+		doneOn           *time.Time
+		doneKm, firstKm  *int64
+	}
+	var plans []planRow
+	vehicles := map[string]bool{}
+	for rows.Next() {
+		var pr planRow
+		if err := rows.Scan(&pr.plan.ID, &pr.unit, &pr.res, &pr.vehicle, &pr.label, &pr.plan.Kind, &pr.plan.IntervalMonths, &pr.plan.IntervalKm,
+			&pr.plan.DurationMinutes, &pr.plan.CreatedAt, &pr.doneOn, &pr.doneKm, &pr.firstKm); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		pr.plan.InUse = true
+		if pr.vehicle != "" {
+			vehicles[pr.vehicle] = true
+		}
+		plans = append(plans, pr)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	var rs []reading
-	if vehicle != nil {
-		rows, err := tx.Query(ctx, `
-			SELECT read_at, km FROM odometer_readings
-			WHERE vehicle_id = $1 AND NOT decreasing AND read_at >= $2::timestamptz - interval '365 days' AND read_at <= $2
-			ORDER BY read_at`, *vehicle, now)
-		if err != nil {
-			return nil, err
-		}
-		for rows.Next() {
-			var r reading
-			if err := rows.Scan(&r.at, &r.km); err != nil {
-				rows.Close()
-				return nil, err
-			}
-			rs = append(rs, r)
-		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return nil, err
-		}
+	if len(plans) == 0 {
+		return nil, nil
 	}
-	var out []ServiceDue
-	for _, p := range plans {
-		if !p.InUse {
-			continue
-		}
-		var doneOn *time.Time
-		var km *int64
-		var on time.Time
-		var k *int64
-		err := tx.QueryRow(ctx, `SELECT done_on::timestamptz, km FROM fleet_service_done WHERE unit_id = $1 AND kind = $2 ORDER BY done_on DESC, created_at DESC LIMIT 1`, unitID, p.Kind).Scan(&on, &k)
-		if err == nil {
-			doneOn, km = &on, k
-		} else if !errors.Is(err, pgx.ErrNoRows) {
+	ids := make([]string, 0, len(vehicles))
+	for v := range vehicles {
+		ids = append(ids, v)
+	}
+	readings := map[string][]reading{}
+	rr, err := tx.Query(ctx, `
+		SELECT vehicle_id::text, read_at, km FROM odometer_readings
+		WHERE vehicle_id = ANY($1::uuid[]) AND NOT decreasing AND read_at >= $2::timestamptz - interval '365 days' AND read_at <= $2
+		ORDER BY vehicle_id, read_at`, ids, now)
+	if err != nil {
+		return nil, fmt.Errorf("read the readings: %w", err)
+	}
+	for rr.Next() {
+		var v string
+		var r reading
+		if err := rr.Scan(&v, &r.at, &r.km); err != nil {
+			rr.Close()
 			return nil, err
 		}
-		var first *int64
-		if vehicle != nil && doneOn == nil {
-			var f int64
-			if err := tx.QueryRow(ctx, `SELECT km FROM odometer_readings WHERE vehicle_id = $1 AND NOT decreasing AND read_at >= $2 ORDER BY read_at LIMIT 1`, *vehicle, p.CreatedAt).Scan(&f); err == nil {
-				first = &f
-			} else if !errors.Is(err, pgx.ErrNoRows) {
-				return nil, err
+		readings[v] = append(readings[v], r)
+	}
+	rr.Close()
+	if err := rr.Err(); err != nil {
+		return nil, err
+	}
+	type setAside struct {
+		id       string
+		from, to time.Time
+	}
+	aside := map[string]setAside{}
+	br, err := tx.Query(ctx, `
+		SELECT f.plan_id::text || ':' || f.due_on::text, b.id::text, lower(b.period), upper(b.period)
+		FROM fleet_service_blocks f JOIN resource_blocks b ON b.id = f.block_id
+		WHERE b.status IN ('held', 'confirmed') AND NOT (b.status = 'held' AND b.expires_at <= clock_timestamp())`)
+	if err != nil {
+		return nil, fmt.Errorf("read the blocks set aside: %w", err)
+	}
+	for br.Next() {
+		var key string
+		var a setAside
+		var to *time.Time
+		if err := br.Scan(&key, &a.id, &a.from, &to); err != nil {
+			br.Close()
+			return nil, err
+		}
+		if to != nil {
+			a.to = *to
+		}
+		aside[key] = a
+	}
+	br.Close()
+	if err := br.Err(); err != nil {
+		return nil, err
+	}
+	var out []ServiceRow
+	for _, pr := range plans {
+		d := nextDue(pr.plan, pr.doneOn, pr.doneKm, pr.firstKm, readings[pr.vehicle], now, loc)
+		row := ServiceRow{UnitID: pr.unit, ResourceID: pr.res, Label: pr.label, ServiceDue: d}
+		if d.DueOn != nil {
+			if a, ok := aside[pr.plan.ID+":"+d.DueOn.Format("2006-01-02")]; ok {
+				row.BlockID, row.BlockFrom, row.BlockTo = a.id, a.from, a.to
 			}
 		}
-		out = append(out, nextDue(p, doneOn, km, first, rs, now, loc))
+		out = append(out, row)
 	}
-	slices.SortStableFunc(out, func(a, b ServiceDue) int {
+	slices.SortStableFunc(out, func(a, b ServiceRow) int {
 		switch {
 		case a.DueOn == nil && b.DueOn == nil:
 			return 0
@@ -377,4 +450,19 @@ func serviceDueTx(ctx context.Context, tx pgx.Tx, unitID string, now time.Time) 
 		return a.DueOn.Compare(*b.DueOn)
 	})
 	return out, nil
+}
+
+func serviceDueTx(ctx context.Context, tx pgx.Tx, unitID string, now time.Time) ([]ServiceDue, error) {
+	var one int
+	if err := tx.QueryRow(ctx, `SELECT 1 FROM rental_units WHERE id = $1`, unitID).Scan(&one); errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+	rows, err := serviceRowsTx(ctx, tx, unitID, now)
+	out := make([]ServiceDue, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, r.ServiceDue)
+	}
+	return out, err
 }

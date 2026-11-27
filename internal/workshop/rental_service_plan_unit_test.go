@@ -82,3 +82,40 @@ func TestTheNextServiceIsTheEarlierOfTheDateAndTheKilometresAtThePace(t *testing
 		t.Errorf("kilometres with no readings gave %v", d.DueOn)
 	}
 }
+
+// The first stretch long enough before the deadline, never touching what is
+// booked, and none when there is none -- an open-ended block or a deadline too
+// near ends the search.
+func TestTheFirstFreeWindowIsTheEarliestThatFitsAndTouchesNothing(t *testing.T) {
+	at := func(d, h int) time.Time { return time.Date(2026, 6, d, h, 0, 0, 0, time.UTC) }
+	four := 4 * time.Hour
+	free := []busyPeriod{}
+	if got, ok := firstFreeWindow(free, at(2, 8), at(5, 0), four); !ok || !got.Equal(at(2, 8)) {
+		t.Errorf("nothing booked: %v %v", got, ok)
+	}
+	// Booked 8 to 14 on the 2nd, and from 16 the same day: two hours do not hold four.
+	b := []busyPeriod{{from: at(2, 8), to: at(2, 14)}, {from: at(2, 16), to: at(2, 22)}}
+	if got, ok := firstFreeWindow(b, at(2, 8), at(5, 0), four); !ok || !got.Equal(at(2, 22)) {
+		t.Errorf("after the second block: %v %v", got, ok)
+	}
+	// A gap of exactly four hours fits.
+	b = []busyPeriod{{from: at(2, 8), to: at(2, 12)}, {from: at(2, 16), to: at(2, 20)}}
+	if got, ok := firstFreeWindow(b, at(2, 8), at(5, 0), four); !ok || !got.Equal(at(2, 12)) {
+		t.Errorf("a gap that just fits: %v %v", got, ok)
+	}
+	// Busy before the search starts does not matter; out of order does not either.
+	b = []busyPeriod{{from: at(3, 9), to: at(3, 17)}, {from: at(1, 8), to: at(2, 7)}, {from: at(2, 8), to: at(2, 9)}}
+	if got, ok := firstFreeWindow(b, at(2, 8), at(5, 0), four); !ok || !got.Equal(at(2, 9)) {
+		t.Errorf("out of order: %v %v", got, ok)
+	}
+	// Past the deadline is no window; so is an open-ended block ahead of a fit.
+	if _, ok := firstFreeWindow([]busyPeriod{{from: at(2, 8), to: at(4, 20)}}, at(2, 8), at(5, 0), 8*time.Hour); ok {
+		t.Error("a window after the deadline")
+	}
+	if _, ok := firstFreeWindow([]busyPeriod{{from: at(2, 9), open: true}}, at(2, 8), at(5, 0), four); ok {
+		t.Error("a window before an open-ended block that is too short, or after it")
+	}
+	if got, ok := firstFreeWindow([]busyPeriod{{from: at(2, 13), open: true}}, at(2, 8), at(5, 0), four); !ok || !got.Equal(at(2, 8)) {
+		t.Errorf("a fit before an open-ended block: %v %v", got, ok)
+	}
+}
