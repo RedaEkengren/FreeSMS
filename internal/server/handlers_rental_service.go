@@ -119,3 +119,43 @@ func (s *Server) handleServiceHorizon(w http.ResponseWriter, r *http.Request) {
 	s.submitted(w, r)
 	http.Redirect(w, r, "/rental/service", http.StatusSeeOther)
 }
+
+// handleFleetTyres lists the fleet's cars against a season and a date the shop sets.
+func (s *Server) handleFleetTyres(w http.ResponseWriter, r *http.Request) {
+	s.renderFleetTyres(w, r, rentalData{})
+}
+
+func (s *Server) renderFleetTyres(w http.ResponseWriter, r *http.Request, d rentalData) {
+	session := sessionFrom(r.Context())
+	season := r.FormValue("season")
+	if season == "" {
+		season = "winter"
+	}
+	rows, err := workshop.FleetTyreChange(r.Context(), s.pool, session.Scope, season)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	d.FleetTyres, d.FleetSeason, d.FleetBy = rows, season, strings.TrimSpace(r.FormValue("by"))
+	s.render(w, r, http.StatusOK, "rentaltyres", pageData{Title: "The fleet's tyres", Session: session, Rental: d})
+}
+
+// handleFleetTyreJobs opens a job for each car picked. A car something holds then
+// is named and the rest are opened.
+func (s *Server) handleFleetTyreJobs(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	locale, _ := workshop.ShopLocale(r.Context(), s.pool, session.Scope.ShopID)
+	if locale == "" {
+		locale = s.locale
+	}
+	season := r.FormValue("season")
+	what := "Change to winter tyres"
+	if season == "summer" {
+		what = "Change to summer tyres"
+	}
+	opened, refused, err := workshop.OpenFleetTyreJobs(r.Context(), s.pool, session.Scope, r.Form["unit"], s.catalogues.For(locale).T(what))
+	if s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	s.renderFleetTyres(w, r, rentalData{FleetOpened: opened, FleetRefused: refused, FleetRan: true})
+}
