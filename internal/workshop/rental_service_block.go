@@ -66,12 +66,8 @@ func ServicesDueSoon(ctx context.Context, pool *pgxpool.Pool, scope access.Scope
 }
 
 func dueSoonTx(ctx context.Context, tx pgx.Tx, horizonDays int, now time.Time) ([]ServiceRow, error) {
-	rows, err := serviceRowsTx(ctx, tx, "", now)
-	if err != nil {
-		return nil, err
-	}
-	loc, err := shopLocationTx(ctx, tx)
-	if err != nil {
+	rows, loc, err := serviceRowsTx(ctx, tx, "", now)
+	if err != nil || len(rows) == 0 {
 		return nil, err
 	}
 	n := now.In(loc)
