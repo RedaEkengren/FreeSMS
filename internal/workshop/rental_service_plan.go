@@ -177,14 +177,22 @@ func RecordServiceDone(ctx context.Context, pool *pgxpool.Pool, scope access.Sco
 		}
 		if km != nil && vehicle != nil {
 			at := time.Date(day.Year(), day.Month(), day.Day(), 12, 0, 0, 0, loc)
-			_, err := tx.Exec(ctx, `
+			if _, err := tx.Exec(ctx, `
 				INSERT INTO odometer_readings (shop_id, vehicle_id, km, read_at, source, decreasing)
 				VALUES ($1, $2, $3, $4, 'service',
 				        EXISTS (SELECT 1 FROM odometer_readings o WHERE o.vehicle_id = $2 AND o.read_at < $4 AND o.km > $3))`,
-				scope.ShopID, *vehicle, *km, at)
-			return err
+				scope.ShopID, *vehicle, *km, at); err != nil {
+				return err
+			}
 		}
-		return nil
+		// The time set aside for it is let go at its actual end: from now, and
+		// the next one is worked out from what was just done.
+		_, err = tx.Exec(ctx, `
+			UPDATE resource_blocks b SET status = 'released', ended_at = clock_timestamp(), ended_by = NULLIF($3, '')::uuid
+			FROM fleet_service_blocks f JOIN fleet_service_plans p ON p.id = f.plan_id
+			WHERE b.id = f.block_id AND p.unit_id = $1 AND p.kind = $2 AND b.status IN ('held', 'confirmed')`,
+			unitID, kind, scope.UserID)
+		return err
 	})
 }
 

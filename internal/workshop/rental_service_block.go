@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -207,3 +208,88 @@ func serviceWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope)
 	})
 	return out, err
 }
+
+var errServiceBlock = fmt.Errorf("%w: there is no time set aside for that service to confirm", ErrInvalid)
+
+// ConfirmServiceBlock makes the time set aside for a service a booking: it no
+// longer runs out on the due date. For the rental desk.
+func ConfirmServiceBlock(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, blockID string) error {
+	if !scope.Role.HandsOverRentals() {
+		return access.ErrForbidden
+	}
+	if err := scope.Require(access.Rental); err != nil {
+		return err
+	}
+	if !looksLikeUUID(blockID) {
+		return ErrNotFound
+	}
+	var ok bool
+	if err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM fleet_service_blocks WHERE block_id = $1)`, blockID).Scan(&ok)
+	}); err != nil {
+		return err
+	}
+	if !ok {
+		return errServiceBlock
+	}
+	return ConfirmBlock(ctx, pool, scope, blockID)
+}
+
+// StartServiceJob opens a workshop job on the unit's car for a service that has
+// time set aside, and lets that time go in the same transaction so the job's own
+// block takes its place; if the car cannot be had then, nothing is done. The
+// shop's own customer is the job's. The complaint is the shop's own words. For
+// the rental desk, in a shop that runs both the rental and the workshop.
+func StartServiceJob(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, unitID, kind, complaint string) (string, error) {
+	if !scope.Role.HandsOverRentals() {
+		return "", access.ErrForbidden
+	}
+	if err := scope.Require(access.Rental, access.Workshop); err != nil {
+		return "", err
+	}
+	if !looksLikeUUID(unitID) {
+		return "", ErrNotFound
+	}
+	if !slices.Contains(ServiceKinds, kind) {
+		return "", errServiceKind
+	}
+	complaint = strings.TrimSpace(complaint)
+	if complaint == "" || len(complaint) > 500 {
+		return "", errServiceComplaint
+	}
+	var job string
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		if _, err := lockResourceOfTx(ctx, tx, `SELECT resource_id FROM rental_units WHERE id = $1`, unitID); err != nil {
+			return err
+		}
+		var registration string
+		if err := tx.QueryRow(ctx, `
+			SELECT coalesce(reg.registration, '') FROM rental_units u JOIN resources r ON r.id = u.resource_id
+			LEFT JOIN vehicle_registrations reg ON reg.vehicle_id = r.vehicle_id AND reg.valid_to IS NULL WHERE u.id = $1`, unitID).Scan(&registration); err != nil {
+			return err
+		}
+		if registration == "" {
+			return errServiceNoCar
+		}
+		// The time set aside for this kind goes first, in this transaction.
+		if _, err := tx.Exec(ctx, `
+			UPDATE resource_blocks b SET status = 'released', ended_at = clock_timestamp(), ended_by = NULLIF($3, '')::uuid
+			FROM fleet_service_blocks f JOIN fleet_service_plans p ON p.id = f.plan_id
+			WHERE b.id = f.block_id AND p.unit_id = $1 AND p.kind = $2 AND b.status IN ('held', 'confirmed')`,
+			unitID, kind, scope.UserID); err != nil {
+			return err
+		}
+		own, err := ownCustomerTx(ctx, tx, scope)
+		if err != nil {
+			return err
+		}
+		job, err = takeInForTx(ctx, tx, scope, registration, complaint, nil, Details{}, own)
+		return err
+	})
+	return job, err
+}
+
+var (
+	errServiceComplaint = fmt.Errorf("%w: say what the job is, in 500 characters or fewer", ErrInvalid)
+	errServiceNoCar     = fmt.Errorf("%w: a unit that is not a car with a registration has no workshop job", ErrInvalid)
+)
