@@ -1,6 +1,12 @@
 {{define "content"}}
 <h1>{{.T "Fleet services"}}</h1>
-<p class="waiting">{{.T "What falls due within thirty days, and whether time is set aside for it. Time is held, never taken from a booking."}}</p>
+<p class="waiting">{{.T "What falls due soon, and whether time is set aside for it. Time is held, never taken from a booking."}}</p>
+{{if .Session.Scope.Role.RunsTheShop}}
+<form method="post" action="/rental/service/horizon">
+  <label><span>{{.T "How many days ahead time is set aside"}}</span><input name="days" inputmode="numeric" value="{{.Rental.ServiceHorizon}}" maxlength="3" required></label>
+  <button type="submit" class="secondary">{{.T "Save"}}</button>
+</form>
+{{end}}
 {{if .Rental.ServiceRan}}
 <p class="status-big">{{.T "Time was set aside for %d." .Rental.ServicePlanned}}</p>
 {{if .Rental.ServiceLeft}}
@@ -19,5 +25,5 @@
   {{end}}
 </ul>
 <form method="post" action="/rental/service/plan"><button type="submit">{{.T "Set time aside"}}</button></form>
-{{else}}<p class="empty">{{.T "Nothing falls due within thirty days."}}</p>{{end}}
+{{else}}<p class="empty">{{.T "Nothing falls due in the time ahead."}}</p>{{end}}
 {{end}}

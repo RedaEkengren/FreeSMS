@@ -9754,6 +9754,9 @@
     "Open a workshop job for it": {"other": "Öppna ett verkstadsjobb för den"},
     "there is no time set aside for that service to confirm": {"other": "det finns ingen avsatt tid för den servicen att bekräfta"},
     "say what the job is, in 500 characters or fewer": {"other": "skriv vad jobbet är, med högst 500 tecken"},
-    "a unit that is not a car with a registration has no workshop job": {"other": "en enhet som inte är en bil med registreringsnummer har inget verkstadsjobb"}
+    "a unit that is not a car with a registration has no workshop job": {"other": "en enhet som inte är en bil med registreringsnummer har inget verkstadsjobb"},
+    "How many days ahead time is set aside": {"other": "Hur många dagar framåt tid sätts av"},
+    "What falls due soon, and whether time is set aside for it. Time is held, never taken from a booking.": {"other": "Vad som förfaller snart, och om tid är avsatt för det. Tiden reserveras och tas aldrig från en bokning."},
+    "Nothing falls due in the time ahead.": {"other": "Inget förfaller den närmaste tiden."}
   }
 }

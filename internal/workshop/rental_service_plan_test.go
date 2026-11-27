@@ -391,3 +391,45 @@ func TestARefusedServiceJobLeavesTheTimeSetAsideAndDoneLetsItGo(t *testing.T) {
 		t.Errorf("done, and the time is %q, %v", status, err)
 	}
 }
+
+// The shop says how far ahead services are set aside time for, and the queue
+// follows it; only whoever runs the shop says it.
+func TestTheHorizonIsTheShopsAndTheQueueFollowsIt(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	if err := workshop.SetServicePlan(ctx, pool, rentalDesk(), v.unit, workshop.ServicePlan{Kind: "service", IntervalMonths: 12, DurationMinutes: 240, InUse: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.RecordServiceDone(ctx, pool, rentalDesk(), v.unit, "service", time.Now().AddDate(-1, 0, 20), nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	asked := func() int {
+		items, _ := workshop.WaitingFor(ctx, pool, rentalDesk())
+		return waitingKinds(t, items)["service_due"]
+	}
+	if h, err := workshop.ServiceHorizonOf(ctx, pool, rentalDesk()); err != nil || h != workshop.ServiceHorizonDays {
+		t.Fatalf("the default: %d, %v", h, err)
+	}
+	if asked() != 1 {
+		t.Fatal("a service due in twenty days is not asked about with thirty ahead")
+	}
+	if err := workshop.SetServiceHorizon(ctx, pool, rentalDesk(), 7); !errors.Is(err, access.ErrForbidden) {
+		t.Errorf("the rental desk set the horizon: %v", err)
+	}
+	if err := workshop.SetServiceHorizon(ctx, pool, rentalOwner(), 0); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("a horizon of nothing: %v", err)
+	}
+	if err := workshop.SetServiceHorizon(ctx, pool, rentalOwner(), 7); err != nil {
+		t.Fatal(err)
+	}
+	if asked() != 0 {
+		t.Error("a service due in twenty days is asked about with seven ahead")
+	}
+	if err := workshop.SetServiceHorizon(ctx, pool, rentalOwner(), 60); err != nil {
+		t.Fatal(err)
+	}
+	if asked() != 1 {
+		t.Error("with sixty ahead it is asked about again")
+	}
+}

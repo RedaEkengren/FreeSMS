@@ -55,11 +55,15 @@ func (s *Server) handleRentalService(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) renderRentalService(w http.ResponseWriter, r *http.Request, d rentalData) {
 	session := sessionFrom(r.Context())
-	rows, err := workshop.ServicesDueSoon(r.Context(), s.pool, session.Scope, workshop.ServiceHorizonDays)
+	horizon, err := workshop.ServiceHorizonOf(r.Context(), s.pool, session.Scope)
 	if s.handoverError(w, r, err) {
 		return
 	}
-	d.ServiceRows = rows
+	rows, err := workshop.ServicesDueSoon(r.Context(), s.pool, session.Scope, horizon)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	d.ServiceRows, d.ServiceHorizon = rows, horizon
 	s.render(w, r, http.StatusOK, "rentalservice", pageData{Title: "Fleet services", Session: session, Rental: d})
 }
 
@@ -67,7 +71,11 @@ func (s *Server) renderRentalService(w http.ResponseWriter, r *http.Request, d r
 // have none, and says which could not be given any.
 func (s *Server) handleRentalServicePlan(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
-	n, left, err := workshop.PlanDueServices(r.Context(), s.pool, session.Scope, workshop.ServiceHorizonDays)
+	horizon, err := workshop.ServiceHorizonOf(r.Context(), s.pool, session.Scope)
+	if s.handoverError(w, r, err) {
+		return
+	}
+	n, left, err := workshop.PlanDueServices(r.Context(), s.pool, session.Scope, horizon)
 	if s.handoverError(w, r, err) {
 		return
 	}
@@ -96,6 +104,16 @@ func (s *Server) handleServiceJob(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleServiceConfirm(w http.ResponseWriter, r *http.Request) {
 	session := sessionFrom(r.Context())
 	if err := workshop.ConfirmServiceBlock(r.Context(), s.pool, session.Scope, r.PathValue("id")); s.handoverError(w, r, err) {
+		return
+	}
+	s.submitted(w, r)
+	http.Redirect(w, r, "/rental/service", http.StatusSeeOther)
+}
+
+// handleServiceHorizon sets how far ahead services that fall due are set aside time for.
+func (s *Server) handleServiceHorizon(w http.ResponseWriter, r *http.Request) {
+	session := sessionFrom(r.Context())
+	if err := workshop.SetServiceHorizon(r.Context(), s.pool, session.Scope, formInt(r, "days")); s.handoverError(w, r, err) {
 		return
 	}
 	s.submitted(w, r)

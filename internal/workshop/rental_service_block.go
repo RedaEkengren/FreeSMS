@@ -20,8 +20,53 @@ import (
 // never takes time from anything booked, and when there is none it moves and
 // cancels nothing: the service is left for somebody to decide on.
 
-// ServiceHorizonDays is how far ahead a service that falls due is set aside for.
+// ServiceHorizonDays is how far ahead a service that falls due is set aside for,
+// until the shop says otherwise.
 const ServiceHorizonDays = 30
+
+var errServiceHorizon = fmt.Errorf("%w: from 1 to 365 days ahead", ErrInvalid)
+
+func horizonTx(ctx context.Context, tx pgx.Tx) (int, error) {
+	n := ServiceHorizonDays
+	err := tx.QueryRow(ctx, `SELECT horizon_days FROM fleet_service_settings ORDER BY changed_at DESC, id LIMIT 1`).Scan(&n)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return 0, err
+	}
+	return n, nil
+}
+
+// SetServiceHorizon says how far ahead services that fall due are set aside time
+// for. Whoever runs the shop.
+func SetServiceHorizon(ctx context.Context, pool *pgxpool.Pool, scope access.Scope, days int) error {
+	if !scope.Role.RunsTheShop() {
+		return access.ErrForbidden
+	}
+	if err := scope.Require(access.Rental); err != nil {
+		return err
+	}
+	if days < 1 || days > 365 {
+		return errServiceHorizon
+	}
+	return database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `INSERT INTO fleet_service_settings (shop_id, horizon_days, changed_by) VALUES ($1, $2, NULLIF($3, '')::uuid)`,
+			scope.ShopID, days, scope.UserID)
+		return err
+	})
+}
+
+// ServiceHorizonOf reads the horizon the shop has chosen. For the rental desk.
+func ServiceHorizonOf(ctx context.Context, pool *pgxpool.Pool, scope access.Scope) (int, error) {
+	if !scope.Role.HandsOverRentals() {
+		return 0, access.ErrForbidden
+	}
+	var n int
+	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		n, err = horizonTx(ctx, tx)
+		return err
+	})
+	return n, err
+}
 
 type busyPeriod struct {
 	from, to time.Time
@@ -71,6 +116,11 @@ func dueSoonTx(ctx context.Context, tx pgx.Tx, horizonDays int, now time.Time) (
 	if err != nil || len(rows) == 0 {
 		return nil, err
 	}
+	return withinHorizon(rows, loc, horizonDays, now), nil
+}
+
+// withinHorizon keeps the rows that fall due by the end of the day horizonDays ahead.
+func withinHorizon(rows []ServiceRow, loc *time.Location, horizonDays int, now time.Time) []ServiceRow {
 	n := now.In(loc)
 	limit := time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, horizonDays+1)
 	var out []ServiceRow
@@ -79,7 +129,7 @@ func dueSoonTx(ctx context.Context, tx pgx.Tx, horizonDays int, now time.Time) (
 			out = append(out, r)
 		}
 	}
-	return out, nil
+	return out
 }
 
 // PlanDueServices sets time aside for every service that falls due within the
@@ -191,10 +241,17 @@ func serviceWaiting(ctx context.Context, pool *pgxpool.Pool, scope access.Scope)
 	}
 	var out []ActionItem
 	err := database.InScope(ctx, pool, scope, func(ctx context.Context, tx pgx.Tx) error {
-		rows, err := dueSoonTx(ctx, tx, ServiceHorizonDays, time.Now())
+		// The plans first: a shop with none asks nothing more of the database.
+		now := time.Now()
+		all, loc, err := serviceRowsTx(ctx, tx, "", now)
+		if err != nil || len(all) == 0 {
+			return err
+		}
+		horizon, err := horizonTx(ctx, tx)
 		if err != nil {
 			return err
 		}
+		rows := withinHorizon(all, loc, horizon, now)
 		unplanned := 0
 		for _, r := range rows {
 			if !r.Planned() {
