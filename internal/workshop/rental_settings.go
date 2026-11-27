@@ -219,6 +219,9 @@ type RentalRules struct {
 	ReportingRequired    bool
 	// Insured for rental use on every day of the rental (#202).
 	InsuranceRequired bool
+	// On a winter or an all-season set, for a rental that touches 1 December to
+	// 31 March (#233). The shop's rule, off until it is turned on.
+	WinterTyresRequired bool
 	// How the shop works.
 	CheckOutTemplateID  string
 	CheckInTemplateID   string
@@ -333,12 +336,12 @@ func insertRulesTx(ctx context.Context, tx pgx.Tx, shopID, userID, profileID str
 		INSERT INTO rental_profile_versions (shop_id, profile_id, version, permit_required, registration_required,
 			licence_check_required, licence_categories, reporting_required, check_out_template_id, check_in_template_id,
 			cleaning_buffer, mileage_allowance, default_deposit_minor, minimum_age, sublet_banned, unconfirmed, created_by,
-			insurance_required)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, '')::uuid, NULLIF($10, '')::uuid, $11, $12, $13, $14, $15, $16, NULLIF($17, '')::uuid, $18)
+			insurance_required, winter_tyres_required)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, '')::uuid, NULLIF($10, '')::uuid, $11, $12, $13, $14, $15, $16, NULLIF($17, '')::uuid, $18, $19)
 		RETURNING id`,
 		shopID, profileID, version, r.PermitRequired, r.RegistrationRequired, r.LicenceCheckRequired, cats,
 		r.ReportingRequired, r.CheckOutTemplateID, r.CheckInTemplateID, r.CleaningBuffer, r.MileageAllowance,
-		r.DefaultDepositMinor, age, r.SubletBanned, unconfirmed, userID, r.InsuranceRequired).Scan(&id)
+		r.DefaultDepositMinor, age, r.SubletBanned, unconfirmed, userID, r.InsuranceRequired, r.WinterTyresRequired).Scan(&id)
 	if err != nil {
 		return "", fmt.Errorf("record the profile's rules: %w", err)
 	}
@@ -349,7 +352,7 @@ const profileColumns = `
 	p.id, p.base, p.name, p.created_by IS NULL, v.id, v.version, v.permit_required, v.registration_required, v.licence_check_required,
 	v.licence_categories, v.reporting_required, coalesce(v.check_out_template_id::text, ''),
 	coalesce(v.check_in_template_id::text, ''), v.cleaning_buffer, v.mileage_allowance, v.default_deposit_minor,
-	coalesce(v.minimum_age, 0), v.sublet_banned, v.unconfirmed, v.created_at, coalesce(pe.display_name, ''), v.insurance_required`
+	coalesce(v.minimum_age, 0), v.sublet_banned, v.unconfirmed, v.created_at, coalesce(pe.display_name, ''), v.insurance_required, v.winter_tyres_required`
 
 func scanProfile(row pgx.Row) (RentalProfile, error) {
 	var p RentalProfile
@@ -357,7 +360,7 @@ func scanProfile(row pgx.Row) (RentalProfile, error) {
 	err := row.Scan(&p.ID, &p.Base, &p.Name, &p.Shipped, &p.VersionID, &p.Version, &r.PermitRequired, &r.RegistrationRequired,
 		&r.LicenceCheckRequired, &r.LicenceCategories, &r.ReportingRequired, &r.CheckOutTemplateID, &r.CheckInTemplateID,
 		&r.CleaningBuffer, &r.MileageAllowance, &r.DefaultDepositMinor, &r.MinimumAge, &r.SubletBanned,
-		&p.Unconfirmed, &p.ChangedAt, &p.ChangedBy, &r.InsuranceRequired)
+		&p.Unconfirmed, &p.ChangedAt, &p.ChangedBy, &r.InsuranceRequired, &r.WinterTyresRequired)
 	return p, err
 }
 
@@ -578,7 +581,7 @@ func sameRules(a, b RentalRules) bool {
 	return slices.Equal(a.LicenceCategories, b.LicenceCategories) &&
 		a.PermitRequired == b.PermitRequired && a.RegistrationRequired == b.RegistrationRequired &&
 		a.LicenceCheckRequired == b.LicenceCheckRequired && a.ReportingRequired == b.ReportingRequired &&
-		a.InsuranceRequired == b.InsuranceRequired &&
+		a.InsuranceRequired == b.InsuranceRequired && a.WinterTyresRequired == b.WinterTyresRequired &&
 		a.CheckOutTemplateID == b.CheckOutTemplateID && a.CheckInTemplateID == b.CheckInTemplateID &&
 		a.CleaningBuffer == b.CleaningBuffer && a.MileageAllowance == b.MileageAllowance &&
 		a.DefaultDepositMinor == b.DefaultDepositMinor && a.MinimumAge == b.MinimumAge && a.SubletBanned == b.SubletBanned

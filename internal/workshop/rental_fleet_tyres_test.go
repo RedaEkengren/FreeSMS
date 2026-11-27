@@ -95,3 +95,97 @@ func TestTheFleetsTyreChangeListsWhatIsOnTheWrongSeasonAndOpensJobs(t *testing.T
 		t.Errorf("a rental over a car in for its tyres: %v", err)
 	}
 }
+
+// A profile that asks for winter tyres in the winter: a rental between
+// 1 December and 31 March on a car not standing on a winter or an all-season set
+// lacks them at handover, whoever runs the shop may let it go with a reason, and
+// neither a summer rental nor a profile that does not ask is held up.
+func TestAWinterRentalOnTheWrongTyresLacksThemAndMayBeLetGoWithAReason(t *testing.T) {
+	pool := setup(t)
+	ctx := context.Background()
+	v := rentableVan(t, pool)
+	car := profileFor(t, pool, workshop.ProfileCar)
+	winterDay := func(d int) time.Time { return time.Date(2031, 1, d, 9, 0, 0, 0, time.UTC) }
+	hasGap := func(booking, code string) bool {
+		gaps, err := workshop.RentalBookingGaps(ctx, pool, rentalDesk(), booking)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, g := range gaps {
+			if g.Code == code {
+				return true
+			}
+		}
+		return false
+	}
+	// A profile that does not ask: no gap, whatever the car stands on.
+	notAsked, err := v.book(pool, winterDay(10), winterDay(12))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasGap(notAsked, workshop.GapWinterTyres) {
+		t.Fatal("a profile that does not ask lacks winter tyres")
+	}
+	rules := car.Rules
+	rules.WinterTyresRequired = true
+	if _, err := workshop.SaveRentalProfile(ctx, pool, rentalOwner(), car.ID, rules); err != nil {
+		t.Fatal(err)
+	}
+	winter, err := v.book(pool, winterDay(20), winterDay(22))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasGap(winter, workshop.GapWinterTyres) {
+		t.Fatal("a winter rental with no set on the car does not lack winter tyres")
+	}
+	summer, err := v.book(pool, in2031(10, 9), in2031(12, 9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasGap(summer, workshop.GapWinterTyres) {
+		t.Error("a rental in May lacks winter tyres")
+	}
+	// Summer tyres on the car do not do; the rental desk may not let it go.
+	var vehicle string
+	if err := pool.QueryRow(ctx, `SELECT r.vehicle_id::text FROM resources r WHERE r.id = $1`, v.resource).Scan(&vehicle); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshop.CreateShopTyreSet(ctx, pool, rentalOwner(), summerSet("", vehicle)); err != nil {
+		t.Fatal(err)
+	}
+	if !hasGap(winter, workshop.GapWinterTyres) {
+		t.Error("summer tyres on the car do for the winter")
+	}
+	if err := workshop.OverrideHandoverGap(ctx, pool, rentalDesk(), winter, workshop.GapWinterTyres, "Kunden hämtar däck"); !errors.Is(err, access.ErrForbidden) {
+		t.Errorf("the rental desk let it go: %v", err)
+	}
+	if err := workshop.OverrideHandoverGap(ctx, pool, rentalOwner(), winter, workshop.GapWinterTyres, " "); !errors.Is(err, workshop.ErrInvalid) {
+		t.Errorf("let go with no reason: %v", err)
+	}
+	if err := workshop.OverrideHandoverGap(ctx, pool, rentalOwner(), winter, workshop.GapWinterTyres, "Vinterdäcken sätts på vid hämtningen"); err != nil {
+		t.Fatal(err)
+	}
+	if hasGap(winter, workshop.GapWinterTyres) {
+		t.Error("a gap let go is still a gap")
+	}
+	// A winter set fitted takes the gap away on its own.
+	other, err := v.book(pool, winterDay(25), winterDay(27))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasGap(other, workshop.GapWinterTyres) {
+		t.Fatal("another winter rental does not lack them")
+	}
+	n := summerSet("", "")
+	n.Season = workshop.SeasonWinterFriction
+	id, err := workshop.CreateShopTyreSet(ctx, pool, rentalOwner(), n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := workshop.MoveTyreSet(ctx, pool, rentalOwner(), id, vehicle); err != nil {
+		t.Fatalf("fitting a winter set: %v", err)
+	}
+	if hasGap(other, workshop.GapWinterTyres) {
+		t.Error("a winter set on the car still lacks winter tyres")
+	}
+}

@@ -30,6 +30,8 @@ var bookingGapsCTEs = `
 	g_zone AS (SELECT timezone FROM shops),
 	g_booking AS (
 	    SELECT q.id, q.starts_at, q.ends_at, v.permit_required, v.reporting_required, v.insurance_required, v.licence_check_required,
+	           v.winter_tyres_required,
+	           (SELECT r.vehicle_id FROM rental_units ru JOIN resources r ON r.id = ru.resource_id WHERE ru.id = b.unit_id) AS vehicle_id,
 	           ` + firstDay("q.starts_at", "z.timezone") + ` AS first_day,
 	           ` + lastDay("q.ends_at", "z.timezone") + ` AS last_day,
 	           (q.ends_at AT TIME ZONE z.timezone)::date AS end_day,
@@ -60,6 +62,17 @@ var bookingGapsCTEs = `
 	                  WHERE NOT EXISTS (SELECT 1 FROM fleet_insurances i WHERE i.membership_id = a.membership AND i.covers_rental = 'yes'
 	                                    AND i.valid_from <= d::date AND (i.valid_to IS NULL OR d::date <= i.valid_to)))
 	      AND NOT EXISTS (SELECT 1 FROM rental_gap_overrides o WHERE o.booking_id = a.id AND o.code = 'insurance'
+	                        AND o.starts_at = a.starts_at AND o.ends_at = a.ends_at)
+	    UNION ALL
+	    SELECT a.id, 6, false, NULL, 'winter_tyres', ''
+	    FROM g_booking a
+	    WHERE a.winter_tyres_required AND a.vehicle_id IS NOT NULL
+	      AND EXISTS (SELECT 1 FROM generate_series(a.first_day, a.last_day, interval '1 day') d WHERE extract(month FROM d) IN (12, 1, 2, 3))
+	      AND NOT EXISTS (SELECT 1 FROM tyre_sets ts
+	                      WHERE ts.season IN ('winter_studded', 'winter_friction', 'all_season')
+	                        AND (SELECT e.vehicle_id FROM tyre_set_vehicle_events e WHERE e.tyre_set_id = ts.id ORDER BY e.seq DESC LIMIT 1) = a.vehicle_id
+	                        AND NOT EXISTS (SELECT 1 FROM tyre_set_exits x WHERE x.tyre_set_id = ts.id))
+	      AND NOT EXISTS (SELECT 1 FROM rental_gap_overrides o WHERE o.booking_id = a.id AND o.code = 'winter_tyres'
 	                        AND o.starts_at = a.starts_at AND o.ends_at = a.ends_at)
 	    UNION ALL
 	    SELECT a.id, 4, NOT dr.main, dr.added_at, 'licence',
@@ -110,6 +123,7 @@ var gapSentences = map[string]HandoverGap{
 	GapPermit:      {Code: GapPermit, Sentence: "There is no rental permit that stands for the whole rental."},
 	GapNotReported: {Code: GapNotReported, Overridable: true, Sentence: "The unit has not been reported into rental use in the vehicle register."},
 	GapInsurance:   {Code: GapInsurance, Overridable: true, Sentence: "No insurance covering rental use is recorded for every day of the rental."},
+	GapWinterTyres: {Code: GapWinterTyres, Overridable: true, Sentence: "The car does not stand on winter or all-season tyres, and the rental falls between 1 December and 31 March."},
 	GapLicence:     {Code: GapLicence, Sentence: "%s has not shown a valid licence for this rental."},
 	GapNoDriver:    {Code: GapNoDriver, Sentence: "No driver is named for the rental."},
 }
